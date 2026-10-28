@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "id": "feishu",
+  "name": "飞书",
+  "version": "1.0.0",
+  "author": "Aline",
+  "builtin": true,
+  "colors": {
+    "light": {
+      "bg": "#f3f5f8",
+      "surface": "#ffffff",
+      "sidebar": "#eef1f6",
+      "fg": "#1f2329",
+      "muted": "#646a73",
+      "border": "#e5e8ed",
+      "code": "#f5f7fa",
+      "accent": "#3370ff",
+      "syntax": "#7b61ff"
+    },
+    "dark": {
+      "bg": "#1c1f24",
+      "surface": "#252a31",
+      "sidebar": "#1c1f24",
+      "fg": "#edf0f4",
+      "muted": "#a0a8b2",
+      "border": "#3b414a",
+      "code": "#20252b",
+      "accent": "#6b9cff",
+      "syntax": "#c3a6ff"
+    },
+    "sepia": {
+      "bg": "#f3f0e8",
+      "surface": "#faf7ef",
+      "sidebar": "#eee9dd",
+      "fg": "#38352e",
+      "muted": "#70695d",
+      "border": "#e1dbce",
+      "code": "#eee9dd",
+      "accent": "#917243",
+      "syntax": "#7b61ff"
+    }
+  },
+  "previews": {
+    "light": "previews/light.svg",
+    "dark": "previews/dark.svg",
+    "sepia": "previews/sepia.svg"
+  }
+}

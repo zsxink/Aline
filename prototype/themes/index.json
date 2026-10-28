@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "themes": [
+    {
+      "id": "github",
+      "manifest": "github/theme.json"
+    },
+    {
+      "id": "notion",
+      "manifest": "notion/theme.json"
+    },
+    {
+      "id": "vue",
+      "manifest": "vue/theme.json"
+    },
+    {
+      "id": "feishu",
+      "manifest": "feishu/theme.json"
+    }
+  ]
+}

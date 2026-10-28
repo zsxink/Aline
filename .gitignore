@@ -1,0 +1,23 @@
+# Build artifacts
+/target/
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Environment / secrets
+.env
+.env.*
+
+# Backup / swap files
+*.swp
+*.swo
+*~
+
+# Skill / tool caches
+.impeccable/

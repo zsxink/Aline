@@ -1,0 +1,48 @@
+/* Native menu bar placement and shared MarkFlow-style popover surface. */
+.system-menu-bar{height:26px;display:flex;align-items:center;justify-content:space-between;padding:0 13px;background:var(--surface);border-bottom:1px solid var(--border);color:var(--fg);font-size:12px;user-select:none}
+.system-menu-group,.system-menu-inline{display:flex;align-items:center;gap:2px;min-width:0}
+.system-menu-trigger{height:24px;padding:0 8px;border-radius:4px;color:inherit;font-size:12px;white-space:nowrap}
+.system-menu-trigger:hover,.system-menu-trigger[aria-expanded="true"]{background:var(--hover)}
+.system-status-items{display:flex;align-items:center;gap:13px;color:var(--fg);font-size:11px}
+.system-status-items span{white-space:nowrap}
+.system-status-items svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.35;stroke-linecap:round;stroke-linejoin:round}
+.titlebar .system-menu-inline{display:none}
+.titlebar .window-controls{display:none}
+html[data-platform="macos"] #app{height:calc(100vh - 58px)}
+html[data-platform="macos"] .system-menu-bar{display:flex}
+html[data-platform="windows"] .system-menu-bar{display:none}
+html[data-platform="windows"] .titlebar{height:32px;position:relative;justify-content:flex-start;gap:0;padding:0;background:var(--surface);border-bottom:1px solid var(--border)}
+html[data-platform="windows"] .titlebar .traffic,html[data-platform="windows"] .titlebar>img{display:none}
+html[data-platform="windows"] .titlebar .system-menu-inline{display:flex;align-self:stretch;padding-left:8px}
+html[data-platform="windows"] .titlebar .system-menu-trigger{height:26px;padding:0 9px}
+html[data-platform="windows"] .titlebar>strong{position:absolute;left:50%;transform:translateX(-50%);margin:0!important;max-width:32%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none}
+html[data-platform="windows"] .titlebar .window-controls{display:flex;align-self:stretch;margin-left:auto;gap:0}
+html[data-platform="windows"] .titlebar .window-controls button{width:46px;height:32px;border-radius:0;font-size:14px;color:var(--muted)}
+html[data-platform="windows"] .titlebar .window-controls svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.1;stroke-linecap:round;stroke-linejoin:round}
+html[data-platform="windows"] .titlebar .window-controls button:hover{background:var(--hover)}
+html[data-platform="windows"] .titlebar .window-controls button:last-child:hover{background:#c42b1c;color:white}
+.app-menu-popup{position:fixed;z-index:1000;min-width:232px;max-width:min(320px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow-y:auto;overflow-x:visible;padding:5px;background:var(--surface);border:1px solid var(--border);border-radius:7px;box-shadow:0 8px 28px rgba(31,35,40,.18);color:var(--fg);font-size:13px}
+.app-menu-popup[hidden]{display:none}
+.app-menu-item{position:relative;display:flex;align-items:center;gap:22px;width:100%;min-height:30px;padding:5px 10px;border-radius:4px;text-align:left;color:var(--fg);font-size:13px;white-space:nowrap}
+.app-menu-item>span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.app-menu-item kbd{margin-left:auto;color:var(--muted);font:11px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.app-menu-item:hover:not(:disabled),.app-menu-item:focus-visible:not(:disabled){background:var(--accent-soft);color:var(--accent);outline:none}
+.app-menu-item.danger:not(:disabled){color:var(--danger,#cf222e)}
+.app-menu-item.danger:hover:not(:disabled),.app-menu-item.danger:focus-visible:not(:disabled){background:rgba(207,34,46,.1);color:var(--danger,#cf222e)}
+.app-menu-item:disabled{color:var(--muted);opacity:.58;cursor:default}
+.app-menu-entry{position:relative}
+.app-menu-chevron{margin-left:auto;color:var(--muted);font-size:17px;line-height:12px}
+.app-menu-divider{height:1px;margin:5px 4px;background:var(--border)}
+.theme-menu-popup{max-height:min(360px,calc(100vh - 16px));overflow:hidden;display:flex;flex-direction:column}
+.theme-menu-popup[hidden]{display:none}
+.app-theme-mode-list{flex:none}
+.app-theme-palette-list{max-height:min(192px,calc(100vh - 160px));overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:thin}
+.app-theme-choice{gap:10px}
+.app-theme-choice[aria-checked="true"]{color:var(--accent);font-weight:600}
+.app-theme-check{flex:none;width:16px;text-align:center;color:var(--accent);visibility:hidden}
+.app-theme-choice[aria-checked="true"] .app-theme-check{visibility:visible}
+.app-theme-choice[data-palette]::before{content:"";flex:none;width:10px;height:10px;border:1px solid var(--border);border-radius:50%;background:var(--theme-dot)}
+.app-theme-choice[data-palette="github"]{--theme-dot:#0969da}.app-theme-choice[data-palette="notion"]{--theme-dot:#777873}.app-theme-choice[data-palette="vue"]{--theme-dot:#42b883}.app-theme-choice[data-palette="feishu"]{--theme-dot:#3370ff}
+.app-menu-submenu{position:fixed;z-index:1001;min-width:220px;max-width:min(300px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow:auto;padding:5px;background:var(--surface);border:1px solid var(--border);border-radius:7px;box-shadow:0 8px 28px rgba(31,35,40,.18)}
+.app-menu-submenu[hidden]{display:none}
+@media(max-width:800px){.system-menu-bar{padding:0 7px}.system-menu-trigger{padding:0 5px;font-size:11px}.system-status-items{gap:7px}.titlebar .system-menu-trigger{padding:0 5px!important;font-size:11px!important}.titlebar .window-controls button{width:36px!important}}

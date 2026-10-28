@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="360" viewBox="0 0 800 360" role="img" aria-label="层叠的山丘与一轮日光">
+  <rect width="800" height="360" fill="#f6f8fa"/>
+  <circle cx="627" cy="92" r="35" fill="#eacb94"/>
+  <path d="M0 254 172 91 357 265 509 139 800 312V360H0Z" fill="#d6e3e9"/>
+  <path d="m0 320 208-167 215 196 191-132 186 99v44H0Z" fill="#9ebbc8"/>
+  <path d="M0 344c125-45 211-24 325 0s191-59 283-54 134 20 192 37v33H0Z" fill="#587d8c"/>
+</svg>
