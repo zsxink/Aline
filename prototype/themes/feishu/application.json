@@ -1,0 +1,196 @@
+{
+  "common": {
+    "typography": {
+      "uiFamilies": [
+        "system-ui",
+        "-apple-system",
+        "BlinkMacSystemFont",
+        "Segoe UI",
+        "sans-serif"
+      ],
+      "uiSize": 13,
+      "uiWeight": 400
+    },
+    "icons": {
+      "style": "outline",
+      "strokeWidth": 1.7,
+      "default": "#59636e",
+      "muted": "#59636e",
+      "accent": "#0969da",
+      "active": "#0969da",
+      "disabled": "#8c959f",
+      "danger": "#cf222e"
+    },
+    "fileTree": {
+      "folderClosed": {
+        "style": "outline",
+        "color": "#bf8700"
+      },
+      "folderOpen": {
+        "style": "outline",
+        "color": "#bf8700"
+      },
+      "markdownFile": {
+        "style": "outline",
+        "color": "#0969da"
+      },
+      "imageFile": {
+        "style": "outline",
+        "color": "#8250df"
+      },
+      "otherFile": {
+        "style": "outline",
+        "color": "#6e7781"
+      }
+    }
+  },
+  "modes": {
+    "light": {
+      "colors": {
+        "window": "#f3f5f8",
+        "editor": "#ffffff",
+        "surface": "#ffffff",
+        "sidebar": "#eef1f6",
+        "toolbar": "#ffffff",
+        "tabBar": "#f3f5f8",
+        "statusBar": "#f3f5f8",
+        "menu": "#ffffff",
+        "input": "#ffffff",
+        "text": "#1f2329",
+        "muted": "#646a73",
+        "accent": "#3370ff",
+        "border": "#e5e8ed",
+        "selection": "#dbeafe",
+        "hover": "#f5f7fa",
+        "focus": "#3370ff",
+        "danger": "#cf222e"
+      },
+      "window": {
+        "backgroundOpacity": 1.0
+      },
+      "icons": {
+        "default": "#646a73",
+        "muted": "#646a73",
+        "accent": "#3370ff",
+        "active": "#3370ff",
+        "disabled": "#646a73",
+        "danger": "#cf222e"
+      },
+      "fileTree": {
+        "folderClosed": {
+          "color": "#d29922"
+        },
+        "folderOpen": {
+          "color": "#d29922"
+        },
+        "markdownFile": {
+          "color": "#3370ff"
+        },
+        "imageFile": {
+          "color": "#7b61ff"
+        },
+        "otherFile": {
+          "color": "#646a73"
+        }
+      }
+    },
+    "dark": {
+      "colors": {
+        "window": "#1c1f24",
+        "editor": "#252a31",
+        "surface": "#252a31",
+        "sidebar": "#1c1f24",
+        "toolbar": "#252a31",
+        "tabBar": "#1c1f24",
+        "statusBar": "#1c1f24",
+        "menu": "#252a31",
+        "input": "#252a31",
+        "text": "#edf0f4",
+        "muted": "#a0a8b2",
+        "accent": "#6b9cff",
+        "border": "#3b414a",
+        "selection": "#1f3a5f",
+        "hover": "#20252b",
+        "focus": "#6b9cff",
+        "danger": "#ff7b72"
+      },
+      "window": {
+        "backgroundOpacity": 1.0
+      },
+      "icons": {
+        "default": "#a0a8b2",
+        "muted": "#a0a8b2",
+        "accent": "#6b9cff",
+        "active": "#6b9cff",
+        "disabled": "#a0a8b2",
+        "danger": "#ff7b72"
+      },
+      "fileTree": {
+        "folderClosed": {
+          "color": "#e3b341"
+        },
+        "folderOpen": {
+          "color": "#e3b341"
+        },
+        "markdownFile": {
+          "color": "#6b9cff"
+        },
+        "imageFile": {
+          "color": "#c3a6ff"
+        },
+        "otherFile": {
+          "color": "#a0a8b2"
+        }
+      }
+    },
+    "sepia": {
+      "colors": {
+        "window": "#f3f0e8",
+        "editor": "#faf7ef",
+        "surface": "#faf7ef",
+        "sidebar": "#eee9dd",
+        "toolbar": "#faf7ef",
+        "tabBar": "#f3f0e8",
+        "statusBar": "#f3f0e8",
+        "menu": "#faf7ef",
+        "input": "#faf7ef",
+        "text": "#38352e",
+        "muted": "#70695d",
+        "accent": "#917243",
+        "border": "#e1dbce",
+        "selection": "#eadfc8",
+        "hover": "#eee9dd",
+        "focus": "#917243",
+        "danger": "#cf222e"
+      },
+      "window": {
+        "backgroundOpacity": 1.0
+      },
+      "icons": {
+        "default": "#70695d",
+        "muted": "#70695d",
+        "accent": "#917243",
+        "active": "#917243",
+        "disabled": "#70695d",
+        "danger": "#cf222e"
+      },
+      "fileTree": {
+        "folderClosed": {
+          "color": "#d29922"
+        },
+        "folderOpen": {
+          "color": "#d29922"
+        },
+        "markdownFile": {
+          "color": "#917243"
+        },
+        "imageFile": {
+          "color": "#7b61ff"
+        },
+        "otherFile": {
+          "color": "#70695d"
+        }
+      }
+    }
+  }
+}

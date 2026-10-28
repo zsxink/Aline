@@ -1,0 +1,449 @@
+{
+  "common": {
+    "typography": {
+      "bodyFamilies": [
+        "system-ui",
+        "-apple-system",
+        "BlinkMacSystemFont",
+        "Segoe UI",
+        "sans-serif"
+      ],
+      "headingFamilies": [
+        "system-ui",
+        "-apple-system",
+        "BlinkMacSystemFont",
+        "Segoe UI",
+        "sans-serif"
+      ],
+      "codeFamilies": [
+        "SFMono-Regular",
+        "Consolas",
+        "monospace"
+      ],
+      "bodySize": 16,
+      "bodyWeight": 400,
+      "lineHeight": 1.75,
+      "bodyAlign": "left"
+    },
+    "headings": {
+      "h1": {
+        "size": 32,
+        "weight": 700,
+        "lineHeight": 1.3,
+        "align": "left",
+        "marginBefore": 0,
+        "marginAfter": 16
+      },
+      "h2": {
+        "size": 24,
+        "weight": 600,
+        "lineHeight": 1.35,
+        "align": "left",
+        "marginBefore": 30,
+        "marginAfter": 14
+      },
+      "h3": {
+        "size": 20,
+        "weight": 600,
+        "lineHeight": 1.4,
+        "align": "left",
+        "marginBefore": 26,
+        "marginAfter": 12
+      },
+      "h4": {
+        "size": 17,
+        "weight": 600,
+        "lineHeight": 1.45,
+        "align": "left",
+        "marginBefore": 22,
+        "marginAfter": 10
+      },
+      "h5": {
+        "size": 15,
+        "weight": 600,
+        "lineHeight": 1.5,
+        "align": "left",
+        "marginBefore": 18,
+        "marginAfter": 8
+      },
+      "h6": {
+        "size": 14,
+        "weight": 600,
+        "lineHeight": 1.5,
+        "align": "left",
+        "marginBefore": 16,
+        "marginAfter": 8
+      }
+    },
+    "spacing": {
+      "paragraphAfter": 16,
+      "listItemGap": 4,
+      "blockBefore": 20,
+      "blockAfter": 24,
+      "quotePadding": 16
+    },
+    "inline": {
+      "strong": {
+        "weight": 700
+      },
+      "emphasis": {
+        "italic": true
+      },
+      "strike": {
+        "enabled": true
+      },
+      "link": {
+        "underline": false
+      },
+      "codeSpan": {
+        "radius": 4
+      }
+    },
+    "blockquote": {
+      "lineColor": "#d1d9e0"
+    },
+    "task": {
+      "color": "#1f2328"
+    },
+    "rule": {
+      "color": "#d1d9e0"
+    },
+    "image": {
+      "captionColor": "#59636e"
+    },
+    "callout": {
+      "note": {},
+      "tip": {},
+      "important": {},
+      "warning": {},
+      "caution": {}
+    },
+    "formula": {},
+    "diagram": {},
+    "codeBlock": {
+      "radius": 6,
+      "paddingX": 20,
+      "paddingY": 18,
+      "fontSize": 13,
+      "lineHeight": 1.6
+    },
+    "table": {
+      "headerWeight": 600,
+      "cellPaddingX": 13,
+      "cellPaddingY": 9,
+      "rowLineHeight": 1.65,
+      "zebra": true
+    }
+  },
+  "modes": {
+    "light": {
+      "colors": {
+        "body": "#202124",
+        "muted": "#777873",
+        "subtle": "#777873",
+        "link": "#2e67d1",
+        "selection": "#dbeafe",
+        "caret": "#2e67d1",
+        "error": "#cf222e",
+        "errorBackground": "#ffebe9"
+      },
+      "inline": {
+        "strong": {
+          "color": "#202124"
+        },
+        "emphasis": {
+          "color": "#202124"
+        },
+        "strike": {
+          "color": "#777873"
+        },
+        "link": {
+          "color": "#2e67d1"
+        },
+        "codeSpan": {
+          "background": "#f1f1ef",
+          "color": "#202124"
+        }
+      },
+      "blockquote": {
+        "color": "#777873",
+        "background": "#f7f7f5",
+        "border": "#e7e7e5",
+        "lineColor": "#2e67d1"
+      },
+      "task": {
+        "color": "#202124",
+        "background": "#f7f7f5",
+        "border": "#e7e7e5"
+      },
+      "rule": {
+        "color": "#e7e7e5",
+        "background": "#e7e7e5",
+        "border": "#e7e7e5"
+      },
+      "image": {
+        "color": "#202124",
+        "background": "#f7f7f5",
+        "border": "#e7e7e5",
+        "captionColor": "#777873"
+      },
+      "callout": {
+        "note": {
+          "color": "#202124",
+          "background": "#f1f1ef",
+          "border": "#2e67d1"
+        },
+        "tip": {
+          "color": "#202124",
+          "background": "#f1f1ef",
+          "border": "#1a7f37"
+        },
+        "important": {
+          "color": "#202124",
+          "background": "#f1f1ef",
+          "border": "#8b5cf6"
+        },
+        "warning": {
+          "color": "#202124",
+          "background": "#f1f1ef",
+          "border": "#9a6700"
+        },
+        "caution": {
+          "color": "#202124",
+          "background": "#f1f1ef",
+          "border": "#cf222e"
+        }
+      },
+      "formula": {
+        "color": "#202124",
+        "background": "#f7f7f5",
+        "border": "#e7e7e5"
+      },
+      "diagram": {
+        "color": "#202124",
+        "background": "#f7f7f5",
+        "border": "#e7e7e5"
+      },
+      "codeBlock": {
+        "background": "#f1f1ef",
+        "color": "#202124",
+        "border": "#e7e7e5",
+        "lineNumberColor": "#777873",
+        "lineNumberBackground": "#f1f1ef"
+      },
+      "table": {
+        "headerBackground": "#f1f1ef",
+        "headerColor": "#202124",
+        "cellBackground": "#f7f7f5",
+        "alternateBackground": "#f1f1ef",
+        "border": "#e7e7e5"
+      }
+    },
+    "dark": {
+      "colors": {
+        "body": "#e9e9e7",
+        "muted": "#a0a09d",
+        "subtle": "#a0a09d",
+        "link": "#8ab4f8",
+        "selection": "#1f3a5f",
+        "caret": "#8ab4f8",
+        "error": "#ff7b72",
+        "errorBackground": "#490202"
+      },
+      "inline": {
+        "strong": {
+          "color": "#e9e9e7"
+        },
+        "emphasis": {
+          "color": "#e9e9e7"
+        },
+        "strike": {
+          "color": "#a0a09d"
+        },
+        "link": {
+          "color": "#8ab4f8"
+        },
+        "codeSpan": {
+          "background": "#292927",
+          "color": "#e9e9e7"
+        }
+      },
+      "blockquote": {
+        "color": "#a0a09d",
+        "background": "#191919",
+        "border": "#373735",
+        "lineColor": "#8ab4f8"
+      },
+      "task": {
+        "color": "#e9e9e7",
+        "background": "#191919",
+        "border": "#373735"
+      },
+      "rule": {
+        "color": "#373735",
+        "background": "#373735",
+        "border": "#373735"
+      },
+      "image": {
+        "color": "#e9e9e7",
+        "background": "#191919",
+        "border": "#373735",
+        "captionColor": "#a0a09d"
+      },
+      "callout": {
+        "note": {
+          "color": "#e9e9e7",
+          "background": "#292927",
+          "border": "#8ab4f8"
+        },
+        "tip": {
+          "color": "#e9e9e7",
+          "background": "#292927",
+          "border": "#1a7f37"
+        },
+        "important": {
+          "color": "#e9e9e7",
+          "background": "#292927",
+          "border": "#c8a8ff"
+        },
+        "warning": {
+          "color": "#e9e9e7",
+          "background": "#292927",
+          "border": "#9a6700"
+        },
+        "caution": {
+          "color": "#e9e9e7",
+          "background": "#292927",
+          "border": "#cf222e"
+        }
+      },
+      "formula": {
+        "color": "#e9e9e7",
+        "background": "#191919",
+        "border": "#373735"
+      },
+      "diagram": {
+        "color": "#e9e9e7",
+        "background": "#191919",
+        "border": "#373735"
+      },
+      "codeBlock": {
+        "background": "#292927",
+        "color": "#e9e9e7",
+        "border": "#373735",
+        "lineNumberColor": "#a0a09d",
+        "lineNumberBackground": "#292927"
+      },
+      "table": {
+        "headerBackground": "#292927",
+        "headerColor": "#e9e9e7",
+        "cellBackground": "#191919",
+        "alternateBackground": "#292927",
+        "border": "#373735"
+      }
+    },
+    "sepia": {
+      "colors": {
+        "body": "#39362f",
+        "muted": "#777166",
+        "subtle": "#777166",
+        "link": "#9a6b3f",
+        "selection": "#eadfc8",
+        "caret": "#9a6b3f",
+        "error": "#cf222e",
+        "errorBackground": "#ffebe9"
+      },
+      "inline": {
+        "strong": {
+          "color": "#39362f"
+        },
+        "emphasis": {
+          "color": "#39362f"
+        },
+        "strike": {
+          "color": "#777166"
+        },
+        "link": {
+          "color": "#9a6b3f"
+        },
+        "codeSpan": {
+          "background": "#efebe1",
+          "color": "#39362f"
+        }
+      },
+      "blockquote": {
+        "color": "#777166",
+        "background": "#f4f1e9",
+        "border": "#e3ded2",
+        "lineColor": "#9a6b3f"
+      },
+      "task": {
+        "color": "#39362f",
+        "background": "#f4f1e9",
+        "border": "#e3ded2"
+      },
+      "rule": {
+        "color": "#e3ded2",
+        "background": "#e3ded2",
+        "border": "#e3ded2"
+      },
+      "image": {
+        "color": "#39362f",
+        "background": "#f4f1e9",
+        "border": "#e3ded2",
+        "captionColor": "#777166"
+      },
+      "callout": {
+        "note": {
+          "color": "#39362f",
+          "background": "#efebe1",
+          "border": "#9a6b3f"
+        },
+        "tip": {
+          "color": "#39362f",
+          "background": "#efebe1",
+          "border": "#1a7f37"
+        },
+        "important": {
+          "color": "#39362f",
+          "background": "#efebe1",
+          "border": "#8b5cf6"
+        },
+        "warning": {
+          "color": "#39362f",
+          "background": "#efebe1",
+          "border": "#9a6700"
+        },
+        "caution": {
+          "color": "#39362f",
+          "background": "#efebe1",
+          "border": "#cf222e"
+        }
+      },
+      "formula": {
+        "color": "#39362f",
+        "background": "#f4f1e9",
+        "border": "#e3ded2"
+      },
+      "diagram": {
+        "color": "#39362f",
+        "background": "#f4f1e9",
+        "border": "#e3ded2"
+      },
+      "codeBlock": {
+        "background": "#efebe1",
+        "color": "#39362f",
+        "border": "#e3ded2",
+        "lineNumberColor": "#777166",
+        "lineNumberBackground": "#efebe1"
+      },
+      "table": {
+        "headerBackground": "#efebe1",
+        "headerColor": "#39362f",
+        "cellBackground": "#f4f1e9",
+        "alternateBackground": "#efebe1",
+        "border": "#e3ded2"
+      }
+    }
+  }
+}

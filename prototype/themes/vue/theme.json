@@ -1,44 +1,14 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 3,
   "id": "vue",
   "name": "Vue",
   "version": "1.0.0",
   "author": "Aline",
-  "builtin": true,
-  "colors": {
-    "light": {
-      "bg": "#ffffff",
-      "surface": "#ffffff",
-      "sidebar": "#f6f8f7",
-      "fg": "#213547",
-      "muted": "#62717f",
-      "border": "#e2e8e7",
-      "code": "#f6f8f7",
-      "accent": "#42b883",
-      "syntax": "#8e5cd9"
-    },
-    "dark": {
-      "bg": "#1b1b1f",
-      "surface": "#202127",
-      "sidebar": "#1b1b1f",
-      "fg": "#dfdfd6",
-      "muted": "#98989f",
-      "border": "#34363f",
-      "code": "#18181c",
-      "accent": "#42d392",
-      "syntax": "#c5a3ff"
-    },
-    "sepia": {
-      "bg": "#f3f1e8",
-      "surface": "#fbfaf5",
-      "sidebar": "#efeee5",
-      "fg": "#303b37",
-      "muted": "#6e7974",
-      "border": "#dfdfd4",
-      "code": "#f0efe6",
-      "accent": "#32855f",
-      "syntax": "#764abc"
-    }
+  "inherits": "github",
+  "files": {
+    "markdown": "markdown.json",
+    "application": "application.json",
+    "highlight": "highlight.json"
   },
   "previews": {
     "light": "previews/light.svg",

@@ -29,7 +29,7 @@ $('#editor').addEventListener('input',()=>{if($('#editor').querySelector('.place
 $('#editor').addEventListener('keyup',updateStats);$('#editor').addEventListener('click',updateStats);
 function updateStats(){let text=$('#editor').innerText.replace('开始写作 — 输入即所得','');$('#words').textContent=`${[...text.trim()].filter(c=>!/\s/.test(c)).length} 字`;$('#lines').textContent=`${Math.max(1,text.split('\n').length)} 行`;const sel=getSelection();if(sel&&sel.anchorNode){const r=document.createRange();r.selectNodeContents($('#editor'));r.setEnd(sel.anchorNode,sel.anchorOffset);const before=r.toString();const lines=before.split('\n');$('#cursor').textContent=`行 ${lines.length}, 列 ${[...lines.at(-1)].length}`}}
 $('#settings-open').onclick=$('#status-settings').onclick=()=>openSettings();$('#settings-close').onclick=()=>$('#settings-backdrop').hidden=true;$('#settings-backdrop').onclick=e=>{if(e.target.id==='settings-backdrop')e.currentTarget.hidden=true};
-function page(title,desc,body){return `<div class="settings-page"><h2>${title}</h2><p class="settings-intro">${desc}</p>${body}</div>`}
+function page(title,desc,body){return `<section class="settings-page" id="settings-page-${title}" data-settings-page="${title}"><h2>${title}</h2><p class="settings-intro">${desc}</p>${body}</section>`}
 function group(title,body){return `<section class="settings-group"><div class="settings-group-heading"><h3 class="settings-group-title">${title}</h3><button class="settings-reset" type="button">恢复默认</button></div>${body}</section>`}
 const settings={
  '通用':page('通用','管理文件行为与启动方式。',group('文件',row('自动保存','编辑时自动保存到文件系统',toggle(true))+row('自动保存间隔','文件有修改时才会执行保存　默认 30 秒 · 范围 1–2147483',input('30','number','秒'))+row('显示不支持格式的文件','关闭后文件树仅显示 Markdown 与图片',toggle(false)))+group('启动',row('恢复上次工作区','启动时打开上次使用的文件夹',toggle(true)))),
@@ -38,11 +38,14 @@ const settings={
    group('字体与排版',row('正文字号','',select('18 px',['14 px','16 px','18 px','20 px','22 px']))+row('行高','',select('1.6 · 标准',['1.5 · 紧凑','1.6 · 标准','1.7 · 舒展','1.8 · 宽松','2.0 · 双倍'])))+
    group('界面',row('默认展开侧边栏','',toggle(true))+row('工具栏提示','',toggle(true)))+
    group('主题配置',themeGallery())),
- '编辑器':page('编辑器','调整写作与代码编辑体验。',group('编辑行为',row('拼写检查','',toggle(true))+row('自动换行','长行在所见即所得与源码模式中自动折行',toggle(true)))+group('代码块',row('代码高亮','在所见即所得和源码模式中高亮代码语法',toggle(true))+row('代码块行号','在代码块左侧显示行号',toggle(false))+row('代码块自动换行','',toggle(false)))),
+ '编辑器':page('编辑器','调整写作与代码编辑体验。',group('编辑行为',row('拼写检查','',toggle(true))+row('自动换行','长行在所见即所得与源码模式中自动折行',toggle(true)))+group('代码块',row('代码块行号','在代码块左侧显示行号',toggle(false))+row('代码块自动换行','',toggle(false)))),
  '图片':page('图片','统一图片保存位置、引用方式与命名。',group('存储位置与应用范围',`<div class="settings-field"><label class="settings-label">插入图片时</label><div class="settings-desc">剪贴板图片始终保存到这里；本地和网络图片可分别选择是否保存</div>${select('复制到指定路径（默认）',['复制到指定路径（默认）','复制到当前文件夹 ./（和文档同级）','复制到 ./\${filename}-images'],'full')}</div><div class="settings-field"><label class="settings-label">指定路径</label><div class="settings-desc">支持相对路径（相对于文档）、绝对路径、Windows 盘符路径和 UNC 路径</div><div class="settings-path-control"><input class="setting-control" value="./images"><button class="setting-control">选择文件夹…</button></div></div>`+row('对本地图片应用','复制到上述位置并更新引用路径',toggle(true))+row('对网络图片应用','下载到上述位置并更新引用路径',toggle(false)))+group('引用路径',row('Markdown 引用样式','插入图片时使用的路径格式',select('相对路径（推荐）',['相对路径（推荐）','绝对路径'])))+group('剪贴板图片命名',`<div class="settings-field"><label class="settings-label">文件名模板</label><div class="settings-desc">扩展名自动保留原始格式，重名时追加序号。</div><input class="setting-control" value="img-\${date:yyyyMMdd}\${time:HHmmss}"><div class="settings-desc">变量：\${filename} 当前文档名 · \${date:yyyyMMdd} 日期 · \${time:HHmmss} 时间</div></div>`)),
  '高级':page('高级','调整文件树、文档处理与图表服务。',group('文件树性能',row('忽略目录','逗号分隔，支持 * 和 ?',input('.git, node_modules, target, dist','wide'))+row('单次加载条目','默认 500 项 · 范围 50–5000',input('500','number','项'))+row('自动恢复展开深度','默认 8 层 · 范围 1–32',input('8','number','层')))+group('文档处理',`<p class="settings-desc">通过文件大小与行数决定默认编辑模式，仍可手动切换到所见即所得。</p><div class="settings-subfield">${row('所见即所得文档大小','超过此大小的新文档使用源码模式',input('1','number','MB'))}${row('源码文档大小','超过此大小时询问是否仍然打开',input('10','number','MB'))}${row('最大行数','超过此行数时默认使用源码模式',input('1000000','number','行'))}</div>`)+group('PlantUML',`<div class="settings-field"><label class="settings-label">服务器地址</label><div class="settings-warning">使用外部服务器会将图表文本发送给第三方。敏感内容建议使用自建服务器。<div class="settings-desc">PlantUML 公共服务器：<code>https://www.plantuml.com/plantuml</code></div></div><input class="setting-control" placeholder="输入 PlantUML 服务器地址"></div>`)),
- '快捷键':page('快捷键','当前系统的可用快捷键。',`<section class="settings-group"><h3 class="settings-group-title">文件与应用</h3><div class="shortcuts-grid">${key('新建文件','⌘ N')}${key('打开文件','⌘ O')}${key('保存','⌘ S')}${key('新建标签','⌘ T')}${key('关闭标签','⌘ W')}</div></section><section class="settings-group"><h3 class="settings-group-title">格式与插入</h3><div class="shortcuts-grid">${key('一级标题','⌘ 1')}${key('二级标题','⌘ 2')}${key('粗体','⌘ B')}${key('斜体','⌘ I')}${key('插入链接','⌘ K')}</div></section><section class="settings-group"><h3 class="settings-group-title">视图与标签</h3><div class="shortcuts-grid">${key('切换侧边栏','⌘ \\')}${key('切换编辑模式','⌘ /')}${key('专注模式','⇧ ⌘ F')}${key('下一个标签','Ctrl Tab')}${key('上一个标签','Ctrl ⇧ Tab')}</div></section>`),
- '关于':page('关于','',`<div class="settings-about"><img src="./assets/aline.png" alt="Aline"><h2>Aline</h2><p>简洁、专注的 Markdown 编辑器</p><p>所见即所得与源码自由切换，让想法自然成文。</p><p>版本 0.1.0 · UI 原型</p></div>`)
+ '插件':page('插件','在这里启用或停用内置插件；插件的专属选项集中在左侧“插件设置”分组。',group('内置插件',row('Mermaid','渲染 Markdown 中的 Mermaid 图表',`<button id="plugin-mermaid-toggle" data-plugin-toggle="mermaid" class="toggle active" role="switch" aria-checked="true" aria-label="启用 Mermaid"></button>`)+row('表格增强','提供表格插入、行列操作与对齐工具；当前无需单独配置',`<button id="plugin-table-toggle" data-plugin-toggle="table" class="toggle active" role="switch" aria-checked="true" aria-label="启用表格增强"></button>`)+row('导出','导出为 PDF、Word 和 HTML',`<button id="plugin-export-toggle" data-plugin-toggle="export" class="toggle active" role="switch" aria-checked="true" aria-label="启用导出"></button>`)+row('公式','渲染行内和块级数学公式',`<button id="plugin-math-toggle" data-plugin-toggle="math" class="toggle active" role="switch" aria-checked="true" aria-label="启用公式"></button>`)+row('代码语言高亮','为代码块提供语法高亮；专属模式与主题在“插件设置”中配置',`<button id="highlight-plugin-toggle" data-plugin-toggle="code-highlight" class="toggle active" role="switch" aria-checked="true" aria-label="启用代码语言高亮"></button>`))),
+ 'Mermaid':page('Mermaid','控制 Mermaid 图表的主题来源与自定义主题；这些设置不改变应用界面的主题。',group('图表主题',row('主题来源','跟随应用明暗时只读取白天或夜间状态，不继承应用强调色。',`<select id="mermaid-theme-mode" class="setting-control" data-setting-key="aline.plugin.setting.mermaid.theme-mode" aria-label="Mermaid 主题来源"><option>跟随应用明暗模式</option><option>固定主题</option></select>`)+`<div class="settings-field" id="mermaid-fixed-options" hidden><label class="settings-label">固定主题</label><div class="settings-desc">选择内置主题或已导入的 Mermaid 自定义主题。</div><select id="mermaid-theme-select" class="setting-control" data-setting-key="aline.plugin.setting.mermaid.theme" aria-label="Mermaid 图表主题"><option>default · 默认</option><option>dark · 暗色</option><option>forest · 森林</option><option>neutral · 中性</option></select><div class="plugin-theme-actions"><button class="setting-control" type="button" data-plugin-action="mermaid-import">导入主题…</button><button class="setting-control" type="button" data-plugin-action="mermaid-manage">管理自定义主题</button></div></div>`)),
+ '导出':page('导出','分别配置 PDF、Word 与 HTML 导出选项。导出入口由应用设置中的插件开关控制。',group('PDF',row('纸张尺寸','',`<select class="setting-control" data-setting-key="aline.plugin.setting.export.pdf.paper" aria-label="PDF 纸张尺寸"><option>A4</option><option>A3</option><option>Letter</option><option>Legal</option></select>`)+row('页面方向','',`<select class="setting-control" data-setting-key="aline.plugin.setting.export.pdf.orientation" aria-label="PDF 页面方向"><option>纵向</option><option>横向</option></select>`)+row('页边距','上、右、下、左',`<div class="export-margin-grid"><label>上<input class="setting-control" type="number" min="0" max="100" value="20" data-setting-key="aline.plugin.setting.export.pdf.margin.top"><span>mm</span></label><label>右<input class="setting-control" type="number" min="0" max="100" value="20" data-setting-key="aline.plugin.setting.export.pdf.margin.right"><span>mm</span></label><label>下<input class="setting-control" type="number" min="0" max="100" value="20" data-setting-key="aline.plugin.setting.export.pdf.margin.bottom"><span>mm</span></label><label>左<input class="setting-control" type="number" min="0" max="100" value="20" data-setting-key="aline.plugin.setting.export.pdf.margin.left"><span>mm</span></label></div>`))+group('Word',row('标题与正文样式','',`<select class="setting-control" data-setting-key="aline.plugin.setting.export.word.text-style" aria-label="Word 标题与正文样式"><option>跟随文档样式</option><option>紧凑</option><option>标准</option></select>`)+row('代码块样式','',`<select class="setting-control" data-setting-key="aline.plugin.setting.export.word.code-style" aria-label="Word 代码块样式"><option>跟随文档主题</option><option>浅色背景</option><option>深色背景</option><option>纯文本</option></select>`))+group('HTML',row('包含样式','导出独立 HTML 页面时嵌入呈现样式',`<button class="toggle active" role="switch" aria-checked="true" aria-label="HTML 包含样式" data-setting-key="aline.plugin.setting.export.html.include-styles"></button>`)+row('图片资源','选择导出 HTML 时的图片处理方式',`<select class="setting-control" data-setting-key="aline.plugin.setting.export.html.images" aria-label="HTML 图片资源处理"><option>复制到导出资源目录</option><option>保留原引用路径</option></select>`))),
+ '公式':page('公式','设置公式渲染结果的背景；公式插件关闭时，源码仍可见且可编辑。',group('公式外观',row('公式背景','',`<select id="formula-background-mode" class="setting-control" data-setting-key="aline.plugin.setting.math.background-mode" aria-label="公式背景"><option>跟随内容主题</option><option>透明</option><option>自定义颜色</option></select>`)+`<div id="formula-custom-color" hidden>${row('自定义背景色','用于行内与块级公式的渲染表面。',`<input id="formula-background-color" type="color" class="setting-control color-control" value="#f3f4f6" data-setting-key="aline.plugin.setting.math.background-color" aria-label="自定义背景色">`)}</div>`)),
+ '代码语言高亮':page('代码语言高亮','配置代码高亮插件的专属选项。启用状态在“应用设置 > 插件”中管理。',group('代码块配色',row('代码高亮模式','可独立于应用外观选择亮色、暗色或护眼代码配色。',`<select id="highlight-mode-select" class="setting-control" aria-label="代码高亮模式"><option value="follow-app">随应用切换</option><option value="light">亮</option><option value="dark">暗</option><option value="sepia">护眼</option></select>`)+row('代码主题','选择主题包中的代码语法颜色；也可以跟随当前应用主题。',`<select id="highlight-theme-select" class="setting-control" aria-label="代码主题"><option value="follow-app">随应用切换</option><option value="github">GitHub</option></select>`)+`<p class="highlight-settings-note" id="highlight-settings-description">代码主题与高亮模式可分别设置。例如：浅色应用 + 暗色代码高亮。</p>`))
 };
 function row(label,desc,control){return `<div class="settings-row"><div><div class="settings-label">${label}</div>${desc?`<div class="settings-desc">${desc}</div>`:''}</div>${control}</div>`}
 function toggle(on){return `<button class="toggle ${on?'active':''}" role="switch" aria-checked="${on}" aria-label="切换"></button>`}
@@ -52,22 +55,69 @@ function key(a,b){return `<div class="shortcut-row"><span>${a}</span><kbd class=
 function themeGallery(){
  return `<div class="theme-library-toolbar"><div class="theme-library-actions"><button type="button" class="theme-library-action" data-theme-action="open-folder"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5h5l1.5 1.6h6.5v6.4h-13z"/><path d="M1.5 4.5V3.2h4l1.4 1.3"/></svg>打开主题文件夹</button><button type="button" class="theme-library-action" data-theme-action="import"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 10.5V2.2M4.8 5.5 8 2.2l3.2 3.3M2 9.5v3h12v-3"/></svg>导入 ZIP</button><input id="theme-zip-input" type="file" accept=".zip,application/zip" hidden><button type="button" class="theme-library-action" data-theme-action="refresh"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.4 6A5.7 5.7 0 0 0 3.2 4.7L2 6M2 2.8V6h3.2M2.6 10a5.7 5.7 0 0 0 10.2 1.3L14 10M14 13.2V10h-3.2"/></svg>刷新</button></div><span class="theme-library-status" id="theme-library-status" role="status">正在读取主题目录…</span></div><div class="theme-gallery" id="theme-gallery"></div>`;
 }
+let settingsRendered=false;
+function syncSettingsLocation(){
+ const content=$('#settings-content'), pages=$$('.settings-page[data-settings-page]:not([hidden])');
+ if(!content||!pages.length)return;
+ const probe=content.getBoundingClientRect().top+Math.min(110,content.clientHeight*.22);
+ let current=pages[0];
+ for(const section of pages){if(section.getBoundingClientRect().top<=probe)current=section;else break;}
+ const page=current.dataset.settingsPage;
+ $('#settings-current-page').textContent=page;
+ $$('#settings-nav button').forEach(button=>{const active=button.dataset.page===page;button.classList.toggle('active',active);if(active)button.setAttribute('aria-current','location');else button.removeAttribute('aria-current')});
+}
+function initializeSettings(){
+ if(settingsRendered)return;
+ const content=$('#settings-content');
+ content.innerHTML=Object.values(settings).join('');
+ Object.entries({'Mermaid':'mermaid','导出':'export','公式':'math','代码语言高亮':'code-highlight'}).forEach(([page,plugin])=>$(`[data-settings-page="${page}"]`)?.setAttribute('data-plugin-settings-section',plugin));
+ $$('[data-plugin-toggle]').forEach(button=>{try{const saved=localStorage.getItem(`aline.plugin.enabled.${button.dataset.pluginToggle}`);if(saved==='true'||saved==='false'){button.classList.toggle('active',saved==='true');button.setAttribute('aria-checked',saved)}}catch{}});
+ $$('[data-setting-key]').forEach(control=>{try{const saved=localStorage.getItem(control.dataset.settingKey);if(saved!==null){if(control.matches('.toggle')){control.classList.toggle('active',saved==='true');control.setAttribute('aria-checked',saved)}else control.value=saved}}catch{}});
+ $$('.appearance-mode-option').forEach(button=>button.onclick=()=>setAppearanceMode(button.dataset.mode,true));
+ const follow=$('[data-follow-system]');if(follow){follow.onclick=()=>{followSystemTheme=!followSystemTheme;if(followSystemTheme)setAppearanceMode(systemAppearance?.matches?'dark':'light',false);else syncAppearanceControls()};}
+ $$('.toggle:not([data-follow-system])').forEach(button=>button.onclick=()=>{button.classList.toggle('active');const enabled=button.classList.contains('active');button.setAttribute('aria-checked',String(enabled));if(button.dataset.pluginToggle){try{localStorage.setItem(`aline.plugin.enabled.${button.dataset.pluginToggle}`,String(enabled))}catch{}}if(button.dataset.settingKey){try{localStorage.setItem(button.dataset.settingKey,String(enabled))}catch{}}syncPluginSettingsVisibility()});
+ content.addEventListener('change',event=>{const control=event.target.closest?.('[data-setting-key]');if(control){try{localStorage.setItem(control.dataset.settingKey,control.value)}catch{}}syncPluginOptionVisibility()});
+ content.addEventListener('click',event=>{const action=event.target.closest?.('[data-plugin-action]');if(action)toast(action.dataset.pluginAction==='mermaid-import'?'选择 Mermaid 主题文件（原型操作）':'打开 Mermaid 自定义主题管理（原型操作）')});
+ syncPluginSettingsVisibility();
+ content.addEventListener('scroll',syncSettingsLocation,{passive:true});
+ settingsRendered=true;
+ syncAppearanceControls();
+ syncPluginOptionVisibility();
+ window.syncHighlightSettings?.();
+}
+function syncPluginOptionVisibility(){const fixed=$('#mermaid-fixed-options'),custom=$('#formula-custom-color');if(fixed)fixed.hidden=$('#mermaid-theme-mode')?.value!=='固定主题';if(custom)custom.hidden=$('#formula-background-mode')?.value!=='自定义颜色'}
+function syncPluginSettingsVisibility(){
+ $$('[data-plugin-settings]').forEach(button=>{
+  const pluginId=button.dataset.pluginSettings,toggle=$(`[data-plugin-toggle="${pluginId}"]`),section=$(`[data-plugin-settings-section="${pluginId}"]`);
+  const enabled=toggle?.classList.contains('active')??true;
+  button.hidden=!enabled;
+  if(section)section.hidden=!enabled;
+  if(!enabled&&section?.dataset.settingsPage===$('#settings-current-page').textContent)setPage('插件');
+ });
+ const group=$('#plugin-settings-nav-group');
+ if(group)group.hidden=!group.querySelector('button[data-plugin-settings]:not([hidden])');
+ syncSettingsLocation();
+}
 function openSettings(page='通用'){$('#settings-backdrop').hidden=false;setPage(page)}
 function setPage(page){
- $('#settings-content').innerHTML=settings[page];$('#settings-content').scrollTop=0;$('#settings-current-page').textContent=page;
- $$('#settings-nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
- $$('.appearance-mode-option').forEach(b=>b.onclick=()=>setAppearanceMode(b.dataset.mode,true));
- const follow=$('[data-follow-system]');if(follow){follow.onclick=()=>{followSystemTheme=!followSystemTheme;if(followSystemTheme)setAppearanceMode(systemAppearance?.matches?'dark':'light',false);else syncAppearanceControls()};}
- $$('.toggle:not([data-follow-system])').forEach(b=>b.onclick=()=>{b.classList.toggle('active');b.setAttribute('aria-checked',String(b.classList.contains('active')))});
- syncAppearanceControls();
+ initializeSettings();
+ const content=$('#settings-content');let target=$(`[data-settings-page="${page}"]`);
+ if(!target||target.hidden)target=$('[data-settings-page="插件"]');
+ if(!target||target.hidden)return;
+ content.scrollTo({top:target.getBoundingClientRect().top-content.getBoundingClientRect().top+content.scrollTop,behavior:'smooth'});
+ syncSettingsLocation();
 }
-$$('#settings-nav button').forEach(b=>b.onclick=()=>setPage(b.dataset.page));
-$('#open-about').onclick=()=>{$('#brand-popover').hidden=true;$('#about-backdrop').hidden=false};$$('.about-close').forEach(b=>b.onclick=()=>$('#about-backdrop').hidden=true);
+$$('#settings-nav button').forEach(button=>button.onclick=()=>setPage(button.dataset.page));
+window.openAboutDialog=()=>$('#about-backdrop').hidden=false;
+window.openShortcutsDialog=()=>$('#shortcuts-backdrop').hidden=false;
+$$('.about-close').forEach(button=>button.onclick=()=>$('#about-backdrop').hidden=true);
+$$('.shortcuts-close').forEach(button=>button.onclick=()=>$('#shortcuts-backdrop').hidden=true);
+$('#shortcuts-backdrop').onclick=event=>{if(event.target.id==='shortcuts-backdrop')event.currentTarget.hidden=true};
 $('#status-settings').addEventListener('contextmenu',e=>{e.preventDefault();openSettings('外观')});
 $('#export-btn').onclick=()=>{let menu=$('.export-menu');if(menu){menu.remove();return}menu=document.createElement('div');menu.className='export-menu';menu.innerHTML='<button>导出 PDF (.pdf)</button><button>导出 Word (.docx)</button><button>导出 HTML (.html)</button><button>打印…</button>';const r=$('#export-btn').getBoundingClientRect();menu.style.left=`${Math.min(r.left,innerWidth-205)}px`;menu.style.top=`${r.bottom+6}px`;document.body.append(menu);menu.querySelectorAll('button').forEach(b=>b.onclick=()=>{toast(b.textContent);menu.remove()});setTimeout(()=>document.addEventListener('click',function close(e){if(!menu.contains(e.target)&&e.target!==$('#export-btn')){menu.remove();document.removeEventListener('click',close)}},{once:true}),0)};
 document.addEventListener('click',e=>{const toggle=e.target.closest?.('#theme-quick-toggle');if(toggle){const popover=$('.theme-quick-popover');popover.hidden=!popover.hidden;toggle.setAttribute('aria-expanded',String(!popover.hidden));return}const option=e.target.closest?.('.theme-quick-option');if(option){setPaletteFamily(option.dataset.palette);return}if(!e.target.closest?.('.status-theme-quick')){$('.theme-quick-popover')?.setAttribute('hidden','');$('#theme-quick-toggle')?.setAttribute('aria-expanded','false')}});
 document.addEventListener('keydown',e=>{
- if(e.key==='Escape'){const menu=$('.theme-quick-popover');if(menu&&!menu.hidden){menu.hidden=true;$('#theme-quick-toggle')?.setAttribute('aria-expanded','false');$('#theme-quick-toggle')?.focus();return}$('#settings-backdrop').hidden=true;$('#about-backdrop').hidden=true;$('#brand-popover').hidden=true}
+ if(e.key==='Escape'){const menu=$('.theme-quick-popover');if(menu&&!menu.hidden){menu.hidden=true;$('#theme-quick-toggle')?.setAttribute('aria-expanded','false');$('#theme-quick-toggle')?.focus();return}$('#settings-backdrop').hidden=true;$('#about-backdrop').hidden=true;$('#shortcuts-backdrop').hidden=true;$('#brand-popover').hidden=true}
  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='s'){e.preventDefault();toast('已保存')}
  const menu=e.target.closest?.('.theme-quick-popover');if(menu&&(e.key==='ArrowDown'||e.key==='ArrowUp')){const items=$$('.theme-quick-option');const current=items.indexOf(document.activeElement);const step=e.key==='ArrowDown'?1:-1;items[(current+step+items.length)%items.length]?.focus();e.preventDefault()}
 });

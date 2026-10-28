@@ -16,6 +16,7 @@ Aline —— Typora 式 Markdown 编辑器（Rust + GPUI，无 WebView），macO
 | [docs/v1-features.md](docs/v1-features.md) | V1 功能清单，以及 V1 明确不做的范围 | 判断一个功能该不该做 |
 | [docs/plugin-system.md](docs/plugin-system.md) | V1 内置插件的产品行为、设置归属、启停与架构边界 | 设计或实现插件功能和插件设置前 |
 | [docs/ui-spec.md](docs/ui-spec.md) | UI 与交互验收规范：MarkFlow 对照范围、Aline 品牌、浅色主题、代码块细节和 Markdown 展示夹具 | 实现或评审任何面向用户的界面 |
+| [docs/theme-package-spec.md](docs/theme-package-spec.md) | 自定义主题包格式、可配置样式字段、继承规则和导入校验 | 设计或实现主题包字段与主题加载前 |
 | [docs/v1-architecture.md](docs/v1-architecture.md) | 实施蓝图：crate 划分、模块骨架、各功能组实现方案、里程碑 M0–M6（取代 engine-design §2.13） | 实现任何功能前 |
 | [docs/rust-style-guide.md](docs/rust-style-guide.md) | Rust 代码规范（【强制】/【建议】两级）：工具链、命名、坐标系、错误处理、测试、提交格式、参考项目实证条款 | 写任何 Rust 代码前 |
 | [docs/architecture-guide.md](docs/architecture-guide.md) | 架构规范（【强制】/【建议】）：分层依赖、数据流真源、坐标系边界、命令事务、并发调度、缓存失效、主题/设置传播、插件与持久化边界 | 做架构层决策、动分层/依赖/传播机制前 |

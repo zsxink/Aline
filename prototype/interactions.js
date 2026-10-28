@@ -124,7 +124,8 @@
       const doc = node.type === 'demo' ? demos.find(item => item.id === node.id) : null;
       const name = doc?.name || node.name;
       const selected = doc?.id === active || node.docId === active;
-      return `<button class="file-row tree-demo-file${selected?' selected':''}" ${node.type==='demo'?`data-demo="${escape(node.id)}"`:node.type==='new-file'?`data-document="${escape(node.docId)}"`:`data-asset="${escape(node.name)}"`}>${icon('file','tree-icon')}<span>${escape(name)}</span></button>`;
+      const kind = node.type==='demo'||node.type==='new-file' ? 'markdown' : /\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(name) ? 'image' : 'other';
+      return `<button class="file-row tree-demo-file${selected?' selected':''}" data-kind="${kind}" ${node.type==='demo'?`data-demo="${escape(node.id)}"`:node.type==='new-file'?`data-document="${escape(node.docId)}"`:`data-asset="${escape(node.name)}"`}>${icon('file','tree-icon')}<span>${escape(name)}</span></button>`;
     };
     const allFolderIds = [];
     const collectFolders = nodes => nodes.forEach(node => { if (node.type==='folder') { allFolderIds.push(node.id); collectFolders(node.children||[]); } });

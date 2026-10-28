@@ -32,10 +32,10 @@ aline-source 独立（不进链）：文件 I/O 由 aline-ui / app 直接编排�
 |---|---|---|
 | `aline-source` | 文件字节层：decode/encode（BOM/CRLF）、原子写 | 无（独立 crate，由 ui/app 编排调用） |
 | `aline-buffer` | Buffer trait、StringBuffer、Selection、补丁式 History、锚点平移 | 无 |
-| `aline-markdown` | 预处理改写器 → pulldown-cmark → mdast → 展示树 + sources 映射 + 块切分 + markdown 着色规则 | buffer |
-| `aline-edit` | Command/Change、apart 协议、reread 校验、拒绝制、查找替换核心 | markdown |
+| `aline-markdown` | 预处理改写器 → pulldown-cmark → mdast → 展示树 + sources 映射 + 块切分 + markdown 着色规则；定义纯数据解析扩展契约 | buffer |
+| `aline-edit` | Command/Change、apart 协议、reread 校验、拒绝制、查找替换核心；预留文档修改提案的补丁校验/原子应用协议 | markdown |
 | `aline-app-core` | 主题 token 模型 + 内置主题文件、i18n catalog + t()、设置 | 无 |
-| `aline-plugin` | 插件注册接口、渲染器/命令/导出器注册表、五个内置插件 | edit, app-core, gpui |
+| `aline-plugin` | 插件注册接口、解析扩展实现、渲染器/命令/导出器注册表、五个内置插件 | edit, markdown（仅解析扩展契约）, app-core, gpui |
 | `aline-ui` | DocCore、Document 视图、块渲染、FoldedInlineEditor、行编辑器、IME、资产管线、Workspace/标签页/文件夹浏览器 | 全部 |
 | `app` | main：窗口创建、菜单、设置读写、自动保存计时、崩溃恢复 | ui |
 
@@ -49,14 +49,14 @@ aline/
     aline-buffer/src/{buffer.rs, string_buffer.rs, selection.rs, history.rs, anchors.rs}
     aline-markdown/src/
       pre/{flow.rs, tex.rs, front.rs}     # 预处理改写器（front 见 §4.4 说明）
-      build.rs mdast.rs                   # pulldown 事件 → mdast
+      build.rs mdast.rs extensions.rs     # pulldown 事件 → mdast；插件解析扩展契约
       tree/{mod.rs, sources.rs, html.rs, html_block.rs, stack.rs}
                                           # 展示树 + 双向映射 + 行内 HTML/HTML 块/标签栈
       parse.rs                            # Parsed/Block/alike
       markdown_hl.rs                      # 源码模式 markdown 着色（纯规则）
       tests/{spec.rs, roundtrip.rs}
     aline-edit/src/{command.rs, format.rs, block.rs, lists.rs, tables.rs,
-                    apart.rs, check.rs, find.rs}
+                    apart.rs, check.rs, find.rs, proposals.rs}
     aline-app-core/src/
       theme/{mod.rs, palettes/{aline-default.toml}}
       i18n/{mod.rs, locales/{zh-CN.toml, en.toml}}
@@ -412,65 +412,54 @@ struct PictureAsset { origin: PictureOrigin, hash: blake3::Hash }
 
 ```rust
 pub struct Theme {
-    pub id: &'static str,               // "aline-default"
+    pub id: Arc<str>,                   // 支持运行时加载用户主题 ID
     pub mode: Mode,                     // Day | Night | Eye
-    pub tokens: Tokens,
+    pub markdown: MarkdownTokens,
+    pub application: ApplicationTokens,
 }
-pub struct Tokens {
+pub struct MarkdownTokens {
     // Color / 字体族是 app-core 自有类型（如 Color { r, g, b, a: u8 }）——app-core 零 GPUI
     // （机器可查判定：cargo tree -p aline-app-core -i gpui 为空），到 gpui::Hsla /
     // SharedString 的转换只发生在 aline-ui（impl From<Color> for Hsla）。
-    // 基础
-    pub background: Color, pub surface: Color,      // surface = 块面板/输入框底
-    pub foreground: Color, pub muted: Color, pub subtle: Color,
-    pub accent: Color, pub link: Color,
-    pub selection_bg: Color, pub caret: Color, pub border: Color,
-    // 代码
-    pub code_bg: Color, pub code_border: Color,
-    pub syntax: SyntaxColors,           // comment/keyword/string/number/function/type/operator/punctuation
-    // 结构
-    pub quote_line: Color, pub table_border: Color, pub table_head_bg: Color,
+    pub colors: MarkdownColors,         // 正文、标题、链接、选择等内容语义色
+    pub typography: MarkdownTypography, // 正文/标题/代码字体、字号、字重、行高、对齐
+    pub spacing: MarkdownSpacing,      // 段落、标题、列表与内容块间距
+    pub code: CodeBlockStyle,           // 背景、边框、行号槽、内边距和高亮器语义色
+    pub table: TableStyle,              // 表头、单元格、边框、斑马纹、内边距
+    pub quote_line: Color,
     pub alert: [AlertColor; 5],         // note/tip/important/warning/caution：边线+图标+标题
-    pub error_fg: Color, pub error_bg: Color,
-    // 特殊块
-    pub diagram_bg: Color, pub diagram_fg: Color, pub formula_bg: Color,
-    pub marker: Color,                  // 阶段 B 标记渐隐色（低对比）
-    // 字体
-    pub ui_family: Arc<str>, pub mono_family: Arc<str>,
-    pub scale: f32,
+    pub diagram: DiagramStyle,
+    pub formula: FormulaStyle,
+}
+pub struct ApplicationTokens {
+    pub colors: ApplicationColors,      // 窗口、侧栏、工具栏、标签、菜单、状态、边框、强调色
+    pub typography: UiTypography,
+    pub window_background_opacity: f32,
+    pub icons: IconTokens,              // 支持的样式枚举、描边宽度和语义色
+    pub file_tree_icons: FileTreeIconTokens,
 }
 ```
 
-**主题 = TOML 文件**（rust-embed 打包），一个文件内含三段模式：
+**主题包 = 清单 + 四个 JSON 职责文件**：`theme.json` 保存身份、继承关系和资源路径，`markdown.json` 保存内容区排版与渲染 token，`application.json` 保存窗口外壳、界面和图标 token，`highlight.json` 单独保存代码高亮语义色。三个配置文件中的 `common` 与 `modes.light/dark/sepia` 组成可部分覆盖配置。Markdown/应用配置继承 GitHub 默认主题；高亮配置独立继承 GitHub 高亮方案。高亮插件设置分别选择“代码主题”（跟随应用家族或固定家族）和“代码高亮模式”（跟随应用模式或固定白天/夜间/护眼），因此两种跟随关系互不绑定。主题包格式、字段 allowlist 和逐字段回退见 [theme-package-spec.md](./theme-package-spec.md)。
 
-```toml
-# palettes/aline-default.toml
-id = "aline-default"
+包模式名映射到运行时 `Mode`：`light → Day`、`dark → Night`、`sepia → Eye`。
 
-[day]
-background = "#ffffff"
-foreground = "#1f2328"
-accent     = "#0969da"
-# ……全部 token
-
-[night]   # 同一套 token 的夜间调色
-[eye]     # 护眼 = 独立调色（米黄底、暖前景），不是滤镜
-```
-
-Token 四组（外加字体族与缩放）：
+主题运行时按内容区与应用外壳分组；样式包可配置字段：
 
 | 组 | 内容 | 消费者 |
 |---|---|---|
-| 基础面 | background / surface / foreground / muted / accent / link / selection_bg / caret / border | 一切组件 |
-| 代码 | code_bg / code_border + syntax 8 色 | 代码块、源码模式 |
-| 结构 | quote_line / table_border / table_head_bg / alert 5 色 / error_fg / error_bg | 引用、表格、Alerts、错误面板 |
-| 特殊块 | diagram_bg/fg / formula_bg / marker（阶段 B 标记渐隐色） | 数学/图表资产、折叠编辑器 |
+| Markdown 排版 | 正文与标题的字体、字号、字重、行高、对齐；段落/标题/列表/块间距 | 可视化渲染与源码模式 |
+| 代码与表格 | 代码块表面、行号槽、语义高亮色；表头、单元格、斑马纹、边框与内边距 | 代码块、源码高亮与表格渲染 |
+| 内容语义色 | 正文、标题、链接、引用、提示、公式、图表、选择等语义颜色 | Markdown 内容块与主题资产 |
+| 应用外壳 | 窗口/侧栏/工具栏/标签/菜单/状态栏色、UI 字体、背景透明度、内置图标样式与文件树图标色 | Aline 应用窗口 |
 
-语义化的意义：渲染器里永远不出现具体色值，只出现 `theme.tokens.accent`——换主题零代码改动。
+语义化的意义：渲染器里永远不出现具体色值，只读取诸如 `theme.application.colors.accent` 的语义 token——换主题零代码改动。
+
+主题加载在纯数据层执行默认值 → 用户主题 `common` → 当前模式覆盖的逐叶合并；active theme 切换后一次全局广播。缺字段继承 GitHub 默认主题；错误类型不静默回退。面向包作者的字段范围、数值约束与未开放项见 [theme-package-spec.md](./theme-package-spec.md)。
 
 ## 8.2 加载与运行时（gpui Global 机制）
 
-- 启动：rust-embed 读出 TOML → 解析成 `Vec<Theme>`（hex → app-core `Color`，解析失败的主题跳过并 log）；`Color → gpui Hsla` 的转换只发生在 aline-ui 渲染入口（app-core 零 GPUI，§8.1）。
+- 启动：rust-embed 读出内置 JSON，用户主题从主题目录扫描 JSON → 解析并逐字段合并为 `Vec<Theme>`（hex → app-core `Color`，非法主题隔离并 log）；`Color → gpui Hsla` 的转换只发生在 aline-ui 渲染入口（app-core 零 GPUI，§8.1）。主题自带字体由 app 校验并交给 aline-ui 的 GPUI 文本系统注册，不在 app-core 触碰 GPUI 字体 API。
 - 活动主题 = 设置项 `(theme_id, mode)` 选中某段 → 构造 `ActiveTheme` → `cx.set_global(...)`。
 - 各视图/组件用 `cx.observe_global::<ActiveTheme>()` 订阅；切换 = 一次 `set_global` → 所有订阅者下帧重绘，**包括正在编辑的块**（其渲染同样读 global）。模式切换即时全窗口生效，无重启。
 
@@ -478,7 +467,7 @@ Token 四组（外加字体族与缩放）：
 
 **① 源码模式 markdown 着色——引擎零颜色依赖。** `aline-markdown::markdown_hl` 只产出语义枚举（Heading1、Strong、Link、CodeSpan…），UI 层查 token 表映射颜色与字重。着色规则的测试不需要主题，主题测试不需要解析器。
 
-**② syntect 代码高亮——程序化生成 syntect Theme。** syntect 只认自己的 `syntect::highlighting::Theme` 类型：主题加载时用 `SyntaxColors` 生成一组 ThemeItem（scope 选择器 → 颜色），不依赖外部主题文件；`SyntaxSet` 用 two-face 扩充集 + `LazyLock` 懒加载。高亮输出 `Vec<(Range, HighlightStyle)>`，后台资产按块缓存。
+**② syntect 代码语言高亮——插件产出语义区间，独立解析主题与模式提供样式。** 代码高亮是可独立启停的编译期内置插件：插件通过 syntect 识别语言并产出 scope/语义区间；插件设置中的代码主题可跟随应用主题家族或固定选择，代码高亮模式可跟随应用模式或固定选择白天/夜间/护眼。对应 `highlight.json → syntax` 提供类型化 `SyntaxColors` 并生成 syntect `Theme`；`highlight.json → codeBlock` 提供可选的背景、前景、边框和行号颜色，确保独立模式下代码仍有足够对比。代码块字体、字号、行高和内边距继续来自 `markdown.json`。`SyntaxSet` 用 two-face 扩充集 + `LazyLock` 懒加载；高亮输出 `Vec<(Range, HighlightStyle)>`，后台资产按块缓存。只有某项设为“随应用”时，该项才响应对应的应用主题家族或模式变化；应用亮色界面可组合暗色代码高亮。关闭插件只回退普通代码块，不关闭代码块布局、行号和源码编辑。源码模式 Markdown 标记着色仍归 Markdown 编辑器核心。
 
 **③ ratex / mermaid-rs——颜色烘焙进 SVG，缓存键含主题。** 这两个库在渲染时把 foreground/accent/background 写死进 SVG，所以资产键必须含主题：
 
@@ -491,16 +480,16 @@ key = math:{source}:{display}:{theme_id}:{mode}:{相关token哈希}
 ## 8.4 切换端到端时序
 
 ```
-用户点"夜间" → 设置持久化(theme_id, mode) → resolve(theme.toml[night])
+用户切换任一模式/主题 → 设置持久化(theme_id, app_mode, highlight_theme_setting, highlight_mode_setting) → resolve(theme.json + markdown.json + application.json [app_mode]) + resolve(highlight theme.json + highlight.json [resolved_highlight_mode])
   → cx.set_global(ActiveTheme) → 全窗口下帧重绘
   → 所有含 ThemeKey 的资产键失效 → 后台重渲染 SVG/高亮 → 逐块换色
 ```
 
 解析、buffer、映射完全颜色无关——主题是纯 UI 层概念，对保真和引擎零影响。
 
-## 8.5 外部主题（后续，机制已预留）
+## 8.5 外部主题包
 
-主题是纯声明式资源：加载 = 读用户/扩展目录的 TOML → 同一个 resolve 管道 → 注册进主题列表，**不进 wasm 沙箱**（Zed `theme_extension` 就是"扩展提供主题 JSON → 宿主直读注入 ThemeRegistry"的同款分层）。"用户自定义主题"功能届时只是把 rust-embed 换成/加上目录扫描，其他全部复用。
+主题是纯声明式资源：加载 = 读用户主题目录中的 JSON → 校验 → 基于 GitHub 默认主题逐字段合并 → 同一个 resolve 管道 → 注册进主题列表，**不进 wasm 沙箱**（Zed `theme_extension` 就是"扩展提供主题 JSON → 宿主直读注入 ThemeRegistry"的同款分层）。主题 JSON 不得含 CSS、脚本或可执行资源；允许覆盖范围见 [theme-package-spec.md](./theme-package-spec.md)。
 
 ---
 
@@ -511,22 +500,31 @@ key = math:{source}:{display}:{theme_id}:{mode}:{相关token哈希}
 ## 9.1 定位与边界
 
 - **V1 = 编译期内置插件 + 稳定的注册接口**；动态加载明确后置，但外置化路线已定稿（wasmtime + WIT 组件模型，照 Zed 扩展架构，见 §9.3）——先用五个内置插件验证接口。
-- 插件接口 v1 提供四类能力：
-  1. 注册**块渲染器**（按围栏语言/块类型接管渲染，含"上编辑下渲染"的打开态）；
-  2. 注册**命令**（进快捷键/菜单/右键，产出源码补丁）；
-  3. 注册**导出器**（格式、设置 schema 与执行入口）；
-  4. 贡献**i18n catalog**（自带翻译）和插件设置定义。
+- 插件接口预留六类能力：
+  1. 注册**解析扩展**（映射式预处理、消费核心 mdast 的解析后处理；契约由 `aline-markdown` 定义）；
+  2. 注册**块渲染器**（按围栏语言/块类型接管渲染，含"上编辑下渲染"的打开态）；
+  3. 注册**命令**（进快捷键/菜单/右键，产出源码补丁）；
+  4. 注册**导出器**（格式、设置 schema 与执行入口）；
+  5. 注册**文档修改提案提供器**（返回带版本与源码补丁的纯数据提案，审阅和应用由宿主负责）；
+  6. 贡献**i18n catalog**（自带翻译）和插件设置定义。
 
 ```rust
 // aline-plugin/src/traits.rs
 pub trait Plugin: 'static {
     fn id(&self) -> &'static str;                                  // "math"
+    fn parse_extensions(&self) -> Vec<Box<dyn ParseExtension>> { vec![] }
     fn block_renderers(&self) -> Vec<Box<dyn BlockRenderer>> { vec![] }
     fn commands(&self) -> Vec<CommandSpec> { vec![] }              // id/快捷键/菜单文案 key
     fn exporters(&self) -> Vec<Box<dyn Exporter>> { vec![] }
+    fn proposal_providers(&self) -> Vec<Box<dyn ProposalProvider>> { vec![] }
     fn settings(&self) -> PluginSettingsSpec;
     fn catalog(&self) -> Option<Catalog> { None }
 }
+
+// ParseExtension / PreprocessResult / ExtensionNode 由 aline-markdown 定义，
+// 只承载纯数据与原始源码字节范围；aline-markdown 不依赖 aline-plugin。
+// ProposalProvider / DocumentProposal 由 aline-edit 的纯数据 API 定义；
+// 插件只返回提案，审阅与应用由宿主负责。
 
 pub trait BlockRenderer: 'static {
     fn id(&self) -> &'static str;
@@ -552,6 +550,7 @@ pub enum RenderDesc { Svg { bytes: Vec<u8>, size: (f32, f32) }, /* styled-runs /
 
 - `RenderCtx` 提供：主题 token、缩放、文档相对目录（图片/资产解析）、`cx`/`window` 句柄、提交 `Change` 的回调（插件一切编辑必须走补丁通道，禁止自己摸文本）。
 - **注册表**：启动时静态收集（`registry.rs` 里显式列出内置插件，V1 不用 inventory 宏），按 `(BlockKind, fence_lang)` 优先匹配，未命中走内建默认渲染。
+- **解析扩展注册表**：宿主静态组装后传入 `aline-markdown`；按固定阶段执行并保留原始源码字节映射。pulldown-cmark 仍是唯一 Markdown 解析器，插件不得重解析全文。
 
 ## 9.2 五个内置插件的职责切分
 
@@ -564,6 +563,8 @@ pub enum RenderDesc { Svg { bytes: Vec<u8>, size: (f32, f32) }, /* styled-runs /
 | `highlight` | 代码块渲染（syntect 高亮）及源码模式 fenced 高亮 | 关闭或失败时回退普通代码块 |
 
 - 预留插件位（V1 只留接口空间，不写代码）：`plantuml`（BlockRenderer + HTTP 资产，接 Kroki）、`picgo` 图床（Command：选文件→上传→`EditImage` 补丁替换 URL）。
+- 预留语法扩展插件：front matter 元数据/属性面板、脚注呈现与导航、`[TOC]` 目录呈现与行为。V1 的脚注与 `[TOC]` 基础能力继续由核心解析和渲染提供；后续插件通过 `aline-markdown` 的解析扩展契约增强或接管指定节点。
+- 预留文档修改提案插件（如 AI 改写）：插件返回带文档版本和补丁的提案；aline-ui 展示差异并等待用户接受，aline-edit 校验后以一个事务应用。不得自动应用或允许插件直接修改 buffer；外发文档上下文前需告知范围与目标服务并获授权。V1 不实现 AI 接入。
 - 插件命令的快捷键冲突策略：内建 > 插件按注册顺序，冲突时后者不生效并 log。
 
 ## 9.3 加载模型与外置化路线（参考 Zed 源码）
@@ -579,7 +580,7 @@ Aline 的映射：
 
 | 资源 | 层 |
 |---|---|
-| 主题 TOML、社区语言包（i18n catalog TOML） | 声明式，宿主直读，永远不进沙箱 |
+| 主题 JSON 包、社区语言包（i18n catalog TOML） | 声明式，宿主直读，永远不进沙箱 |
 | PlantUML、图表引擎、图床、其他公式后端 | wasm 插件（资产型：传块源码，回 SVG/URL 补丁） |
 | 表格/数学/Mermaid/高亮 | 内置插件（元素级 API，进程内） |
 

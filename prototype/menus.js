@@ -22,7 +22,7 @@
     {id:'view',label:'视图',items:[item('切换所见即所得/源码','⌘ /'),item('切换侧边栏','⌘ \\'),item('显示文件树'),item('显示大纲'),sep,item('专注模式','⇧ ⌘ F'),sep,item('放大','⌘ =',true),item('缩小','⌘ -',true),item('重置缩放','',true),sep,item('全屏'),item('开发者工具','⌥ ⌘ I',true)]},
     {id:'theme',label:'主题',items:[]},
     {id:'window',label:'窗口',items:[item('最小化'),item('缩放'),sep,item('下一个标签页','Ctrl Tab'),item('上一个标签页','Ctrl ⇧ Tab'),item('恢复关闭的标签页','⇧ ⌘ T'),item('关闭所有标签页')]},
-    {id:'help',label:'帮助',items:[item('快捷键一览','',true),item('打开日志目录'),item('问题反馈（GitHub Issue）'),...(platform==='windows'?[sep,item('关于 Aline')]:[])]}
+    {id:'help',label:'帮助',items:[item('快捷键一览'),item('打开日志目录'),item('问题反馈（GitHub Issue）'),...(platform==='windows'?[sep,item('关于 Aline')]:[])]}
   ];
   const shownMenus = menus.filter(menu => !menu.macOnly || platform === 'macos');
   const themeModes = [['light','白天'],['dark','夜间'],['sepia','护眼']];
@@ -126,7 +126,8 @@
     if (row.dataset.mode) window.setAppearanceMode?.(row.dataset.mode,true);
     else if (row.dataset.palette) window.setPaletteFamily?.(row.dataset.palette);
     else if (label==='设置…') $('#settings-open')?.click();
-    else if (label==='关于 Aline') $('#open-about')?.click();
+    else if (label==='关于 Aline') window.openAboutDialog?.();
+    else if (label==='快捷键一览') window.openShortcutsDialog?.();
     else if (label==='切换所见即所得/源码') $('#mode-source')?.click();
     else if (label==='切换侧边栏') $('#sidebar-toggle')?.click();
     else if (label==='专注模式') $('#focus-mode')?.click();

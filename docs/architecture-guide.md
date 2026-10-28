@@ -280,7 +280,7 @@ ElyMark 也发作过同一种病：16MiB 全选字数统计在 UI 线程 1.8s，
 
 1. **单一 global + observe + refresh_windows 是唯一传播机制**：theme / locale / settings 各一个 `Global`（§8.13 的准入规则），改动后 `cx.observe_global` + `refresh_windows()`（Zed 78 个观察点验证的形态）；禁止第二套通知机制。
 2. **设置一次解析成类型化快照**（`Settings` struct），运行期不再碰 TOML；两级合并（默认值 + 用户文件）起步，Zed 六层 SettingsStore 明确不抄。
-3. **主题 token 语义分组**（背景 / 前景 / 强调 / 状态 / 语法）+ refine 派生：默认只填 ~15 个锚点色，其余由锚点推导（Zed `ThemeSettings::refine` 形态）；内容色与选择色分离。【建议】
+3. **主题 token 语义分组**（背景 / 前景 / 强调 / 状态 / 语法）+ refine 派生：内置默认值可只填约 15 个锚点色，其余由锚点推导（Zed `ThemeSettings::refine` 形态）；用户主题先逐字段合并 GitHub 基准，再执行派生。主题包可覆盖规范 allowlist 中的叶子字段；内容色与选择色分离。【建议】
 4. **i18n `t("key")` 第一天强制**（rust-style-guide §11）；引擎错误枚举的翻译只发生在 UI 层。
 5. 主题切换首帧走"立即应用"路径（Ely `set_mode_now` 专供首帧），之后的切换才可过渡——首帧不闪。
 6. token 名与调色板字段的对齐用测试锁死：每个颜色名都能被 `token()` 找到，未知名 panic（Ely `theme/tests.rs`）。
@@ -289,8 +289,12 @@ ElyMark 也发作过同一种病：16MiB 全选字数统计在 UI 线程 1.8s，
 
 1. V1 编译期静态注册（五个内置插件即接口测试用例）；动态加载后置到 V2。插件设置归属与启停行为见 [plugin-system.md](./plugin-system.md)。【强制】
 2. **插件接口分两层（2026-10-26 裁决，与 v1-architecture §9.1 统一）**：外部（wasm/进程外）插件只允许 `AssetRenderer → RenderDesc`（SVG 字节 / 尺寸，纯数据进出，无元素、无 gpui 类型）——锁定 V2 wasm 化的接口形状；内置（编译期进程内）插件可用元素级 `BlockRenderer`（experimental，永不跨 wasm 边界）。原"一律返回 desc"的表述与 v1-architecture §9.1 的 AnyElement 签名冲突，本条修订为两层制。【强制】
-3. 声明式资源（外部主题 / 语言包 catalog）宿主直读，永不进沙箱；`extension.toml` 清单约定第一天就用（Zed 同款）。【建议】
-4. 接口标注 `experimental`，形状不稳是已知风险（v1-architecture 第 14 章）。【强制】
+3. **解析扩展契约由 `aline-markdown` 定义，插件实现并由宿主注入**；引擎 crate 禁止反向依赖 `aline-plugin`。预处理必须携带“改写字节 → 原源码字节”映射；解析后处理只消费核心 mdast 并生成带源码范围的纯数据扩展节点。pulldown-cmark 仍是唯一 Markdown 解析器。【强制】
+4. 扩展解析为确定性纯逻辑，不访问 GPUI、文件系统或网络；固定执行顺序，扩展 ID 唯一，冲突需显式诊断并回退核心行为。【强制】
+5. 声明式资源（外部主题 / 语言包 catalog）宿主直读，永不进沙箱；`extension.toml` 清单约定第一天就用（Zed 同款）。【建议】
+6. 接口标注 `experimental`，形状不稳是已知风险（v1-architecture 第 14 章）。【强制】
+7. **文档修改型插件只能返回提案，不能直接写 buffer**：提案绑定文档身份和生成时版本，携带源码区间补丁；UI 展示差异并等待用户接受，`aline-edit` 校验版本和范围后以单事务应用。过期提案拒绝并重新生成，不自动重基。【强制】
+8. 将文档内容发送给远程 AI 前，必须清楚展示发送范围与目标服务并获得用户授权；不得在后台静默上传完整文档。【强制】
 
 ## 15. 持久化与文件
 

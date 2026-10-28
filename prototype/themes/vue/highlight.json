@@ -1,0 +1,80 @@
+{
+  "common": {},
+  "modes": {
+    "light": {
+      "syntax": {
+        "keyword": "#42b883",
+        "string": "#1a7f5a",
+        "function": "#7c3aed",
+        "number": "#087ea4",
+        "comment": "#62717f",
+        "operator": "#213547",
+        "punctuation": "#213547",
+        "type": "#42b883",
+        "tag": "#42b883",
+        "attribute": "#7c3aed",
+        "variable": "#213547",
+        "macro": "#42b883",
+        "inserted": "#1a7f37",
+        "deleted": "#cf222e"
+      },
+      "codeBlock": {
+        "background": "#f6f8f7",
+        "color": "#213547",
+        "border": "#e2e8e7",
+        "lineNumberColor": "#62717f",
+        "lineNumberBackground": "#f6f8f7"
+      }
+    },
+    "dark": {
+      "syntax": {
+        "keyword": "#42d392",
+        "string": "#86d9ac",
+        "function": "#b694ff",
+        "number": "#79c9e8",
+        "comment": "#98989f",
+        "operator": "#dfdfd6",
+        "punctuation": "#dfdfd6",
+        "type": "#42d392",
+        "tag": "#42d392",
+        "attribute": "#b694ff",
+        "variable": "#dfdfd6",
+        "macro": "#42d392",
+        "inserted": "#6bc98d",
+        "deleted": "#ff8585"
+      },
+      "codeBlock": {
+        "background": "#18181c",
+        "color": "#dfdfd6",
+        "border": "#34363f",
+        "lineNumberColor": "#98989f",
+        "lineNumberBackground": "#18181c"
+      }
+    },
+    "sepia": {
+      "syntax": {
+        "keyword": "#42b883",
+        "string": "#1a7f5a",
+        "function": "#7c3aed",
+        "number": "#087ea4",
+        "comment": "#6e7974",
+        "operator": "#303b37",
+        "punctuation": "#303b37",
+        "type": "#32855f",
+        "tag": "#32855f",
+        "attribute": "#7c3aed",
+        "variable": "#303b37",
+        "macro": "#42b883",
+        "inserted": "#1a7f37",
+        "deleted": "#cf222e"
+      },
+      "codeBlock": {
+        "background": "#f0efe6",
+        "color": "#303b37",
+        "border": "#dfdfd4",
+        "lineNumberColor": "#6e7974",
+        "lineNumberBackground": "#f0efe6"
+      }
+    }
+  }
+}

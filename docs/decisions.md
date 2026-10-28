@@ -8,8 +8,14 @@
 
 ### 2026-10-28 · UI 参照范围与浅色主题
 
+- **D-2026-10-28-19 · 代码主题与高亮模式归代码高亮插件独立配置**：`highlight.json` 仍是主题包中必需的独立职责文件，提供语义 token 和可选代码块背景/前景/边框/行号色；代码高亮插件设置分别提供“代码主题”（随应用主题家族 / 固定主题包）和“代码高亮模式”（随应用模式 / 固定亮、暗、护眼）。两项独立解析，允许 GitHub 亮色应用 + Vue 暗色代码高亮，且暗色代码表面与文本颜色共同切换以维持对比。只有选择“随应用”的维度才跟随应用变化。该设置属于插件本身，不放在外观主题页；代码块字体、行高、内边距等几何仍由 `markdown.json` 控制。主题配置缺省字段逐字段继承 GitHub 高亮配置，代码块颜色字段缺省则沿用 Markdown 主题。（plugin-system.md §3.5、theme-package-spec.md、v1-architecture.md §8.3、v1-features.md §6、ui-spec.md §13）
+- **D-2026-10-28-18 · 代码高亮配色从 Markdown 与应用界面主题中拆分为必需的 `highlight.json`**：语法插件负责识别、scope 和高亮区间，可独立启停；语义颜色由 `highlight.json` 中的类型化 token 提供，支持用户将一个主题包的界面/Markdown 样式与另一份代码高亮语义色组合。插件设置归属与跟随规则以后续 D19 为准。`markdown.json` 继续定义代码块布局与尺寸；代码块颜色由 D19 明确插件和 Markdown 配置的覆盖关系。主题包 schema 升至 3，`highlight.json` 必须存在但可为 `{}` 或只包含局部字段。（theme-package-spec.md、plugin-system.md §3.5、v1-architecture.md §8.3、v1-features.md §6、ui-spec.md）
+- **D-2026-10-28-17 · 代码语言高亮保留为内置插件，配色归 Aline 主题（已被 D18 修订）**：曾决定语义色跟随界面主题；用户后来明确需要独立组合高亮方案，见 D18。
 - **D-2026-10-28-14 · MarkFlow 界面复刻、Aline 品牌与 GitHub Primer 浅色主题**：MarkFlow 当前桌面应用作为 Aline 的界面结构与交互参照，覆盖主窗口、设置页、对话框、菜单、浮层和其他窗口；应用名称与图标使用 Aline。浅色主题按用户后续明确要求采用素白画布和 GitHub Primer 风格中性色、蓝色强调色，并与 Aline 图标协调，因此该主题决定优先于 MarkFlow 原主题色。功能范围仍受 v1-features.md 限定，只迁移允许范围内的功能语义。验收细节与代码块交互见 ui-spec.md。（ui-spec.md、v1-features.md）
 - **D-2026-10-28-15 · V1 内置插件管理、格式导出与 Mermaid 专属主题**：一期设置页新增插件管理，管理 Mermaid、表格增强、导出、公式、代码高亮五个编译期内置插件；V1 不提供运行时第三方插件加载。导出插件支持 PDF、Word、HTML，关闭后工具栏和菜单栏的导出入口均隐藏。Mermaid 支持跟随应用明暗状态、指定内置主题及导入/自定义主题；Mermaid 主题只影响图表，不并入 Aline 全局主题。表格插件提供行列悬停快捷插入与右键增删、复制操作；关闭后保留基础表格编辑，只隐藏悬停快捷按钮。完整功能、设置与验收见 plugin-system.md。（plugin-system.md、v1-features.md、v1-architecture.md、ui-spec.md）
+- **D-2026-10-28-16 · 自定义主题采用职责拆分 JSON 与默认逐字段继承（文件拆分由 D18 扩充）**：起初主题包使用清单、Markdown 和应用三个 JSON；其余裁决仍有效：三个职责配置必须存在，可以是空对象或部分覆盖；缺失值逐叶继承默认值。主题可选携带有授权文件的静态 TTF/OTF 字体。选择 JSON 是因为主题包可直接被 Rust/浏览器解析并随 ZIP 分发；模式覆盖优先于公共值；非法字段报错，不静默掩盖。仅允许类型化 token 与受支持枚举，不接受 CSS/脚本/任意图形资源；窗口透明度只作用于背景。V1 纳入用户主题包导入。（theme-package-spec.md、v1-architecture.md §8、v1-features.md §7）
+- **D-2026-10-28-20 · 为未来语法插件预留解析扩展契约**：后续 PlantUML、front matter、脚注、`[TOC]` 等插件可接入解析与展示流程。纯数据解析扩展契约定义在 `aline-markdown`，由 `aline-plugin` 实现并由宿主注入，避免 crate 依赖反向；提供映射式预处理与消费核心 mdast 的解析后处理，所有扩展数据保留原始 UTF-8 字节范围。pulldown-cmark 仍为唯一 Markdown 解析器；插件不得重建或直接改写源文本。V1 只预留能力，不实现这些专属插件行为；V1 已有的脚注与 `[TOC]` 基础渲染继续由核心提供。（plugin-system.md §4、v1-architecture.md §9、architecture-guide.md §14）
+- **D-2026-10-28-21 · AI 文档修改采用提案审阅再应用**：未来 AI 插件只生成绑定文档身份与 buffer 版本的纯数据区间补丁提案，不直接访问或修改 buffer。宿主展示差异，用户显式接受后由 `aline-edit` 校验并作为一个补丁事务应用，拒绝则丢弃；版本过期时不自动重基。向远程服务发送文档上下文前，展示发送范围和目标服务并取得用户授权。V1 预留接口，不接入 AI 服务。（plugin-system.md §4.2、v1-architecture.md §9、architecture-guide.md §14）
 
 ## 决策时间线
 

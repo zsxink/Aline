@@ -1102,6 +1102,8 @@ pub enum Event { Changed, Parsed, Pointed(Target), EditRefused(EditRefusal) }
 
 **共同约束**：三个改写器的扫描都必须跳过围栏代码块、缩进代码块与行内代码 span（HTML 块内同样不改写）——代码里的字面 `$$`、`\(` 永不被触碰，否则即数据损坏。每个改写器对此有专项规格测试（§2.11.3）。
 
+**未来插件扩展位**：语法插件可在预处理阶段注册映射式变换，或在核心 mdast 构建后注册纯数据后处理器；扩展契约定义在 `aline-markdown`，由宿主将启用扩展表传入解析入口。预处理必须提供到原文 UTF-8 字节的映射，后处理节点必须携带原文范围。V1 不执行插件自定义解析，也不改变 pulldown-cmark 是唯一 Markdown 解析器的决定；PlantUML、front matter 增强、脚注和 `[TOC]` 后续复用该扩展位，见 [plugin-system.md](./plugin-system.md) §4。
+
 ### 2.3.2 pulldown 配置
 
 ```rust
