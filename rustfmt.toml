@@ -1,0 +1,3 @@
+# 使用已验证 stable 选项，格式宽度统一为 100。
+max_width = 100
+edition = "2024"

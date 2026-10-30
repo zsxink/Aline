@@ -1,0 +1,12 @@
+[package]
+name = "aline-app-core"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+toml.workspace = true
+rust-embed.workspace = true
