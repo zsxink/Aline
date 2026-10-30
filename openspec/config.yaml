@@ -1,0 +1,67 @@
+schema: spec-driven
+
+context: |
+  Language: zh-CN
+  All artifacts must be written in zh-CN.
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+  Aline is a Rust + GPUI Markdown editor. The repository currently starts at M0 and has no Cargo workspace or application implementation.
+  Authoritative product scope: docs/v1-prd.md. Architecture and implementation constraints: AGENTS.md and the current docs linked from docs/README.md. Validation evidence: docs/v1-validation-plan.md.
+  OpenSpec records proposed changes and implementation plans; it does not supersede confirmed repository docs. Cite relevant sections and do not turn unverified plans into claims of completed validation.
+  Follow docs/development-process.md and docs/v1-architecture.md §13 for M0–M6 sequencing and phase exits.
+  Mandatory engineering baseline: openspec/CODE_STANDARDS.md and openspec/specs/engineering-governance/spec.md. Read them and the affected current docs before coding or reviewing. They supplement implementation governance; existing product and confirmed architecture contracts retain their responsibilities.
+  Divide modules by responsibility, state ownership, lifecycle and testable boundaries; line counts are review signals rather than automatic split thresholds. Use design patterns only for real boundaries, variation or testing needs, and prefer the simplest sufficient concrete implementation.
+
+rules:
+  proposal:
+    - Write in Simplified Chinese and cite affected PRD/architecture/spec sections.
+    - State the target M0–M6 phase, non-goals, risks, and acceptance evidence.
+    - Do not silently change a confirmed decision; list any conflict as unresolved.
+    - For code or architecture changes, identify affected crates/modules and applicable CODE_STANDARDS sections and R/S rules.
+  specs:
+    - Feature specs describe observable product behavior; engineering-governance specs describe verifiable development constraints. Keep private implementation details in design/tasks.
+    - Preserve existing AC and vocabulary unless the proposal explicitly changes them.
+    - Include normal and relevant rejection/failure scenarios; do not present planned guards or platform experiments as completed evidence.
+  design:
+    - Respect the crate dependency direction and engine/UI boundary in AGENTS.md.
+    - Include failure, refusal, cancellation, stale-result, and platform implications where applicable.
+    - Read openspec/CODE_STANDARDS.md. Record module responsibilities, state owners, allowed dependency directions, public boundaries and side-effect commit entry points.
+    - Explain the real problem, simplest viable solution, chosen pattern or ordinary implementation, trade-offs and verification. No extra trait, crate or service layer solely to name a pattern.
+    - Explain module split/retention decisions using cohesion, lifecycle, API size and testability, not hard line-count or trait-method limits. Record compatibility and migration impact where relevant.
+  tasks:
+    - Sequence pure engine mechanisms before UI integration where applicable.
+    - Include documentation/validation-plan updates and concrete verification evidence.
+    - Trace task groups to requirements/scenarios and applicable engineering rules. For refactors include obsolete implementation/export/dependency/fake cleanup and reference checks.
+    - Include positive and minimal violating examples when adding or changing automated guards; verify every workspace member actually inherits the intended lint policy.
+
+operations:
+  apply:
+    guidance:
+      - Before coding read openspec/CODE_STANDARDS.md, engineering-governance and affected current docs; apply these rules to local fixes even when no change is required.
+      - Check actual responsibility, dependency, ownership, abstraction and pattern choices against design; update affected artifacts before continuing work that depends on a changed contract.
+      - Verify applicable architecture K and Rust C checks, concrete failure/cancellation cases and the required Cargo commands once the workspace exists. Record actual results, manual checks and uncovered platforms.
+      - Route important architecture/API/security/concurrency/refactor work for independent review as required by AGENTS.md. Do not claim an unimplemented guard is active.
+  archive:
+    guidance:
+      - Confirm implementation, applicable validation, delta synchronization and current-doc updates are complete before archive; archive does not prove milestone exits or V experiments passed.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing

@@ -1,5 +1,7 @@
 # Aline 产品与开发文档
 
+2026-10-30 按用户要求初始化 [OpenSpec 代码与架构执行规范](../openspec/CODE_STANDARDS.md)及[工程治理主规格](../openspec/specs/engineering-governance/spec.md)，后续编码、重构和评审必须遵循。规范汇总现行 R/S 约束并补充模块职责/规模判断、设计模式适用边界和交付证据，参考来源及采纳范围在执行规范 §7；入口和流程已接入 AGENTS、[开发流程](./development-process.md)及 OpenSpec 配置。产品与专项文档继续按下述职责负责，变更提案不得覆盖已确认契约；当前无 Cargo workspace，M0 工程守卫及 V-01～V-09 仍未完成，见[本次决定记录](./decisions.md#13-2026-10-30-openspec-工程规范初始化)。
+
 2026-10-30 [开发前独立终审](./maintenance/pre-development-review/report.md)及[M0 任务顺序](./maintenance/pre-development-review/m0-task-order.md)是维护审计入口，**不是产品规范或技术验证结果**。实际阅读范围、必要修订、需求追踪及检查限制见[附件说明](./maintenance/pre-development-review/README.md)；V-01～V-09 与 M0 工具实验状态仍以验证计划及实际取证为准。
 
 2026-10-30 [独立删除准备复核](./maintenance/deletion-readiness/report.md)及[附件与复查方法](./maintenance/deletion-readiness/README.md)是维护审计入口，**不是产品规范或技术验证结果**。复核收尾通过后，用户明确授权删除，`docs_bak/`、`reports/` 已删除；原件删除前核对、执行范围与删除后检查见[执行记录](./maintenance/deletion-readiness/deletion-execution.md)。下方旧审计的“未授权/未删除”属于当时快照。

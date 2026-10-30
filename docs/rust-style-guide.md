@@ -69,6 +69,8 @@ RS-01 已确认逐项配置策略；`missing_docs`、`expect_used`、打印/调�
 
 ## 3. crate、模块、文件与可见性
 
+后续实现同时遵循 [OpenSpec 执行规范 §3～6](../openspec/CODE_STANDARDS.md)的模块职责/规模判断、抽象与设计模式记录及交付要求；其工程验收见[工程治理主规格](../openspec/specs/engineering-governance/spec.md)。这些补充不改变本章最窄可见性、八 crate、mod.rs 布局及行数仅作人工复核信号的规则。
+
 职责和允许依赖边以[架构 §4](./v1-architecture.md#4-crate-图职责与公开边界)及[架构规范 §1～2](./architecture-guide.md)为准：
 
 ```text

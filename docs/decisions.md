@@ -533,3 +533,15 @@ PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02
 本次用户指令替代 PROTO-01 中旧品牌 PNG 的保留策略，并为 PROTO-04 的只读归档规则增加有限例外：删除 `docs/assets/aline.png` 与 `docs/prototype/legacy/assets/aline.png` 两份旧 PNG，旧 SHA-256 均为 `252fe12bbaa6af7c6738cbc089ad9c8c27e6e4beb97ed760aea9732a6f838317`；历史 `index.html` 三处品牌引用改为共享新 PNG。历史清单的原始 entries / 哈希及既有确认原文、审计快照保持不变，后续精确变更登记在 [inventory.json](./prototype/inventory.json) 的 authorized_updates；其它历史文件仍受原字节检查保护。旧图权利事实不被补造，也不再作为采用新图的前提；PROTO-03 等其余历史来源问题不因此关闭。
 
 回写：PRD §6.1、UI §3.1、架构 §4.5、V-01、素材使用与来源说明、原型入口 / 清单 / 检查器及文档总入口。图标选用与删除已执行，文件级检查见图标目录；打包配置、真实 Dock / Finder / Windows / Linux 显示仍未取证，V-01 与其余 V / M0 状态不变。
+
+## 13. 2026-10-30 OpenSpec 工程规范初始化
+
+来源：用户要求“参考知名公司的 Rust 代码规范、架构规范等，初始化一份 openspec 的代码架构规范”，并要求合理使用设计模式、合理划分模块、参考本地 Echo，以及“以后代码实现过程中必须遵循规范”。本次据此制定后续必遵循的工程基线，未改变产品范围或既有 RS/ED/TA/PL/TH 决定。
+
+落地：[CODE_STANDARDS.md](../openspec/CODE_STANDARDS.md)集中说明 crate/状态所有者、模块职责与规模判断、抽象准入、模式适用与代价、Rust 规则索引、OpenSpec 工件和交付证据；[engineering-governance 主规格](../openspec/specs/engineering-governance/spec.md)提供可验收要求与场景。同步 AGENTS、OpenSpec context/rules/apply/archive 指引、开发流程、架构/Rust 规范和文档入口，局部修复同样适用。
+
+依据与取舍：参考 Microsoft、Google、PingCAP/TiKV 和 Rust 官方一手资料，具体链接与采纳边界见执行规范 §7；借鉴 Echo 的规范/工作流/有效门禁组织，保留 Aline 八 crate、单解析器、源码补丁/保真/坐标、无头引擎和零运行时引入约束。模块按职责、生命周期、最小 API 和可测试性拆分；约 500 行仍仅为人工复核信号，不引入 Echo 的 1000 行、trait 方法数或覆盖率硬门槛。模式须说明问题、最简单方案、代价与验证，允许保持普通函数/具体类型。
+
+效力与验证：工程基线自本次初始化起约束后续开发；现行产品和专项契约继续按职责负责，拟议 change 不能自动覆盖已确认决定。M0 仍需实际建立并以正反例证明依赖闭包、成员 lint 等自动守卫；OpenSpec 格式检查不代替 Cargo、平台或 V 验证。未创建应用代码、Cargo workspace、CI 或新的依赖，V-01～V-09 与阶段出口状态保持不变。
+
+本次检查：OpenSpec CLI 1.13.2 执行 `openspec validate --all --strict --no-interactive`，工程治理主规格 1/1 通过（12 项要求）；PyYAML 解析配置及字段类型通过；在临时项目验证 proposal/specs/design/tasks 的 context/rules 和 apply/archive 的 guidance 均被 CLI 实际加载，临时项目已移除；所涉八份 Markdown 的 395 处本地目标/锚点引用通过，`git diff --check` 通过。独立审查提出的热路径措辞和 S 规则索引问题已修正并复核关闭，无剩余审查阻塞项。上述为文档和配置证据，未运行 Cargo 或平台实验。
