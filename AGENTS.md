@@ -61,4 +61,4 @@ cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 - **按里程碑推进**（v1-architecture 第 13 章）：M0 引擎地基 → M1 单文档只读 → M2 可编辑核心（可日用）→ M3 命令与表格 → M4 插件与主题 → M5 应用壳 → M6 收尾。阶段可形成内部预览，验收按三平台分别取证；先 macOS 后 Windows/Linux 验证，正式 V1 三平台同发（PRD §9、V-01）。
 - 新增依赖先对照 engine-design §18.2 和 v1-architecture §3.2 的准入规则，同类功能不得引入第二个库。
 - 实现期对照：ElyMark 完整历史关键文件索引已保全于 `docs/archive/migration-evidence/engine-design.md`，当前入口见 engine-design §18.3；Zed 克隆在 `/Users/xian/Project/book/zed`（gpui 新架构与锁定的 gpui-pre 存在 API 代差，机制线索参考 docs/zed-notes.md §0及其完整历史证据，具体 API 及性能结论须重新取证）。Aline 全部自写实现，外部源码只作对照参考。
-- 外观与交互参照 MarkFlow（`/Users/xian/Project/book/MarkFlow`）：设置模型、导出主题、图片粘贴、自动保存/外部修改检测等功能语义从它迁移（迁语义不迁代码）。其 2026-10-25 性能诊断（128KB 文档卡顿三病根，issue #458/#459/#460）已并入 architecture-guide §11 作为反面实证；方向研究报告全文在 MarkFlow 仓库 `docs/superpowers/specs/2026-10-26-aline-gpui-rebuild-design.md`。
+- 外观与交互参照 MarkFlow（[`MarkFlow`](https://github.com/zsxink/MarkFlow)）：设置模型、导出主题、图片粘贴、自动保存/外部修改检测等功能语义从它迁移（迁语义不迁代码）。其 2026-10-25 性能诊断（128KB 文档卡顿三病根，issue #458/#459/#460）已并入 architecture-guide §11 作为反面实证；方向研究报告全文在 MarkFlow 仓库 `docs/superpowers/specs/2026-10-26-aline-gpui-rebuild-design.md`。
