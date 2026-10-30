@@ -1,0 +1,826 @@
+[
+  {
+    "scenario": "metadata-base-final",
+    "metadata_reachable_packages": 318,
+    "cargo_tree_selected_packages": 285,
+    "findings": [
+      {
+        "package": "regex",
+        "version": "1.13.1",
+        "metadata_shortest_path": [
+          {
+            "from": "aline-m0-gpui-candidate@0.0.0",
+            "to": "gpui-pre@0.3.9",
+            "alias": "gpui",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          },
+          {
+            "from": "gpui-pre@0.3.9",
+            "to": "regex@1.13.1",
+            "alias": "regex",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ],
+        "selected_by_cargo_tree": true,
+        "metadata_features": [
+          "default",
+          "perf",
+          "perf-backtrack",
+          "perf-cache",
+          "perf-dfa",
+          "perf-inline",
+          "perf-literal",
+          "perf-onepass",
+          "std",
+          "unicode",
+          "unicode-age",
+          "unicode-bool",
+          "unicode-case",
+          "unicode-gencat",
+          "unicode-perl",
+          "unicode-script",
+          "unicode-segment"
+        ]
+      },
+      {
+        "package": "wasip2",
+        "version": "1.0.4+wasi-0.2.12",
+        "metadata_shortest_path": [
+          {
+            "from": "aline-m0-gpui-candidate@0.0.0",
+            "to": "gpui-pre@0.3.9",
+            "alias": "gpui",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          },
+          {
+            "from": "gpui-pre@0.3.9",
+            "to": "getrandom@0.3.4",
+            "alias": "getrandom",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": "cfg(target_family = \"wasm\")"
+              }
+            ]
+          },
+          {
+            "from": "getrandom@0.3.4",
+            "to": "wasip2@1.0.4+wasi-0.2.12",
+            "alias": "wasip2",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": "cfg(all(target_arch = \"wasm32\", target_os = \"wasi\", target_env = \"p2\"))"
+              }
+            ]
+          }
+        ],
+        "selected_by_cargo_tree": true,
+        "metadata_features": []
+      }
+    ],
+    "admission": "未准入；regex 实际可达，与当前禁令冲突",
+    "limits": "仅核查已知包名与最短路径；不穷举路径、不证明未知包用途或五引擎合规"
+  },
+  {
+    "scenario": "metadata-base",
+    "metadata_reachable_packages": 318,
+    "cargo_tree_selected_packages": 285,
+    "findings": [
+      {
+        "package": "regex",
+        "version": "1.13.1",
+        "metadata_shortest_path": [
+          {
+            "from": "aline-m0-gpui-candidate@0.0.0",
+            "to": "gpui-pre@0.3.9",
+            "alias": "gpui",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          },
+          {
+            "from": "gpui-pre@0.3.9",
+            "to": "regex@1.13.1",
+            "alias": "regex",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ],
+        "selected_by_cargo_tree": true,
+        "metadata_features": [
+          "default",
+          "perf",
+          "perf-backtrack",
+          "perf-cache",
+          "perf-dfa",
+          "perf-inline",
+          "perf-literal",
+          "perf-onepass",
+          "std",
+          "unicode",
+          "unicode-age",
+          "unicode-bool",
+          "unicode-case",
+          "unicode-gencat",
+          "unicode-perl",
+          "unicode-script",
+          "unicode-segment"
+        ]
+      },
+      {
+        "package": "wasip2",
+        "version": "1.0.4+wasi-0.2.12",
+        "metadata_shortest_path": [
+          {
+            "from": "aline-m0-gpui-candidate@0.0.0",
+            "to": "gpui-pre@0.3.9",
+            "alias": "gpui",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          },
+          {
+            "from": "gpui-pre@0.3.9",
+            "to": "getrandom@0.3.4",
+            "alias": "getrandom",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": "cfg(target_family = \"wasm\")"
+              }
+            ]
+          },
+          {
+            "from": "getrandom@0.3.4",
+            "to": "wasip2@1.0.4+wasi-0.2.12",
+            "alias": "wasip2",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": "cfg(all(target_arch = \"wasm32\", target_os = \"wasi\", target_env = \"p2\"))"
+              }
+            ]
+          }
+        ],
+        "selected_by_cargo_tree": true,
+        "metadata_features": []
+      }
+    ],
+    "admission": "未准入；regex 实际可达，与当前禁令冲突",
+    "limits": "仅核查已知包名与最短路径；不穷举路径、不证明未知包用途或五引擎合规"
+  },
+  {
+    "scenario": "metadata-linux-arm-both",
+    "metadata_reachable_packages": 295,
+    "cargo_tree_selected_packages": 250,
+    "findings": [
+      {
+        "package": "regex",
+        "version": "1.13.1",
+        "metadata_shortest_path": [
+          {
+            "from": "aline-m0-gpui-candidate@0.0.0",
+            "to": "gpui-pre@0.3.9",
+            "alias": "gpui",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          },
+          {
+            "from": "gpui-pre@0.3.9",
+            "to": "regex@1.13.1",
+            "alias": "regex",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ],
+        "selected_by_cargo_tree": true,
+        "metadata_features": [
+          "default",
+          "perf",
+          "perf-backtrack",
+          "perf-cache",
+          "perf-dfa",
+          "perf-inline",
+          "perf-literal",
+          "perf-onepass",
+          "std",
+          "unicode",
+          "unicode-age",
+          "unicode-bool",
+          "unicode-case",
+          "unicode-gencat",
+          "unicode-perl",
+          "unicode-script",
+          "unicode-segment"
+        ]
+      }
+    ],
+    "admission": "未准入；regex 实际可达，与当前禁令冲突",
+    "limits": "仅核查已知包名与最短路径；不穷举路径、不证明未知包用途或五引擎合规"
+  },
+  {
+    "scenario": "metadata-linux-x64-both",
+    "metadata_reachable_packages": 296,
+    "cargo_tree_selected_packages": 251,
+    "findings": [
+      {
+        "package": "regex",
+        "version": "1.13.1",
+        "metadata_shortest_path": [
+          {
+            "from": "aline-m0-gpui-candidate@0.0.0",
+            "to": "gpui-pre@0.3.9",
+            "alias": "gpui",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          },
+          {
+            "from": "gpui-pre@0.3.9",
+            "to": "regex@1.13.1",
+            "alias": "regex",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ],
+        "selected_by_cargo_tree": true,
+        "metadata_features": [
+          "default",
+          "perf",
+          "perf-backtrack",
+          "perf-cache",
+          "perf-dfa",
+          "perf-inline",
+          "perf-literal",
+          "perf-onepass",
+          "std",
+          "unicode",
+          "unicode-age",
+          "unicode-bool",
+          "unicode-case",
+          "unicode-gencat",
+          "unicode-perl",
+          "unicode-script",
+          "unicode-segment"
+        ]
+      }
+    ],
+    "admission": "未准入；regex 实际可达，与当前禁令冲突",
+    "limits": "仅核查已知包名与最短路径；不穷举路径、不证明未知包用途或五引擎合规"
+  },
+  {
+    "scenario": "metadata-linux-x64-wayland",
+    "metadata_reachable_packages": 286,
+    "cargo_tree_selected_packages": 251,
+    "findings": [
+      {
+        "package": "regex",
+        "version": "1.13.1",
+        "metadata_shortest_path": [
+          {
+            "from": "aline-m0-gpui-candidate@0.0.0",
+            "to": "gpui-pre@0.3.9",
+            "alias": "gpui",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          },
+          {
+            "from": "gpui-pre@0.3.9",
+            "to": "regex@1.13.1",
+            "alias": "regex",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ],
+        "selected_by_cargo_tree": true,
+        "metadata_features": [
+          "default",
+          "perf",
+          "perf-backtrack",
+          "perf-cache",
+          "perf-dfa",
+          "perf-inline",
+          "perf-literal",
+          "perf-onepass",
+          "std",
+          "unicode",
+          "unicode-age",
+          "unicode-bool",
+          "unicode-case",
+          "unicode-gencat",
+          "unicode-perl",
+          "unicode-script",
+          "unicode-segment"
+        ]
+      }
+    ],
+    "admission": "未准入；regex 实际可达，与当前禁令冲突",
+    "limits": "仅核查已知包名与最短路径；不穷举路径、不证明未知包用途或五引擎合规"
+  },
+  {
+    "scenario": "metadata-linux-x64-x11",
+    "metadata_reachable_packages": 296,
+    "cargo_tree_selected_packages": 251,
+    "findings": [
+      {
+        "package": "regex",
+        "version": "1.13.1",
+        "metadata_shortest_path": [
+          {
+            "from": "aline-m0-gpui-candidate@0.0.0",
+            "to": "gpui-pre@0.3.9",
+            "alias": "gpui",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          },
+          {
+            "from": "gpui-pre@0.3.9",
+            "to": "regex@1.13.1",
+            "alias": "regex",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ],
+        "selected_by_cargo_tree": true,
+        "metadata_features": [
+          "default",
+          "perf",
+          "perf-backtrack",
+          "perf-cache",
+          "perf-dfa",
+          "perf-inline",
+          "perf-literal",
+          "perf-onepass",
+          "std",
+          "unicode",
+          "unicode-age",
+          "unicode-bool",
+          "unicode-case",
+          "unicode-gencat",
+          "unicode-perl",
+          "unicode-script",
+          "unicode-segment"
+        ]
+      }
+    ],
+    "admission": "未准入；regex 实际可达，与当前禁令冲突",
+    "limits": "仅核查已知包名与最短路径；不穷举路径、不证明未知包用途或五引擎合规"
+  },
+  {
+    "scenario": "metadata-macos-arm-test",
+    "metadata_reachable_packages": 318,
+    "cargo_tree_selected_packages": 280,
+    "findings": [
+      {
+        "package": "regex",
+        "version": "1.13.1",
+        "metadata_shortest_path": [
+          {
+            "from": "aline-m0-gpui-candidate@0.0.0",
+            "to": "gpui-pre@0.3.9",
+            "alias": "gpui",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          },
+          {
+            "from": "gpui-pre@0.3.9",
+            "to": "regex@1.13.1",
+            "alias": "regex",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ],
+        "selected_by_cargo_tree": true,
+        "metadata_features": [
+          "default",
+          "perf",
+          "perf-backtrack",
+          "perf-cache",
+          "perf-dfa",
+          "perf-inline",
+          "perf-literal",
+          "perf-onepass",
+          "std",
+          "unicode",
+          "unicode-age",
+          "unicode-bool",
+          "unicode-case",
+          "unicode-gencat",
+          "unicode-perl",
+          "unicode-script",
+          "unicode-segment"
+        ]
+      }
+    ],
+    "admission": "未准入；regex 实际可达，与当前禁令冲突",
+    "limits": "仅核查已知包名与最短路径；不穷举路径、不证明未知包用途或五引擎合规"
+  },
+  {
+    "scenario": "metadata-macos-arm",
+    "metadata_reachable_packages": 286,
+    "cargo_tree_selected_packages": 251,
+    "findings": [
+      {
+        "package": "regex",
+        "version": "1.13.1",
+        "metadata_shortest_path": [
+          {
+            "from": "aline-m0-gpui-candidate@0.0.0",
+            "to": "gpui-pre@0.3.9",
+            "alias": "gpui",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          },
+          {
+            "from": "gpui-pre@0.3.9",
+            "to": "regex@1.13.1",
+            "alias": "regex",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ],
+        "selected_by_cargo_tree": true,
+        "metadata_features": [
+          "default",
+          "perf",
+          "perf-backtrack",
+          "perf-cache",
+          "perf-dfa",
+          "perf-inline",
+          "perf-literal",
+          "perf-onepass",
+          "std",
+          "unicode",
+          "unicode-age",
+          "unicode-bool",
+          "unicode-case",
+          "unicode-gencat",
+          "unicode-perl",
+          "unicode-script",
+          "unicode-segment"
+        ]
+      }
+    ],
+    "admission": "未准入；regex 实际可达，与当前禁令冲突",
+    "limits": "仅核查已知包名与最短路径；不穷举路径、不证明未知包用途或五引擎合规"
+  },
+  {
+    "scenario": "metadata-macos-intel",
+    "metadata_reachable_packages": 287,
+    "cargo_tree_selected_packages": 252,
+    "findings": [
+      {
+        "package": "regex",
+        "version": "1.13.1",
+        "metadata_shortest_path": [
+          {
+            "from": "aline-m0-gpui-candidate@0.0.0",
+            "to": "gpui-pre@0.3.9",
+            "alias": "gpui",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          },
+          {
+            "from": "gpui-pre@0.3.9",
+            "to": "regex@1.13.1",
+            "alias": "regex",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ],
+        "selected_by_cargo_tree": true,
+        "metadata_features": [
+          "default",
+          "perf",
+          "perf-backtrack",
+          "perf-cache",
+          "perf-dfa",
+          "perf-inline",
+          "perf-literal",
+          "perf-onepass",
+          "std",
+          "unicode",
+          "unicode-age",
+          "unicode-bool",
+          "unicode-case",
+          "unicode-gencat",
+          "unicode-perl",
+          "unicode-script",
+          "unicode-segment"
+        ]
+      }
+    ],
+    "admission": "未准入；regex 实际可达，与当前禁令冲突",
+    "limits": "仅核查已知包名与最短路径；不穷举路径、不证明未知包用途或五引擎合规"
+  },
+  {
+    "scenario": "metadata-test-support-resolve",
+    "metadata_reachable_packages": 411,
+    "cargo_tree_selected_packages": 317,
+    "findings": [
+      {
+        "package": "regex",
+        "version": "1.13.1",
+        "metadata_shortest_path": [
+          {
+            "from": "aline-m0-gpui-candidate@0.0.0",
+            "to": "gpui-pre@0.3.9",
+            "alias": "gpui",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          },
+          {
+            "from": "gpui-pre@0.3.9",
+            "to": "regex@1.13.1",
+            "alias": "regex",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ],
+        "selected_by_cargo_tree": true,
+        "metadata_features": [
+          "default",
+          "perf",
+          "perf-backtrack",
+          "perf-cache",
+          "perf-dfa",
+          "perf-inline",
+          "perf-literal",
+          "perf-onepass",
+          "std",
+          "unicode",
+          "unicode-age",
+          "unicode-bool",
+          "unicode-case",
+          "unicode-gencat",
+          "unicode-perl",
+          "unicode-script",
+          "unicode-segment"
+        ]
+      },
+      {
+        "package": "wasip2",
+        "version": "1.0.4+wasi-0.2.12",
+        "metadata_shortest_path": [
+          {
+            "from": "aline-m0-gpui-candidate@0.0.0",
+            "to": "gpui-pre@0.3.9",
+            "alias": "gpui",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          },
+          {
+            "from": "gpui-pre@0.3.9",
+            "to": "getrandom@0.3.4",
+            "alias": "getrandom",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": "cfg(target_family = \"wasm\")"
+              }
+            ]
+          },
+          {
+            "from": "getrandom@0.3.4",
+            "to": "wasip2@1.0.4+wasi-0.2.12",
+            "alias": "wasip2",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": "cfg(all(target_arch = \"wasm32\", target_os = \"wasi\", target_env = \"p2\"))"
+              }
+            ]
+          }
+        ],
+        "selected_by_cargo_tree": true,
+        "metadata_features": []
+      },
+      {
+        "package": "wasi",
+        "version": "0.11.1+wasi-snapshot-preview1",
+        "metadata_shortest_path": [
+          {
+            "from": "aline-m0-gpui-candidate@0.0.0",
+            "to": "gpui-pre@0.3.9",
+            "alias": "gpui",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          },
+          {
+            "from": "gpui-pre@0.3.9",
+            "to": "zed-scap@0.0.8-zed",
+            "alias": "scap",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": "cfg(any(target_os = \"linux\", target_os = \"freebsd\", target_os = \"windows\"))"
+              }
+            ]
+          },
+          {
+            "from": "zed-scap@0.0.8-zed",
+            "to": "rand@0.8.8",
+            "alias": "rand",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": "cfg(any(target_os = \"linux\", target_os = \"freebsd\"))"
+              }
+            ]
+          },
+          {
+            "from": "rand@0.8.8",
+            "to": "rand_core@0.6.4",
+            "alias": "rand_core",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          },
+          {
+            "from": "rand_core@0.6.4",
+            "to": "getrandom@0.2.17",
+            "alias": "getrandom",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          },
+          {
+            "from": "getrandom@0.2.17",
+            "to": "wasi@0.11.1+wasi-snapshot-preview1",
+            "alias": "wasi",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": "cfg(target_os = \"wasi\")"
+              }
+            ]
+          }
+        ],
+        "selected_by_cargo_tree": false,
+        "metadata_features": []
+      }
+    ],
+    "admission": "未准入；regex 实际可达，与当前禁令冲突",
+    "limits": "仅核查已知包名与最短路径；不穷举路径、不证明未知包用途或五引擎合规"
+  },
+  {
+    "scenario": "metadata-windows-x64",
+    "metadata_reachable_packages": 304,
+    "cargo_tree_selected_packages": 263,
+    "findings": [
+      {
+        "package": "regex",
+        "version": "1.13.1",
+        "metadata_shortest_path": [
+          {
+            "from": "aline-m0-gpui-candidate@0.0.0",
+            "to": "gpui-pre@0.3.9",
+            "alias": "gpui",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          },
+          {
+            "from": "gpui-pre@0.3.9",
+            "to": "regex@1.13.1",
+            "alias": "regex",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ],
+        "selected_by_cargo_tree": true,
+        "metadata_features": [
+          "default",
+          "perf",
+          "perf-backtrack",
+          "perf-cache",
+          "perf-dfa",
+          "perf-inline",
+          "perf-literal",
+          "perf-onepass",
+          "std",
+          "unicode",
+          "unicode-age",
+          "unicode-bool",
+          "unicode-case",
+          "unicode-gencat",
+          "unicode-perl",
+          "unicode-script",
+          "unicode-segment"
+        ]
+      }
+    ],
+    "admission": "未准入；regex 实际可达，与当前禁令冲突",
+    "limits": "仅核查已知包名与最短路径；不穷举路径、不证明未知包用途或五引擎合规"
+  }
+]

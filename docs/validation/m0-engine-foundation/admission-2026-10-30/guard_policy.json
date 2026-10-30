@@ -1,0 +1,201 @@
+{
+  "format": 1,
+  "purpose": "第1组精确候选；不是workspace工程门禁",
+  "scenarios": {
+    "clean": {
+      "has_gpui": false
+    },
+    "base-final": {
+      "has_gpui": true,
+      "gpui_subtree_sha256": "132457ed41e56c4fc2463ae86d36286b6c300149bacbf7c519946b7e197974c0",
+      "metadata": "metadata-base-final.json",
+      "tree": "tree-all-base-packages.stdout.log"
+    },
+    "test-support-resolve": {
+      "has_gpui": true,
+      "gpui_subtree_sha256": "8e6eac2b8d0c3be8389edb232814f04eb462b9d36b18279ece23b96ce160c4c5",
+      "metadata": "metadata-test-support-resolve.json",
+      "tree": "tree-all-test-support-packages.stdout.log"
+    },
+    "macos-arm": {
+      "has_gpui": true,
+      "gpui_subtree_sha256": "c79b601a236318d51c89c8806aa43b8c7500507679fab10c04c6ff9717213640",
+      "metadata": "metadata-macos-arm.json",
+      "tree": "tree-macos-arm-packages.stdout.log"
+    },
+    "macos-intel": {
+      "has_gpui": true,
+      "gpui_subtree_sha256": "2dbcd810e1874f98ba58ab5345402f40fd92e127fefb3485afe9bc4106322340",
+      "metadata": "metadata-macos-intel.json",
+      "tree": "tree-macos-intel-packages.stdout.log"
+    },
+    "windows-x64": {
+      "has_gpui": true,
+      "gpui_subtree_sha256": "b74a158a922151c71a5fcd946823041fbe59ea898bcf7286615db3319f1241f6",
+      "metadata": "metadata-windows-x64.json",
+      "tree": "tree-windows-x64-packages.stdout.log"
+    },
+    "linux-x64-x11": {
+      "has_gpui": true,
+      "gpui_subtree_sha256": "e5a64ef06dc534e424510c73ac7a78a982944575cd0f662d2cb30732b66abb9d",
+      "metadata": "metadata-linux-x64-x11.json",
+      "tree": "tree-linux-x64-x11-packages.stdout.log"
+    },
+    "linux-x64-wayland": {
+      "has_gpui": true,
+      "gpui_subtree_sha256": "350956525588f7eb4bb2d5ccf4bf3942a49b3443e9c46e49e0c9c1ee737d22e6",
+      "metadata": "metadata-linux-x64-wayland.json",
+      "tree": "tree-linux-x64-wayland-packages.stdout.log"
+    },
+    "linux-x64-both": {
+      "has_gpui": true,
+      "gpui_subtree_sha256": "37d763f9815f280d0d0378fe6916dad48b8c5caf2a43f8f97f95139a761597a2",
+      "metadata": "metadata-linux-x64-both.json",
+      "tree": "tree-linux-x64-both-packages.stdout.log"
+    },
+    "linux-arm-both": {
+      "has_gpui": true,
+      "gpui_subtree_sha256": "1362d67dca0f6d8c0559b9ea363ca5b0a6cdfacf2c0f264af48781826556c0bb",
+      "metadata": "metadata-linux-arm-both.json",
+      "tree": "tree-linux-arm-both-packages.stdout.log"
+    },
+    "macos-arm-test": {
+      "has_gpui": true,
+      "gpui_subtree_sha256": "a543144804b8681b20b7597d0ee0ae21955da5639d2b79fc7faf29d90ead0643",
+      "metadata": "metadata-macos-arm-test.json",
+      "tree": "tree-macos-arm-test-packages.stdout.log"
+    }
+  },
+  "exceptions": {
+    "regex-automata@0.4.18": {
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "ad8553b9b26413251cbf30e620595c7a41b3887f03da04579c0e6b0d6a06b4b2",
+      "incoming": [
+        {
+          "from": "regex@1.13.1",
+          "to": "regex-automata@0.4.18",
+          "alias": "regex_automata",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ]
+        }
+      ],
+      "scenarios": [
+        "base-final",
+        "test-support-resolve",
+        "macos-arm",
+        "macos-intel",
+        "windows-x64",
+        "linux-x64-x11",
+        "linux-x64-wayland",
+        "linux-x64-both",
+        "linux-arm-both",
+        "macos-arm-test"
+      ]
+    },
+    "regex-syntax@0.8.11": {
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4",
+      "incoming": [
+        {
+          "from": "regex-automata@0.4.18",
+          "to": "regex-syntax@0.8.11",
+          "alias": "regex_syntax",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ]
+        },
+        {
+          "from": "regex@1.13.1",
+          "to": "regex-syntax@0.8.11",
+          "alias": "regex_syntax",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ]
+        },
+        {
+          "from": "proptest@1.12.0",
+          "to": "regex-syntax@0.8.11",
+          "alias": "regex_syntax",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ]
+        }
+      ],
+      "scenarios": [
+        "base-final",
+        "test-support-resolve",
+        "macos-arm",
+        "macos-intel",
+        "windows-x64",
+        "linux-x64-x11",
+        "linux-x64-wayland",
+        "linux-x64-both",
+        "linux-arm-both",
+        "macos-arm-test"
+      ]
+    },
+    "regex@1.13.1": {
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "f020237b6c8eed93db2e2cb53c00c60a8e1bc73da7d073199a1180401450218d",
+      "incoming": [
+        {
+          "from": "gpui-pre@0.3.9",
+          "to": "regex@1.13.1",
+          "alias": "regex",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ]
+        }
+      ],
+      "scenarios": [
+        "base-final",
+        "test-support-resolve",
+        "macos-arm",
+        "macos-intel",
+        "windows-x64",
+        "linux-x64-x11",
+        "linux-x64-wayland",
+        "linux-x64-both",
+        "linux-arm-both",
+        "macos-arm-test"
+      ]
+    },
+    "wasip2@1.0.4+wasi-0.2.12": {
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "b67efb37e106e55ce722a510d6b5f9c17f083e5fc79afc2badeb12cc313d9487",
+      "incoming": [
+        {
+          "from": "getrandom@0.3.4",
+          "to": "wasip2@1.0.4+wasi-0.2.12",
+          "alias": "wasip2",
+          "kinds": [
+            {
+              "kind": null,
+              "target": "cfg(all(target_arch = \"wasm32\", target_os = \"wasi\", target_env = \"p2\"))"
+            }
+          ]
+        }
+      ],
+      "scenarios": [
+        "base-final",
+        "test-support-resolve"
+      ]
+    }
+  }
+}

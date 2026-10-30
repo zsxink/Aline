@@ -1,0 +1,9 @@
+{
+  "kind": "明确合成的输入变异，不是真实 Cargo 输出",
+  "base": "metadata-base-final.json / tree-all-base-packages.stdout.log / candidate/Cargo.lock",
+  "transformation": "negative-gpui-source-drift",
+  "expected_diagnostic": "子图",
+  "expected_exit_code": 1,
+  "metadata_sha256": "8102d00b4df760982737bd43131f3d04858124c69f00695f7065b9f18e10c73e",
+  "temporary_inputs": "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-candidate-guard-tests-ld3kmb2z/negative-gpui-source-drift"
+}

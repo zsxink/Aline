@@ -1,0 +1,9 @@
+{
+  "kind": "明确合成的输入变异，不是真实 Cargo 输出",
+  "base": "metadata-base-final.json / tree-all-base-packages.stdout.log / candidate/Cargo.lock",
+  "transformation": "negative-nested-engine-gpui",
+  "expected_diagnostic": "实际五引擎旁路",
+  "expected_exit_code": 1,
+  "metadata_sha256": "b8f28d5bad48dfdc1c623d02e6d83b0582dc934259ae5b81b832f0dd3eb3fcfa",
+  "temporary_inputs": "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-candidate-guard-tests-ld3kmb2z/negative-nested-engine-gpui"
+}

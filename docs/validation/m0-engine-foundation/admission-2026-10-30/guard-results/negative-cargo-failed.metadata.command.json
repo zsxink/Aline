@@ -1,0 +1,21 @@
+{
+  "id": "negative-cargo-failed.metadata",
+  "argv": [
+    "cargo",
+    "+1.98.1",
+    "metadata",
+    "--offline",
+    "--format-version",
+    "1",
+    "--manifest-path",
+    "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-candidate-guard-tests-ld3kmb2z/missing/Cargo.toml"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "started_utc": "2026-10-30T12:53:22.968377+00:00",
+  "exit_code": 101,
+  "expected_exit_code": 101,
+  "expected_diagnostic": "does not exist",
+  "independent_expectation": "现行准入规则",
+  "passed": true,
+  "finished_utc": "2026-10-30T12:53:22.986494+00:00"
+}

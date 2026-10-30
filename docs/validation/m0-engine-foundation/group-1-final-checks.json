@@ -1,0 +1,52 @@
+{
+  "checked_at_utc": "2026-10-30T12:58:12.497146+00:00",
+  "commands": [
+    {
+      "argv": [
+        "openspec",
+        "validate",
+        "m0-engine-foundation",
+        "--strict",
+        "--no-interactive"
+      ],
+      "exit_code": 0,
+      "stdout": "Change 'm0-engine-foundation' is valid\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "openspec",
+        "instructions",
+        "apply",
+        "--change",
+        "m0-engine-foundation",
+        "--json"
+      ],
+      "exit_code": 0,
+      "progress": {
+        "total": 46,
+        "complete": 4,
+        "remaining": 42
+      },
+      "state": "ready"
+    }
+  ],
+  "valid_json_files_before_this_record": 168,
+  "preserved_failed_cargo_stdout": [
+    "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-cargo-failed.metadata.json"
+  ],
+  "python_syntax": "通过",
+  "selected_markdown_local_links": "通过",
+  "own_probe_unwrap_expect_panic_scan": "未命中；不是正式引擎安全守卫",
+  "formal_workspace_exists": false
+}

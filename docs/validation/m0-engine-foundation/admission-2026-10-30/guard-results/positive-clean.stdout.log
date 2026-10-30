@@ -1,0 +1,7 @@
+{
+  "status": "该候选组合通过",
+  "scenario": "clean",
+  "selected_packages": 1,
+  "metadata_unselected_packages": [],
+  "limits": "完整 metadata 已保留；已选包之间的边保守核对，无法消除的过近似边拒绝；不是正式 workspace 或平台验证"
+}

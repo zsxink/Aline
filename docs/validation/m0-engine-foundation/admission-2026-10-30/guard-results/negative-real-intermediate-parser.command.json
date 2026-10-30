@@ -1,0 +1,25 @@
+{
+  "id": "negative-real-intermediate-parser",
+  "argv": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/admission-2026-10-30/candidate_guard.py",
+    "--metadata",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-intermediate-parser.metadata.json",
+    "--tree",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-intermediate-parser.tree.stdout.log",
+    "--lock",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/real-cargo/negative-real-intermediate-parser/Cargo.lock",
+    "--scenario",
+    "clean",
+    "--scope",
+    "engine"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "started_utc": "2026-10-30T12:53:21.663450+00:00",
+  "exit_code": 1,
+  "expected_exit_code": 1,
+  "expected_diagnostic": "第二 Markdown",
+  "independent_expectation": "现行准入规则",
+  "passed": true,
+  "finished_utc": "2026-10-30T12:53:21.687715+00:00"
+}

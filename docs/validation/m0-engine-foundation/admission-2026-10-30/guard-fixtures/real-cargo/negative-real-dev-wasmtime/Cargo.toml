@@ -1,0 +1,13 @@
+[package]
+name = "fixture-negative-real-dev-wasmtime"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[dev-dependencies]
+host_alias = { package = "wasmtime", path = "../../packages/wasmtime" }

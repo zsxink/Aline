@@ -1,0 +1,26 @@
+{
+  "id": "tree-all-test-support",
+  "argv": [
+    "cargo",
+    "+1.98.1",
+    "tree",
+    "--manifest-path",
+    "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-admission-k4_p5j6a/gpui-0.3.9/Cargo.toml",
+    "--target",
+    "all",
+    "-e",
+    "all",
+    "--locked",
+    "--features",
+    "test-support"
+  ],
+  "cwd": "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-admission-k4_p5j6a/gpui-0.3.9",
+  "env_overrides": {
+    "CARGO_HOME": "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-admission-k4_p5j6a/cargo-home",
+    "CARGO_TARGET_DIR": "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-admission-k4_p5j6a/target",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "started_utc": "2026-10-30T12:20:40.584636+00:00",
+  "exit_code": 0,
+  "finished_utc": "2026-10-30T12:20:40.713933+00:00"
+}

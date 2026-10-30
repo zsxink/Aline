@@ -1,0 +1,7 @@
+Diff in /private/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-admission-k4_p5j6a/gpui-0.3.9/src/lib.rs:1:
+ //! 隔离候选仅验证依赖可解析与类型可消费，不启动应用或窗口。
+-pub fn candidate_size() -> usize { std::mem::size_of::<gpui::SharedString>() }
++pub fn candidate_size() -> usize {
++    std::mem::size_of::<gpui::SharedString>()
++}
+ 

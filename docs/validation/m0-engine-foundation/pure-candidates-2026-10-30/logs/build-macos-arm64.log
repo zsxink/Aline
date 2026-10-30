@@ -1,0 +1,10 @@
+   Compiling serde_core v1.0.229
+   Compiling aline-edit-probe v0.0.0 (/private/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-pure-candidates-s7evczrv/crates/aline-edit-probe)
+   Compiling aline-buffer-probe v0.0.0 (/private/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-pure-candidates-s7evczrv/crates/aline-buffer-probe)
+   Compiling aline-source-probe v0.0.0 (/private/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-pure-candidates-s7evczrv/crates/aline-source-probe)
+   Compiling aline-markdown-probe v0.0.0 (/private/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-pure-candidates-s7evczrv/crates/aline-markdown-probe)
+   Compiling toml_datetime v1.1.2+spec-1.1.0
+   Compiling serde_spanned v1.1.2
+   Compiling toml v1.1.8+spec-1.1.0
+   Compiling aline-app-core-probe v0.0.0 (/private/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-pure-candidates-s7evczrv/crates/aline-app-core-probe)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.02s

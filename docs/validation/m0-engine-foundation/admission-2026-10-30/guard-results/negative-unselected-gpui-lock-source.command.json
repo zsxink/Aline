@@ -1,0 +1,29 @@
+{
+  "id": "negative-unselected-gpui-lock-source",
+  "argv": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/admission-2026-10-30/candidate_guard.py",
+    "--metadata",
+    "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-candidate-guard-tests-ld3kmb2z/negative-unselected-gpui-lock-source/metadata.json",
+    "--tree",
+    "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-candidate-guard-tests-ld3kmb2z/negative-unselected-gpui-lock-source/tree.stdout.log",
+    "--lock",
+    "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-candidate-guard-tests-ld3kmb2z/negative-unselected-gpui-lock-source/Cargo.lock",
+    "--scenario",
+    "test-support-resolve",
+    "--scope",
+    "app",
+    "--metadata-command",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-test-support-resolve.command.json",
+    "--tree-command",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/admission-2026-10-30/tree-all-test-support-packages.command.json"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "started_utc": "2026-10-30T12:53:22.518206+00:00",
+  "exit_code": 1,
+  "expected_exit_code": 1,
+  "expected_diagnostic": "完整 GPUI 子图 lock/metadata 来源不符",
+  "independent_expectation": "现行准入规则",
+  "passed": true,
+  "finished_utc": "2026-10-30T12:53:22.559290+00:00"
+}

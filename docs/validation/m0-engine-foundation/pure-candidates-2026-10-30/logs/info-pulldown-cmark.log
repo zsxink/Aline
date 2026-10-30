@@ -1,0 +1,17 @@
+    Updating crates.io index
+pulldown-cmark #markdown #commonmark
+A pull parser for CommonMark
+version: 0.13.6
+license: MIT
+rust-version: 1.71.1
+documentation: https://docs.rs/pulldown-cmark/0.13.6
+repository: https://github.com/raphlinus/pulldown-cmark
+crates.io: https://crates.io/crates/pulldown-cmark/0.13.6
+features:
+ +default               = [getopts, html]
+  getopts               = [dep:getopts]
+  html                  = [pulldown-cmark-escape]
+  pulldown-cmark-escape = [dep:pulldown-cmark-escape]
+  gen-tests             = []
+  serde                 = [dep:serde]
+  simd                  = [pulldown-cmark-escape?/simd]

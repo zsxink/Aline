@@ -1,0 +1,13 @@
+[package]
+name = "fixture-negative-real-build-tokio"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[build-dependencies]
+runtime_alias = { package = "tokio", path = "../../packages/tokio" }

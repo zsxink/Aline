@@ -1,0 +1,127 @@
+[
+  {
+    "argv": [
+      "rustc",
+      "-Vv"
+    ],
+    "exit_code": 0,
+    "stdout": "rustc 1.98.1 (48a229cea 2026-09-01)\nbinary: rustc\ncommit-hash: 48a229ceaefd4985c50990b14116b6d856af0985\ncommit-date: 2026-09-01\nhost: aarch64-apple-darwin\nrelease: 1.98.1\nLLVM version: 22.1.8\n",
+    "stderr": "",
+    "actual": true
+  },
+  {
+    "argv": [
+      "cargo",
+      "-V"
+    ],
+    "exit_code": 0,
+    "stdout": "cargo 1.98.1 (797e8a9bc 2026-08-05)\n",
+    "stderr": "",
+    "actual": true
+  },
+  {
+    "argv": [
+      "cargo",
+      "fmt",
+      "--version"
+    ],
+    "exit_code": 0,
+    "stdout": "rustfmt 1.9.0-stable (48a229ceae 2026-09-01)\n",
+    "stderr": "",
+    "actual": true
+  },
+  {
+    "argv": [
+      "cargo",
+      "clippy",
+      "--version"
+    ],
+    "exit_code": 0,
+    "stdout": "clippy 0.1.98 (48a229ceae 2026-09-01)\n",
+    "stderr": "",
+    "actual": true
+  },
+  {
+    "argv": [
+      "rustup",
+      "show"
+    ],
+    "exit_code": 0,
+    "stdout": "Default host: aarch64-apple-darwin\nrustup home:  /Users/xian/.rustup\n\ninstalled toolchains\n--------------------\nstable-aarch64-apple-darwin (active, default)\n1.98.1-aarch64-apple-darwin\n\nactive toolchain\n----------------\nname: stable-aarch64-apple-darwin\nactive because: it's the default toolchain\ninstalled targets:\n  aarch64-apple-darwin\n  aarch64-unknown-linux-gnu\n  x86_64-pc-windows-msvc\n  x86_64-unknown-linux-gnu\n",
+    "stderr": "",
+    "actual": true
+  },
+  {
+    "argv": [
+      "rustup",
+      "target",
+      "list",
+      "--installed"
+    ],
+    "exit_code": 0,
+    "stdout": "aarch64-apple-darwin\naarch64-unknown-linux-gnu\nx86_64-pc-windows-msvc\nx86_64-unknown-linux-gnu\n",
+    "stderr": "",
+    "actual": true
+  },
+  {
+    "argv": [
+      "python3",
+      "--version"
+    ],
+    "exit_code": 0,
+    "stdout": "Python 3.9.6\n",
+    "stderr": "",
+    "actual": true
+  },
+  {
+    "argv": [
+      "sw_vers"
+    ],
+    "exit_code": 0,
+    "stdout": "ProductName:\t\tmacOS\nProductVersion:\t\t27.0.1\nBuildVersion:\t\t26A434\n",
+    "stderr": "",
+    "actual": true
+  },
+  {
+    "argv": [
+      "uname",
+      "-a"
+    ],
+    "exit_code": 0,
+    "stdout": "Darwin XianMac.local 27.0.0 Darwin Kernel Version 27.0.0: Tue Aug 11 21:02:59 PDT 2026; root:xnu-13432.1.9~1/RELEASE_ARM64_T8142 arm64\n",
+    "stderr": "",
+    "actual": true
+  },
+  {
+    "argv": [
+      "xcode-select",
+      "-p"
+    ],
+    "exit_code": 0,
+    "stdout": "/Library/Developer/CommandLineTools\n",
+    "stderr": "",
+    "actual": true
+  },
+  {
+    "argv": [
+      "xcrun",
+      "--find",
+      "clang"
+    ],
+    "exit_code": 0,
+    "stdout": "/Library/Developer/CommandLineTools/usr/bin/clang\n",
+    "stderr": "",
+    "actual": true
+  },
+  {
+    "argv": [
+      "xcrun",
+      "--find",
+      "metal"
+    ],
+    "exit_code": 72,
+    "stdout": "",
+    "stderr": "xcrun: error: unable to find utility \"metal\", not a developer tool or in PATH\n",
+    "actual": true
+  }
+]

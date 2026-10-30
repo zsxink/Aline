@@ -1,0 +1,21 @@
+{
+  "id": "negative-real-alias-regex.metadata",
+  "argv": [
+    "cargo",
+    "+1.98.1",
+    "metadata",
+    "--format-version",
+    "1",
+    "--offline",
+    "--manifest-path",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/real-cargo/negative-real-alias-regex/Cargo.toml"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "started_utc": "2026-10-30T12:53:19.958126+00:00",
+  "exit_code": 0,
+  "expected_exit_code": 0,
+  "expected_diagnostic": "",
+  "independent_expectation": "本地 Cargo 图应成功解析；违规由后续守卫判定",
+  "passed": true,
+  "finished_utc": "2026-10-30T12:53:20.086593+00:00"
+}

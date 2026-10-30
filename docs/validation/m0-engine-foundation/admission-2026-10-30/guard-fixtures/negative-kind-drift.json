@@ -1,0 +1,9 @@
+{
+  "kind": "明确合成的输入变异，不是真实 Cargo 输出",
+  "base": "metadata-base-final.json / tree-all-base-packages.stdout.log / candidate/Cargo.lock",
+  "transformation": "negative-kind-drift",
+  "expected_diagnostic": "target/kind",
+  "expected_exit_code": 1,
+  "metadata_sha256": "dea546f158b73fb6b96dd033c08880daa3329ced8e1a69ce708711552661bd0c",
+  "temporary_inputs": "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-candidate-guard-tests-ld3kmb2z/negative-kind-drift"
+}

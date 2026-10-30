@@ -1,0 +1,9 @@
+{
+  "kind": "明确合成的输入变异，不是真实 Cargo 输出",
+  "base": "metadata-test-support-resolve.json / tree-all-test-support-packages.stdout.log / candidate/Cargo.lock",
+  "transformation": "negative-unselected-gpui-lock-source",
+  "expected_diagnostic": "完整 GPUI 子图 lock/metadata 来源不符",
+  "expected_exit_code": 1,
+  "metadata_sha256": "ad4aa6d6bcd9c59c51a8dcd7230ad1bf9f181527da8ad0576927f37583dd6084",
+  "temporary_inputs": "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-candidate-guard-tests-ld3kmb2z/negative-unselected-gpui-lock-source"
+}

@@ -1,0 +1,9 @@
+{
+  "kind": "明确合成的输入变异，不是真实 Cargo 输出",
+  "base": "metadata-base-final.json / tree-all-base-packages.stdout.log / candidate/Cargo.lock",
+  "transformation": "negative-unselected-own-notify",
+  "expected_diagnostic": "选包差异",
+  "expected_exit_code": 1,
+  "metadata_sha256": "d8f0c94a1838136b383c52955057f8ee303d2191f30b73c396f3262061c54ef5",
+  "temporary_inputs": "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-candidate-guard-tests-ld3kmb2z/negative-unselected-own-notify"
+}

@@ -1,0 +1,3 @@
+[workspace]
+resolver = "3"
+members = ["crates/aline-source-probe", "crates/aline-buffer-probe", "crates/aline-edit-probe", "crates/aline-markdown-probe", "crates/aline-app-core-probe"]

@@ -1,0 +1,23 @@
+{
+  "id": "tree-macos-arm-packages",
+  "argv": [
+    "cargo",
+    "+1.98.1",
+    "tree",
+    "--target",
+    "aarch64-apple-darwin",
+    "-e",
+    "normal,build,dev",
+    "--features",
+    "font-kit",
+    "--locked",
+    "--manifest-path",
+    "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-admission-k4_p5j6a/gpui-0.3.9/Cargo.toml",
+    "--prefix",
+    "none",
+    "--format",
+    "{p}"
+  ],
+  "cwd": "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-admission-k4_p5j6a/gpui-0.3.9",
+  "exit_code": 0
+}

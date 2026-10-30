@@ -1,0 +1,2370 @@
+{
+  "note": "仅本次第1组修改及证据；不把change下未改的既有engine delta声明为本次新增。排除Python缓存；本清单自身不计算自引用hash。",
+  "files": [
+    {
+      "kind": "修改",
+      "path": "AGENTS.md",
+      "sha256": "3c604c7f73528c93755793cb49133b358073b2191f9dceabd5fd20f690292c5a"
+    },
+    {
+      "kind": "修改",
+      "path": "docs/architecture-guide.md",
+      "sha256": "f6f54d17d4f790e41cd7417e2ab34fde3e89e74d94f26b5558887668ec9465eb"
+    },
+    {
+      "kind": "修改",
+      "path": "docs/engine-design.md",
+      "sha256": "78d1f5c992f5cf8ef63555e9318dbeb754fa83860d6a3f5cb84710f3bd33050f"
+    },
+    {
+      "kind": "修改",
+      "path": "docs/rust-style-guide.md",
+      "sha256": "346c16bbf3e8e2826b24b08fc9b45fbc0dac6dd80d075436be2669e004e1b6ac"
+    },
+    {
+      "kind": "修改",
+      "path": "docs/v1-architecture.md",
+      "sha256": "148caddbe2132535603174f50c57db68c3868bf9a1b9b92d5e2765ef316344f9"
+    },
+    {
+      "kind": "修改",
+      "path": "docs/v1-validation-plan.md",
+      "sha256": "f0f83728d5df00448c6bfb9af714f32889e9bcfa897be6ed2c99fa5d8dfeffdf"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/README.md",
+      "sha256": "b03be0a37d6a7812d070c820fe324ef5c666a08b89b5a8416eb7dabb5f77a8ab"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/analyze_metadata.py",
+      "sha256": "b62d20b418dea94072d33cfa5ec28235c820fafe402ad3ac061c0da8c660d6f0"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/build-macos-arm.command.json",
+      "sha256": "95727d0ae685385498049c361e004f6738931c0e092f55ddaf62dfd5965f04b1"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/build-macos-arm.stderr.log",
+      "sha256": "7f456f1150bf0eef4e5089e7b37ff2d878f7e65b518022a3a177b2aa2004c81c"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/build-macos-arm.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/candidate/Cargo.lock",
+      "sha256": "f49c4dfcc314e51d685eba805252fd1481fae6be31c8cb0c328550239906e100"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/candidate/Cargo.toml",
+      "sha256": "edf4cacd2dcc2116dee74af5efdf50f7f1df0b77cf2134635cc4302632123a74"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/candidate/src/lib.rs",
+      "sha256": "d1d36c90b26f296337f6e1a49f5a1ee689969aabe4652587ae09cb69bbcc4c13"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/candidate_guard.py",
+      "sha256": "256320ccce337d554383246358b27b8c984b96e34fe74aebd122acb10cafc784"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/cargo-tree-selected-packages.json",
+      "sha256": "5fa36d95a55c54820a75fc8ce7dfd53a8bda6e763cdc657c94054ef27582cc06"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/check-macos-arm-test-support.command.json",
+      "sha256": "a55762ffce98ff8d8f7e3cb4d432177d3189a757093fe777538fa46fccde3248"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/check-macos-arm-test-support.stderr.log",
+      "sha256": "ce7a852eac24eb4f0131b30f695a7326269a03bb02afcbb683ad6ef1be0e3d5b"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/check-macos-arm-test-support.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/check-macos-arm.command.json",
+      "sha256": "22ac751d077bf1efb32cf03d988e44f999f96472b7dcc9e0c83f1f42b0a4ebd7"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/check-macos-arm.stderr.log",
+      "sha256": "818d33b55a3c4fe3f832ff8e2f0fd5dcc4a1b33b0d920175ab511ac1b5f6a07e"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/check-macos-arm.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/clippy-macos-arm-corrected.command.json",
+      "sha256": "8e5d479370156f7201bfa3b547e4b996b60c9873716ae2884ea13c0a6eda8431"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/clippy-macos-arm-corrected.stderr.log",
+      "sha256": "ebd0ba2b4bb9377bc041dd2a1a8f807e5c3808d1820f3e76022f981561778ae9"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/clippy-macos-arm-corrected.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/clippy-macos-arm.command.json",
+      "sha256": "b830520cfc24b82d8b105b263425776a321d01f0a5471148dcfb9ebafc9ccaf6"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/clippy-macos-arm.stderr.log",
+      "sha256": "969c872f3e96dd3ffc6feeae9c437240038039eb60775f250f544781a16972d7"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/clippy-macos-arm.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/closure-audit.json",
+      "sha256": "02e5bb5a6e3f64df5f8d960f6dcb2ed52b01eddd99115fb007001a8d15028810"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/dependency-ledger-base.csv",
+      "sha256": "5d0b46f02e057a1267d48effff84fac8b242fec4061b72a7f8bc85704fd3d919"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/dependency-ledger-base.json",
+      "sha256": "a60019a9354d054328c1e03cb4ad0f8ccc1578d91b38f3d08cd858a45cfb0308"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/dependency-ledger-test-support.json",
+      "sha256": "17da99a4eb5749c0ccecda0221e72710a527888629e923b1a0b69bf62f8be08b"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/environment-commands.json",
+      "sha256": "59fcef792a12bb4a42527d765b1099e4a29cb3972415b17ec0ab5da4db414763"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/fmt-candidate-recheck.command.json",
+      "sha256": "f2564f12ca4ff3012d04fc3021281c612ba568dca4df96f1b982c79ed1210595"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/fmt-candidate-recheck.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/fmt-candidate-recheck.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/fmt-candidate-write.command.json",
+      "sha256": "77aa08d1d37a8dddf771c41d71cdd119d2c64bf8e1d3296fa9895df538ea2de1"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/fmt-candidate-write.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/fmt-candidate-write.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/fmt-candidate.command.json",
+      "sha256": "680d77653dfa476b6e55eda02b71aee0a064226f5bf796c05054484038090fc5"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/fmt-candidate.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/fmt-candidate.stdout.log",
+      "sha256": "15184a8b54fe6b55ad329febe266cd32660d102742f93047e7fe1ec8d03dc8db"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/gpui-package-file-git-hashes.json",
+      "sha256": "32c1d9621821376c48002b3747fc66146fa9dd81f9affa1a44244fa56bcc83b8"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/gpui-package-identity.json",
+      "sha256": "7e9921218f1e30730a106675e2b89d85bc13e7a2acadf6ec0e24ee63f6de96fb"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/gpui-package-source.diff",
+      "sha256": "a2ca1bb2993d219cb91d29f836f7881b921ee49552bfbaa4d953722c60e089f0"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/gpui-package/Cargo.toml",
+      "sha256": "43ac0a636d1283313dbb48810ff32c0f6b55737824a886bd9fad37735ec0c56c"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/gpui-package/Cargo.toml.orig",
+      "sha256": "def05c8c9f179920a5de537d59817155e2606ac2daa48aeacd88e5ae1846ec36"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/gpui-package/LICENSE-APACHE",
+      "sha256": "752daf2fb234ca4a1fa372c073fe127f44b7b90fd2529ae44273a64f9d53da7a"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/gpui-source-comparison.json",
+      "sha256": "b4e9a9aed905400c34f932e4878854fc38dcf3970480086f07e8995feb853053"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/gpui-upstream-tree.json",
+      "sha256": "78a84238eb95f9db2d878ea3e8d31177c79b324f2126da5637c9f946069574d8"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/negative-checksum-drift.json",
+      "sha256": "7a2018e1f3eae54b7d140f225dc77a0b392516790e6227e534586dda8689ef53"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/negative-empty-tree.json",
+      "sha256": "26732d30ec97f8f366110fd84742bca7e2fd7f0a3e92cc257f23c42d1a5dd38e"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/negative-engine-gpui-exception.json",
+      "sha256": "1aa8904883d5e0ab6e772bcb9dead65ff568a7316f2764617744bbe4c88e60ce"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/negative-existing-gpui-pre-plus-raw-gpui.json",
+      "sha256": "131f71edacca17672f19b6c8a2ba411a0ee5ca63d0755cc7492c8587f4065335"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/negative-existing-regex-bypass.json",
+      "sha256": "82938e3d37d951a4a8a745cffe5ec4a84eef1a4d996e7aa8c8b84e50b54ce53c"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/negative-feature-drift.json",
+      "sha256": "162624e9262d1c30a43b4fe01d431878cbe15037baebc6d068cdb0ff4085e91f"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/negative-gpui-source-drift.json",
+      "sha256": "a2c01a5942089b8f432276385597de9e51962285917385053ccae30c94d79920"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/negative-kind-drift.json",
+      "sha256": "cc8fe74075a2e4a2add46b2be01c3a2fe8b3232b84c6c7b51799759213503a00"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/negative-nested-engine-gpui.json",
+      "sha256": "4236c92fa4c761c1e62af8d43f4b5a02036129ab568937604baf5f731b579a64"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/negative-omitted-selected-package.json",
+      "sha256": "4724386f85b0b1709cdb3168af3b27b213469a948ae0ba6100edd410807aec62"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/negative-source-drift.json",
+      "sha256": "a980e4d3dba4c624fe814d7fa1bd9396021d2ad80f6287cd44592dd72441251d"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/negative-target-drift.json",
+      "sha256": "097e10c1713fe8e543defac105969e35bf9b79604787c53ae9ba8f211918cd5e"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/negative-unreviewed-scenario.json",
+      "sha256": "26f263a7648e2e9b73798656e3ef8ea54145515621df12ab4d769f4badde1af0"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/negative-unselected-gpui-checksum-invalid.json",
+      "sha256": "6e67c1ce6d4d800586eff4053ded03ce919436ee0be0bc25dee0fb2d4a6462ab"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/negative-unselected-gpui-lock-source.json",
+      "sha256": "8d5826cd2cf4a72a31089a034d30cd9adc54054c549db24434ecc7b51e3b99d0"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/negative-unselected-own-notify.json",
+      "sha256": "5eea121ee386c27e947cf2ee636a678fcd7882205dd88879ad846428b29a85e4"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/negative-version-drift.json",
+      "sha256": "1a386327a27cc5ad7557d0fe5766660b5c8645e09db1f7cc7a5b5a04a872d360"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/packages/bridge/Cargo.toml",
+      "sha256": "5ad1108e2bb4e72e7421d3dda516f51320fda67bdc65f43f44c7cedba9c4ed76"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/packages/bridge/src/lib.rs",
+      "sha256": "6d5cb2250323de50bb293d38532ea4d92a1f350bb2fc1b8e053c3f6c21aadef8"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/packages/comrak/Cargo.toml",
+      "sha256": "c489a976d145c01c860cac32b079257ceda78393c7d2e5f65abf7d1917c76994"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/packages/comrak/src/lib.rs",
+      "sha256": "6d5cb2250323de50bb293d38532ea4d92a1f350bb2fc1b8e053c3f6c21aadef8"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/packages/gpui/Cargo.toml",
+      "sha256": "b6a3a79cdca944687005ffca8e99e343dbb8afd0d07e8c7bcf68b5b65ccf5f28"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/packages/gpui/src/lib.rs",
+      "sha256": "6d5cb2250323de50bb293d38532ea4d92a1f350bb2fc1b8e053c3f6c21aadef8"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/packages/notify/Cargo.toml",
+      "sha256": "76397c81ac3fa5e5a08b5d2a36935d31043fdcc25769b283dab995b798f1954d"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/packages/notify/src/lib.rs",
+      "sha256": "6d5cb2250323de50bb293d38532ea4d92a1f350bb2fc1b8e053c3f6c21aadef8"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/packages/regex/Cargo.toml",
+      "sha256": "9076c38f94d3dc651e43af51dd11fa7fe57006f3eceb2022e20ced79b041afaf"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/packages/regex/src/lib.rs",
+      "sha256": "6d5cb2250323de50bb293d38532ea4d92a1f350bb2fc1b8e053c3f6c21aadef8"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/packages/tokio/Cargo.toml",
+      "sha256": "32d283c1376e844b2003b1be3315af7fd0546c7010181d8443e91aef6ae38899"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/packages/tokio/src/lib.rs",
+      "sha256": "6d5cb2250323de50bb293d38532ea4d92a1f350bb2fc1b8e053c3f6c21aadef8"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/packages/wasi/Cargo.toml",
+      "sha256": "07b322bc6a6f1190514c7d58fe55646114c2e0b118276688c248677227079671"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/packages/wasi/src/lib.rs",
+      "sha256": "6d5cb2250323de50bb293d38532ea4d92a1f350bb2fc1b8e053c3f6c21aadef8"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/packages/wasmtime/Cargo.toml",
+      "sha256": "9d906e6e7c0852e9b666fdae5e2ac856912c5e042d9abb5817111ae41bc33290"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/packages/wasmtime/src/lib.rs",
+      "sha256": "6d5cb2250323de50bb293d38532ea4d92a1f350bb2fc1b8e053c3f6c21aadef8"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/positive-added-clean-node.json",
+      "sha256": "fce26ad488b162e16d8f2e945324421a8e89c100ff9c0e8252a692a568773e55"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/positive-renamed-root.json",
+      "sha256": "7e6f01b04565d0361817fa4f218aff2db1ecb17ac7241493aa9d7ff1fd4b12af"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/real-cargo/negative-real-alias-gpui/Cargo.lock",
+      "sha256": "449cd664eb0bacd045b8a48cc23af50e0225350e270fa73c4772926d11ba446b"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/real-cargo/negative-real-alias-gpui/Cargo.toml",
+      "sha256": "10bf28018f6d67ab09c0a5ba0d02cb0abb16a27be55057d097fbd20e180bc11e"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/real-cargo/negative-real-alias-gpui/src/lib.rs",
+      "sha256": "6d5cb2250323de50bb293d38532ea4d92a1f350bb2fc1b8e053c3f6c21aadef8"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/real-cargo/negative-real-alias-regex/Cargo.lock",
+      "sha256": "594d318d9cae13daf480a26e45ff0529ea990ae01170aad93d58e19ed5060b69"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/real-cargo/negative-real-alias-regex/Cargo.toml",
+      "sha256": "b93167a04bbb514a285d695b885a4907aae648e66018ab1db998eb4912883433"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/real-cargo/negative-real-alias-regex/src/lib.rs",
+      "sha256": "6d5cb2250323de50bb293d38532ea4d92a1f350bb2fc1b8e053c3f6c21aadef8"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/real-cargo/negative-real-build-tokio/Cargo.lock",
+      "sha256": "b0927292b59559dbdee61459623366b0db65ce121d64e2fafd2ca57b2c9b77a3"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/real-cargo/negative-real-build-tokio/Cargo.toml",
+      "sha256": "b13cf5da22a0ed46e088634eaa3802bb7917cae508fb32d50b59daaa1fa04b7d"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/real-cargo/negative-real-build-tokio/src/lib.rs",
+      "sha256": "6d5cb2250323de50bb293d38532ea4d92a1f350bb2fc1b8e053c3f6c21aadef8"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/real-cargo/negative-real-dev-wasmtime/Cargo.lock",
+      "sha256": "7c97eeb05be622446dc7aa3c5eee9657adc1a202977ddc59ff3b502dc8012596"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/real-cargo/negative-real-dev-wasmtime/Cargo.toml",
+      "sha256": "316306768ac8658e3feeb725e79674ce39209fa35061530a9a1accf7ebd3bf26"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/real-cargo/negative-real-dev-wasmtime/src/lib.rs",
+      "sha256": "6d5cb2250323de50bb293d38532ea4d92a1f350bb2fc1b8e053c3f6c21aadef8"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/real-cargo/negative-real-feature-wasi/Cargo.lock",
+      "sha256": "d284a0fc027a7a3fbfe5792e0c571aef7e1123119efb8134be525bda8151592a"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/real-cargo/negative-real-feature-wasi/Cargo.toml",
+      "sha256": "29ebd8f6ab3f54cee58d665c58108c9948e22dc33e22b16b667e018d3409caf4"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/real-cargo/negative-real-feature-wasi/src/lib.rs",
+      "sha256": "6d5cb2250323de50bb293d38532ea4d92a1f350bb2fc1b8e053c3f6c21aadef8"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/real-cargo/negative-real-intermediate-parser/Cargo.lock",
+      "sha256": "9007a3e3a25fad69de561d84f0b6710afc4b3f23f02622d83d929daaceaf8c16"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/real-cargo/negative-real-intermediate-parser/Cargo.toml",
+      "sha256": "946aee9bb243f3ed0762f383818542b8df191408ad11978a4bc09d3bf94d535b"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/real-cargo/negative-real-intermediate-parser/src/lib.rs",
+      "sha256": "6d5cb2250323de50bb293d38532ea4d92a1f350bb2fc1b8e053c3f6c21aadef8"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/real-cargo/negative-real-target-notify/Cargo.lock",
+      "sha256": "b2dd7b337e04b094ae88cb0f79ee69ee4aacf2c810dd2422c1f3ca45e4a30320"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/real-cargo/negative-real-target-notify/Cargo.toml",
+      "sha256": "889a01bc4b7b2dff8f1ee8223701b20727653bc7df93a23b6e8f4d415c2c2bdd"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/real-cargo/negative-real-target-notify/src/lib.rs",
+      "sha256": "6d5cb2250323de50bb293d38532ea4d92a1f350bb2fc1b8e053c3f6c21aadef8"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/real-cargo/positive-clean/Cargo.lock",
+      "sha256": "ebb9cbc4ebb5e154d7498083efc284eff3601be89f46125aaf8a68e9b4df1346"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/real-cargo/positive-clean/Cargo.toml",
+      "sha256": "234e9fb96e63c744f7443ff0f0a8099008907d29a0fab45fc165c99d3e1c5ef0"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-fixtures/real-cargo/positive-clean/src/lib.rs",
+      "sha256": "6d5cb2250323de50bb293d38532ea4d92a1f350bb2fc1b8e053c3f6c21aadef8"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-cargo-failed.command.json",
+      "sha256": "ddcbade7829a354add7849a871a62ea6e9ec0709c0808cc5bc8fa10253c0b07b"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-cargo-failed.metadata.command.json",
+      "sha256": "5f6f42eb81a24ee44308d1c476f565d2c487892c8cb7938c82744c79e6b603ee"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-cargo-failed.metadata.json",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-cargo-failed.metadata.stderr.log",
+      "sha256": "e3120815522d5ff3ce565783d7256cd229d2e8f6b3f0e5ba31712813ba65e843"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-cargo-failed.stderr.log",
+      "sha256": "53e26167ecd462447bd85f4063f66c3703391450f852d569b5cadd0f8b631d7e"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-cargo-failed.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-checksum-drift.command.json",
+      "sha256": "c74f0ce1ba89183b7a17e4ceac78022e5a769f788768f4ad6947120084a0ff1f"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-checksum-drift.stderr.log",
+      "sha256": "8ef2bb279db06849b0017973dedf3fe24cc0d52023c3ed05c0e4b0be80bab2b2"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-checksum-drift.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-empty-tree.command.json",
+      "sha256": "948f6227451e01ce4d343309358deb210556dff9fc0aa484048187d86048fe01"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-empty-tree.stderr.log",
+      "sha256": "549b18a606de6f02a66e028348de9af46176d0e4f289b0a48e6b36cec9ffc8c3"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-empty-tree.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-engine-gpui-exception.command.json",
+      "sha256": "b6432aba126e4cee635b92b4d5ae5818bff2b4abe0c84e3c9ac4581f547247cc"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-engine-gpui-exception.stderr.log",
+      "sha256": "a67a5c34c7a5e6a1665b0bcbfe661d5e5b1d6d96b892dca7fa51a64ed09766be"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-engine-gpui-exception.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-existing-gpui-pre-plus-raw-gpui.command.json",
+      "sha256": "83cd308e1f66d0e0d4a6aae54ecefe576a7375388771146398520b7edefdde4b"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-existing-gpui-pre-plus-raw-gpui.stderr.log",
+      "sha256": "bcd14bbe1bd1bdea438f7aebdb46f30e75e73b8b97ad34b3860929518fb29a0b"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-existing-gpui-pre-plus-raw-gpui.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-existing-regex-bypass.command.json",
+      "sha256": "43adc0a2458fb70b835978ce47edb9935577bf4c7be3275be5980e2652e79f5f"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-existing-regex-bypass.stderr.log",
+      "sha256": "63f0fbfd612ceb03be24ea597ae70216a39d49d933017bc0aabcae1f03084982"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-existing-regex-bypass.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-feature-drift.command.json",
+      "sha256": "23dcc8af9da718d1acc6cc05e0be053d80b283b45467ba8d4c2189714f533356"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-feature-drift.stderr.log",
+      "sha256": "6b4f7beab85170a5f517e692e1bb54ace870b9941da66a61ce8f5c8abc9ce1b6"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-feature-drift.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-gpui-source-drift.command.json",
+      "sha256": "5e6fbaefcf8cd0795b9232e7f7c6ebb0abb0232917e68d14e8aa507050c19035"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-gpui-source-drift.stderr.log",
+      "sha256": "6b4f7beab85170a5f517e692e1bb54ace870b9941da66a61ce8f5c8abc9ce1b6"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-gpui-source-drift.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-kind-drift.command.json",
+      "sha256": "5f755c611f4ad50343eb834007010a86a55e1bc3268a9ef62b4e0b0e79e0f5fe"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-kind-drift.stderr.log",
+      "sha256": "23fa32777c4a241603b21b30b206a1737a1a220480ebb43789d2b2ae7bffd94a"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-kind-drift.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-metadata-malformed.command.json",
+      "sha256": "fd76dbfe4008714996ccda42f531d66e3bff8f96a8e668e76ff9f5e6188e267d"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-metadata-malformed.stderr.log",
+      "sha256": "ed82bd5d1255efe7d810698e48c9beadbee15a4ba73ae30c471fc6325d1e550a"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-metadata-malformed.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-metadata-missing.command.json",
+      "sha256": "9fa72ec346fff4bc212032d26d622edfd51c942056d63378720dd857e7639501"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-metadata-missing.stderr.log",
+      "sha256": "6c9a2d6fcb4c642e35d22f1357651005c09436cd5c2443f4d370ee65df74db6f"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-metadata-missing.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-nested-engine-gpui.command.json",
+      "sha256": "730216c23267b157b70a5c8dfc346b6ca2c899b0d5527ebd04f939731e1a2ff9"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-nested-engine-gpui.stderr.log",
+      "sha256": "b4ef2fa2bc42f3c60da106728a8e2583e2e64c5d2da6f0e4ccdf39c6e4536a73"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-nested-engine-gpui.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-omitted-selected-package.command.json",
+      "sha256": "c1d328f61a262ce178abe6a6e7e9aabdc5e6422c5dc70401a8e41db711e68938"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-omitted-selected-package.stderr.log",
+      "sha256": "cc20333ba4989ead63ebb1dd790baa45720f3155de9b5f9977590f01e9fcb538"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-omitted-selected-package.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-alias-gpui-app.command.json",
+      "sha256": "f7a83146e436c6b141bb1e4629c9132ebd3b4c6148df2052a97da25616907457"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-alias-gpui-app.stderr.log",
+      "sha256": "bcd14bbe1bd1bdea438f7aebdb46f30e75e73b8b97ad34b3860929518fb29a0b"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-alias-gpui-app.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-alias-gpui.command.json",
+      "sha256": "ba57bfce3421b0b1be6f69dbfbf132331a1308c212133320ad8accde17cbd340"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-alias-gpui.metadata.command.json",
+      "sha256": "34800ff36f993a5ff6b436c805a3daf5772bf5221c89be80ca4465f03e84e9ce"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-alias-gpui.metadata.json",
+      "sha256": "7907c9da866793e188f0c3ea7e97905ab44bdab23c75b4a548c4fe1e799cd5f5"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-alias-gpui.metadata.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-alias-gpui.stderr.log",
+      "sha256": "bcd14bbe1bd1bdea438f7aebdb46f30e75e73b8b97ad34b3860929518fb29a0b"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-alias-gpui.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-alias-gpui.tree.command.json",
+      "sha256": "ff1969f7b307dd0807c1b84e1a55a1020c748cbde9d94e3a8a65bab2ea39ad70"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-alias-gpui.tree.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-alias-gpui.tree.stdout.log",
+      "sha256": "4561facfaaa931290a876f9fc033d7c668b666b01584292a3d2a71b0f57413f7"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-alias-regex.command.json",
+      "sha256": "f8a0c70dacb8b0f1630f7f6a1fbb6ee6df6b4f9d71a76f29324a932e9d288ecc"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-alias-regex.metadata.command.json",
+      "sha256": "c46f4a9a7de679812d6765deadd6c8c48547451f82a7f62bced9ffd99e847391"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-alias-regex.metadata.json",
+      "sha256": "461ce827d70e91a3fbe422541246373512b131d1d00b370ca2617ee382964904"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-alias-regex.metadata.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-alias-regex.stderr.log",
+      "sha256": "277f03d040d102acdab41c4db59c67778ff07eb9cca72f197fdf42e7dd0787ab"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-alias-regex.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-alias-regex.tree.command.json",
+      "sha256": "3a7a3eb0fdb6b45247fba0024a03d6bf01138b0074843ac7ced8cc51e2a2aca4"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-alias-regex.tree.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-alias-regex.tree.stdout.log",
+      "sha256": "e875113fc02f484550bb2f8895e8c1fcd51fafef8fb4c34f035e2dad509d8fa7"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-build-tokio.command.json",
+      "sha256": "c65b0c5224d75be59ba5abf140db5d6acc7d2a6a057c503b6eef84cba778060b"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-build-tokio.metadata.command.json",
+      "sha256": "786353e1b3dc0c0ea6badbec334c423e4f15d2f843d930e09bb72b6d8c6cb061"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-build-tokio.metadata.json",
+      "sha256": "bdb22f1ca37aed4a67da8ebdf5f7b7d9cf3a6259293dea187da3fb17bf8832b7"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-build-tokio.metadata.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-build-tokio.stderr.log",
+      "sha256": "18d82efaf5ccc8127c9a1eaf5dbd1ba77d2a672193758c391ea57f16f1ac2299"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-build-tokio.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-build-tokio.tree.command.json",
+      "sha256": "44ce4d08b9c491bba8e21a9761e939e922e7fdf44c0eaa633321a1f618a647ec"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-build-tokio.tree.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-build-tokio.tree.stdout.log",
+      "sha256": "ecf36c7f560de79365279eb89ed89ad7ed730bea36628f53c4db973066ea3e63"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-dev-wasmtime.command.json",
+      "sha256": "3a04415599ef9ee757d281b8366b946d9f1e5f91ce0bd2f16817326eee6440a3"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-dev-wasmtime.metadata.command.json",
+      "sha256": "86a199e8540201bcef1facf11c18e7d755c142604af7e48cc0aea2b3d5c6d7d8"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-dev-wasmtime.metadata.json",
+      "sha256": "47e8779a4c8ad28a39db30568bd41181793f61bccde9056edd59ba4bd3e2033c"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-dev-wasmtime.metadata.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-dev-wasmtime.stderr.log",
+      "sha256": "26467162e79c027adaace4e3a1f265818b6401e92235e3f0efe1985c1487ab3b"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-dev-wasmtime.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-dev-wasmtime.tree.command.json",
+      "sha256": "fba2b35f073911bbf76e98f3d89a859378ada9c824b8109caa46b0c3d1c59c67"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-dev-wasmtime.tree.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-dev-wasmtime.tree.stdout.log",
+      "sha256": "6f61867fa3c6b412aaedde100bb858046952371079bff8fa8f6ed9287535d099"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-feature-wasi.command.json",
+      "sha256": "86ee09678b5716ef5b2f8eea3857576fa01765d88f329ff96b4dc771162eabd5"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-feature-wasi.metadata.command.json",
+      "sha256": "6040fe962c87ddf48a65ccc78011bbe1cedb3e0e96842607e032aef3b1708d3f"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-feature-wasi.metadata.json",
+      "sha256": "342cbca521ed9d8d15f8a4a2d24e7ac53e0a9acd5721b7a5f69c1ecd78e471da"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-feature-wasi.metadata.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-feature-wasi.stderr.log",
+      "sha256": "9a246727ffa3a26221184c702506645a16d88195a9a0e8144843bf45911261d1"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-feature-wasi.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-feature-wasi.tree.command.json",
+      "sha256": "189d0e21e9d6d623f2ebabbdc8b2ae0ef01312de732af25740a07cc9c7ebaa72"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-feature-wasi.tree.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-feature-wasi.tree.stdout.log",
+      "sha256": "cc5e1f3818114ec17b13787e6f7ac005a6e504f5c7c54920888414a1311f78af"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-intermediate-parser.command.json",
+      "sha256": "dcb38fda68e7c97cf4e9da418e8ac93455a3cb51b777915274314c1f235a2ea1"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-intermediate-parser.metadata.command.json",
+      "sha256": "6dadb7ac16050915a5388abf7fd350bd29da6a13808f5e12c74f2508fa007402"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-intermediate-parser.metadata.json",
+      "sha256": "9a8c5b11d64d1b0191a866cd9fb950c5ce99c870219089b2d8f264f5b5a80ebc"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-intermediate-parser.metadata.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-intermediate-parser.stderr.log",
+      "sha256": "b77794ec1500fc605472ce2ec1a16a8e903c485aca6421178d06864a191b014f"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-intermediate-parser.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-intermediate-parser.tree.command.json",
+      "sha256": "6925c2d7a23fb52875ca709206a5bbabb1ac24febbe97e4a1815a904769d28dd"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-intermediate-parser.tree.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-intermediate-parser.tree.stdout.log",
+      "sha256": "e37fba16abebe2e6ce8f4527d53a471226b83b2834eef1aa7a75c0ac8b7b367c"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-target-notify.command.json",
+      "sha256": "9ebda9b4952aad9f232ba36fb552ebdbbff79d874fb308d023fae473c857a778"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-target-notify.metadata.command.json",
+      "sha256": "a6e528c3473c7cc0fa2d7d8d9c2116ca88ead074947f67fd96d3d49e847df7ac"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-target-notify.metadata.json",
+      "sha256": "b454006deb72c1345e55c238e123ddb9f715d1cc2611d9d3432c609b4eea68b7"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-target-notify.metadata.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-target-notify.stderr.log",
+      "sha256": "821f3e5c9b38546db2bfbaeb481305f53acd538cd886ae40f528d53ec692f446"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-target-notify.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-target-notify.tree.command.json",
+      "sha256": "cbf21c2850b91c4be0f87626c19bace6f04dc1cd2c3743cc2afa267f4579932e"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-target-notify.tree.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-real-target-notify.tree.stdout.log",
+      "sha256": "9143bbdf49e78e7222e024c3dbc1dfabff0d3a9a81eefaf42b918bbc16c5151b"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-source-drift.command.json",
+      "sha256": "fed481063d9bfb8b26d7b3aa8676b9b49cfd021e4b9e4ccaea3e300df61e900b"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-source-drift.stderr.log",
+      "sha256": "a4d7e2f81c76e9ceb84eb78e3f58463b0c4a70420529c2175fe3e1ad2342dee4"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-source-drift.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-target-drift.command.json",
+      "sha256": "230022d66a1122f7900f0470a1569372f7912adbd50467e3c099efb5148d07f6"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-target-drift.stderr.log",
+      "sha256": "15516a319c00516317e1026aee217538ccb6dc8d5f0629b936a38cdb525aa4eb"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-target-drift.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-tree-missing.command.json",
+      "sha256": "af71d0faf88aa37a2c1b3c436e061507d7322b0bfd3d4ba7eb93915f57bb381b"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-tree-missing.stderr.log",
+      "sha256": "bb2fca9a0a1104065cdfd3648787654aa60c9de66414393ddde2d1a27986b609"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-tree-missing.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-unreviewed-scenario.command.json",
+      "sha256": "cfaa2108c868ebc3d8f95141afdc1848af9ec1813e1f5dfd165c7ed099cc9643"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-unreviewed-scenario.stderr.log",
+      "sha256": "e5b89b6213a0dce39be3c2f1d68fa8641b0eb7c17c914fbba3a01b86fe48e41c"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-unreviewed-scenario.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-unselected-gpui-checksum-invalid.command.json",
+      "sha256": "6071a4cfd107ee9352f638129314bca7011f5f1ad9c62b8832201c581dded8b9"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-unselected-gpui-checksum-invalid.stderr.log",
+      "sha256": "5f6cdac3dd9ae7fb8ca1ccd3c62edc0ccb2ede4794d791d84e053286c041128f"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-unselected-gpui-checksum-invalid.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-unselected-gpui-lock-source.command.json",
+      "sha256": "d7da00872d8decaa0376ca1e439bb072764001deeee74e16be560edd4bc2f4aa"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-unselected-gpui-lock-source.stderr.log",
+      "sha256": "7d792e0448ef76921961c738b62e620055dc4ff7b52e982665b5d1787e5cb06f"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-unselected-gpui-lock-source.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-unselected-own-notify.command.json",
+      "sha256": "21eebaff46e39667ae10e39c39cb8afaec0216cd6e8ad5f3c8ae79518442f9eb"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-unselected-own-notify.stderr.log",
+      "sha256": "f451cfa29f87f4e184ad4b6193818a985e84704575212d330204da3b75d22ce3"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-unselected-own-notify.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-version-drift.command.json",
+      "sha256": "28a9ed5a06d225845bff111a40fd29e95549eaccee8898ab7fefaedc80e55151"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-version-drift.stderr.log",
+      "sha256": "9a013316e6cd53446041a6caff6b95715836a5a50d2a2e730882eb31929001a0"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/negative-version-drift.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-added-clean-node.command.json",
+      "sha256": "99f83dfe8d42ece4251b8e769b99b015a1b8b3da84316afe243f7b10cea47f60"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-added-clean-node.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-added-clean-node.stdout.log",
+      "sha256": "097dfc5ed0dcab2518064bf863c32919f7d961b1d9fd7c57bf77e4eb362efffa"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-base-final.command.json",
+      "sha256": "620b862bb0987d5f6c354499b845c0dd307d45691886aa29a4c842641afb724f"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-base-final.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-base-final.stdout.log",
+      "sha256": "9e866f6f26a5e38364be3c9d2f6fca97816a50ad1df1ceaab9d7a974321a2839"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-clean.command.json",
+      "sha256": "a506ed553e149633fcfa277eb9c37d01aaa62691ab6c57f5df914e80b8ae4d88"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-clean.metadata.command.json",
+      "sha256": "aa474aad33e654d4d805aeb30a85edc49a04c21bd66c2ef575967df2b3381477"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-clean.metadata.json",
+      "sha256": "96f7c647a7fda8af82b8830101063ca32e95b781408ab838e567565b9476224e"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-clean.metadata.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-clean.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-clean.stdout.log",
+      "sha256": "dd0d3af5b4ec591fea4611b7d97098aaa48142389c56b4eab8e1eb8000502bde"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-clean.tree.command.json",
+      "sha256": "c196444d91c4915741fad047a191df82be85fe5e9842f21d548aef3a2123cfa8"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-clean.tree.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-clean.tree.stdout.log",
+      "sha256": "552974308865460301367efc1658e4c1da4b41f23002352974dfa47f5a491410"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-linux-arm-both.command.json",
+      "sha256": "ec98fac4b584c92796b36663845c1738bac06cfd64d07a3bae645a5be2cbc313"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-linux-arm-both.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-linux-arm-both.stdout.log",
+      "sha256": "ef4886a51ec1d9a14a82a24e4c928ef87794b167d68f5e2fdaac9935b0e37e56"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-linux-x64-both.command.json",
+      "sha256": "d25157cbd60eef6cce50d28ba32ed00c549cb88c6c99e2604f4b2adedf1be736"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-linux-x64-both.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-linux-x64-both.stdout.log",
+      "sha256": "2e6d9c743de94c61fab9a0bc2bcc12203b43195cd1d54bb9be9a22a832f8f106"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-linux-x64-wayland.command.json",
+      "sha256": "bebc2be46fd9f7ec82928bacd217933d8e9796d3e477fbbcc4a277cacf79ce41"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-linux-x64-wayland.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-linux-x64-wayland.stdout.log",
+      "sha256": "9d7eea17e9c2eb69d41d43187ee16158a79d40bd32e98baec6145579d43681ab"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-linux-x64-x11.command.json",
+      "sha256": "8ee8a89d936ec5fa9b7c4fc0017d6febbcd96b76cec9c7256359cb637aeb8e11"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-linux-x64-x11.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-linux-x64-x11.stdout.log",
+      "sha256": "23a6e6d53288633c56f35ff0d0673f04937e45ed96285e7492dff1af4f659fea"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-macos-arm-test.command.json",
+      "sha256": "3671d854d078f54734a15184553a81c0d8002d0b5582094ae7fdf8773bf5a1f2"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-macos-arm-test.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-macos-arm-test.stdout.log",
+      "sha256": "1388eb1a43055f008bb460988fb4ef0ec0b821ffac07fbe174239c3c07f8e650"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-macos-arm.command.json",
+      "sha256": "b2b69256c88163e94b2b63c9ce1aea1772c0a9f653750394c186529fa992424d"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-macos-arm.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-macos-arm.stdout.log",
+      "sha256": "844f88546389eef4b1aa47dbaba5595645078711ca74033211f7c506a49fc0aa"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-macos-intel.command.json",
+      "sha256": "4ce6dbf9ba2bf0e07b91b165a97597a949431b30aaddbe05210c289e6e2a4c5e"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-macos-intel.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-macos-intel.stdout.log",
+      "sha256": "5216cdb0fbbcfb2ff71eb5fa7ca40b4db63cab91fd1cdba8d720bc445ce3e118"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-renamed-root.command.json",
+      "sha256": "fc520c641055c89d5709f00f9f60d1ba8693ada574b009271ec92475dcf6195b"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-renamed-root.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-renamed-root.stdout.log",
+      "sha256": "9e866f6f26a5e38364be3c9d2f6fca97816a50ad1df1ceaab9d7a974321a2839"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-restored-original.command.json",
+      "sha256": "61f3bbfa1e9fb8a24b8b584da4a9170eb4afb404379f763c75f1d3c282c52e4e"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-restored-original.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-restored-original.stdout.log",
+      "sha256": "9e866f6f26a5e38364be3c9d2f6fca97816a50ad1df1ceaab9d7a974321a2839"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-test-support-resolve.command.json",
+      "sha256": "10c9ecef98ed9453aae36a4dd435d457a830c8171959c749631cac047ec62fc8"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-test-support-resolve.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-test-support-resolve.stdout.log",
+      "sha256": "86f22175d19bc612926d653e066c3f0d02a942e4b45d2bfe2c30d2041bb99c50"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-windows-x64.command.json",
+      "sha256": "a96955387ac2ffd78844d59e1c79c429fbbb4be662ad768005559b56d81430b4"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-windows-x64.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/positive-windows-x64.stdout.log",
+      "sha256": "887c3d340ace1d565cbe6deb06a9d0e6291f109f31161773d33ff8565b26e979"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/self-test.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/self-test.stdout.log",
+      "sha256": "b7619b26a16b072e370afaa4d3f83fd36c3f3aaa8f48db8fc35ca54029d09097"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/summary.before-raw-gpui.json",
+      "sha256": "02c60c983f0e70cb3a21ff1eee993927f69bde2c90b81daecb0a76b2ef5d286d"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/summary.before-unselected-lock.json",
+      "sha256": "8d770c894759e3e2ba4799cacb9c5a4a5ecd0d1b5dbc59635c6bef86affe7032"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/summary.initial.json",
+      "sha256": "115850d70a8c32a1dbbab82a9c0320068588711e7e9d10a8381e147ccaf7852d"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-results/summary.json",
+      "sha256": "43dc3f4a218c1458216990ecf42bb3502ac41818f7c3642b370492517fe4bfd3"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard-summary.md",
+      "sha256": "b61933fed89168de22c2fb4272a1e1ada59a2daef641eafc60e8c30ed772429c"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/guard_policy.json",
+      "sha256": "ceb01ca47870d405b6dc6d68056551ed135947a02e7d5e36f6be07f6f115e687"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/incompatible-edition-2015/Cargo.toml",
+      "sha256": "c4d5e12e07611532e28ae08850a090496b29114543923e7ba41ec156b86eb792"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/incompatible-edition-2015/src/lib.rs",
+      "sha256": "953bac6d006741dff0d2bf9bb5568f88af6fa14052f2e07b45b15ebaec21e916"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/independent-review.md",
+      "sha256": "b398e43d45fdd09d02652bd61d2729dbfef1078fe23fcabe21ef31febadf2d5e"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/isolation.json",
+      "sha256": "5d48b6f5cc971537c3c00218819980e7034b95de95b608f03294d72d7ca2ce22"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-base-final.command.json",
+      "sha256": "bc2bba96bee21e22b0056763d75a7505abefade66e650f0a8d2d98b70bb56758"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-base-final.json",
+      "sha256": "329118b212aacdecc254765cb39655911643048d7483a732df0c2f16391f3772"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-base-final.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-base.command.json",
+      "sha256": "ddf2374ed25a77a2a5fdabf1264e8b7f511ca67c137033be0849bbac7411244b"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-base.json",
+      "sha256": "329118b212aacdecc254765cb39655911643048d7483a732df0c2f16391f3772"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-base.stderr.log",
+      "sha256": "6d9e9aee5517cc3ed2f7812c9b702e149967a166024f487a9234305518665e4e"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-linux-arm-both.command.json",
+      "sha256": "512bcd662e60d9b3ef71a082d2f1811a958087cffae2779748395306391cd6e4"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-linux-arm-both.json",
+      "sha256": "fb0b6b164acfbf197b4dce7ca5f72ed8a7f674eb86e518c04d96f80cffc7d440"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-linux-arm-both.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-linux-x64-both.command.json",
+      "sha256": "bfe88373aef79239c5810082336d1d26a06e66e2eab42bf697986a17b5b9ea7b"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-linux-x64-both.json",
+      "sha256": "49ed8e9e1bd6e2da37235fac7d40ca0406aea1652041c0f14a1eacbe38d94578"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-linux-x64-both.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-linux-x64-wayland.command.json",
+      "sha256": "a55087f16d2ba1d301c18c5e0ae46884c5179b38b1bedb183dfc1246895e723d"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-linux-x64-wayland.json",
+      "sha256": "9341fb27d36860bb129bca8151c75ad6d860092f8a84ca4f1f530984927f629e"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-linux-x64-wayland.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-linux-x64-x11.command.json",
+      "sha256": "65459043ed81dd82b940b2a61fa44b91f6603f3200be6f68cb230b0345158bc7"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-linux-x64-x11.json",
+      "sha256": "85c09b0e1a2c103ea893c34a4dfa67a62419031610c0e421a93f7e68e94bca7a"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-linux-x64-x11.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-macos-arm-test.command.json",
+      "sha256": "047aea71a4577140ae2301f057330cf6aa795ab6e4f848e02af2103ec65102f3"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-macos-arm-test.json",
+      "sha256": "a6420119c9e4bf6db207207a8180e43dd5e8bfd630552767af3b15891091916c"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-macos-arm-test.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-macos-arm.command.json",
+      "sha256": "c246a9b05837448cfcbe02a4d711dca8a9dae474eb5aa31a7dce5b24fc611ec0"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-macos-arm.json",
+      "sha256": "29311b5f38bd1b82ec5c1240241b9c4face962c0dbcdf0f161416f86dd943202"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-macos-arm.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-macos-intel.command.json",
+      "sha256": "b9ff6ce68ce3bb39b76e10e14c0424e1d6a95d9a6a7256f5776cf0e317361f89"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-macos-intel.json",
+      "sha256": "bf10a4f5ae0d099e469a7337564f20faf3902cb7d1bdb32c683e6f0c265d6463"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-macos-intel.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-test-support-resolve.command.json",
+      "sha256": "a3f8241c5abd9d6245c6a45eac4b7d3d9f11a7e5d0cfdf4951145743491f8949"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-test-support-resolve.json",
+      "sha256": "aa799227e85b1d02dd06bd0ca6477eec3affec80c93b7c22c3911deba85e566c"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-test-support-resolve.stderr.log",
+      "sha256": "24846252c40c71ec7b642d676344f6e0d9819722ccc7b6193e5e8a632740f1c7"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-windows-x64.command.json",
+      "sha256": "1707f3ff353ae1bab0c34d5f3210559420af38b14b54cd53f88192f7937dca41"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-windows-x64.json",
+      "sha256": "b44e8642643a4968df3a6b8d947ef6449b10846ccddc7e3667971b195d6f1211"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-windows-x64.stderr.log",
+      "sha256": "e5831c9765825b2fdcce6aff39abd98b6f0faa6432d55c0286cde5ab8d3d31fc"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/negative-edition-2015.command.json",
+      "sha256": "ed74ba8523c2a2ce45d2f519022c5a71143d47f7ecd590505fc8326d43ce0a02"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/negative-edition-2015.stderr.log",
+      "sha256": "751b722bd9353ec17aaa6245619ba4bcd13810445844cc35b697783064b33607"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/negative-edition-2015.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/proposed-policy.md",
+      "sha256": "4d1bdadac4645a1cbbed5e6c800593c8f2113fcb1bc3d2163ad14f489778582a"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/report.md",
+      "sha256": "de89a351727d8f5697d26babeb31b2d07a18242253e3ec639c7d5fcce5d1e01f"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/safety-build.command.json",
+      "sha256": "6e2f471c7782ca894215e9cb79e55e383c61b99bc22a68a748b7e367719f86a9"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/safety-build.stderr.log",
+      "sha256": "5da90d0aa254f331bd9ae96135e9b47e688afc3c56d00278e0c2f6e2aa1036b9"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/safety-build.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/safety-clippy.command.json",
+      "sha256": "e6ea919a585a372e02aabb29be05984830faec7958632a7080bf8a82f8f1f44f"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/safety-clippy.stderr.log",
+      "sha256": "36a88195e84ceb38eae4b6c5930d10e8603e67cc8290e3ce09d011520109b1e4"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/safety-clippy.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/safety-fmt.command.json",
+      "sha256": "b2619d31e216d0691b6ac060699f0f1ede2d7b19416334a7be0f567688e074be"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/safety-fmt.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/safety-fmt.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/safety-negative-edition.command.json",
+      "sha256": "d1b41e726c8026b453f06d92f4fe33178b6c97ca59d45b7734dbdf50defc4157"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/safety-negative-edition.stderr.log",
+      "sha256": "4dc33ffbb7805be400bc704120a29d0477845f58cb9902cbdeb1b0d3dedc7d7d"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/safety-negative-edition.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/test_candidate_guard.py",
+      "sha256": "38bb8e00a72ae99bb668e7f14707b7a55446ca1a559f6d42514878435637a25d"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-all-base-packages.command.json",
+      "sha256": "061bf89a09aa49fe99427beaa32fe4769eef51bfc38b9a33d7ef2bedfa0e0a30"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-all-base-packages.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-all-base-packages.stdout.log",
+      "sha256": "32e2d444f269121481bbc84aa7723035ffadba8f61d0ed73ac3f7bf4e330c37d"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-all-base.command.json",
+      "sha256": "494e5732be6610619515975ca07038f32337a522f822e46244db53d0df477cf1"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-all-base.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-all-base.stdout.log",
+      "sha256": "4842f9013933458704a260f6a60fed9285c1336887b1c9e9f5a8153733634f5e"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-all-test-support-packages.command.json",
+      "sha256": "fc7c6b12c9074e942402c60be63ba476ff91f4fb4cd598d1083fd64a39e4f61d"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-all-test-support-packages.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-all-test-support-packages.stdout.log",
+      "sha256": "afa220c3c254da1113f6326f945ad7dfaad0efb64d13583cce4e322514fc1189"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-all-test-support.command.json",
+      "sha256": "6a25b5ca49f8043e55446003945e5568987877942a52186390a7ed719c8dcbc0"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-all-test-support.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-all-test-support.stdout.log",
+      "sha256": "bdacb8fc30463683e996a6b72d34b72ff3a4f97100487bf2478106ca2810de2b"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-all-wasi-path.command.json",
+      "sha256": "09f94a080d2166bd9384710e63191e25059d4624828d25a7f0fe2268a77b8ebb"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-all-wasi-path.stderr.log",
+      "sha256": "4dc8e4fe7f86c681d8b81d94c4e76a3dda13457f37def5513d5850195a7778f6"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-all-wasi-path.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-linux-arm-both-packages.command.json",
+      "sha256": "8a4f838c0439c04c82494e617c56d9e3ebe960a0c0d66449c516e574c1a9384d"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-linux-arm-both-packages.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-linux-arm-both-packages.stdout.log",
+      "sha256": "cd22fef8c9356ac8eea7707ed6e8f5b17b1d4d252eb8e3061e324732af949250"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-linux-arm-both.command.json",
+      "sha256": "1a19122d2830dcf7d93eba8e8692c3e22f4749d36e096a5961f05aee4e0b259b"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-linux-arm-both.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-linux-arm-both.stdout.log",
+      "sha256": "5addb63d6c4638372c6f60a6eff2196dc041b09682e3c267acc4d17bb16d4997"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-linux-x64-both-packages.command.json",
+      "sha256": "702c49f8ed035b43afc7667aa6729b4391c81d00183818c688fd2ca34300782a"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-linux-x64-both-packages.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-linux-x64-both-packages.stdout.log",
+      "sha256": "1cc87ab36019027595fca65f99a3f734ca50bf6b5603888806293314a1d4f955"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-linux-x64-both.command.json",
+      "sha256": "3c2e3065db2315d3c66210a07d1bbf819c20f0a4ffe7ab7f485da75a0e95ed1d"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-linux-x64-both.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-linux-x64-both.stdout.log",
+      "sha256": "08a1cf9ec3d99a6e2253d4294868fdbe1ceb16028988e34275255810f1c2213b"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-linux-x64-wayland-packages.command.json",
+      "sha256": "d98bc4fbfaf4fa96c0452e45429e4db17e02c5124753966cafd77657a419cf53"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-linux-x64-wayland-packages.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-linux-x64-wayland-packages.stdout.log",
+      "sha256": "1cc87ab36019027595fca65f99a3f734ca50bf6b5603888806293314a1d4f955"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-linux-x64-wayland.command.json",
+      "sha256": "218dacf2a8f25bbdf354f378a3f3c5c8d12143be6022d7e824641dd95fab1586"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-linux-x64-wayland.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-linux-x64-wayland.stdout.log",
+      "sha256": "08a1cf9ec3d99a6e2253d4294868fdbe1ceb16028988e34275255810f1c2213b"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-linux-x64-x11-packages.command.json",
+      "sha256": "f670da10c1972724162076328057a990dff7ed2cccebf83347892787a781d5ff"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-linux-x64-x11-packages.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-linux-x64-x11-packages.stdout.log",
+      "sha256": "1cc87ab36019027595fca65f99a3f734ca50bf6b5603888806293314a1d4f955"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-linux-x64-x11.command.json",
+      "sha256": "d77a4e72303e99c66faac08f74022b6456223f52f679bacf4acf8d8c1bcf0039"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-linux-x64-x11.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-linux-x64-x11.stdout.log",
+      "sha256": "08a1cf9ec3d99a6e2253d4294868fdbe1ceb16028988e34275255810f1c2213b"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-macos-arm-packages.command.json",
+      "sha256": "59769e9e7001ac9661bf59957436c2823f0828ebe1010e2e3bced4d3d467fa80"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-macos-arm-packages.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-macos-arm-packages.stdout.log",
+      "sha256": "47a40ce143129753fffeaf767118d9aacb48f84bf19803b43554d72898819cea"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-macos-arm-test-packages.command.json",
+      "sha256": "732fbafa4f8cad81133ea7754e9ec54c22062448f70774f5c5d6453c69fdc32c"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-macos-arm-test-packages.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-macos-arm-test-packages.stdout.log",
+      "sha256": "99d650c00fa3459edb7d5bc89554e8b2d888f54b96176c00292065762e275f73"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-macos-arm-test.command.json",
+      "sha256": "ae5b808e810df0f9d824e7f6b7e8159eaa2386629e7a0ee2ebd86656a7bea10b"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-macos-arm-test.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-macos-arm-test.stdout.log",
+      "sha256": "ac9a3d18c4f6b580db49da8d68f106d72c14f42c45623987799c6dce343e4798"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-macos-arm.command.json",
+      "sha256": "b84e31f0171859d1d98a762484a57a9207043bfa5fa5e41386999db745705f38"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-macos-arm.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-macos-arm.stdout.log",
+      "sha256": "c71af262c78e56fbbb0fb61dd780ca1a44506cfc093d1e0c8dc72b8e2c95c4f5"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-macos-intel-packages.command.json",
+      "sha256": "c671255eb6b01c962ba5a9af5a22e4fe8a47e2ef8108baf0748264acee071ffb"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-macos-intel-packages.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-macos-intel-packages.stdout.log",
+      "sha256": "b9de754c8836390a1a66f34cb189553c7e4593d23aaadf5dfa5a523271f9125e"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-macos-intel.command.json",
+      "sha256": "0ee90c004f1db30bf2de664da9d64b97f5873aa0dfd0c2033948a3a8af3a69ef"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-macos-intel.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-macos-intel.stdout.log",
+      "sha256": "8842df135387b8cfe95a569f76bb58dfc18a1716b075b7c1548b9dccea29647d"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-windows-x64-packages.command.json",
+      "sha256": "83002ae92211119eaeabe343c509f61da4e4a8e65aee3993e8105b5b70139b37"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-windows-x64-packages.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-windows-x64-packages.stdout.log",
+      "sha256": "d84c9fcdcdefccbf8dc483f7d007130f38a162a9c3358bb25c417b1fb81e86a7"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-windows-x64.command.json",
+      "sha256": "618d3a831521afa3f82e869519520db8eff468a1e839e30d350ae808fe03ffb4"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-windows-x64.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/admission-2026-10-30/tree-windows-x64.stdout.log",
+      "sha256": "9cb7ce6b63bb5a867c05f6d4eea30b88ff9222caaa2b2adb0c995e5939e51aeb"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/group-1-admission.json",
+      "sha256": "279fde9c38cc4dfdb5aed7566f6b5f7396a8be4d27445d9d711eb5a20936af48"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/group-1-final-checks.json",
+      "sha256": "0875255f5cb38e1d4e4fe4534ab090f2569da0358701aba276a53da4113792ff"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/group-1-guard.command.json",
+      "sha256": "85d8a6c485863402a6461ece5f104f4bfd98adce2bf6844a0fbc9d4f2ad6c114"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/group-1-guard.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/group-1-guard.stdout.log",
+      "sha256": "b7619b26a16b072e370afaa4d3f83fd36c3f3aaa8f48db8fc35ca54029d09097"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/group-1-report.md",
+      "sha256": "4fed52f15f0a9e84af9c9f7e98e6b7676d18dcf19940e5d6377a7b0776c16f64"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/group-1-review.md",
+      "sha256": "cb177abbb55c2576767eabbfc2e5d130bd9a2bb04aa08f47341e64e15b104801"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/Cargo.lock",
+      "sha256": "bb343932f2f4ba1d6e99957a5ecf023d8c0235f8497824270235814d24292a45"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/candidate-root.txt",
+      "sha256": "8085c707d40fadbd7ee00c19c2b1cc3e9e0082f376ac5bc5498956e27e955688"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/commands.md",
+      "sha256": "aaa94f7f38155752a782b9f11d4da8ac15c99dcac763f118ad856e3540cb9fd8"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/crates/aline-app-core-probe/Cargo.toml",
+      "sha256": "e090f905c2b8e6b856fe30b872d980d1434fd05a9281e75d70f4ac789a5f93b4"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/crates/aline-app-core-probe/assets/zh-CN.toml",
+      "sha256": "6eae03f9b9334587fe9938feb62a62d0e1593eac8e5960e4a64e39ddc15b7d00"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/crates/aline-app-core-probe/examples/probe-consume.rs",
+      "sha256": "cbdd57f938a2e8711c8b07982c2845fcee89caa007d73c1023b41991982d1b37"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/crates/aline-app-core-probe/src/lib.rs",
+      "sha256": "5197a7177dc9624f766bf76940a317e6ab468817e42e29fdf947f01c18a28d20"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/crates/aline-buffer-probe/Cargo.toml",
+      "sha256": "9a522d9a52660dcce15dd4c253a0a0657b5edac56400d79bbd3557bf3c980e9d"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/crates/aline-buffer-probe/src/lib.rs",
+      "sha256": "a6e644b75d215c4cc342778054d4b4bd6573a0c3122f314b778a7a2ae2870265"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/crates/aline-edit-probe/Cargo.toml",
+      "sha256": "506666bdeba93a62249574ebb4deb0c283dce8b7c61269305ca1ef5b4abfe3a7"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/crates/aline-edit-probe/src/lib.rs",
+      "sha256": "a6e644b75d215c4cc342778054d4b4bd6573a0c3122f314b778a7a2ae2870265"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/crates/aline-markdown-probe/Cargo.toml",
+      "sha256": "f3c2df30231f2bacf4fe33df5cb0b4049c3a9f89d97e1ff83993daa86737b43b"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/crates/aline-markdown-probe/examples/probe-consume.rs",
+      "sha256": "edfa42b51429b13713550d05a3cc645e20a59ea292581bd13b9a8e151b19a419"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/crates/aline-markdown-probe/src/lib.rs",
+      "sha256": "4ba9d5000bae89734f473ed2b40e14d79b5b66b0a3b007ee0082e221e2c1aebd"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/crates/aline-source-probe/Cargo.toml",
+      "sha256": "a7174bb310c749cb74bfadcdd3e623fa2a4ea26b8dc1383587185cfdfa34f5c2"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/crates/aline-source-probe/src/lib.rs",
+      "sha256": "a6e644b75d215c4cc342778054d4b4bd6573a0c3122f314b778a7a2ae2870265"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/dependency-ledger.json",
+      "sha256": "bd47731fceb8ab69a535bd4f4ff700a536607197fabc305ed572f47f9e136769"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/isolation.json",
+      "sha256": "b834f90071cda8d8c371cda2f71bbfeb77286c069843b93b28ff9aba62a2b76d"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/logs/build-app-core-release-macos-arm64.log",
+      "sha256": "4b0f96bf37108c26e00e27441cfa8fcd07017e71eadc94f3801630c8f890e0a2"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/logs/build-macos-arm64.log",
+      "sha256": "d3b2b716b0025e381dc94b247d98e63dedc8a73cb03df47be65aa19e5a632a4e"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/logs/build-release-macos-arm64.log",
+      "sha256": "6bfa9e18ffdef821c711a542cfebd7db0982665615563e5a191285e489609c6f"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/logs/check-app-core-macos-arm64.log",
+      "sha256": "1b3ae6c22640599e6948f54884a21b3c82433ce925908ce4407c979a8ee1c47f"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/logs/check-macos-arm64.log",
+      "sha256": "6d77f64dfc8c5325b90fdbe05d8be367bdd578bcccec24f275c5ffee7d03dd6e"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/logs/first-attempt-toml-serde-failure.log",
+      "sha256": "4d3224c37a92354ae2828fc32eedfce11f4d826a1dfca18429e68cbaafa6d99f"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/logs/info-pulldown-cmark.log",
+      "sha256": "d7a4a53a7f3f685110089861a74fe61ea26291aa9b23a44419713bafb77e5068"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/logs/info-rust-embed.log",
+      "sha256": "0ebe76c2a101f63fb9f267d506e850c49854066547287656911f8604cbff268e"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/logs/info-toml.log",
+      "sha256": "10083992224cd2d34efbfd1c5c7fbef9460d8bfa738d53264a42959d23d5d864"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/logs/metadata-aarch64-apple-darwin.json",
+      "sha256": "5a8702a48347bee1bb06c78d8ed13246f70827dbc6e9fba2b6092ba37572d8c2"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/logs/metadata-aarch64-apple-darwin.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/logs/metadata-aarch64-unknown-linux-gnu.json",
+      "sha256": "5a8702a48347bee1bb06c78d8ed13246f70827dbc6e9fba2b6092ba37572d8c2"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/logs/metadata-aarch64-unknown-linux-gnu.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/logs/metadata-all.json",
+      "sha256": "5537158b7e96799885a07b55dc63836c2547703f87140989df123f745f9bdd58"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/logs/metadata-all.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/logs/metadata-x86_64-apple-darwin.json",
+      "sha256": "998a170c4690f4584685a2e19ea61e41c866d85eb9af46b7231e9ede9870c203"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/logs/metadata-x86_64-apple-darwin.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/logs/metadata-x86_64-pc-windows-msvc.json",
+      "sha256": "b2def5ad32d3d6b7b96615db15ec2a9e65cc2358aa3dbd35d41a0ad2f19be81e"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/logs/metadata-x86_64-pc-windows-msvc.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/logs/metadata-x86_64-unknown-linux-gnu.json",
+      "sha256": "998a170c4690f4584685a2e19ea61e41c866d85eb9af46b7231e9ede9870c203"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/logs/metadata-x86_64-unknown-linux-gnu.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/logs/run-app-core-consumer.log",
+      "sha256": "688e2d6b41daa0b2d197a10cfc834fe5ab3d632b6ded394f65a3f276b4b53c5c"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/logs/run-markdown-consumer.log",
+      "sha256": "4181cd1d898144a09df1ddad60cceac15f79e6964fcbff04111f12394428df9e"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/logs/tree-all.txt",
+      "sha256": "64ad2cc9f17b78344f4a9eeebac37e739c80fd3a3276cd589184c12d6cc055a7"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/probe-Cargo.toml",
+      "sha256": "02c946795143097ddfa842e7a06e9f830e355424b76706f32de80ef02cba8231"
+    },
+    {
+      "kind": "新增证据/夹具",
+      "path": "docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/report.md",
+      "sha256": "4b3bde6a1f86254045e250efdf189d86d9c5fa626c362fd2cb3b5f348f4336be"
+    },
+    {
+      "kind": "修改",
+      "path": "openspec/CODE_STANDARDS.md",
+      "sha256": "3b522693c06b0e34450566a53bf521ad73eff16aa30289080f27b945c98a8aca"
+    },
+    {
+      "kind": "修改",
+      "path": "openspec/changes/m0-engine-foundation/design.md",
+      "sha256": "faca36d1cb570d9ebecc6d16ebe6c32c485208c8b0273a289f8d50b52ce9c360"
+    },
+    {
+      "kind": "修改",
+      "path": "openspec/changes/m0-engine-foundation/proposal.md",
+      "sha256": "dc38c3e459063ded32033c842cf08c630d569ed2f6b2d47a1e66aca36fb20467"
+    },
+    {
+      "kind": "新增",
+      "path": "openspec/changes/m0-engine-foundation/specs/engineering-governance/spec.md",
+      "sha256": "cbe659265b19ead20a95b577e0360438fbe7cc5180bcf6d9ce04e08341a1184e"
+    },
+    {
+      "kind": "修改",
+      "path": "openspec/changes/m0-engine-foundation/specs/workspace/engineering-gates/spec.md",
+      "sha256": "accfc708ceca663e0fea87e4d258955378446954b208604c65e22c0c65e11cb1"
+    },
+    {
+      "kind": "修改",
+      "path": "openspec/changes/m0-engine-foundation/tasks.md",
+      "sha256": "d76d6d6c64f1cd1cd09b52c60aab4bebf60c3e43c9f8c5979d3f4b8f7d63234b"
+    },
+    {
+      "kind": "修改",
+      "path": "openspec/specs/engineering-governance/spec.md",
+      "sha256": "53f3fcdedd5d058bc50f145b2c32d74b39bf9853f39d6791d56fda6629cd6bf6"
+    }
+  ]
+}

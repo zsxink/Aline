@@ -1,0 +1,15 @@
+[package]
+name = "aline-m0-gpui-candidate"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+gpui = { package = "gpui-pre", version = "=0.3.9", default-features = false }
+
+[features]
+font-kit = ["gpui/font-kit"]
+wayland = ["gpui/wayland"]
+x11 = ["gpui/x11"]
+windows-manifest = ["gpui/windows-manifest"]
+test-support = ["gpui/test-support"]

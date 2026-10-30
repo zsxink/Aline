@@ -1,0 +1,25 @@
+{
+  "id": "positive-linux-x64-x11",
+  "argv": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/admission-2026-10-30/candidate_guard.py",
+    "--metadata",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/admission-2026-10-30/metadata-linux-x64-x11.json",
+    "--tree",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/admission-2026-10-30/tree-linux-x64-x11-packages.stdout.log",
+    "--lock",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/admission-2026-10-30/candidate/Cargo.lock",
+    "--scenario",
+    "linux-x64-x11",
+    "--scope",
+    "app"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "started_utc": "2026-10-30T12:53:19.382282+00:00",
+  "exit_code": 0,
+  "expected_exit_code": 0,
+  "expected_diagnostic": "",
+  "independent_expectation": "现行准入规则",
+  "passed": true,
+  "finished_utc": "2026-10-30T12:53:19.421924+00:00"
+}

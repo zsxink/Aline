@@ -1,0 +1,82 @@
+{
+  "date": "2026-10-30",
+  "git_head": "47430d6a9c1b6a5dc5b07cb838f4e03ba9f203cf",
+  "scope": "任务第1组1.1-1.4；不代表M0出口或V验收",
+  "toolchain": {
+    "rustc": "1.98.1",
+    "cargo": "1.98.1",
+    "edition": "2024",
+    "rustfmt": "1.9.0-stable",
+    "clippy": "0.1.98",
+    "msrv": "未声明、未验证"
+  },
+  "formal_workspace_exists": false,
+  "dependencies": [
+    {
+      "package": "gpui-pre",
+      "version": "0.3.9",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "34f61c1cfd36fc9c436af09308c963822ae27a45a84feb21a77ba5c9e051f1c0",
+      "license": "Apache-2.0",
+      "planned_consumers": [
+        "app",
+        "aline-ui",
+        "aline-plugin"
+      ],
+      "default_features": false,
+      "feature_combinations": "受 guard_policy.json 的10组精确基线约束；不表示额外feature获准",
+      "admission": "第1组候选准入；第2组实际接线仍须核对全部闭包"
+    },
+    {
+      "version": "0.13.6",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license": "MIT",
+      "package": "pulldown-cmark",
+      "checksum": "3db2be46835f013dd3f4fa7f5f7402c537787b54ebb6fe2b94bbdd7e2669bb7b",
+      "planned_consumers": [
+        "aline-markdown"
+      ],
+      "selected_features": [],
+      "admission": "第1组候选准入；消费探针通过，不代表正式功能验证"
+    },
+    {
+      "version": "1.1.8+spec-1.1.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license": "MIT OR Apache-2.0",
+      "package": "toml",
+      "checksum": "20489e00e4d8741d6be680764cc12e270655e375a20d1011e844a9c3379e678d",
+      "planned_consumers": [
+        "aline-app-core"
+      ],
+      "selected_features": [
+        "parse",
+        "serde",
+        "std"
+      ],
+      "admission": "第1组候选准入；消费探针通过，不代表正式功能验证"
+    },
+    {
+      "version": "8.13.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license": "MIT",
+      "package": "rust-embed",
+      "checksum": "19afa5b4b6a611de00bd1bdae6ae6f39084c9399f0679c3f52d8469cf335cc23",
+      "planned_consumers": [
+        "aline-app-core"
+      ],
+      "selected_features": [
+        "debug-embed"
+      ],
+      "admission": "第1组候选准入；消费探针通过，不代表正式功能验证"
+    }
+  ],
+  "std_only_planned_engines": [
+    "aline-source",
+    "aline-buffer",
+    "aline-edit"
+  ],
+  "extra_dependency_candidates": "实体/emoji/Unicode分段/随机/diff等Aline自有依赖尚未准入；GPUI已审test-support内既有proptest属于锁定第三方子图，不给引擎使用proptest的例外",
+  "guard_policy": "admission-2026-10-30/guard_policy.json",
+  "guard_result": "admission-2026-10-30/guard-results/summary.json",
+  "platform_limits": "仅macOS aarch64实际构建；其它目标只做metadata/tree解析；原生后端和metal未验证；V-01至V-09未通过"
+}

@@ -1,0 +1,13 @@
+[package]
+name = "fixture-negative-real-target-notify"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+watcher = { package = "notify", path = "../../packages/notify" }
