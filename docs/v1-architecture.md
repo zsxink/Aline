@@ -52,7 +52,22 @@
 | 基础工具 | 历史清单的 toml、rust-embed、blake3、directories、rfd，以及 diff 候选 similar、测试 proptest | 引入前逐项登记用途、所属 crate、精确版本及许可证；未使用的不添加 |
 | 导出 / ZIP / 平台集成 | 旧架构没有给出可执行的 PDF/.docx/HTML 后端及安全解包依赖闭环 | V-02/V-04/V-01 实验选型，登记新增依赖后再实现；不在此猜定库或借浏览器/WebView补齐 |
 
-依赖准入以本节和[现行引擎 §18.2](./engine-design.md#182-依赖准入与未解决实现风险)为准；[历史 engine-design §2.12](./archive/migration-evidence/engine-design.md)仅供追溯候选来源，不能覆盖当前禁令、版本登记和 V 验证。第三方版本集中到 workspace；同类功能不引入第二个库。V1 禁 notify、regex、tokio、Wasmtime/WASI、动态插件宿主；禁止把旧 §9.3 的 actor、心跳、WIT、安装目录搬进 M0–M6。后续外部插件接入方向已获用户明确确认，加载协议、执行环境、隔离与权限、兼容策略及交付阶段尚待专项设计；本稿不预建宿主、不确定工期，也不恢复旧 Wasmtime 路线。
+依赖准入以本节和[现行引擎 §18.2](./engine-design.md#182-依赖准入与未解决实现风险)为准；[历史 engine-design §2.12](./archive/migration-evidence/engine-design.md)仅供追溯候选来源，不能覆盖当前禁令、版本登记和 V 验证。第三方版本集中到 workspace；同类功能不引入第二个库。V1 禁 notify、regex、tokio、Wasmtime/WASI、动态插件宿主，完整图中仅允许下列已批准的 GPUI 精确例外；五引擎完整闭包继续无 GPUI、无禁用依赖。禁止把旧 §9.3 的 actor、心跳、WIT、安装目录搬进 M0–M6。后续外部插件接入方向已获用户明确确认，加载协议、执行环境、隔离与权限、兼容策略及交付阶段尚待专项设计；本稿不预建宿主、不确定工期，也不恢复旧 Wasmtime 路线。
+
+#### M0 GPUI 精确准入例外（2026-10-30）
+
+用户在隔离审计及最小例外草案交付后指示继续完成第 1 组，批准本次规范同步。依据及未测边界见 [GPUI 审计](./validation/m0-engine-foundation/admission-2026-10-30/report.md)与[独立复核](./validation/m0-engine-foundation/admission-2026-10-30/independent-review.md)。本次只承认 crates.io `gpui-pre =0.3.9`，归档 SHA-256 为 `34f61c1cfd36fc9c436af09308c963822ae27a45a84feb21a77ba5c9e051f1c0`，声明源快照为 Zed `93d745668805029476e6d7fbb19652116fed51de`；发布包的 `actions!` 宏路径修订及许可证 symlink 实体化已留差异证据。没有 Aline 自有补丁，其它 GPUI 内部包未逐文件比对；不能把包来源核对扩写为第三方代码全面安全审计。
+
+| 精确例外 | 归属、路径与目标边界 |
+|---|---|
+| `regex =1.13.1`，及其实现包 `regex-automata =0.4.18`、`regex-syntax =0.8.11` | 只允许 app/aline-ui/aline-plugin 经锁定 GPUI 既有路径消费，包含已审 `GPUI/test-support → proptest =1.12.0 → regex-syntax =0.8.11` 入边；Aline 自有代码禁止直接依赖，五引擎禁止借其它中间包引入（含引擎测试的 proptest）。必须检查所有实际入边及根路径，存在一条合法 GPUI 路径不能掩盖其它非法路径 |
+| `gpui-pre =0.3.9 → getrandom =0.3.4 → wasip2 =1.0.4+wasi-0.2.12` | 仅允许末边条件 `cfg(all(target_arch = "wasm32", target_os = "wasi", target_env = "p2"))`；保留 all-target 图且证明登记桌面目标的实际选包均不包含该绑定。不得加入 WASI 执行宿主、Wasmtime 或动态加载能力 |
+
+例外按包身份、来源、归档校验和、依赖边、target 条件、features 和消费方共同约束。正式 workspace 可替换隔离消费方并新增已准入节点，但 GPUI 受审子图变化须重新审计，不能要求整个锁文件与临时候选根字节相等。metadata 过近似路径与实际 Cargo tree 分目标/feature 交叉核对；图解析失败或未解析组合不能判合规。旧 `wasi 0.11.1` 只见于本次 metadata 过近似路径，实际 tree 未选中，本次不批准其例外。未使用的 screen-capture/bench-support/profiler/stacker/inspector 等 features 仍未准入，升级或新路径不自动获得例外。
+
+已实际验证 Rust/Cargo 1.98.1、edition 2024、rustfmt 1.9.0、Clippy 0.1.98 下的 macOS aarch64 GPUI 核心库消费方构建/检查；未声明 MSRV，未构建原生平台后端。`metal` 工具缺失、Intel Mac/Windows/Linux 构建、真实窗口/输入及五引擎正式闭包继续留待对应任务取证，不能据此宣称 V-01 或 M0 出口通过。
+
+第 1 组纯引擎拟用依赖另以五个 `*-probe` 隔离消费方取证：[候选账本](./validation/m0-engine-foundation/pure-candidates-2026-10-30/report.md)。`aline-markdown` 使用 `pulldown-cmark =0.13.6`（关闭默认 features）；`aline-app-core` 使用 `toml =1.1.8`（lock 实体为 `1.1.8+spec-1.1.0`，关闭默认 features，启用 std/parse/serde）与 `rust-embed =8.13.0`（关闭默认 features，启用 debug-embed，避免开发配置运行期读取 catalog 文件）。source/buffer/edit 当前无需第三方依赖。完整候选图及 normal/dev/build/target 边见机器账本，尚无 GPUI/禁用包；这不是正式五引擎的构建或测试通过声明。实体、emoji、Unicode 分段、随机/diff 及资产后端等未消费候选尚未准入，后续如实际需要须先补同等审计；第 2 组仍须核验真实 workspace 图，不能从临时探针推断实际接线合规。
 
 ## 4. crate 图、职责与公开边界
 

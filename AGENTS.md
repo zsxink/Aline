@@ -53,7 +53,7 @@ cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 
 - 跑单个测试：`cargo test -p <crate> <test_name>`（测试命名 `被测行为_场景`，如 `edit_single_patch_creates_one_undo_step`）。
 - RS-01 已确认：默认 lint + 逐项启用铁律/高价值 lint，`pedantic` 按项引入，不整组开启；保留 `-D warnings`，不全局放行坐标转换。具体 lint 级别、作用范围、成员继承及正反样例在 M0 验证登记，当前尚无配置或 CI。
-- gpui 锁死快照版本（`gpui-pre`），升级是显式动作；V1 不引入 notify / regex / tokio 等运行时与额外依赖（当前准入见 engine-design §18.2 和 v1-architecture §3.2；历史依赖表不是预装许可）。
+- gpui 锁死快照版本（`gpui-pre`），升级是显式动作；V1 不引入 notify / regex / tokio 等运行时与额外依赖。2026-10-30 已批准的例外仅为架构 §3.2 登记的 GPUI 0.3.9→regex 精确路径与非桌面 WASI p2 绑定路径；Aline 自有直接依赖、五引擎及其它路径继续禁止。按来源/版本/校验和/边/target/features 审计，不全包或前缀放行（当前准入见 engine-design §18.2 和 v1-architecture §3.2；历史依赖表不是预装许可）。
 
 ## 工作方式
 

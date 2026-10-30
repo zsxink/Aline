@@ -12,6 +12,18 @@
 
 顺序固定：先验证 macOS，完成后再验证 Windows/Linux；正式 V1 三平台一起发布。Windows 10、Intel Mac 必须保留。
 
+M0 兼容目标登记（2026-10-30，目标候选，不代表支持或验证通过）：
+
+| 平台目标 | CPU / 系统候选 | 显示环境候选 | 可用取证设备与缺口 |
+|---|---|---|---|
+| macOS | Apple Silicon `aarch64`、Intel `x86_64`；最低系统待测候选 macOS 14，当前实际主机 27.0.1；最终下限未冻结 | macOS 原生显示环境 | 当前可用设备：MacBook Pro（Apple M5，macOS 27.0.1，`aarch64`），内建 Liquid Retina XDR 及外接 4096×2304 显示器；Intel Mac 和低系统版本取证环境尚未接入 |
+| Windows 10 | `x86_64`，测试版本候选 22H2；最终最低 build 与 ARM64 是否纳入待确定 | Windows 原生显示环境 | 本次未接入 Windows 10 设备；安装、显示、输入法、系统集成均未取证 |
+| Linux | `x86_64`、`aarch64`；发行版样本候选 Ubuntu 24.04 LTS、Debian 12，最终最低版本待测 | X11、Wayland 为待验证候选 | 本次未接入 Linux 设备/VM；发行版、显示会话与系统集成均未取证 |
+
+目标与设备证据及命令见 [M0 引擎地基验证记录](./validation/m0-engine-foundation/README.md)。当前仅 macOS `aarch64` 主机环境已实际观察；上述其余 CPU/系统/显示值均为候选或缺口，不能据此推断平台支持。验证顺序为先 macOS，再 Windows/Linux；V-01 仍未执行。
+
+第 1 组已取得隔离 GPUI 核心库的 macOS aarch64 构建和各目标依赖解析证据，见[候选审计](./validation/m0-engine-foundation/admission-2026-10-30/report.md)。系统版本候选用于安排后续取证，不是兼容测试结果；Intel Mac、Windows/Linux 的原生构建/运行、真实 IME 和安装分发均未执行，不能将 `cargo metadata`/`tree` 的成功称为平台已支持。
+
 产物：最低系统版本、CPU 架构、Linux 发行版与显示环境、安装/卸载/签名或信任提示、系统菜单、文件关联、重复进程转交、文件路径与中文输入矩阵。增加 Windows AltGr/欧洲键盘布局与 Ctrl+Alt 快捷键交错输入样例，核实实际平台事件而不将旧稿的事件描述视作已验证事实（原历史线索见引擎证据 L1427～1435）。先确定实际测试设备和环境，不用尚未验证的系统泛化“支持三平台”。
 
 时点：M0 确定兼容目标，M1 首轮 macOS 冒烟，M5～M6 按既定顺序完成全平台验证。对应 FILE-02～03、第 7.1 节。

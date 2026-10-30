@@ -116,6 +116,8 @@ Repository、Unit of Work 等仅在出现对应领域存储或事务需要时评
 
 格式由登记环境 rustfmt 处理；Clippy 采用默认组加逐项铁律/高价值规则，保留 `-D warnings`，不整组开启 pedantic。workspace lint 必须验证每个成员实际继承，禁止全局放行坐标转换。外部指南列出的 cargo-audit、Miri 等只作按需评估工具，不自动新增当前必跑命令。
 
+依赖禁令的唯一精确例外见现行架构 §3.2（2026-10-30 GPUI 审计裁决）：仅限锁定 GPUI 的 regex 路径及非桌面 WASI p2 绑定，五引擎隔离不变。门禁保留完整图并与实际 target/features 的 Cargo tree 交叉核对，检查所有引入路径和包身份/校验和，禁止全闭包或包名前缀放行；解析失败不能判合规。
+
 ## 6. OpenSpec、评审与交付
 
 ### 6.1 每次变更的记录

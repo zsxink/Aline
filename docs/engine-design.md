@@ -602,7 +602,9 @@ RS-01～RS-05 同轮按 A 确认，具体 Rust 政策见[现行 Rust 规范](./r
 
 仅 pulldown-cmark 的单解析器路线及 GPUI 精确锁快照是当前约束；具体版本以 M0 实际登记/lockfile 为准。`entities`/`emojis` 是 HTML 实体/短代码的历史候选，`similar` 是 diff 候选，`proptest` 是测试候选；引入时核用途、归属、版本/许可证和同类库，不因旧清单出现就全部添加。
 
-ratex/ratex-svg、mermaid-rs-renderer、usvg、syntect/two-face 属插件/资产候选，不让纯引擎为展示而直接依赖 GPUI。ropey 只在性能证据要求时评估；V1 禁 notify/regex/tokio/Wasmtime/WASI/动态宿主，与架构 §3.2 一致。主题 ZIP/导出及 Unicode 分段等新增依赖按专项验证准入，不猜定后端或冻结旧版本。
+第 1 组隔离消费者已实际解析 `pulldown-cmark 0.13.6` 的事件，并验证 toml/rust-embed 的当前 catalog 依赖组合，归属/精确 features/源码来源和纯候选闭包见[纯引擎候选审计](./validation/m0-engine-foundation/pure-candidates-2026-10-30/report.md)及架构 §3.2。此处只登记依赖可消费性，GFM/产品语法的运行期 Options 与映射/HTML 金样仍须第 6 组验证；不能将单一事件计数探针当作语法或保真验收。当前未准入实体/emoji/分段/随机/diff 等额外候选。
+
+ratex/ratex-svg、mermaid-rs-renderer、usvg、syntect/two-face 属插件/资产候选，不让纯引擎为展示而直接依赖 GPUI。ropey 只在性能证据要求时评估；V1 禁 notify/regex/tokio/Wasmtime/WASI/动态宿主，与架构 §3.2 一致。2026-10-30 批准的 GPUI 0.3.9 精确例外仅适用 app/ui/plugin：regex 既有路径及 all-target 图中的非桌面 WASI p2 绑定，完整身份、边、target 与变更复审要求以架构 §3.2 为准；五引擎完整闭包继续无 GPUI、无禁用依赖。见[实际审计](./validation/m0-engine-foundation/admission-2026-10-30/report.md)，不能以单条合法路径掩盖其它入边，也不能把 metadata 过近似包视为实际启用或忽略解析失败。主题 ZIP/导出及 Unicode 分段等新增依赖按专项验证准入，不猜定后端或冻结旧版本。
 
 后续实现的主要待验证影响：ED-01 决策阻塞已解除，组合期显式发布的等待/取消与结束后快照须按 V-07/V-08 验证；V-07 同时决定映射算法/有限 HTML/改写/命令金样能否安全开放；V-05/V-06 决定 StringBuffer、巨块与扫描预算是否满足目标；V-03 决定特殊语法后端覆盖；V-08 决定快照/重载/资源能否正确接线。任何一项缺证据，都不能以“旧项目跑过”代替。
 
