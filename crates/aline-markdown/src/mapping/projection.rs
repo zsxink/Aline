@@ -1,0 +1,395 @@
+//! 投影身份与受检坐标；恒等投影由源码片段构造，供 UI/edit 无头消费。
+//!
+//! 此阶段只建立恒等投影和单位边界，不解析 Markdown、不伪造实体/HTML 映射。
+//! 投影持有不可变源码与受预算索引，查询不重建全文或在调用方手算局部差。
+
+use std::fmt;
+use std::ops::Range;
+use std::sync::Arc;
+
+use super::coordinates::{DrawnOffset, DrawnRange, ProjectionId, Utf16Offset, Utf16Range};
+
+use aline_buffer::{
+    Affinity, BufferError, SnapshotId, SrcOffset, SrcRange, SrcSelection, TextBudget, TextSnapshot,
+};
+
+/// 映射输入、投影身份、单位边界或预算失败。
+#[derive(Debug)]
+pub enum MappingError {
+    /// 源码快照或范围校验失败，保留原始类别。
+    Source(BufferError),
+    /// 绘制/UTF-16 端点超出当前投影。
+    OutOfBounds {
+        /// 请求端点。
+        offset: usize,
+        /// 当前单位长度。
+        len: usize,
+    },
+    /// 绘制字节端点位于 UTF-8 标量内部。
+    NotCharBoundary,
+    /// UTF-16 端点位于代理对中间。
+    MiddleSurrogate,
+    /// 输入属于另一投影。
+    ProjectionMismatch,
+    /// 合法源码端点位于当前局部投影以外。
+    SourceOutsideProjection,
+    /// 半开范围反向。
+    ReversedRange,
+    /// 注入的绘制字节或索引点预算耗尽。
+    BudgetExceeded,
+    /// 长度累计溢出。
+    LengthOverflow,
+    /// 内部索引没有满足构造不变量。
+    InvalidMapping,
+    /// 受检分配失败。
+    Allocation(std::collections::TryReserveError),
+}
+
+impl fmt::Display for MappingError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(self, formatter)
+    }
+}
+
+impl std::error::Error for MappingError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Source(error) => Some(error),
+            Self::Allocation(error) => Some(error),
+            _ => None,
+        }
+    }
+}
+
+/// 映射结果的来源精确性；本阶段恒等投影只产生 Exact。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MappingPrecision {
+    /// 原样文本边界精确对应。
+    Exact,
+    /// 多对一来源对齐到规范锚点。
+    Aligned,
+    /// 隐藏源码的映射锚点。
+    Hidden,
+    /// 合成展示内容的来源锚点。
+    Synthetic,
+}
+
+/// 携带精确性、来源和方向偏好的受检转换结果。
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Mapped<T> {
+    value: T,
+    source: SrcRange,
+    precision: MappingPrecision,
+    affinity: Affinity,
+}
+
+impl<T> Mapped<T> {
+    /// 借用受检目标坐标。
+    pub fn value(&self) -> &T {
+        &self.value
+    }
+    /// 取得受检目标坐标所有权。
+    pub fn into_value(self) -> T {
+        self.value
+    }
+    /// 返回实际源码来源，恒等端点的来源是空范围。
+    pub fn source_range(&self) -> &SrcRange {
+        &self.source
+    }
+    /// 返回来源精确性，不能把非 Exact 伪装成双射。
+    pub const fn precision(&self) -> MappingPrecision {
+        self.precision
+    }
+    /// 返回本次转换采用的方向偏好。
+    pub const fn affinity(&self) -> Affinity {
+        self.affinity
+    }
+}
+
+/// 投影构造的字节与索引点预算，不代表发布性能限额。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MappingBudget {
+    max_drawn_bytes: usize,
+    max_points: usize,
+}
+
+impl MappingBudget {
+    /// 注入绘制文本和索引点上限。
+    pub const fn new(max_drawn_bytes: usize, max_points: usize) -> Self {
+        Self {
+            max_drawn_bytes,
+            max_points,
+        }
+    }
+}
+
+/// 只读恒等投影；输入源范围和 UTF-16 索引由映射层统一拥有。
+#[derive(Clone)]
+pub struct Projection {
+    id: ProjectionId,
+    snapshot: TextSnapshot,
+    source: SrcRange,
+    drawn: Arc<String>,
+    points: Arc<Vec<(usize, usize)>>,
+}
+
+impl fmt::Debug for Projection {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Projection")
+            .field("id", &self.id)
+            .field("source", &self.source)
+            .field("drawn_bytes", &self.drawn.len())
+            .field("points", &self.points.len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl Projection {
+    /// 从明确源码片段构造恒等投影；只在显式构造点复制片段并建立受预算索引。
+    pub fn identity(
+        snapshot: TextSnapshot,
+        source: SrcRange,
+        budget: MappingBudget,
+    ) -> Result<Self, MappingError> {
+        snapshot
+            .validate_range(&source)
+            .map_err(MappingError::Source)?;
+        let slice = snapshot
+            .slice(&source, TextBudget::new(budget.max_drawn_bytes))
+            .map_err(MappingError::Source)?;
+        let mut drawn = String::new();
+        drawn
+            .try_reserve_exact(slice.len())
+            .map_err(MappingError::Allocation)?;
+        drawn.push_str(&slice);
+        let mut points = Vec::new();
+        let mut units = 0usize;
+        push_point(&mut points, (0, 0), budget)?;
+        for (drawn_off, character) in drawn.char_indices() {
+            let end = drawn_off
+                .checked_add(character.len_utf8())
+                .ok_or(MappingError::LengthOverflow)?;
+            units = units
+                .checked_add(character.len_utf16())
+                .ok_or(MappingError::LengthOverflow)?;
+            push_point(&mut points, (end, units), budget)?;
+        }
+        Ok(Self {
+            id: ProjectionId(Arc::new(())),
+            snapshot,
+            source,
+            drawn: Arc::new(drawn),
+            points: Arc::new(points),
+        })
+    }
+
+    /// 返回投影实例身份。
+    pub fn id(&self) -> &ProjectionId {
+        &self.id
+    }
+    /// 返回输入源码的身份，不返回可写句柄。
+    pub fn snapshot_id(&self) -> &SnapshotId {
+        self.snapshot.id()
+    }
+    /// 返回恒等投影对应的全局源码范围。
+    pub fn source_range(&self) -> &SrcRange {
+        &self.source
+    }
+    /// 返回绘制文本；它是只读投影，不是文档真源。
+    pub fn drawn_text(&self) -> &str {
+        &self.drawn
+    }
+
+    /// 构造绘制字节偏移；通过预建索引检查 UTF-8，不逐次物化源码。
+    pub fn drawn_offset(&self, drawn_off: usize) -> Result<DrawnOffset, MappingError> {
+        if drawn_off > self.drawn.len() {
+            return Err(MappingError::OutOfBounds {
+                offset: drawn_off,
+                len: self.drawn.len(),
+            });
+        }
+        self.points
+            .binary_search_by_key(&drawn_off, |&(byte, _)| byte)
+            .map_err(|_| MappingError::NotCharBoundary)?;
+        Ok(DrawnOffset {
+            projection: self.id.clone(),
+            byte: drawn_off,
+        })
+    }
+
+    /// 构造 UTF-16 偏移；代理对中间和越界失败，不 clamp。
+    pub fn utf16_offset(&self, utf16_off: usize) -> Result<Utf16Offset, MappingError> {
+        let total = self.points.last().ok_or(MappingError::InvalidMapping)?.1;
+        if utf16_off > total {
+            return Err(MappingError::OutOfBounds {
+                offset: utf16_off,
+                len: total,
+            });
+        }
+        self.points
+            .binary_search_by_key(&utf16_off, |&(_, unit)| unit)
+            .map_err(|_| MappingError::MiddleSurrogate)?;
+        Ok(Utf16Offset {
+            projection: self.id.clone(),
+            unit: utf16_off,
+        })
+    }
+
+    /// 校验绘制半开范围的两端和投影身份。
+    pub fn drawn_range(&self, bytes: Range<usize>) -> Result<DrawnRange, MappingError> {
+        DrawnRange::new(
+            self.drawn_offset(bytes.start)?,
+            self.drawn_offset(bytes.end)?,
+        )
+    }
+
+    /// 校验 UTF-16 半开范围的两端和投影身份。
+    pub fn utf16_range(&self, units: Range<usize>) -> Result<Utf16Range, MappingError> {
+        Utf16Range::new(
+            self.utf16_offset(units.start)?,
+            self.utf16_offset(units.end)?,
+        )
+    }
+
+    /// 绘制端点转换为全局源码端点；即使恒等转换也复验投影身份。
+    pub fn source_at(
+        &self,
+        drawn: &DrawnOffset,
+        affinity: Affinity,
+    ) -> Result<Mapped<SrcOffset>, MappingError> {
+        if drawn.projection != self.id {
+            return Err(MappingError::ProjectionMismatch);
+        }
+        self.drawn_offset(drawn.byte)?;
+        let src_off = self
+            .source
+            .byte_range()
+            .start
+            .checked_add(drawn.byte)
+            .ok_or(MappingError::LengthOverflow)?;
+        let value = self
+            .snapshot
+            .src_offset(src_off)
+            .map_err(MappingError::Source)?;
+        let source = self
+            .snapshot
+            .src_range(src_off..src_off)
+            .map_err(MappingError::Source)?;
+        Ok(Mapped {
+            value,
+            source,
+            precision: MappingPrecision::Exact,
+            affinity,
+        })
+    }
+
+    /// 全局源码端点转换为当前局部绘制端点；不由调用方减块起点。
+    pub fn drawn_at(
+        &self,
+        source: &SrcOffset,
+        affinity: Affinity,
+    ) -> Result<Mapped<DrawnOffset>, MappingError> {
+        let src_off = self
+            .snapshot
+            .validate_offset(source)
+            .map_err(MappingError::Source)?;
+        let range = self.source.byte_range();
+        if src_off < range.start || src_off > range.end {
+            return Err(MappingError::SourceOutsideProjection);
+        }
+        let drawn_off = src_off
+            .checked_sub(range.start)
+            .ok_or(MappingError::LengthOverflow)?;
+        let value = self.drawn_offset(drawn_off)?;
+        let source = self
+            .snapshot
+            .src_range(src_off..src_off)
+            .map_err(MappingError::Source)?;
+        Ok(Mapped {
+            value,
+            source,
+            precision: MappingPrecision::Exact,
+            affinity,
+        })
+    }
+
+    /// 原生 UTF-16 端点经同一索引转换到源码；代理对中间不接受。
+    pub fn source_from_utf16(
+        &self,
+        offset: &Utf16Offset,
+        affinity: Affinity,
+    ) -> Result<Mapped<SrcOffset>, MappingError> {
+        if offset.projection != self.id {
+            return Err(MappingError::ProjectionMismatch);
+        }
+        self.utf16_offset(offset.unit)?;
+        let index = self
+            .points
+            .binary_search_by_key(&offset.unit, |&(_, unit)| unit)
+            .map_err(|_| MappingError::InvalidMapping)?;
+        let drawn_off = self
+            .points
+            .get(index)
+            .ok_or(MappingError::InvalidMapping)?
+            .0;
+        self.source_at(&self.drawn_offset(drawn_off)?, affinity)
+    }
+
+    /// 源码端点转换为原生 UTF-16；不让调用方另建 UTF-16 表。
+    pub fn utf16_from_source(
+        &self,
+        source: &SrcOffset,
+        affinity: Affinity,
+    ) -> Result<Mapped<Utf16Offset>, MappingError> {
+        let drawn = self.drawn_at(source, affinity)?;
+        let index = self
+            .points
+            .binary_search_by_key(&drawn.value.byte, |&(byte, _)| byte)
+            .map_err(|_| MappingError::InvalidMapping)?;
+        let units = self
+            .points
+            .get(index)
+            .ok_or(MappingError::InvalidMapping)?
+            .1;
+        Ok(Mapped {
+            value: self.utf16_offset(units)?,
+            source: drawn.source,
+            precision: drawn.precision,
+            affinity,
+        })
+    }
+
+    /// 对齐方向性源码选区；恒等投影保持原端点与方向且验证范围。
+    pub fn aligned(&self, selection: &SrcSelection) -> Result<SrcSelection, MappingError> {
+        self.snapshot
+            .validate_selection(selection)
+            .map_err(MappingError::Source)?;
+        let (anchor_affinity, head_affinity) = if selection.is_reversed() {
+            (Affinity::After, Affinity::Before)
+        } else {
+            (Affinity::Before, Affinity::After)
+        };
+        let anchor = self.drawn_at(selection.anchor(), anchor_affinity)?;
+        let head = self.drawn_at(selection.head(), head_affinity)?;
+        SrcSelection::new(
+            self.source_at(anchor.value(), anchor_affinity)?
+                .into_value(),
+            self.source_at(head.value(), head_affinity)?.into_value(),
+        )
+        .map_err(MappingError::Source)
+    }
+}
+
+fn push_point(
+    points: &mut Vec<(usize, usize)>,
+    point: (usize, usize),
+    budget: MappingBudget,
+) -> Result<(), MappingError> {
+    if points.len() >= budget.max_points {
+        return Err(MappingError::BudgetExceeded);
+    }
+    points.try_reserve(1).map_err(MappingError::Allocation)?;
+    points.push(point);
+    Ok(())
+}
