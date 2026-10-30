@@ -175,6 +175,10 @@ def check_structure(packages, nodes, roots):
         for dependency in packages[parent].get("dependencies", []):
             if dependency["name"] in MEMBERS and not allowed_internal(packages[parent]["name"], dependency["name"]):
                 raise Violation("内部声明非法边: %s -> %s alias=%s kind=%s target=%s" % (packages[parent]["name"], dependency["name"], dependency.get("rename"), dependency.get("kind"), dependency.get("target")))
+    for parent in roots:
+        for child in reachable(nodes, [parent]) - {parent}:
+            if child in roots and not allowed_internal(packages[parent]["name"], packages[child]["name"]):
+                raise Violation("完整闭包内部非法方向: " + route(packages, nodes, [parent], child))
     full = reachable(nodes, roots)
     for identity in full:
         if packages[identity]["name"] == "gpui":
@@ -216,6 +220,11 @@ def validate(data, tree, lock_path, policy, scenario):
     gpui = gpuis[0] if gpuis else None
     outside = reachable(nodes, roots, selected, omit=gpui) if gpui else selected
     gpui_full = reachable(nodes, [gpui]) if gpui else set()
+    full_outside = reachable(nodes, roots, omit=gpui) if gpui else full
+    for identity in full_outside - selected:
+        name = packages[identity]["name"]
+        if forbidden_name(name) or gpui_name(name) or name in PARSERS:
+            raise Violation("metadata-only 自有禁库旁路: " + route(packages, nodes, roots, identity))
     incoming = collections.defaultdict(list)
     for parent in selected:
         for edge in nodes[parent]["deps"]:
@@ -245,6 +254,9 @@ def validate(data, tree, lock_path, policy, scenario):
         if forbidden_name(name) or gpui_name(name) or name in PARSERS:
             raise Violation("未经审查的 metadata-only 自有禁库路径: " + route(packages, nodes, roots, identity))
     if gpui:
+        for identity in full - gpui_full:
+            if gpui_name(packages[identity]["name"]):
+                raise Violation("未审 GPUI 旁支身份: " + route(packages, nodes, roots, identity))
         expected = policy["scenarios"].get(scenario)
         if expected is None or not policy.get("reviewed"):
             raise Violation("正式 GPUI 子图尚未独立批准基线: " + scenario)

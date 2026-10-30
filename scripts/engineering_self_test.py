@@ -1,0 +1,173 @@
+"""实际隔离 Cargo 正反例及明确标记的图变异；输出可重跑的完整命令与诊断。"""
+
+import copy
+import json
+from pathlib import Path
+import sys
+import tempfile
+
+from engineering_dependencies import MEMBERS, load_json
+from check_engineering import ROOT, POLICY, SCENARIOS, record_command, sha256
+
+
+def run(output=None):
+    output = Path(output or tempfile.mkdtemp(prefix="aline-engineering-tests-"))
+    output.mkdir(parents=True, exist_ok=True)
+    fixtures = output / "fixtures"
+    fixtures.mkdir(exist_ok=True)
+    results = []
+
+    def command(label, argv, expected=0, diagnostic="", expectation="现行架构 §3.2/4 与任务 2.2"):
+        out, rec = record_command(argv, output / "results", label)
+        record = load_json(rec)
+        text = out.read_text() + out.with_name(label + ".stderr.log").read_text()
+        passed = record["exit_code"] == expected and diagnostic in text
+        row = {"id": label, "exit_code": record["exit_code"], "expected_exit_code": expected,
+               "expected_diagnostic": diagnostic, "passed": passed, "independent_expectation": expectation,
+               "command_record": str(rec)}
+        results.append(row)
+        print(label, "符合预期" if passed else "失败", flush=True)
+        return out, rec
+
+    def invoke(label, project, metadata, tree, meta_record, tree_record, scenario="all", expected=1, diagnostic=""):
+        argv = [sys.executable, str(ROOT / "scripts/check_engineering.py"), "--metadata", str(metadata), "--tree", str(tree),
+                "--lock", str(project / "Cargo.lock"), "--scenario", scenario, "--metadata-command", str(meta_record), "--tree-command", str(tree_record)]
+        return command(label, argv, expected, diagnostic)
+
+    # 所有同名禁库均为0.0.0本地合成包；不会安装真实发布物。
+    packages = fixtures / "packages"
+    def package(path, name, extra="", workspace=False):
+        (path / "src").mkdir(parents=True, exist_ok=True)
+        (path / "Cargo.toml").write_text('[package]\nname = "' + name + '"\nversion = "0.0.0"\nedition = "2024"\npublish = false\n' + ('\n[workspace]\n' if workspace else '') + '\n' + extra)
+        (path / "src/lib.rs").write_text('//! 明确的工程守卫合成夹具，不是真实发布库。\n')
+    for name in ("gpui-pre", "gpui", "notify", "regex", "tokio", "wasmtime", "wasi", "comrak"):
+        package(packages / name, name, workspace=True)
+
+    def edge(name, path, table="dependencies", optional=False):
+        return '[' + table + ']\nhidden_alias = { package = "' + name + '", path = "' + str(path) + '"' + (', optional = true' if optional else '') + ' }\n' + ('[features]\nviolation = ["dep:hidden_alias"]\n' if optional else '')
+
+    cases = [("positive-clean", None, None, "", "", None, 0, ""),
+             ("positive-downward", None, None, "", "", None, 0, ""),
+             ("negative-buffer-source", "aline-buffer", "aline-source", "dependencies", "", None, 1, "非法依赖边"),
+             ("negative-markdown-edit", "aline-markdown", "aline-edit", "dependencies", "", None, 1, "非法依赖边"),
+             ("negative-plugin-ui", "aline-plugin", "aline-ui", "dependencies", "", None, 1, "非法依赖边"),
+             ("negative-buffer-bridge-source", "aline-buffer", "aline-source", "dependencies", "bridge", None, 1, "完整闭包内部非法方向"),
+             ("negative-plugin-bridge-ui", "aline-plugin", "aline-ui", "dependencies", "bridge", None, 1, "完整闭包内部非法方向")]
+    for kind, table, mode in [("alias", "dependencies", ""), ("dev", "dev-dependencies", ""), ("build", "build-dependencies", ""),
+                              ("target", "target.'cfg(target_os = \"windows\")'.dependencies", ""), ("feature", "dependencies", "feature"), ("intermediate", "dependencies", "bridge")]:
+        cases.append(("negative-engine-gpui-" + kind, "aline-buffer", "gpui-pre", table, mode, "all-features" if mode == "feature" else None, 1, "五引擎完整闭包泄漏"))
+    for name in ("notify", "regex", "tokio", "wasmtime", "wasi", "comrak", "gpui"):
+        diagnostic = "第二 Markdown" if name == "comrak" else ("禁止替代 GPUI" if name == "gpui" else "禁库或 GPUI 例外旁路")
+        cases.append(("negative-ui-" + name, "aline-ui", name, "dependencies", "", None, 1, diagnostic))
+    for label, parent, child, table, mode, feature, expected, diagnostic in cases:
+        project = fixtures / label
+        project.mkdir(exist_ok=True)
+        (project / "Cargo.toml").write_text('[workspace]\nresolver = "3"\nmembers = [' + ','.join('"' + name + '"' for name in sorted(MEMBERS)) + ']\n')
+        extras = {name: "" for name in MEMBERS}
+        if parent:
+            child_path = project / child if child in MEMBERS else packages / child
+            if mode == "bridge":
+                helper = packages / (label + "-helper")
+                package(helper, "fixture-helper", edge(child, child_path), workspace=True)
+                extras[parent] = edge("fixture-helper", helper, table)
+            else:
+                extras[parent] = edge(child, child_path, table, mode == "feature")
+        if label == "positive-downward":
+            chain = ["aline", "aline-ui", "aline-plugin", "aline-edit", "aline-markdown", "aline-buffer"]
+            for a,b in zip(chain,chain[1:]):
+                extras[a] = edge(b, project / b)
+            extras["aline-ui"] += '[dependencies.aline-source]\npath = "' + str(project / "aline-source") + '"\n'
+        for name in MEMBERS:
+            package(project / name, name, extras[name])
+        scenario = feature or "all"
+        common = ["--manifest-path", str(project / "Cargo.toml"), "--offline"]
+        feature_args = ["--all-features"] if feature else []
+        metadata, mr = command(label + "-metadata", ["cargo", "metadata"] + common + ["--format-version", "1"] + feature_args,
+                               expectation="实际 Cargo 解析本地隔离 fixture 应成功；后续守卫判断违规")
+        tree, tr = command(label + "-tree", ["cargo", "tree"] + common + ["--locked", "--workspace", "--target", "all", "-e", "normal,build,dev", "--prefix", "none", "--format", "{p}"] + feature_args,
+                           expectation="实际 Cargo tree 保留真实包名/alias/kind/target；未执行构建")
+        invoke(label, project, metadata, tree, mr, tr, scenario, expected, diagnostic)
+
+    # 全部漂移样例基于正式实际图，但明确是合成变异，不当作 Cargo 原输出。
+    baseline = ROOT / "docs/validation/m0-engine-foundation/group-2/engineering-live-graphs"
+    base = load_json(baseline / "all-metadata.stdout.log")
+    base_tree = (baseline / "all-tree.stdout.log").read_text()
+    base_lock = (ROOT / "Cargo.lock").read_text()
+    def mutation(label, mutate, diagnostic, expected=1):
+        project = fixtures / label
+        project.mkdir(exist_ok=True)
+        data, tree, lock = mutate(copy.deepcopy(base), base_tree, base_lock)
+        metadata, tree_path = project / "metadata.json", project / "tree.log"
+        metadata.write_text(json.dumps(data)); tree_path.write_text(tree); (project / "Cargo.lock").write_text(lock)
+        # 变异身份显式记录；仅为规则判定测试构造采集信封，不声称真实Cargo执行。
+        records=[]
+        for kind,path in (("metadata",metadata),("tree",tree_path)):
+            argv=["cargo",kind,"--manifest-path",str(project / "Cargo.toml")]
+            argv += ["--format-version","1"] if kind=="metadata" else ["--workspace","--target","all","-e","normal,build,dev"]
+            record=project/(kind+".synthetic-command.json")
+            record.write_text(json.dumps({"evidence_kind":"明确合成变异，不是实际Cargo命令输出", "argv":argv,"exit_code":0,"stdout_sha256":sha256(path)}))
+            records.append(record)
+        (project / "fixture.json").write_text(json.dumps({"kind":"明确的图/lock变异", "base":str(baseline),"transformation":label,"independent_expectation":"现行架构§3.2精确身份/边/target/features；任务2.2"},ensure_ascii=False,indent=2))
+        invoke(label,project,metadata,tree_path,*records,expected=expected,diagnostic=diagnostic)
+    def node(data,name):
+        identity=next(p["id"] for p in data["packages"] if p["name"]==name)
+        return next(n for n in data["resolve"]["nodes"] if n["id"]==identity)
+    def add_edge(data,parent,child):
+        node(data,parent)["deps"].append({"name":"hidden_alias","pkg":node(data,child)["id"],"dep_kinds":[{"kind":None,"target":None}]})
+    def bypass(data,tree,lock):
+        add_edge(data,"aline-ui","regex");return data,tree,lock
+    mutation("negative-existing-regex-bypass",bypass,"例外旁路")
+    def noise_bypass(data,tree,lock):
+        add_edge(data,"aline-ui","wasip2");tree="\n".join(line for line in tree.splitlines() if not line.startswith(("wasip2 v", "wit-bindgen v")))+"\n";return data,tree,lock
+    mutation("negative-metadata-only-wasip2-bypass",noise_bypass,"metadata-only 自有禁库旁路")
+    def checksum(data,tree,lock):
+        from engineering_dependencies import parse_lock
+        entry=parse_lock(ROOT/"Cargo.lock")["regex@1.13.1"]
+        return data,tree,lock.replace(entry["checksum"],"0"*64)
+    mutation("negative-regex-checksum",checksum,"来源/校验和漂移")
+    def metadata_checksum(data,tree,lock):
+        from engineering_dependencies import parse_lock
+        entry=next(v for k,v in parse_lock(ROOT/"Cargo.lock").items() if k.startswith("rav1e@"))
+        return data,tree,lock.replace(entry["checksum"],"0"*64)
+    mutation("negative-metadata-only-checksum",metadata_checksum,"子图身份/来源/features/边/选包漂移")
+    # getrandom存在多版本，按实际wasip2入边定位。
+    def target(data,tree,lock):
+        edge=next(e for n in data["resolve"]["nodes"] for e in n["deps"] if 'wasip2@' in e["pkg"])
+        edge["dep_kinds"][0]["target"]='cfg(target_os = "windows")';return data,tree,lock
+    mutation("negative-wasip2-target",target,"新增入边/target/kind")
+    def kind(data,tree,lock):
+        next(e for e in node(data,"gpui-pre")["deps"] if '#regex@' in e["pkg"])["dep_kinds"][0]["kind"]="build";return data,tree,lock
+    mutation("negative-regex-kind",kind,"新增入边/target/kind")
+    def features(data,tree,lock):
+        node(data,"gpui-pre")["features"].append("screen-capture");return data,tree,lock
+    mutation("negative-gpui-feature",features,"子图身份/来源/features/边/选包漂移")
+    def version(data,tree,lock):
+        p=next(p for p in data["packages"] if p["name"]=="gpui-pre");p["version"]="0.3.8"
+        return data,tree.replace('gpui-pre v0.3.9','gpui-pre v0.3.8'),lock.replace('name = "gpui-pre"\nversion = "0.3.9"','name = "gpui-pre"\nversion = "0.3.8"')
+    mutation("negative-gpui-version",version,"精确例外新增入边")
+    def source(data,tree,lock):
+        p=next(p for p in data["packages"] if p["name"]=="regex");p["source"]="registry+https://example.invalid/index"
+        old='name = "regex"\nversion = "1.13.1"\nsource = "registry+https://github.com/rust-lang/crates.io-index"'
+        new=old.replace('https://github.com/rust-lang/crates.io-index','https://example.invalid/index')
+        return data,tree,lock.replace(old,new)
+    mutation("negative-regex-source",source,"来源/校验和漂移")
+    mutation("positive-synthetic-baseline",lambda d,t,l:(d,t,l),"",expected=0)
+    # 采集错误/标签/损坏输出的最小信封反例，不修改正式原始证据。
+    for label,modify,diagnostic in [
+        ("negative-acquisition-exit",lambda m,t:m.update(exit_code=101),"Cargo 采集失败"),
+        ("negative-acquisition-hash",lambda m,t:m.update(stdout_sha256="0"*64),"输出 hash 不符"),
+        ("negative-acquisition-target",lambda m,t:t["argv"].__setitem__(t["argv"].index("--target")+1,"x86_64-pc-windows-msvc"),"target 与场景标签不符"),
+        ("negative-acquisition-feature",lambda m,t:m["argv"].append("--all-features"),"feature 与场景标签不符"),
+        ("negative-acquisition-duplicate-target",lambda m,t:t["argv"].extend(["--target","x86_64-pc-windows-msvc"]),"重复采集参数")]:
+        project=fixtures/label;project.mkdir(exist_ok=True)
+        m=load_json(baseline/"all-metadata.command.json");t=load_json(baseline/"all-tree.command.json")
+        # 使用正式文件和锁，不需要伪造内容。
+        modify(m,t);mp=project/"metadata.command.json";tp=project/"tree.command.json";mp.write_text(json.dumps(m));tp.write_text(json.dumps(t))
+        invoke(label,ROOT,baseline/"all-metadata.stdout.log",baseline/"all-tree.stdout.log",mp,tp,diagnostic=diagnostic)
+    # 确认失败Cargo本身不会转成通过，保留真实失败原输出。
+    failed,fr=command("negative-real-cargo-acquisition",["cargo","metadata","--offline","--format-version","1","--manifest-path",str(fixtures/"missing/Cargo.toml")],101,"does not exist",expectation="不存在清单应由Cargo报错；不是合规图")
+    invoke("negative-real-cargo-error-not-pass",ROOT,failed,baseline/"all-tree.stdout.log",fr,baseline/"all-tree.command.json",diagnostic="Cargo 采集失败")
+    summary={"passed":all(r["passed"] for r in results),"records":results,"limits":"本机host为aarch64 macOS；桌面target仅依赖解析。局部合成包均0.0.0，图漂移明确标记synthetic；未构建任何违规库或宣称平台支持。"}
+    (output/"summary.json").write_text(json.dumps(summary,ensure_ascii=False,indent=2)+"\n")
+    print(json.dumps({"passed":summary["passed"],"commands":len(results),"summary":str(output/"summary.json")},ensure_ascii=False))
+    return 0 if summary["passed"] else 1

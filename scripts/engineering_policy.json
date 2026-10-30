@@ -1,0 +1,162 @@
+{
+  "format": 1,
+  "reviewed": true,
+  "review_evidence": "docs/validation/m0-engine-foundation/group-2/engineering-baseline-review.md",
+  "purpose": "正式八成员 workspace 的 GPUI 精确子图；不准许自动更新指纹",
+  "workspace_features": {
+    "aline": {},
+    "aline-ui": {},
+    "aline-plugin": {},
+    "aline-edit": {},
+    "aline-markdown": {},
+    "aline-buffer": {},
+    "aline-source": {},
+    "aline-app-core": {}
+  },
+  "scenarios": {
+    "all": {
+      "gpui_subtree_sha256": "cfb02f486601ea7deabbb3f00e252a09a584ae4ffd1edc27f1d826bd50da6793"
+    },
+    "all-features": {
+      "gpui_subtree_sha256": "cfb02f486601ea7deabbb3f00e252a09a584ae4ffd1edc27f1d826bd50da6793"
+    },
+    "macos-arm": {
+      "gpui_subtree_sha256": "566a8f38426457379e7f65e1fd302b5852b062544222a5f43cf331da88816f0b"
+    },
+    "macos-intel": {
+      "gpui_subtree_sha256": "720d711d934a5556d7c353f01745ed1dddd5614fd8b9790f9d0e0cd4eea6c22a"
+    },
+    "windows-x64": {
+      "gpui_subtree_sha256": "7be384797015bcf31fb7907681c8e1489aa296e3eef09d62034f8cd0e7bc682e"
+    },
+    "linux-x64": {
+      "gpui_subtree_sha256": "9a9e650697a552c5984fdaf0e93f75f87bf38655915769a91a1250039462f3b3"
+    },
+    "linux-arm": {
+      "gpui_subtree_sha256": "02fee5ca4c0b024365fce876ff3a4b7d6e325efe6d563b9322b4729fa689537a"
+    }
+  },
+  "exceptions": {
+    "regex-automata@0.4.18": {
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "ad8553b9b26413251cbf30e620595c7a41b3887f03da04579c0e6b0d6a06b4b2",
+      "incoming": [
+        {
+          "from": "regex@1.13.1",
+          "to": "regex-automata@0.4.18",
+          "alias": "regex_automata",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ]
+        }
+      ],
+      "scenarios": [
+        "all",
+        "all-features",
+        "macos-arm",
+        "macos-intel",
+        "windows-x64",
+        "linux-x64",
+        "linux-arm"
+      ]
+    },
+    "regex-syntax@0.8.11": {
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4",
+      "incoming": [
+        {
+          "from": "regex-automata@0.4.18",
+          "to": "regex-syntax@0.8.11",
+          "alias": "regex_syntax",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ]
+        },
+        {
+          "from": "regex@1.13.1",
+          "to": "regex-syntax@0.8.11",
+          "alias": "regex_syntax",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ]
+        },
+        {
+          "from": "proptest@1.12.0",
+          "to": "regex-syntax@0.8.11",
+          "alias": "regex_syntax",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ]
+        }
+      ],
+      "scenarios": [
+        "all",
+        "all-features",
+        "macos-arm",
+        "macos-intel",
+        "windows-x64",
+        "linux-x64",
+        "linux-arm"
+      ]
+    },
+    "regex@1.13.1": {
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "f020237b6c8eed93db2e2cb53c00c60a8e1bc73da7d073199a1180401450218d",
+      "incoming": [
+        {
+          "from": "gpui-pre@0.3.9",
+          "to": "regex@1.13.1",
+          "alias": "regex",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ]
+        }
+      ],
+      "scenarios": [
+        "all",
+        "all-features",
+        "macos-arm",
+        "macos-intel",
+        "windows-x64",
+        "linux-x64",
+        "linux-arm"
+      ]
+    },
+    "wasip2@1.0.4+wasi-0.2.12": {
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "b67efb37e106e55ce722a510d6b5f9c17f083e5fc79afc2badeb12cc313d9487",
+      "incoming": [
+        {
+          "from": "getrandom@0.3.4",
+          "to": "wasip2@1.0.4+wasi-0.2.12",
+          "alias": "wasip2",
+          "kinds": [
+            {
+              "kind": null,
+              "target": "cfg(all(target_arch = \"wasm32\", target_os = \"wasi\", target_env = \"p2\"))"
+            }
+          ]
+        }
+      ],
+      "scenarios": [
+        "all",
+        "all-features"
+      ]
+    }
+  }
+}

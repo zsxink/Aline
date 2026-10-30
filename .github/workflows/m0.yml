@@ -1,0 +1,29 @@
+name: M0 工程检查
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  macos-foundation:
+    # 仅接线已预装登记工具链和隔离缓存的 macOS ARM64 runner，不自动安装。
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 20
+    env:
+      RUSTUP_TOOLCHAIN: 1.98.1
+      CARGO_HOME: ${{ vars.ALINE_M0_CARGO_HOME }}
+      CARGO_NET_OFFLINE: "true"
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      # 已核对官方仓库此精确快照的 action.yml；不使用浮动标签。
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          set-safe-directory: false
+          clean: false
+      - name: 检查 workspace 和守卫正反例
+        run: python3 scripts/check_workspace.py --output-dir "$RUNNER_TEMP/aline-m0-evidence"

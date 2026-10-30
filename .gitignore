@@ -22,3 +22,8 @@
 # Skill / tool caches
 .impeccable/
 .codegraph/
+
+# 工程守卫生成的 Python 缓存与隔离 Cargo 构建产物。
+__pycache__/
+**/cargo-target/
+**/target/
