@@ -1,0 +1,436 @@
+{
+  "date": "2026-10-30",
+  "source_commit": "28254bb214da4e9a77967a0a4604a9fcbb9a8935",
+  "authority": "仅历史来源及文件完整性账本，不代表产品规格、授权或正式主题格式校验",
+  "absent_directories": [
+    "docs_bak/docs/assets"
+  ],
+  "entries": [
+    {
+      "source": "docs_bak/prototype/README.md",
+      "target": "docs/prototype/legacy/README.md",
+      "bytes": 2514,
+      "sha256": "3ab54f587781594277de597210669f7dfb187210377812075bae6612fff5237d",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/assets/aline.png",
+      "target": "docs/prototype/legacy/assets/aline.png",
+      "bytes": 235494,
+      "sha256": "252fe12bbaa6af7c6738cbc089ad9c8c27e6e4beb97ed760aea9732a6f838317",
+      "disposition": "迁移为非权威历史归档（原件未删除）",
+      "format": "PNG RGBA",
+      "width": 512,
+      "height": 512
+    },
+    {
+      "source": "docs_bak/prototype/assets/showcase-landscape.svg",
+      "target": "docs/prototype/legacy/assets/showcase-landscape.svg",
+      "bytes": 488,
+      "sha256": "3904cf1b8a8cbd224520ce3a28bb81f1c86e3452825c03c8521a59b661193179",
+      "disposition": "迁移为非权威历史归档（原件未删除）",
+      "format": "SVG",
+      "width": "800",
+      "height": "360",
+      "viewBox": "0 0 800 360"
+    },
+    {
+      "source": "docs_bak/prototype/icons.js",
+      "target": "docs/prototype/legacy/icons.js",
+      "bytes": 3623,
+      "sha256": "f592ef2e556f382be48672f2bb43e6861a5b70bd0bb7eedf29019268155644ea",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/index.html",
+      "target": "docs/prototype/legacy/index.html",
+      "bytes": 14801,
+      "sha256": "56e23befc02c5520151bd763e80de0531ef3bbc26dd6f6bc683b1b79bef20234",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/interactions.js",
+      "target": "docs/prototype/legacy/interactions.js",
+      "bytes": 36149,
+      "sha256": "60afb32f169344d5bd5adc80e6763b5bd969d3aa75632e67ed828bf9fcecdd29",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/light.css",
+      "target": "docs/prototype/legacy/light.css",
+      "bytes": 33055,
+      "sha256": "7017b7103e1853c0318eb2c3bd1f13b625408f88f6bc635fcd237df6efc7fa26",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/measure.css",
+      "target": "docs/prototype/legacy/measure.css",
+      "bytes": 1121,
+      "sha256": "cc0ba1e4da554d44e1a1a753512a1e52e78c7901debdc5c44d97c948b2a826a4",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/menus.css",
+      "target": "docs/prototype/legacy/menus.css",
+      "bytes": 5472,
+      "sha256": "6999beccf63997fec665d8bc2d76b68b0f5f618f4c147c79a79dcd65dce5ce3b",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/menus.js",
+      "target": "docs/prototype/legacy/menus.js",
+      "bytes": 16798,
+      "sha256": "4bb285c15a492a45417e405084bad2b854b2cc03d756baaaa7eb6ce5da6bcb2a",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/prototype.css",
+      "target": "docs/prototype/legacy/prototype.css",
+      "bytes": 25461,
+      "sha256": "70a298f836ec4bdf051f8cf80ca46d9f6407c7daab8e269f08dc205205c6c403",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/prototype.js",
+      "target": "docs/prototype/legacy/prototype.js",
+      "bytes": 29183,
+      "sha256": "ceacef60d03c13d21ae7012972d1430004fb30aa7a0118c8406b8a8c507d03d6",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/showcase.js",
+      "target": "docs/prototype/legacy/showcase.js",
+      "bytes": 18272,
+      "sha256": "b42d5313031390263e981195ea8ef9ed0d41b04906d8d685f474be54e21f33b6",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/theme-gallery.css",
+      "target": "docs/prototype/legacy/theme-gallery.css",
+      "bytes": 13668,
+      "sha256": "3f2fd8991c2352a6ca415fd25ccd21657626c6adc485a11d69582f9b17fe9aec",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/theme-library.js",
+      "target": "docs/prototype/legacy/theme-library.js",
+      "bytes": 46833,
+      "sha256": "46cce9de96f19a9ddd5f6c85dc8e3c06218ab01a9e728b8365610ea4f44cccc4",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/themes/.DS_Store",
+      "target": null,
+      "bytes": 6148,
+      "sha256": "8ab98817eb0726711ceac693287d77af69f06dabed3835b4f51c0edf56798e8d",
+      "disposition": "无需迁移，系统文件（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/themes/feishu/application.json",
+      "target": "docs/prototype/legacy/themes/feishu/application.json",
+      "bytes": 4403,
+      "sha256": "79358bd753347b32c45799239650cf37504d2373dbdc59895aaef0c1fefbd262",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/themes/feishu/highlight.json",
+      "target": "docs/prototype/legacy/themes/feishu/highlight.json",
+      "bytes": 2033,
+      "sha256": "d929fad55853861b9d6ca5bb9ac65c0c8ab06464403f668f09e63c19d8295c1c",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/themes/feishu/markdown.json",
+      "target": "docs/prototype/legacy/themes/feishu/markdown.json",
+      "bytes": 10114,
+      "sha256": "424507777ba754b9b2d31576d00a8a35bf9413398b1b380ba77881f79a7055ab",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/themes/feishu/previews/dark.svg",
+      "target": "docs/prototype/legacy/themes/feishu/previews/dark.svg",
+      "bytes": 6080,
+      "sha256": "4a14a22a81b3adfb43526c5b806c1cf3ddb52c24cee2446bce9d8fcce65554e7",
+      "disposition": "迁移为非权威历史归档（原件未删除）",
+      "format": "SVG",
+      "width": "960",
+      "height": "540",
+      "viewBox": "0 0 960 540"
+    },
+    {
+      "source": "docs_bak/prototype/themes/feishu/previews/light.svg",
+      "target": "docs/prototype/legacy/themes/feishu/previews/light.svg",
+      "bytes": 6081,
+      "sha256": "e72a826f8eda1291d4fff14dbd5859a4d6cbbaf58fe8ab60455bb78aad013cb9",
+      "disposition": "迁移为非权威历史归档（原件未删除）",
+      "format": "SVG",
+      "width": "960",
+      "height": "540",
+      "viewBox": "0 0 960 540"
+    },
+    {
+      "source": "docs_bak/prototype/themes/feishu/previews/sepia.svg",
+      "target": "docs/prototype/legacy/themes/feishu/previews/sepia.svg",
+      "bytes": 6081,
+      "sha256": "ef93e01c26cc17b5380e8bc5606436bc7fd93c25aeee93ec14de019b7b188dc9",
+      "disposition": "迁移为非权威历史归档（原件未删除）",
+      "format": "SVG",
+      "width": "960",
+      "height": "540",
+      "viewBox": "0 0 960 540"
+    },
+    {
+      "source": "docs_bak/prototype/themes/feishu/theme.json",
+      "target": "docs/prototype/legacy/themes/feishu/theme.json",
+      "bytes": 377,
+      "sha256": "e514b91fdb7687994026b3cbbb57fb2ab531aad87f7f84c62225a288f103aa13",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/themes/github/application.json",
+      "target": "docs/prototype/legacy/themes/github/application.json",
+      "bytes": 4403,
+      "sha256": "ae3cf7f75ba7fd0ee399c01ec50e39408024aab68442bca7d387d81cfc35fc1d",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/themes/github/highlight.json",
+      "target": "docs/prototype/legacy/themes/github/highlight.json",
+      "bytes": 2033,
+      "sha256": "51603798cd046f5fb247ffb26d59652327f60debf7054a003388fbf5f70bbc07",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/themes/github/markdown.json",
+      "target": "docs/prototype/legacy/themes/github/markdown.json",
+      "bytes": 10114,
+      "sha256": "76fd0fda0d2c29e4f7f12ce6d563f2636fa1fa3d8be058cc3fd59a3ece30fa7b",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/themes/github/previews/dark.svg",
+      "target": "docs/prototype/legacy/themes/github/previews/dark.svg",
+      "bytes": 6080,
+      "sha256": "e92932ed23667249ae1498cd78e6c2faa8d1acfb93c7cae35754d750fa14dca8",
+      "disposition": "迁移为非权威历史归档（原件未删除）",
+      "format": "SVG",
+      "width": "960",
+      "height": "540",
+      "viewBox": "0 0 960 540"
+    },
+    {
+      "source": "docs_bak/prototype/themes/github/previews/light.svg",
+      "target": "docs/prototype/legacy/themes/github/previews/light.svg",
+      "bytes": 6081,
+      "sha256": "ef666c5db6ce1a7a6ef92c3914467d63de6b0c453eab362247a70e07fa95fa1e",
+      "disposition": "迁移为非权威历史归档（原件未删除）",
+      "format": "SVG",
+      "width": "960",
+      "height": "540",
+      "viewBox": "0 0 960 540"
+    },
+    {
+      "source": "docs_bak/prototype/themes/github/previews/sepia.svg",
+      "target": "docs/prototype/legacy/themes/github/previews/sepia.svg",
+      "bytes": 6081,
+      "sha256": "4399c3a0b79b7b0413045c80c788b8a97de030e0f8c17e5bb787fa6adf150d5d",
+      "disposition": "迁移为非权威历史归档（原件未删除）",
+      "format": "SVG",
+      "width": "960",
+      "height": "540",
+      "viewBox": "0 0 960 540"
+    },
+    {
+      "source": "docs_bak/prototype/themes/github/theme.json",
+      "target": "docs/prototype/legacy/themes/github/theme.json",
+      "bytes": 377,
+      "sha256": "14dc851ff6560e520ca4e18d3568249cc995680883d23b4b206cfc6dd79c978e",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/themes/index.json",
+      "target": "docs/prototype/legacy/themes/index.json",
+      "bytes": 329,
+      "sha256": "9584c70f0cf857d62895a730fec8fea4b184dbf558a6217134a3ba0c905dbbea",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/themes/notion/application.json",
+      "target": "docs/prototype/legacy/themes/notion/application.json",
+      "bytes": 4403,
+      "sha256": "3dda422830d83b05e50193ca32836c8f41ba116d06e807cf2433a1871313d28d",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/themes/notion/highlight.json",
+      "target": "docs/prototype/legacy/themes/notion/highlight.json",
+      "bytes": 2033,
+      "sha256": "37dc5364a969ab2e66e456bc0f44cb01c44d02e3cbf070c4045dac1a9e4ac94c",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/themes/notion/markdown.json",
+      "target": "docs/prototype/legacy/themes/notion/markdown.json",
+      "bytes": 10114,
+      "sha256": "8b509e148760f04d0d0cbeae9daaa3c5162c3503aee62c077a7dad1cb9684652",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/themes/notion/previews/dark.svg",
+      "target": "docs/prototype/legacy/themes/notion/previews/dark.svg",
+      "bytes": 5292,
+      "sha256": "e85973dda35535d7b6fa489a719283a88dd5387e6e5dd8c4786584198c6cdaf3",
+      "disposition": "迁移为非权威历史归档（原件未删除）",
+      "format": "SVG",
+      "width": "960",
+      "height": "540",
+      "viewBox": "0 0 960 540"
+    },
+    {
+      "source": "docs_bak/prototype/themes/notion/previews/light.svg",
+      "target": "docs/prototype/legacy/themes/notion/previews/light.svg",
+      "bytes": 5293,
+      "sha256": "744417dc559b067519c6a4260d003dc878a3c6b5370f60a059931827382bd918",
+      "disposition": "迁移为非权威历史归档（原件未删除）",
+      "format": "SVG",
+      "width": "960",
+      "height": "540",
+      "viewBox": "0 0 960 540"
+    },
+    {
+      "source": "docs_bak/prototype/themes/notion/previews/sepia.svg",
+      "target": "docs/prototype/legacy/themes/notion/previews/sepia.svg",
+      "bytes": 5293,
+      "sha256": "61d3eb2d1082291f5f6740b151974fdff4ed6b91dd48c0407933b94a65dad036",
+      "disposition": "迁移为非权威历史归档（原件未删除）",
+      "format": "SVG",
+      "width": "960",
+      "height": "540",
+      "viewBox": "0 0 960 540"
+    },
+    {
+      "source": "docs_bak/prototype/themes/notion/theme.json",
+      "target": "docs/prototype/legacy/themes/notion/theme.json",
+      "bytes": 377,
+      "sha256": "48845f18652635e4ad8dc7e4b8b3f7db902930d785cdb3f7e36aaf910fe4b2ce",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/themes/vue/application.json",
+      "target": "docs/prototype/legacy/themes/vue/application.json",
+      "bytes": 4403,
+      "sha256": "02ba59d6c5d91b1a7990647065d1a716fdeabb68cb12717ee775c9d21872c8c8",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/themes/vue/highlight.json",
+      "target": "docs/prototype/legacy/themes/vue/highlight.json",
+      "bytes": 2033,
+      "sha256": "103ec3a79519e984ce8d5097aaba341ff60686006e82691d336b7b9a936edef1",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/themes/vue/markdown.json",
+      "target": "docs/prototype/legacy/themes/vue/markdown.json",
+      "bytes": 10114,
+      "sha256": "2743d6a18545c804c674421b37a58a85599851388be47f686c603fd512618393",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/themes/vue/previews/dark.svg",
+      "target": "docs/prototype/legacy/themes/vue/previews/dark.svg",
+      "bytes": 6069,
+      "sha256": "eafe6ecab60b2283e821840b8bcf9d5b251693315d0f6bcb4fbdb3182051a9ff",
+      "disposition": "迁移为非权威历史归档（原件未删除）",
+      "format": "SVG",
+      "width": "960",
+      "height": "540",
+      "viewBox": "0 0 960 540"
+    },
+    {
+      "source": "docs_bak/prototype/themes/vue/previews/light.svg",
+      "target": "docs/prototype/legacy/themes/vue/previews/light.svg",
+      "bytes": 6070,
+      "sha256": "5c1f4b77202530f300f450deb2179de7970541517af118f45acb57e831715384",
+      "disposition": "迁移为非权威历史归档（原件未删除）",
+      "format": "SVG",
+      "width": "960",
+      "height": "540",
+      "viewBox": "0 0 960 540"
+    },
+    {
+      "source": "docs_bak/prototype/themes/vue/previews/sepia.svg",
+      "target": "docs/prototype/legacy/themes/vue/previews/sepia.svg",
+      "bytes": 6070,
+      "sha256": "cb9895afc2f9238e518eb22b46183a3545f43d6e8ca68e1ab113f5e1a0816877",
+      "disposition": "迁移为非权威历史归档（原件未删除）",
+      "format": "SVG",
+      "width": "960",
+      "height": "540",
+      "viewBox": "0 0 960 540"
+    },
+    {
+      "source": "docs_bak/prototype/themes/vue/theme.json",
+      "target": "docs/prototype/legacy/themes/vue/theme.json",
+      "bytes": 371,
+      "sha256": "c3ec23fbc6da84ea082e6990b761cd56442bf82fc7879e7fc05cb8006afd7253",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/prototype/tools/generate-theme-previews.py",
+      "target": "docs/prototype/legacy/tools/generate-theme-previews.py",
+      "bytes": 9957,
+      "sha256": "91b1a6581e33953a46db0214035c8ad0ff20cf06cc089fd1ff645a208704e0be",
+      "disposition": "迁移为非权威历史归档（原件未删除）"
+    },
+    {
+      "source": "docs_bak/docs/icons/.DS_Store",
+      "target": null,
+      "bytes": 6148,
+      "sha256": "d65165279105ca6773180500688df4bdc69a2c7b771752f0a46ef120b7fd8ec3",
+      "disposition": "无需迁移，系统文件（原件未删除）"
+    },
+    {
+      "source": "docs_bak/docs/icons/Aline.png",
+      "target": "docs/assets/aline.png",
+      "bytes": 235494,
+      "sha256": "252fe12bbaa6af7c6738cbc089ad9c8c27e6e4beb97ed760aea9732a6f838317",
+      "disposition": "复用现有品牌参考（重复副本原件未删除）",
+      "format": "PNG RGBA",
+      "width": 512,
+      "height": 512
+    }
+  ],
+  "authorized_updates": [
+    {
+      "date": "2026-10-30",
+      "authorization": "用户要求结合现行文档明确开发使用的新图标并删除旧图标；本次仅替换图标引用和删除旧图标副本。",
+      "path": "docs/assets/aline.png",
+      "action": "delete",
+      "old_sha256": "252fe12bbaa6af7c6738cbc089ad9c8c27e6e4beb97ed760aea9732a6f838317",
+      "new_sha256": null,
+      "replacement": "docs/assets/app-icon/aline.png",
+      "replacement_sha256": "fed6b07ef4e94d48d14cb70a19b91d2f17c1650834d7dbf620ada94ca6cbfd37"
+    },
+    {
+      "date": "2026-10-30",
+      "authorization": "用户要求结合现行文档明确开发使用的新图标并删除旧图标；本次仅替换图标引用和删除旧图标副本。",
+      "path": "docs/prototype/legacy/assets/aline.png",
+      "action": "delete",
+      "old_sha256": "252fe12bbaa6af7c6738cbc089ad9c8c27e6e4beb97ed760aea9732a6f838317",
+      "new_sha256": null,
+      "replacement": "docs/assets/app-icon/aline.png",
+      "replacement_sha256": "fed6b07ef4e94d48d14cb70a19b91d2f17c1650834d7dbf620ada94ca6cbfd37"
+    },
+    {
+      "date": "2026-10-30",
+      "authorization": "用户要求结合现行文档明确开发使用的新图标并删除旧图标；本次仅替换图标引用和删除旧图标副本。",
+      "path": "docs/prototype/legacy/index.html",
+      "action": "replace_icon_reference",
+      "old_sha256": "56e23befc02c5520151bd763e80de0531ef3bbc26dd6f6bc683b1b79bef20234",
+      "new_sha256": "816c119e4b0c48fc9dfdcecf96397515d400a070fc47a767241752052f330843",
+      "replacement": "docs/assets/app-icon/aline.png",
+      "replacement_sha256": "fed6b07ef4e94d48d14cb70a19b91d2f17c1650834d7dbf620ada94ca6cbfd37"
+    }
+  ]
+}

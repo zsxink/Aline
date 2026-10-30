@@ -1,0 +1,244 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="2600" viewBox="0 0 2000 2600" role="img" aria-labelledby="title description">
+<title id="title">Aline V1 模块目录图</title><desc id="description">八 crate 的建议源码目录、职责、阶段和 GPUI 边界。所示文件均为实施规划，不代表已创建或已验证。</desc>
+<metadata>依据 docs/v1-architecture.md 0.4、PRD 0.4；2026-10-29；规划图，尚未实现；V-01～V-09 未执行。</metadata>
+<defs>
+<marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="#2563EB" stroke-width="1.5"/></marker>
+<marker id="arrow-teal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="#0F766E" stroke-width="1.5"/></marker>
+<marker id="arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="#53657C" stroke-width="1.5"/></marker>
+</defs>
+<rect width="2000" height="2600" fill="#F5F7FA"/>
+<text x="64" y="88" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="46" font-weight="700" fill="#17243A">Aline / V1 模块目录</text>
+<text x="66" y="132" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="24" font-weight="400" fill="#53657C" data-max-width="1500">按职责拆解的建议文件结构 · 八个 crate · 模块目录统一使用 mod.rs</text>
+<rect x="1550" y="65" width="386" height="34" rx="8" fill="#FFF3D9" stroke="#FFF3D9" stroke-width="1.5"/>
+<text x="1562" y="89" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="600" fill="#986315" data-max-width="362">实施规划 · 尚未创建代码</text>
+<rect x="64" y="178" width="1872" height="142" rx="16" fill="#EEF3FA" stroke="#D0DEEF" stroke-width="1.5"/>
+<text x="92" y="218" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="28" font-weight="700" fill="#17243A" data-max-width="1790">Aline/</text>
+<text x="92" y="255" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="21" font-weight="400" fill="#53657C" data-max-width="1815">Cargo.toml / Cargo.lock · app/ · crates/{source,buffer,markdown,edit,app-core,plugin,ui}（实际 crate 均以 aline- 命名）</text>
+<text x="92" y="289" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="21" font-weight="400" fill="#53657C" data-max-width="1815">tests/fixtures/ · scripts/ · packaging/{macos,windows,linux}/ · docs/（当前文档）</text>
+<text x="64" y="365" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="25" font-weight="650" fill="#17243A">上层与共享基础</text>
+<text x="1000" y="365" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="20" font-weight="400" fill="#53657C" data-max-width="935">蓝色：允许 GPUI    绿色：纯逻辑零 GPUI；分组不表示 Cargo 依赖</text>
+<rect x="64" y="398" width="444" height="652" rx="16" fill="white" stroke="#CFD9E6" stroke-width="1.5"/>
+<path d="M81 398 H491" stroke="#2563EB" stroke-width="4"/>
+<text x="86" y="438" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="23" font-weight="650" fill="#17243A" data-max-width="400">app/</text>
+<text x="86" y="470" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="20" font-weight="600" fill="#2563EB" data-max-width="400">应用入口与平台接线</text>
+<text x="86" y="501" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="400" fill="#53657C" data-max-width="400">M0 / M5–M6</text>
+<text x="86" y="545" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">Cargo.toml</text>
+<text x="86" y="572" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">src/</text>
+<text x="86" y="599" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ main.rs</text>
+<text x="86" y="626" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ init.rs</text>
+<text x="86" y="653" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ menus.rs</text>
+<text x="86" y="680" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ open_events.rs</text>
+<text x="86" y="707" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">└─ platform/</text>
+<text x="86" y="734" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">   ├─ mod.rs</text>
+<text x="86" y="761" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">   ├─ macos.rs</text>
+<text x="86" y="788" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">   ├─ windows.rs</text>
+<text x="86" y="815" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">   ├─ linux.rs</text>
+<text x="86" y="842" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">   ├─ single_instance.rs</text>
+<text x="86" y="869" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">   └─ dialogs.rs</text>
+<path d="M 86 940 H 486" fill="none" stroke="#CFD9E6" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="86" y="972" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="400" fill="#53657C" data-max-width="400">系统打开 / IPC / 文件关联</text>
+<text x="86" y="999" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="400" fill="#53657C" data-max-width="400">启动与关闭接线；业务留 UI</text>
+<rect x="540" y="398" width="444" height="652" rx="16" fill="white" stroke="#CFD9E6" stroke-width="1.5"/>
+<path d="M557 398 H967" stroke="#0F766E" stroke-width="4"/>
+<text x="562" y="438" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="23" font-weight="650" fill="#17243A" data-max-width="400">crates/aline-source/</text>
+<text x="562" y="470" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="20" font-weight="600" fill="#0F766E" data-max-width="400">独立文件字节层</text>
+<text x="562" y="501" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="400" fill="#53657C" data-max-width="400">M0 / M2</text>
+<text x="562" y="545" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">src/</text>
+<text x="562" y="572" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ lib.rs</text>
+<text x="562" y="599" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ decode.rs</text>
+<text x="562" y="626" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ encode.rs</text>
+<text x="562" y="653" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ metadata.rs</text>
+<text x="562" y="680" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ version.rs</text>
+<text x="562" y="707" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ read.rs</text>
+<text x="562" y="734" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ atomic.rs</text>
+<text x="562" y="761" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">└─ error.rs</text>
+<text x="562" y="788" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">tests/</text>
+<text x="562" y="815" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ roundtrip.rs</text>
+<text x="562" y="842" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">└─ atomic_write.rs</text>
+<path d="M 562 940 H 962" fill="none" stroke="#CFD9E6" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="562" y="972" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="400" fill="#53657C" data-max-width="400">BOM / 行尾 / 磁盘版本</text>
+<text x="562" y="999" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="400" fill="#53657C" data-max-width="400">不依赖 buffer，不开线程</text>
+<rect x="1016" y="398" width="444" height="652" rx="16" fill="white" stroke="#CFD9E6" stroke-width="1.5"/>
+<path d="M1033 398 H1443" stroke="#0F766E" stroke-width="4"/>
+<text x="1038" y="438" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="23" font-weight="650" fill="#17243A" data-max-width="400">crates/aline-buffer/</text>
+<text x="1038" y="470" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="20" font-weight="600" fill="#0F766E" data-max-width="400">文本、选区与补丁历史</text>
+<text x="1038" y="501" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="400" fill="#53657C" data-max-width="400">M0 / M2</text>
+<text x="1038" y="545" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">src/</text>
+<text x="1038" y="572" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ lib.rs</text>
+<text x="1038" y="599" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ buffer.rs</text>
+<text x="1038" y="626" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ string_buffer.rs</text>
+<text x="1038" y="653" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ patch.rs</text>
+<text x="1038" y="680" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ selection.rs</text>
+<text x="1038" y="707" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ anchors.rs</text>
+<text x="1038" y="734" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ history.rs</text>
+<text x="1038" y="761" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">└─ revision.rs</text>
+<text x="1038" y="788" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">tests/</text>
+<text x="1038" y="815" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ history.rs</text>
+<text x="1038" y="842" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">└─ patch_properties.rs</text>
+<path d="M 1038 940 H 1438" fill="none" stroke="#CFD9E6" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="1038" y="972" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="400" fill="#53657C" data-max-width="400">正 / 逆补丁 + before/after 选区</text>
+<text x="1038" y="999" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="400" fill="#53657C" data-max-width="400">保存内容身份不以栈深替代</text>
+<rect x="1492" y="398" width="444" height="652" rx="16" fill="white" stroke="#CFD9E6" stroke-width="1.5"/>
+<path d="M1509 398 H1919" stroke="#0F766E" stroke-width="4"/>
+<text x="1514" y="438" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="23" font-weight="650" fill="#17243A" data-max-width="400">crates/aline-app-core/</text>
+<text x="1514" y="470" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="20" font-weight="600" fill="#0F766E" data-max-width="400">主题 / 设置 / 多语言纯模型</text>
+<text x="1514" y="501" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="400" fill="#53657C" data-max-width="400">M0 / M4</text>
+<text x="1514" y="545" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">src/</text>
+<text x="1514" y="572" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ lib.rs</text>
+<text x="1514" y="599" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ theme/</text>
+<text x="1514" y="626" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  ├─ mod.rs / tokens.rs</text>
+<text x="1514" y="653" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  └─ schema.rs / resolve.rs</text>
+<text x="1514" y="680" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ settings/</text>
+<text x="1514" y="707" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  ├─ mod.rs / model.rs</text>
+<text x="1514" y="734" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  └─ validate.rs</text>
+<text x="1514" y="761" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">└─ i18n/</text>
+<text x="1514" y="788" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">   ├─ mod.rs / catalog.rs</text>
+<text x="1514" y="815" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">   └─ locale.rs</text>
+<text x="1514" y="842" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">resources/</text>
+<text x="1514" y="869" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ locales/{zh-CN,en}.toml</text>
+<text x="1514" y="896" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">└─ themes/{github,notion,vue,feishu}/</text>
+<path d="M 1514 940 H 1914" fill="none" stroke="#CFD9E6" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="1514" y="972" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="400" fill="#53657C" data-max-width="400">四 JSON + 三模式预览 / 字体授权</text>
+<text x="1514" y="999" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="400" fill="#53657C" data-max-width="400">UI 负责 I/O、字体注册与广播</text>
+<rect x="64" y="1102" width="444" height="1190" rx="16" fill="white" stroke="#CFD9E6" stroke-width="1.5"/>
+<path d="M81 1102 H491" stroke="#0F766E" stroke-width="4"/>
+<text x="86" y="1142" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="23" font-weight="650" fill="#17243A" data-max-width="400">crates/aline-markdown/</text>
+<text x="86" y="1174" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="20" font-weight="600" fill="#0F766E" data-max-width="400">解析 / 展示树 / 源码映射</text>
+<text x="86" y="1205" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="400" fill="#53657C" data-max-width="400">M0 / M1</text>
+<text x="86" y="1249" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">src/</text>
+<text x="86" y="1276" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ lib.rs</text>
+<text x="86" y="1303" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ pre/</text>
+<text x="86" y="1330" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  ├─ mod.rs / rewrite.rs</text>
+<text x="86" y="1357" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  ├─ flow.rs / tex.rs</text>
+<text x="86" y="1384" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  └─ front.rs</text>
+<text x="86" y="1411" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ build.rs / mdast.rs</text>
+<text x="86" y="1438" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ extensions.rs</text>
+<text x="86" y="1465" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ tree/</text>
+<text x="86" y="1492" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  ├─ mod.rs / sources.rs</text>
+<text x="86" y="1519" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  ├─ offsets.rs / utf16.rs</text>
+<text x="86" y="1546" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  ├─ html.rs / html_block.rs</text>
+<text x="86" y="1573" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  └─ stack.rs</text>
+<text x="86" y="1600" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ parse.rs / blocks.rs</text>
+<text x="86" y="1627" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ protection.rs</text>
+<text x="86" y="1654" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ navigation.rs</text>
+<text x="86" y="1681" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ markdown_hl.rs</text>
+<text x="86" y="1708" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">└─ budget.rs</text>
+<text x="86" y="1735" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">tests/</text>
+<text x="86" y="1762" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ spec.rs / mapping.rs</text>
+<text x="86" y="1789" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ protection.rs / html.rs</text>
+<text x="86" y="1816" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">└─ hostile.rs</text>
+<text x="86" y="1843" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">benches/</text>
+<text x="86" y="1870" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">└─ parse.rs</text>
+<path d="M 86 2182 H 486" fill="none" stroke="#CFD9E6" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="86" y="2214" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="400" fill="#53657C" data-max-width="400">唯一解析器 pulldown-cmark</text>
+<text x="86" y="2241" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="400" fill="#53657C" data-max-width="400">纯数据扩展；不依赖 plugin/UI</text>
+<rect x="540" y="1102" width="444" height="1190" rx="16" fill="white" stroke="#CFD9E6" stroke-width="1.5"/>
+<path d="M557 1102 H967" stroke="#0F766E" stroke-width="4"/>
+<text x="562" y="1142" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="23" font-weight="650" fill="#17243A" data-max-width="400">crates/aline-edit/</text>
+<text x="562" y="1174" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="20" font-weight="600" fill="#0F766E" data-max-width="400">编辑命令与安全补丁计划</text>
+<text x="562" y="1205" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="400" fill="#53657C" data-max-width="400">M0 / M2–M3</text>
+<text x="562" y="1249" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">src/</text>
+<text x="562" y="1276" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ lib.rs</text>
+<text x="562" y="1303" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ command.rs / change.rs</text>
+<text x="562" y="1330" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ apart.rs / check.rs</text>
+<text x="562" y="1357" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ refusal.rs</text>
+<text x="562" y="1384" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ block.rs / format.rs</text>
+<text x="562" y="1411" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ lists.rs / tables.rs</text>
+<text x="562" y="1438" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ links.rs</text>
+<text x="562" y="1465" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ find.rs</text>
+<text x="562" y="1492" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">└─ formatter/</text>
+<text x="562" y="1519" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">   ├─ mod.rs / plan.rs</text>
+<text x="562" y="1546" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">   └─ protected.rs</text>
+<text x="562" y="1573" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">tests/</text>
+<text x="562" y="1600" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ command_golden.rs</text>
+<text x="562" y="1627" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ cross_block.rs</text>
+<text x="562" y="1654" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ table.rs / list.rs</text>
+<text x="562" y="1681" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ find.rs / formatter.rs</text>
+<text x="562" y="1708" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">└─ refusal.rs</text>
+<path d="M 562 2182 H 962" fill="none" stroke="#CFD9E6" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="562" y="2214" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="400" fill="#53657C" data-max-width="400">快照 / 预演 / reread / 原子应用</text>
+<text x="562" y="2241" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="400" fill="#53657C" data-max-width="400">格式化不从 AST 重建全文</text>
+<rect x="1016" y="1102" width="444" height="1190" rx="16" fill="white" stroke="#CFD9E6" stroke-width="1.5"/>
+<path d="M1033 1102 H1443" stroke="#2563EB" stroke-width="4"/>
+<text x="1038" y="1142" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="23" font-weight="650" fill="#17243A" data-max-width="400">crates/aline-plugin/</text>
+<text x="1038" y="1174" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="20" font-weight="600" fill="#2563EB" data-max-width="400">可扩展插件系统</text>
+<text x="1038" y="1205" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="400" fill="#53657C" data-max-width="400">M4：系统与内置 / 后续：外部</text>
+<text x="1038" y="1249" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">src/</text>
+<text x="1038" y="1276" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ lib.rs</text>
+<text x="1038" y="1303" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ contracts/</text>
+<text x="1038" y="1330" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  ├─ mod.rs / descriptor.rs</text>
+<text x="1038" y="1357" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  ├─ capability.rs</text>
+<text x="1038" y="1384" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  └─ request.rs / result.rs</text>
+<text x="1038" y="1411" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ registry.rs / lifecycle.rs</text>
+<text x="1038" y="1438" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ dispatch.rs / traits.rs</text>
+<text x="1038" y="1465" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ context.rs / actions.rs</text>
+<text x="1038" y="1492" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ settings.rs</text>
+<text x="1038" y="1519" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ built_in/</text>
+<text x="1038" y="1546" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  ├─ mod.rs</text>
+<text x="1038" y="1573" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  ├─ math.rs</text>
+<text x="1038" y="1600" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  ├─ mermaid.rs</text>
+<text x="1038" y="1627" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  ├─ table.rs</text>
+<text x="1038" y="1654" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  ├─ highlight.rs</text>
+<text x="1038" y="1681" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  ├─ image_preview.rs</text>
+<text x="1038" y="1708" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  └─ export/</text>
+<text x="1038" y="1735" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│     ├─ mod.rs / snapshot.rs</text>
+<text x="1038" y="1762" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│     ├─ options.rs</text>
+<text x="1038" y="1789" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│     ├─ pdf.rs / docx.rs</text>
+<text x="1038" y="1816" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│     ├─ html.rs / diagram.rs</text>
+<text x="1038" y="1843" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│     └─ artifact.rs</text>
+<text x="1038" y="1870" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">tests/</text>
+<text x="1038" y="1897" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ gates.rs / registration.rs</text>
+<text x="1038" y="1924" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">└─ export_contract.rs</text>
+<path d="M 1038 2182 H 1438" fill="none" stroke="#CFD9E6" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="1038" y="2214" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="400" fill="#53657C" data-max-width="400">contracts/：公共语义；built_in/：首批提供者</text>
+<text x="1038" y="2241" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="400" fill="#53657C" data-max-width="400">后续外部接入：加载/执行机制另行设计</text>
+<text x="1038" y="2268" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="400" fill="#53657C" data-max-width="400">内部 Rust/GPUI trait 不等于外部 ABI</text>
+<rect x="1492" y="1102" width="444" height="1190" rx="16" fill="white" stroke="#CFD9E6" stroke-width="1.5"/>
+<path d="M1509 1102 H1919" stroke="#2563EB" stroke-width="4"/>
+<text x="1514" y="1142" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="23" font-weight="650" fill="#17243A" data-max-width="400">crates/aline-ui/</text>
+<text x="1514" y="1174" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="20" font-weight="600" fill="#2563EB" data-max-width="400">视图、会话与事务唯一编排层</text>
+<text x="1514" y="1205" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="400" fill="#53657C" data-max-width="400">M1–M5</text>
+<text x="1514" y="1249" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">src/</text>
+<text x="1514" y="1276" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ lib.rs / init.rs / root.rs</text>
+<text x="1514" y="1303" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ document/</text>
+<text x="1514" y="1330" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  ├─ mod.rs / core.rs</text>
+<text x="1514" y="1357" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  ├─ visual.rs / source_mode.rs</text>
+<text x="1514" y="1384" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  └─ open_block.rs / snapshot.rs</text>
+<text x="1514" y="1411" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ editors/</text>
+<text x="1514" y="1438" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  ├─ mod.rs / text_input.rs</text>
+<text x="1514" y="1465" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  └─ line_editor.rs / ime.rs</text>
+<text x="1514" y="1492" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ workspace/</text>
+<text x="1514" y="1519" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  ├─ mod.rs / registry.rs</text>
+<text x="1514" y="1546" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  ├─ tabs.rs / folder_pane.rs</text>
+<text x="1514" y="1573" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  └─ commands.rs / close_guard.rs</text>
+<text x="1514" y="1600" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ render/</text>
+<text x="1514" y="1627" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  └─ mod.rs / blocks.rs / point.rs</text>
+<text x="1514" y="1654" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ persistence/</text>
+<text x="1514" y="1681" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  ├─ mod.rs / coordinator.rs</text>
+<text x="1514" y="1708" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  ├─ save.rs / conflict.rs</text>
+<text x="1514" y="1735" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  └─ recovery.rs</text>
+<text x="1514" y="1762" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ resources/</text>
+<text x="1514" y="1789" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  ├─ mod.rs / images.rs</text>
+<text x="1514" y="1816" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  └─ migration.rs</text>
+<text x="1514" y="1843" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ assets/</text>
+<text x="1514" y="1870" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  └─ mod.rs / tasks.rs / cache.rs</text>
+<text x="1514" y="1897" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ settings/</text>
+<text x="1514" y="1924" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  ├─ mod.rs / page.rs</text>
+<text x="1514" y="1951" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  └─ theme_import.rs</text>
+<text x="1514" y="1978" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ export/</text>
+<text x="1514" y="2005" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  ├─ mod.rs / coordinator.rs</text>
+<text x="1514" y="2032" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">│  └─ output.rs</text>
+<text x="1514" y="2059" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">├─ preview.rs / find_replace.rs</text>
+<text x="1514" y="2086" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">└─ platform_services.rs</text>
+<text x="1514" y="2113" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">tests/</text>
+<text x="1514" y="2140" font-family="'SFMono-Regular',Menlo,Consolas,'PingFang SC',monospace" font-size="18" font-weight="400" fill="#17243A" data-max-width="400">└─ support/ / input.rs / file_flow.rs</text>
+<path d="M 1514 2182 H 1914" fill="none" stroke="#CFD9E6" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="1514" y="2214" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="400" fill="#53657C" data-max-width="400">执行器、版本采纳、资源引用生命周期</text>
+<text x="1514" y="2241" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="400" fill="#53657C" data-max-width="400">GPUI API 限于 UI / plugin / app</text>
+<text x="64" y="2362" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="28" font-weight="650" fill="#17243A">目录落地约束</text>
+<text x="64" y="2404" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="21" font-weight="400" fill="#53657C" data-max-width="1872">① 文件按阶段建立，不空建未来插件宿主；表格基础能力归 markdown / edit / ui，增强插件只提供快捷按钮。</text>
+<text x="64" y="2440" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="21" font-weight="400" fill="#53657C" data-max-width="1872">② app-core 只解析纯配置；UI 负责主题安装、字体注册、设置持久化与全窗口传播；export 插件计算产物，UI 发布输出。</text>
+<text x="64" y="2476" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="21" font-weight="400" fill="#53657C" data-max-width="1872">③ 各 crate 的公开 API 只从 lib.rs 导出；模块内默认私有；完整叶子目录、资源结构与测试归位见架构文档 §4.3～§4.4。</text>
+<text x="64" y="2512" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="21" font-weight="400" fill="#53657C" data-max-width="1872">④ tests/fixtures/ 为共享输入语料；各 crate tests/ 为集成测试；单元测试就近放源文件；V1 不引入额外运行时或第二 Markdown 解析器。</text>
+<text x="64" y="2572" font-family="'PingFang SC','Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="400" fill="#53657C" data-max-width="1870">依据：docs/v1-architecture.md §4 · 2026-10-29 · V-01～V-09 仍全部未执行</text>
+</svg>

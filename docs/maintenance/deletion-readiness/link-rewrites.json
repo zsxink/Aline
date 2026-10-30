@@ -1,0 +1,107 @@
+[
+  {
+    "source": "docs/README.md",
+    "line": 3,
+    "old": "../reports/2026-10-30-migration-closure.md",
+    "new": "maintenance/deletion-readiness/prior-evidence/closure-report.md",
+    "reason": "消费者转向隔离历史证据；原件未改"
+  },
+  {
+    "source": "docs/README.md",
+    "line": 3,
+    "old": "../reports/2026-10-30-docs-migration-audit.md",
+    "new": "maintenance/deletion-readiness/prior-evidence/initial-audit.md",
+    "reason": "消费者转向隔离历史证据；原件未改"
+  },
+  {
+    "source": "docs/archive/2026-10-30-migration-decisions.md",
+    "line": 35,
+    "old": "../../reports/2026-10-30-migration-closure.md",
+    "new": "../maintenance/deletion-readiness/prior-evidence/closure-report.md",
+    "reason": "消费者转向隔离历史证据；原件未改"
+  },
+  {
+    "source": "docs/archive/migration-evidence/README.md",
+    "line": 5,
+    "old": "../../../reports/2026-10-30-migration-closure.md",
+    "new": "../../maintenance/deletion-readiness/prior-evidence/closure-report.md",
+    "reason": "消费者转向隔离历史证据；原件未改"
+  },
+  {
+    "source": "docs/archive/migration-evidence/README.md",
+    "line": 21,
+    "old": "../../../reports/2026-10-29-v1-features-review.md",
+    "new": "../../maintenance/deletion-readiness/prior-evidence/features-review.md",
+    "reason": "消费者转向隔离历史证据；原件未改"
+  },
+  {
+    "source": "docs/decisions.md",
+    "line": 517,
+    "old": "../reports/2026-10-30-docs-migration-audit.md",
+    "new": "maintenance/deletion-readiness/prior-evidence/initial-audit.md",
+    "reason": "消费者转向隔离历史证据；原件未改"
+  },
+  {
+    "source": "docs/decisions.md",
+    "line": 525,
+    "old": "../reports/2026-10-30-migration-closure.md",
+    "new": "maintenance/deletion-readiness/prior-evidence/closure-report.md",
+    "reason": "消费者转向隔离历史证据；原件未改"
+  },
+  {
+    "source": "docs/engine-design.md",
+    "line": 538,
+    "old": "../reports/2026-10-30-migration-closure/topic-mapping.md",
+    "new": "maintenance/deletion-readiness/prior-evidence/closure-topic-mapping.md",
+    "reason": "消费者转向隔离历史证据；原件未改"
+  },
+  {
+    "source": "docs/plugin-system.md",
+    "line": 364,
+    "old": "../reports/2026-10-30-migration-closure/topic-mapping.md",
+    "new": "maintenance/deletion-readiness/prior-evidence/closure-topic-mapping.md",
+    "reason": "消费者转向隔离历史证据；原件未改"
+  },
+  {
+    "source": "docs/prototype/open-questions.md",
+    "line": 44,
+    "old": "../../reports/2026-10-30-migration-closure.md",
+    "new": "../maintenance/deletion-readiness/prior-evidence/closure-report.md",
+    "reason": "消费者转向隔离历史证据；原件未改"
+  },
+  {
+    "source": "docs/prototype/review.md",
+    "line": 3,
+    "old": "../../reports/2026-10-30-migration-closure.md",
+    "new": "../maintenance/deletion-readiness/prior-evidence/closure-report.md",
+    "reason": "消费者转向隔离历史证据；原件未改"
+  },
+  {
+    "source": "docs/rust-style-guide.md",
+    "line": 423,
+    "old": "../reports/2026-10-30-migration-closure/topic-mapping.md",
+    "new": "maintenance/deletion-readiness/prior-evidence/closure-topic-mapping.md",
+    "reason": "消费者转向隔离历史证据；原件未改"
+  },
+  {
+    "source": "docs/theme-package-spec.md",
+    "line": 599,
+    "old": "../reports/2026-10-30-migration-closure/topic-mapping.md",
+    "new": "maintenance/deletion-readiness/prior-evidence/closure-topic-mapping.md",
+    "reason": "消费者转向隔离历史证据；原件未改"
+  },
+  {
+    "source": "docs/ui-spec.md",
+    "line": 538,
+    "old": "../reports/2026-10-30-migration-closure/topic-mapping.md",
+    "new": "maintenance/deletion-readiness/prior-evidence/closure-topic-mapping.md",
+    "reason": "消费者转向隔离历史证据；原件未改"
+  },
+  {
+    "source": "docs/v1-architecture.md",
+    "line": 791,
+    "old": "../reports/2026-10-30-migration-closure/topic-mapping.md",
+    "new": "maintenance/deletion-readiness/prior-evidence/closure-topic-mapping.md",
+    "reason": "消费者转向隔离历史证据；原件未改"
+  }
+]

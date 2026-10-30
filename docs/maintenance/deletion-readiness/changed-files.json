@@ -1,0 +1,135 @@
+[
+  {
+    "path": "CLAUDE.md",
+    "before_sha256": "36224bc0c814d320c44de916e661ca66dc52f6f31265e98da8a20c7cd9c00c35",
+    "after_sha256": "4e1f11dcfc7a2a84d1da0ec592aa165fb8fe2cb72d94384c872c3df07949ccbb",
+    "original_bytes": 332,
+    "current_bytes": 571
+  },
+  {
+    "path": "docs/README.md",
+    "before_sha256": "e876126782a81cb445939f3decd3a84c315da49e6205907b3c4c2100c4dc991d",
+    "after_sha256": "064c75a08bf01dd7a1726156398d4dc1eadf1c75e2d57b0f319fbddbea70884c",
+    "original_bytes": 15167,
+    "current_bytes": 15591
+  },
+  {
+    "path": "docs/architecture-guide.md",
+    "before_sha256": "ee86f392c449a166913d34e5eba304390bc2a44cc375f765130fab3545d9e765",
+    "after_sha256": "4e3d34d065fa56a85473d73f965598c4c131a69a89a20751d637b45ff7b04ffb",
+    "original_bytes": 72424,
+    "current_bytes": 72448
+  },
+  {
+    "path": "docs/archive/2026-10-30-migration-decisions.md",
+    "before_sha256": "9ec31e878ffe26625b1f6e163395cf5488ab586a15410128929e6f42c7068d3d",
+    "after_sha256": "06ed5e52840456e5812348229636b80ce4afb43a2162fcbe86dc2494fac8e2c6",
+    "original_bytes": 20111,
+    "current_bytes": 20132
+  },
+  {
+    "path": "docs/archive/migration-evidence/README.md",
+    "before_sha256": "59f52f6f501ddd61283444e1652660f159753e902b795a4fa7bbeee7b960d20a",
+    "after_sha256": "c9285b27733be34bda72107de45149c1fec83c1f613b2a627247a07066936967",
+    "original_bytes": 5423,
+    "current_bytes": 5902
+  },
+  {
+    "path": "docs/archive/migration-evidence/architecture-guide.md",
+    "before_sha256": "03ca492045092cb19b32b94b88b986cb35a90fdbae57189ae06d4288fd3686f9",
+    "after_sha256": "80e226622c2d43e80e0d639f08cea447187dbb1aaf995ff8caf39b1bc1422baf",
+    "original_bytes": 20404,
+    "current_bytes": 21434
+  },
+  {
+    "path": "docs/archive/migration-evidence/engine-design.md",
+    "before_sha256": "1dfd08f27b9f48bcffaf26a9ff9438ce5c468c83fb9aff9f30937fcdb6b59a98",
+    "after_sha256": "25fbc3e477d4c1ab9010ceb02613a132aaf2f9ce2b41c1c0b692afbbc261a3d2",
+    "original_bytes": 56830,
+    "current_bytes": 76036
+  },
+  {
+    "path": "docs/archive/migration-evidence/index.json",
+    "before_sha256": "127ba917f8936292ce3136336e7cdbfc8eec8ff6cc964fea117c64c98c8ded1a",
+    "after_sha256": "12890b474b39fbc957cc82e2807d223c8adf3d03c9084fc577c2b48f48df0a1a",
+    "original_bytes": 15581,
+    "current_bytes": 16690
+  },
+  {
+    "path": "docs/decisions.md",
+    "before_sha256": "bb94b641332022a388071fa4d600ee63ae4c597b81984f82eec95908d92809a1",
+    "after_sha256": "3e2d3887275dfba3dc8bb56fee1e2baef2b8e18d3310202f4cf5346d49bfdf0e",
+    "original_bytes": 65058,
+    "current_bytes": 65240
+  },
+  {
+    "path": "docs/engine-design.md",
+    "before_sha256": "3ccc442064cd0912e20ea047cc5d907f44ea18845297397e035798710ec3ca42",
+    "after_sha256": "698536c27f1b343ee0ee7740cb105fd59fc9a1487baca84af36a7bce38c84881",
+    "original_bytes": 83956,
+    "current_bytes": 83994
+  },
+  {
+    "path": "docs/plugin-system.md",
+    "before_sha256": "f500b2c07b1f1c8f97e489bef4a1a24a97029e6a17c5c5d6c87c6ecdd4cd189c",
+    "after_sha256": "5098bcb83a71877c668f8b8e4693b43d0b996ed0f3e5d41200b366994a33124c",
+    "original_bytes": 57215,
+    "current_bytes": 57253
+  },
+  {
+    "path": "docs/prototype/.DS_Store",
+    "before_sha256": "985e0568fbc2218c2e240ca88398620eea60d3d7e59f675cc3fb975a1db19dff",
+    "after_sha256": "099ee601b8a50ff8fa77b73bba033dada26492ae5c98cd6987d7309f241b70a5",
+    "original_bytes": 6148,
+    "current_bytes": 6148
+  },
+  {
+    "path": "docs/prototype/open-questions.md",
+    "before_sha256": "ebdd3a04ca53765e30bca5dbab4d4d757da7402f3bf8dad0c24bc77f04777b01",
+    "after_sha256": "47fc2f0a9160fd8ae88b0468983271622194c37e817866c6f25d7410e99481f5",
+    "original_bytes": 3222,
+    "current_bytes": 3243
+  },
+  {
+    "path": "docs/prototype/review.md",
+    "before_sha256": "30113891e5c4722b84e17c378dfe48611c73eb86a0169d3079fce73eafb033f3",
+    "after_sha256": "9e664ac9c92f7f97b4f9f701a2841a437ce65dab4095de866aed6a148a0171c5",
+    "original_bytes": 25096,
+    "current_bytes": 25117
+  },
+  {
+    "path": "docs/rust-style-guide.md",
+    "before_sha256": "c39e9395a033f30a2a636480948168af8b1298dcf0c13d955d78d4c772a3d026",
+    "after_sha256": "c7ea691621867183e4a95ad2c611c54924d03268efa236003a06f1cfaa4b7fff",
+    "original_bytes": 65167,
+    "current_bytes": 65205
+  },
+  {
+    "path": "docs/theme-package-spec.md",
+    "before_sha256": "2a49d024b480ca0abd9553e211b085c3b5965f1f7e8bbdc0fa38925943bebda2",
+    "after_sha256": "8bc321747fd000ffeb14f81d1ca5d8420aabe65d08b4d5a57e6ecfe52857292d",
+    "original_bytes": 71697,
+    "current_bytes": 71732
+  },
+  {
+    "path": "docs/ui-spec.md",
+    "before_sha256": "2dce1150491aa4f60c770e258ec78515635c11137e4a522e3cd2732a18f0a151",
+    "after_sha256": "544e95a331d640f382c29fbc7068ea856032202b8bcd2677fe51afad4fb3d79b",
+    "original_bytes": 80664,
+    "current_bytes": 80699
+  },
+  {
+    "path": "docs/v1-architecture.md",
+    "before_sha256": "93d26777b1795fbc9aaafc5c07219068d57a09afb3f0fa14b15af31dad2f05e6",
+    "after_sha256": "b8f10c6d1566ac7cf0a6aa59f4568e859737019a97ac4f163a0270f41b03acae",
+    "original_bytes": 102957,
+    "current_bytes": 102992
+  },
+  {
+    "path": "docs/v1-validation-plan.md",
+    "before_sha256": "c614c3680f3da5eec77a840a31fe7bb48ad312fc0bf15d365cc32b15c2d5785c",
+    "after_sha256": "6b9032dc52a5921d97095191ca91604ed2375b77d7750735790595e36b0a557c",
+    "original_bytes": 17487,
+    "current_bytes": 17766
+  }
+]

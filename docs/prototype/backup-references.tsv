@@ -1,0 +1,139 @@
+file	line	text
+docs/README.md	29	开发阅读顺序：仓库 [AGENTS.md](../AGENTS.md) → PRD → 验证计划 → 架构指引 → 引擎设计指引 → 架构规范 → Rust 代码规范 → 产品界面规范 → 插件系统规范 → 主题包规范 → 按需查阅对应历史专项证据。插件功能和设置实现前先核对插件规范第 3～9 节，评审按第 10～12 节核对验收、技术验证及已确认行为。主题字段、加载或导入实现前，在架构/UI/插件边界之后核对主题包规范第 3～11 节，按第 13～14 节检查测试计划与已确认决定。界面设计/评审在 PRD 和验证计划之后可先读 UI 规范，再按问题回查架构与引擎边界。架构铁律和工作规则优先；PRD 定义产品结果，架构指引分配模块与验收责任，引擎指引细化机制，架构规范约束跨层实现，Rust 规范规定代码写法及工具/人工检查，UI 规范描述用户可见结果及其验收，插件规范约束提供者与宿主交互及其回退，主题包规范规定静态格式/资源/继承/导入及管理行为，验证计划收口尚未执行的实验和细化契约。当前稿件与已确认决定的效力按各规范的状态及权威关系区分；阅读顺序不是裁决优先级。历史归档保留当时版本引用。旧架构蓝图、引擎设计、架构规范、Rust 规范和 UI 规范已分别复核形成新稿；UI 决定已回写，插件专项已完成首轮复核及 PL 确认回写，主题包专项已完成首轮复核和 TH 确认回写，其余 docs_bak 材料仍按需复核迁入。历史建议不能视为当前决定。
+docs/README.md	37	2026-10-29 用户确认 TH-01～TH-10 全部采用方案 A：正式 schema 1，无原型 2/3 自动兼容；采用封闭字段与唯一色源、逐叶递归合并/null 拒绝；预览仅静态 PNG，内置图标为 outline/filled；受保护 GitHub 作继承/最终回退根，磁盘副本保留修改；普通同 ID 拒绝，V1 无覆盖升级命令或应用内删除按钮；安装只更新列表不应用；失效保留选择身份并有效回默认，修复/重装/刷新/重启均须显式重选，不自动盖回新选择。已同步主题规范、PRD、UI、架构、插件入口、验证计划和本入口，并新增确认归档，当前无待确认主题包问题。V-04/V-06/V-09 等仍未执行，数值预算/默认视觉值及字体/图标/透明度原生能力尚未通过；未创建代码、主题包、二进制资源或实验结果，docs_bak 与既有归档保留。
+docs/README.md	39	2026-10-29 决策记录完成第一轮复核迁移：历史原文和 docs_bak 保留；旧栈深 dirty、保存前强制 flush、五插件数量、schema 3、缺色回内容主题及固定外部宿主等按现行依据标明修订/替代。决定记录可在 PRD/验证计划之后按需查先例；当前未发现新增决定阻塞，技术验证仍按原 V 和 M0 计划推进。本轮仅新增 decisions.md 和更新本入口，没有修改 PRD、专项规范或归档。
+docs/README.md	41	2026-10-30 WordCraft 调研完成首轮复核迁入：修正旧“无导出/格式化待定/无 ZIP/图片唯一炸弹面”、恢复纯文本及后置 M5 等前提，区分现有规则、实现候选和待验证数值。阅读入口在当前 PRD/验证计划和相应规范之后；docs_bak 原件保留，历史提案不自动立项。下一步等待 WC-01～WC-07 裁决，未新增代码、依赖、实验或发布成绩。
+docs/README.md	43	2026-10-30 完成旧原型与相关素材首轮整理：45个原型有效文件逐字节复制到 docs/prototype/legacy/，旧icons品牌PNG复用现有同字节参考，2个系统文件无需迁移；docs_bak/docs/assets/不存在。入口、逐项处置、相对资源/HTTP检查及剩余旧引用已记录，未改产品契约、主题包格式或V验证状态。PROTO-01～PROTO-06均待用户裁决，其余旧docs原件尚未完成删除准备；本轮未删除docs_bak，未制作正式主题包或新增发布资产。
+docs/architecture-guide.md	13	本轮裁决顺序：AGENTS.md 的架构铁律及工作规则 → 当前 PRD 已决定的产品契约 → 当前架构及引擎指引 → 验证计划的方法与待验证边界 → 当前决定记录 → `docs_bak` 历史规范及参考项目调研。AGENTS.md 的旧文档地图、“docs 优先”总述及旧稿“更新的一方优先”不能绕过上述顺序。同级文档若出现无法按职责解释的矛盾，记录待确认问题，不按日期自行裁决。
+docs/architecture-guide.md	64	| R-1-04 | 新增/升级依赖先对照[架构 §3.2](./v1-architecture.md#32-栈与依赖的状态)、[引擎 §18.2](./engine-design.md#182-依赖准入与未解决实现风险)及[历史依赖清单 §2.12](../docs_bak/docs/engine-design.md)。登记用途、归属、精确版本、许可证、同类库重叠及相关 V 证据；历史清单是准入起点，不是全部预装的许可 | K-01/K-08：依赖变更记录与 lockfile；导出/ZIP/平台候选分别经 V-02/V-04/V-01 收口 |
+docs/architecture-guide.md	202	本节只约束生命周期、数据写入与适配责任。用户可见布局、焦点、浮层、菜单与已确认 UI-01～UI-06 由[UI 规范](./ui-spec.md)承接；具体 GPUI 调用及视觉尺寸仍按锁定版本和 V-01/V-09 验证。[历史 Zed 笔记 §0](../docs_bak/docs/zed-notes.md)明确主线与 `gpui-pre` 有代差，旧签名不作可直接调用的要求。
+docs/architecture-guide.md	240	历史[旧规范 §11](../docs_bak/docs/architecture-guide.md#11-性能与反面实证)保留 2026-10-25 issue #458/#459/#460 的诊断摘要；方向研究位于 MarkFlow 仓库 `docs/superpowers/specs/2026-10-26-aline-gpui-rebuild-design.md`。本轮未复验该仓库/issue，不重报旧毫秒数为 Aline 成绩。
+docs/architecture-guide.md	366	| [Rust 规范 0.2](./rust-style-guide.md) / [历史 Rust 稿](../docs_bak/docs/rust-style-guide.md) | 现行命名、可见性、错误/安全、lint/测试与提交纪律；RS-01～RS-05 已确认，历史稿仅作迁移证据 |
+docs/architecture-guide.md	367	| [UI 规范](./ui-spec.md) / [Zed 笔记](../docs_bak/docs/zed-notes.md) | 现行 UI 规范记录用户可见结果与已确认 UI-01～UI-06；具体 GPUI 调用/字体/尺寸/平台焦点仍按锁定版本和 V-01/V-04/V-09 验证，本文件保留状态与渲染副作用边界 |
+docs/architecture-guide.md	381	| [旧规范附录 A～C](../docs_bak/docs/architecture-guide.md#附录-aely-证据索引) | 保留 ElyOffice/Ely-GPUI-Components 源码/ADR、GPUI 组件和测试索引；历史路径/行号未经本轮复验，不宣称 API 可用 |
+docs/architecture-guide.md	382	| [旧引擎稿](../docs_bak/docs/engine-design.md) §1.4/1.5/1.10/附录 | ElyMark 的映射/保真/HTML 机制线索；本文采用的是当前引擎契约，不继承性能或完整 HTML 保证 |
+docs/architecture-guide.md	383	| [Zed 调研](../docs_bak/docs/zed-notes.md) §0/1/3 | 生命周期/IME/虚拟化机制证据；主线代差须核锁定源码，不照搬 CRDT/300ms 分组/全套设置系统 |
+docs/architecture-guide.md	384	| [WordCraft 调研](../docs_bak/docs/wordcraft-study.md) §2/4/5 | 扫描预算、敌意输入、原文透传和保真棘轮适用于 Aline 的自研 pass/文件边界；不照搬第二解析器/快照 undo，也不沿用“无 ZIP/无导出”假设 |
+docs/architecture-guide.md	385	| [旧决定](../docs_bak/docs/decisions.md) / [旧规范 §11](../docs_bak/docs/architecture-guide.md#11-性能与反面实证) | 选型与 MarkFlow 性能反例的历史来源；当前契约/验证优先，诊断不是 Aline 成绩 |
+docs/architecture-guide.md	387	首轮复核只改本文和 README；本轮按用户对 RS-01～RS-05/ED-01 的确认同步现行契约与入口，历史归档和 `docs_bak` 不改写，旧版本号保留当时语境。UI、插件和主题专项均已迁入，PL-01～PL-03 与 TH-01～TH-10 已确认并同步；其它历史专项仍按现行 PRD 与验证计划复核。
+docs/architecture-guide.md	423	对象为不改写的[旧 architecture-guide.md](../docs_bak/docs/architecture-guide.md) v0.2。**保留**保留长期约束，**修订**更新责任/术语/检查；**移出**是不在本文复制专项细节，链接当前指引或待迁入历史材料，不表示本轮修改了那些文件；**删除**是废止其当前规则效力，历史文本仍在；**待验证**沿 V 收口。同章可分拆处理。
+docs/archive/2026-10-29-plugin-decisions.md	29	更新插件系统规范、PRD、UI、验证计划、架构指引、架构规范及 README；新增本归档。保留原问题编号和插件规范第 12 节标题供链接兼容。旧问题和备选方案如下保留，docs_bak 与既有历史归档不改写。本轮不修改主题专项，也不新增代码、依赖或运行时。
+docs/archive/2026-10-29-theme-decisions.md	36	更新主题包规范、PRD、UI、验证计划、架构指引、架构规范、插件专项入口和 README，新增本归档。保留主题规范第 14 节和 TH 问题标题以兼容既有入口。docs_bak 与此前归档不改；不新增应用代码、主题包、字体/预览二进制或实验结果。
+docs/archive/2026-10-29-ui-decisions.md	34	UI 规范、PRD、验证计划、架构指引、架构规范与 Rust 规范的 UI 入口、引擎指引的基线版本引用、README、AGENTS.md 的 UI 索引；本归档新增，docs_bak 与既有历史归档保持原样。未创建代码、测试、配置、CI 或提交。
+docs/decisions.md	10	本轮按任务指定顺序复核：**AGENTS.md 强制约束 → 当前 PRD 已确认契约 → 用户明确确认的记录/批阅归档 → 已确认架构及专项设计 → 验证计划中的验证状态 → docs_bak 历史决定、建议和调研**。[AGENTS.md](../AGENTS.md) 的旧地图和旧稿“日期较新者优先”不构成自行裁决冲突的依据；同级且无法按职责解释的矛盾须交用户。
+docs/decisions.md	12	历史来源为[旧 decisions.md](../docs_bak/docs/decisions.md)，保留其 21 个原 D 编号、四项无日期常设决定及同批卫生修复记录。第 4 节引用的“当时记录”保留旧原文，**其中 API、旧章节号、状态和成绩不能作为现行指令**；当前落点见紧随其后的复核。旧文件和已有归档不改写。没有恢复不存在的 docs/v1-features.md、zed-notes.md、wordcraft-study.md；旧功能清单只在备份中，当前产品入口已为 PRD。
+docs/decisions.md	495	- [旧 Zed 笔记](../docs_bak/docs/zed-notes.md)、[旧 WordCraft 调研](../docs_bak/docs/wordcraft-study.md)、[旧引擎依赖/逆向材料](../docs_bak/docs/engine-design.md)：是历史参考，GPUI API 存在代差，W1～W24 借鉴不因迁移本文自动全部纳入；需要具体实现时按现行规范复核。本轮不迁这些文档，也未重跑其基准或外部源码。
+docs/decisions.md	519	- 文档检查不替代代码/平台实验。仓库尚无 Cargo workspace，本轮不运行 Cargo、不新增代码、不更改 docs_bak、PRD 或专项规范。未解决的技术证据影响对应 M0～M6 实现/发布出口，**没有新增待用户裁决的决定阻塞**。
+docs/engine-design.md	15	本轮裁决顺序：[AGENTS.md](../AGENTS.md) 架构铁律及工作规则 → 当前 PRD 已决定的产品契约 → 当前架构已确认的模块边界和数据流 → 验证计划的方法与待验证边界 → 当前决定记录 → `docs_bak` 历史设计。AGENTS.md 的旧文档地图不能把未迁入的专项稿提升为当前规范。
+docs/engine-design.md	21	首轮复核仅新增本文和 README；本轮依据用户对 RS-01～RS-05/ED-01 的明确确认，同步 PRD、架构、Rust/架构规范和验证计划。历史原问题在确认归档保留，`docs_bak` 不改写；技术验证状态不因回写改变。
+docs/engine-design.md	536	对象是保留不改的[旧 engine-design.md](../docs_bak/docs/engine-design.md)。**移出**指本稿不复制该专项细节、由当前架构或后续专项承接，不表示本轮已迁入其他文件。一节可拆为多种处置；“保留”保留机制价值，不把参考实现视为 Aline 测试证据。
+docs/engine-design.md	606	| [旧引擎稿](../docs_bak/docs/engine-design.md) §1.4/1.5/1.10/2.17 与附录 | Ely 的解析映射/保真/HTML 机制及完整关键文件索引；不是 Aline 已实现/已验证结果 |
+docs/engine-design.md	607	| [旧架构规范](../docs_bak/docs/architecture-guide.md) §4～7/11～12 | 映射边界、事务/调度、MarkFlow 性能反例；dirty 栈深/全局路径/旧 flush 等不继承 |
+docs/engine-design.md	608	| [Rust 规范 0.2](./rust-style-guide.md) / [历史 Rust 稿](../docs_bak/docs/rust-style-guide.md) | 现行代码纪律与 RS-01～RS-05 确认方案；历史稿仅保留迁移证据，当前铁律由 AGENTS 直接约束 |
+docs/engine-design.md	609	| [旧决定](../docs_bak/docs/decisions.md) D-2026-10-26-13、[旧功能稿](../docs_bak/docs/v1-features.md)、[旧插件稿](../docs_bak/docs/plugin-system.md) | HTML 与功能来历；范围/插件方向以当前 PRD/PA-01 为准 |
+docs/engine-design.md	610	| [WordCraft 调研](../docs_bak/docs/wordcraft-study.md) §2/4/5 | 反退化、预算、原文透传/测试棘轮；不照搬手写 Markdown 解析器、无 ZIP/无导出假设或旧限额 |
+docs/engine-design.md	611	| [Zed 调研](../docs_bak/docs/zed-notes.md) §0/1.5/3 | UTF-16/IME、事务与增量失效机制；不继承 CRDT、300ms 分组或未锁定 API |
+docs/plugin-system.md	12	裁决顺序：[AGENTS.md](../AGENTS.md) 架构铁律与工作规则 → 当前 PRD 已决定的产品范围/行为 → 已确认的[架构指引](./v1-architecture.md)、[引擎指引](./engine-design.md)、[架构规范](./architecture-guide.md)和[UI 规范](./ui-spec.md) → [验证计划](./v1-validation-plan.md)的方法与待验证边界 → 当前决定记录 → docs_bak 历史设计。AGENTS.md 的旧地图、“docs 优先”总述和旧稿“本设计纳入 V1”不能改变本轮权威关系。
+docs/plugin-system.md	364	对象为不改写的[旧 plugin-system.md](../docs_bak/docs/plugin-system.md)。**保留**指约束继续适用；**修订**更新职责/范围/行为；**移出**表示详细责任交给现行专项或未来专项，本轮不修改该文件；**删除**表示不再作为 V1 要求，历史原文仍保留；**待验证**按 V 收口。同章可拆分处置。
+docs/plugin-system.md	405	| [旧插件稿](../docs_bak/docs/plugin-system.md)、[旧决定](../docs_bak/docs/decisions.md) | 历史证据，不改写；旧技术方案不自动获得现行效力 |
+docs/prototype/inventory.json	6	    "docs_bak/docs/assets"
+docs/prototype/inventory.json	10	      "source": "docs_bak/prototype/README.md",
+docs/prototype/inventory.json	17	      "source": "docs_bak/prototype/assets/aline.png",
+docs/prototype/inventory.json	27	      "source": "docs_bak/prototype/assets/showcase-landscape.svg",
+docs/prototype/inventory.json	38	      "source": "docs_bak/prototype/icons.js",
+docs/prototype/inventory.json	45	      "source": "docs_bak/prototype/index.html",
+docs/prototype/inventory.json	52	      "source": "docs_bak/prototype/interactions.js",
+docs/prototype/inventory.json	59	      "source": "docs_bak/prototype/light.css",
+docs/prototype/inventory.json	66	      "source": "docs_bak/prototype/measure.css",
+docs/prototype/inventory.json	73	      "source": "docs_bak/prototype/menus.css",
+docs/prototype/inventory.json	80	      "source": "docs_bak/prototype/menus.js",
+docs/prototype/inventory.json	87	      "source": "docs_bak/prototype/prototype.css",
+docs/prototype/inventory.json	94	      "source": "docs_bak/prototype/prototype.js",
+docs/prototype/inventory.json	101	      "source": "docs_bak/prototype/showcase.js",
+docs/prototype/inventory.json	108	      "source": "docs_bak/prototype/theme-gallery.css",
+docs/prototype/inventory.json	115	      "source": "docs_bak/prototype/theme-library.js",
+docs/prototype/inventory.json	122	      "source": "docs_bak/prototype/themes/.DS_Store",
+docs/prototype/inventory.json	129	      "source": "docs_bak/prototype/themes/feishu/application.json",
+docs/prototype/inventory.json	136	      "source": "docs_bak/prototype/themes/feishu/highlight.json",
+docs/prototype/inventory.json	143	      "source": "docs_bak/prototype/themes/feishu/markdown.json",
+docs/prototype/inventory.json	150	      "source": "docs_bak/prototype/themes/feishu/previews/dark.svg",
+docs/prototype/inventory.json	161	      "source": "docs_bak/prototype/themes/feishu/previews/light.svg",
+docs/prototype/inventory.json	172	      "source": "docs_bak/prototype/themes/feishu/previews/sepia.svg",
+docs/prototype/inventory.json	183	      "source": "docs_bak/prototype/themes/feishu/theme.json",
+docs/prototype/inventory.json	190	      "source": "docs_bak/prototype/themes/github/application.json",
+docs/prototype/inventory.json	197	      "source": "docs_bak/prototype/themes/github/highlight.json",
+docs/prototype/inventory.json	204	      "source": "docs_bak/prototype/themes/github/markdown.json",
+docs/prototype/inventory.json	211	      "source": "docs_bak/prototype/themes/github/previews/dark.svg",
+docs/prototype/inventory.json	222	      "source": "docs_bak/prototype/themes/github/previews/light.svg",
+docs/prototype/inventory.json	233	      "source": "docs_bak/prototype/themes/github/previews/sepia.svg",
+docs/prototype/inventory.json	244	      "source": "docs_bak/prototype/themes/github/theme.json",
+docs/prototype/inventory.json	251	      "source": "docs_bak/prototype/themes/index.json",
+docs/prototype/inventory.json	258	      "source": "docs_bak/prototype/themes/notion/application.json",
+docs/prototype/inventory.json	265	      "source": "docs_bak/prototype/themes/notion/highlight.json",
+docs/prototype/inventory.json	272	      "source": "docs_bak/prototype/themes/notion/markdown.json",
+docs/prototype/inventory.json	279	      "source": "docs_bak/prototype/themes/notion/previews/dark.svg",
+docs/prototype/inventory.json	290	      "source": "docs_bak/prototype/themes/notion/previews/light.svg",
+docs/prototype/inventory.json	301	      "source": "docs_bak/prototype/themes/notion/previews/sepia.svg",
+docs/prototype/inventory.json	312	      "source": "docs_bak/prototype/themes/notion/theme.json",
+docs/prototype/inventory.json	319	      "source": "docs_bak/prototype/themes/vue/application.json",
+docs/prototype/inventory.json	326	      "source": "docs_bak/prototype/themes/vue/highlight.json",
+docs/prototype/inventory.json	333	      "source": "docs_bak/prototype/themes/vue/markdown.json",
+docs/prototype/inventory.json	340	      "source": "docs_bak/prototype/themes/vue/previews/dark.svg",
+docs/prototype/inventory.json	351	      "source": "docs_bak/prototype/themes/vue/previews/light.svg",
+docs/prototype/inventory.json	362	      "source": "docs_bak/prototype/themes/vue/previews/sepia.svg",
+docs/prototype/inventory.json	373	      "source": "docs_bak/prototype/themes/vue/theme.json",
+docs/prototype/inventory.json	380	      "source": "docs_bak/prototype/tools/generate-theme-previews.py",
+docs/prototype/inventory.json	387	      "source": "docs_bak/docs/icons/.DS_Store",
+docs/prototype/inventory.json	394	      "source": "docs_bak/docs/icons/Aline.png",
+docs/prototype/inventory.md	3	日期：2026-10-30。范围含旧原型46文件、旧icons目录2文件，共48项；其中2个系统文件不迁移。`docs_bak/docs/assets/` 不存在，不虚构已迁移内容。逐字节副本45项；旧icons PNG复用现有参考1项；没有删除原件。
+docs/prototype/inventory.md	5	路径前缀：下表“旧相对路径”除最后两项外均相对 `docs_bak/prototype/`；目标相对仓库根。`legacy` 全部是非权威历史材料；“迁移归档”不等于确认继续维护或允许对外发布。保留完整依赖是为了安全追溯，不把所有旧成果认定为正式资产。
+docs/prototype/inventory.md	57	| `docs_bak/docs/icons/.DS_Store` | 系统文件：macOS Finder 元数据 | 无运行资源引用 | 不适用 | 废弃建议明确，无长期参考价值；原件未删 | 无需迁移；保留原件待整体删除 |
+docs/prototype/inventory.md	58	| `docs_bak/docs/icons/Aline.png` | 品牌重复 PNG：512×512 RGBA；与两个现存PNG字节相同 | 旧 UI 稿图标链接；现行 PRD/UI 已指向 docs/assets/aline.png | PRD §6.1；UI §3.1 | 不再新增重复正式资产；授权待 PROTO-01 | 复用现有参考；`docs/assets/aline.png` |
+docs/prototype/open-questions.md	10	- **文件或素材：**`docs/assets/aline.png`；历史 `legacy/assets/aline.png`；旧 `docs_bak/docs/icons/Aline.png`。
+docs/prototype/open-questions.md	14	- **是否阻塞删除 docs_bak：****不阻塞**，相同字节已在正式文档参考位置及历史副本保存。
+docs/prototype/open-questions.md	20	- **文件或素材：**`legacy/assets/showcase-landscape.svg`，原路径 `docs_bak/prototype/assets/showcase-landscape.svg`。
+docs/prototype/open-questions.md	24	- **是否阻塞删除 docs_bak：****不阻塞**，原字节与引用已完整复制。
+docs/prototype/open-questions.md	34	- **是否阻塞删除 docs_bak：****不阻塞**，完整历史副本与 README 线索已保存。
+docs/prototype/open-questions.md	44	- **是否阻塞删除 docs_bak：****不阻塞**，本轮完整副本已脱离旧目录；后续精简副本须等裁决。
+docs/prototype/open-questions.md	54	- **是否阻塞删除 docs_bak：****不阻塞**，索引、配置、图和工具均有原字节副本。
+docs/prototype/open-questions.md	60	- **文件或素材：**`docs_bak/docs/` 中 11 份 Markdown：`architecture-guide.md`、`decisions.md`、`engine-design.md`、`plugin-system.md`、`rust-style-guide.md`、`theme-package-spec.md`、`ui-spec.md`、`v1-architecture.md`、`v1-features.md`、`wordcraft-study.md`、`zed-notes.md`；以及仍指向它们的正式文档、AGENTS 旧地图及 CLAUDE 转引。
+docs/prototype/open-questions.md	64	- **是否阻塞删除 docs_bak：****阻塞**。
+docs/prototype/review.md	22	总计48项：45个原型文件复制、1个旧品牌副本由现行参考承接、2个系统文件不迁移。`docs_bak/docs/assets/` 不存在；`docs_bak/docs/icons/` 只有PNG及系统文件。每一文件的用途、引用、规范映射、价值/过时内容和目标路径见 [完整账本](./inventory.md)；源哈希和图像尺寸见 [inventory.json](./inventory.json)。未发现独立产品截图或字体文件，不把生成示意图称为截图。
+docs/prototype/review.md	161	**现在不能删除docs_bak。本轮也不执行删除命令。** 完成状态与整目录删除许可分开：
+docs/prototype/tools/verify-reference.py	45	    if 'docs_bak' in text:
+docs/rust-style-guide.md	15	本轮裁决顺序为：AGENTS.md 的强制规则 → 当前产品需求和明确决定记录 → 已确认的架构边界 → 验证计划中已确定的方法与待验证边界 → `docs_bak` 历史规范和调研。TA-01～TA-03 和 PA-01 沿用既有确认；2026-10-29 用户确认本稿 RS-01～RS-05 与 ED-01 均采用建议方案 A，见[确认归档](./archive/2026-10-29-rust-style-decisions.md)。相关决定已回写引擎/架构/PRD，其它建议及技术参数仍不等于已冻结或验证。同级来源不能按日期自行裁决。
+docs/rust-style-guide.md	19	首轮迁移仅新增本文并更新 README；本轮依据用户确认回写规范、AGENTS.md 及受影响的 PRD/架构/引擎/验证入口，并将原问题保留于确认归档。不改 docs_bak、不创建代码或配置。具体类型与接口名称仍为契约示意，不代表已有实现。
+docs/rust-style-guide.md	274	旧异步“三件套”的 `spawn(AsyncFnOnce(...))` / `background_spawn` / `weak.update`、`InputComposition` key、text input configuration 接口来自 Zed 主线证据，不能写成当前 gpui-pre 可直接编译的强制签名。IME 使用统一映射/输入状态机、不伪造确认/取消；平台调用和生命周期核验属 V-01/V-07，见[历史 Zed §0](../docs_bak/docs/zed-notes.md)。
+docs/rust-style-guide.md	293	**S-15-01（准入，C-02/C-08）：**新增/升级依赖先对照[架构 §3.2](./v1-architecture.md#32-栈与依赖的状态)、[引擎 §18.2](./engine-design.md#182-依赖准入与未解决实现风险)及[历史依赖清单 §2.12](../docs_bak/docs/engine-design.md)。变更记录列用途、所属 crate、为何不能复用、精确解析版本/源码来源、许可证、features/目标及直接/传递重叠、构建/运行风险与 V 证据。未使用的候选不预装。
+docs/rust-style-guide.md	352	| [UI 规范](./ui-spec.md) / [Zed 笔记](../docs_bak/docs/zed-notes.md) | UI 规范已迁入并回写 UI-01～UI-06；具体组件/字体/焦点/GPUI 接线仍须按 PRD、锁定版本及 V-01/V-04/V-09 验证，不从 Zed 主线推定 API 可用 |
+docs/rust-style-guide.md	408	| [历史 Rust 规范](../docs_bak/docs/rust-style-guide.md) | 本轮逐章复核对象；原文保留，处置账本见第 22 节 |
+docs/rust-style-guide.md	409	| [历史引擎](../docs_bak/docs/engine-design.md) / [历史架构](../docs_bak/docs/v1-architecture.md) / [历史架构规范](../docs_bak/docs/architecture-guide.md) | Ely 映射/保真/补丁、crate 与依赖来历；实际约束以当前稿/铁律为准，不照抄“唯一算法”“已实测” |
+docs/rust-style-guide.md	410	| [Zed 笔记](../docs_bak/docs/zed-notes.md) §0/1/3 | 生命周期/输入/缓存/测试机制证据；本轮未重验外部源码行号。`/Users/xian/Project/book/zed` 为后续本地核对入口，不当 gpui-pre API 证明 |
+docs/rust-style-guide.md	411	| [WordCraft 调研](../docs_bak/docs/wordcraft-study.md) §2/4/5 | 敌意扫描/预算/原文透传/保真案例；不采用第二解析器、快照 undo 或“无 ZIP/无导出”旧前提 |
+docs/rust-style-guide.md	412	| [旧决定](../docs_bak/docs/decisions.md) / [旧架构规范 §11](../docs_bak/docs/architecture-guide.md#11-性能与反面实证) | 历史技术选择及 MarkFlow #458/#459/#460 热路径反例；不是 Aline 性能证据，旧版本表不重新冻结 |
+docs/rust-style-guide.md	423	对象为 [docs_bak/docs/rust-style-guide.md](../docs_bak/docs/rust-style-guide.md) v0.1，含导言、§1～18 与附录 A～C。**保留**长期有效约束；**修订**改变范围/术语/检查；**移出**在本文件只留 Rust 侧约束和详细职责链接，不表示本轮编辑了目标文档；**删除**撤销其当前规则效力，历史原文仍保留；**待验证**按 V 或无编号实验收口。同项可拆分处理。
+docs/theme-package-spec.md	12	裁决顺序：[AGENTS.md](../AGENTS.md) 架构铁律与工作规则 → [当前 PRD](./v1-prd.md) 已决定的产品结果 → 已确认的[架构指引](./v1-architecture.md)、[架构规范](./architecture-guide.md)、[UI 规范](./ui-spec.md)及插件规范中有上游依据的契约 → [验证计划](./v1-validation-plan.md) → 当前决定记录 → docs_bak 历史设计。PL-01～PL-03 已确认方案 A，按当前 PRD/插件规范及[确认归档](./archive/2026-10-29-plugin-decisions.md)承接，不重开。旧稿自称 schema 3、原型使用某字段，都不是产品确认。
+docs/theme-package-spec.md	599	保留/修订/移出/删除/待验证均指现行规则效力，**不删除或改写历史文件**。来源为[旧主题包规范](../docs_bak/docs/theme-package-spec.md)及[原型主题目录](./prototype/legacy/themes/)。
+docs/theme-package-spec.md	651	| [产品批阅归档 Q-18](./archive/2026-10-28-v1-open-questions.md) / [历史决定](../docs_bak/docs/decisions.md) | 确认先验证字体及透明回退的依据/历史追溯，旧字段或数值不因归档自动批准 |
+docs/theme-package-spec.md	653	首轮仅交付本文与 README，随后用户确认十项建议。本轮创建确认归档并回写主题、PRD、UI、架构、插件入口、验证计划与 README；docs_bak 和既有归档不改，无应用代码、主题包或实验结果。TH-01～TH-10 的决定阻塞均解除；字段/行为按已确认规则推进，未完成的默认值、数值预算与原生能力仍按 V-04/V-06/V-09 等收口。不能把文档回写当作可发布实现或三平台验收通过。
+docs/ui-spec.md	30	| [旧 UI 稿](../docs_bak/docs/ui-spec.md)与[原型整理入口](./prototype/README.md) | 布局、图标含义、控件邻接和交互意图；处置见第 19 节 | 原型所有控件属于 V1，或浏览器演示已验证原生能力 |
+docs/ui-spec.md	529	| [历史决定](../docs_bak/docs/decisions.md)、[Zed 笔记](../docs_bak/docs/zed-notes.md) | 仅作来源线索；具体主线 GPUI API、旧尺寸和第三方能力不构成 Aline 已验证结果 |
+docs/ui-spec.md	537	以下章节号均指未改写的[历史 UI 稿](../docs_bak/docs/ui-spec.md)。同一章可能同时含可保留要求、需移出内容及待验证数值，故允许多种处置。
+docs/ui-spec.md	579	首轮交付仅新增本文及 README 入口，保留旧资料并建立23行矩阵。随后用户确认六项建议，本轮完成决定归档及 UI、PRD、验证计划、架构与文档入口的同步；未新增代码、UI实现、配置、测试或CI，未改写 docs_bak 或既有历史归档。
+docs/ui-spec.md	583	2026-10-29 插件确认回写：PL-01～PL-03 均采用建议 A，已同步第 3/7/9～11/15/17/18 节及 PRD、插件、架构和验证样本。主题确认回写：TH-01～TH-10 均采用建议 A，已同步 PRD、主题包规范与验证计划；详情见[主题决定归档](./archive/2026-10-29-theme-decisions.md)。这两组决定均不表示真实平台/导出/资源能力或数值实验通过；既有归档与 docs_bak 未改写。
+docs/v1-architecture.md	11	裁决顺序：仓库 [AGENTS.md](../AGENTS.md) 的架构铁律和工作规则 → [PRD 0.8](./v1-prd.md) 已决定的产品契约 → [验证计划](./v1-validation-plan.md) 的方法与待验证边界 → [产品批阅归档](./archive/2026-10-28-v1-open-questions.md)、[架构问题确认归档](./archive/2026-10-29-v1-architecture-decisions.md)及[Rust 与引擎问题确认归档](./archive/2026-10-29-rust-style-decisions.md) → `docs_bak` 历史设计。AGENTS.md 旧文档地图和“docs 优先”总述不能用于绕过本轮明确要求的铁律优先级；历史文档自称“定稿”“强制”“已验证”也不自动取得当前效力。
+docs/v1-architecture.md	55	依赖登记首先对照[历史 engine-design §2.12](../docs_bak/docs/engine-design.md)。第三方版本集中到 workspace；同类功能不引入第二个库。V1 禁 notify、regex、tokio、Wasmtime/WASI、动态插件宿主；禁止把旧 §9.3 的 actor、心跳、WIT、安装目录搬进 M0–M6。后续外部插件接入方向已获用户明确确认，加载协议、执行环境、隔离与权限、兼容策略及交付阶段尚待专项设计；本稿不预建宿主、不确定工期，也不恢复旧 Wasmtime 路线。
+docs/v1-architecture.md	735	| [现行引擎指引](./engine-design.md) / [历史引擎稿](../docs_bak/docs/engine-design.md) | 现行机制契约与 ED-01 决定入口；历史 §1.4～1.5/1.10/2.12/2.17 保留证据，旧性能、Front matter 编辑、WebView/平台说法不继承 |
+docs/v1-architecture.md	736	| [现行架构规范](./architecture-guide.md) / [历史架构规范](../docs_bak/docs/architecture-guide.md) | 现行 R/K 跨层检查与 RS/ED 回写；历史分层/事务/调度/缓存证据保留，旧 dirty 栈深、草稿直接丢弃不继承 |
+docs/v1-architecture.md	737	| [现行 Rust 规范 0.2](./rust-style-guide.md) / [历史 Rust 稿](../docs_bak/docs/rust-style-guide.md) | 工具链、命名、可见性、错误/安全与检查；RS-01～RS-05 已确认，历史稿不扩大准入 |
+docs/v1-architecture.md	739	| [现行插件规范](./plugin-system.md) / [历史插件稿](../docs_bak/docs/plugin-system.md) | 公共系统/六提供者、设置/启停/回退/任务边界与 PL-01～PL-03 已确认行为；历史宿主路线/协议不作为 V1 实施依据，未来外部机制仍待专项 |
+docs/v1-architecture.md	741	| [zed-notes.md](../docs_bak/docs/zed-notes.md) | 原生生命周期/焦点/IME/虚拟化的机制证据；API 签名核对锁定快照，不照抄主线 |
+docs/v1-architecture.md	742	| [wordcraft-study.md](../docs_bak/docs/wordcraft-study.md) | 反退化扫描、敌意输入、权限/原子保存、保真棘轮与案例库；24 条提案不自动全部立项，旧“无导出/无 ZIP”废弃 |
+docs/v1-architecture.md	743	| [decisions.md](../docs_bak/docs/decisions.md) / [v1-features.md](../docs_bak/docs/v1-features.md) | 历史决定与功能来源；当前决定追溯到 PRD/本轮归档，不回写历史掩盖变化 |
+docs/v1-architecture.md	782	对象为[历史 v1-architecture.md](../docs_bak/docs/v1-architecture.md) 的导言、第 1～15 章及附录。**移出**表示本稿不复制该专项内容，保留实际历史链接供后续迁入重审，不表示本轮新建了专项规范；一项可拆为不同处理类别。下表是本轮迁移审计，不是历史文档的改写。
+docs/wordcraft-study.md	9	本文复核[旧调研](../docs_bak/docs/wordcraft-study.md)，保存外部工程证据、分析和提案状态，**不能覆盖 Aline 当前产品契约、架构铁律和技术路线**。已采纳规则以对应 Aline 规范为准；引用当前规范只能证明已有承接，不能证明 WordCraft 是决定的来源，更不表示已经实现或验收通过。
+docs/wordcraft-study.md	11	本轮权威顺序：[AGENTS.md](../AGENTS.md) 强制约束 → [PRD 0.8](./v1-prd.md) 已确定范围/行为 → 已确认的架构、引擎与专项规范 → [验证计划](./v1-validation-plan.md) → [决策记录](./decisions.md) → docs_bak 调研。当前规范均已存在；旧稿里的 v1-features 和旧章节号不再作为当前依据。Q/TA/PA/RS/ED/UI/PL/TH 的已确认项不重开，V-01～V-09 均未执行。
+docs/wordcraft-study.md	287	本轮只新建 `docs/wordcraft-study.md` 并更新 `docs/README.md` 入口；保留 docs_bak 原件、AGENTS.md 的既有修改、所有归档和规范。没有修改 PRD、架构、引擎、Rust、专项或 decisions，也没有建立测试/CI、执行 V 实验或承诺新功能。
+reports/2026-10-29-v1-features-review.md	3	审查日期：2026-10-29。审查对象：[旧版 v1-features.md](../docs_bak/docs/v1-features.md)。
+reports/2026-10-29-v1-features-review.md	11	建议退役旧版功能清单的现行规范用途，不迁入 `docs/`，保留 `docs_bak` 原件作为历史证据。当前产品契约由 PRD 承接；实现约束由专项承接；实验由原 V 编号承接。旧文稿中的可选能力、未来构想和具体算法不恢复为 V1 承诺。
+reports/2026-10-29-v1-features-review.md	251	**建议结论：退役旧版 v1-features.md 的规范用途，不迁入 docs/。** 不创建与 PRD 并列的功能清单。其有效产品信息已由 PRD 承接，技术/实验分别有专项和 V 责任方，未来建议没有恢复价值；原件已有 `docs_bak` 历史载体，无需再复制一份归档。

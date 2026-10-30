@@ -1,0 +1,96 @@
+{
+  "date": "2026-10-30",
+  "purpose": "精选迁移既有审计中仍有追溯价值的信息；逐文件处置见reports-disposition.csv，不复制旧工具或重复渲染。",
+  "records": [
+    {
+      "source": "reports/2026-10-29-v1-features-review.md",
+      "source_bytes": 35980,
+      "source_sha256": "bca7ad96f2963727d563c6d86435c5c00ac6faf935d9614ce8a8b0a2965fd1de",
+      "target": "docs/maintenance/deletion-readiness/prior-evidence/features-review.md",
+      "target_sha256": "4fcd004a37e40fbffd0afe19ae78c3d99652582be9efca8d143a46a28028dc84",
+      "mode": "fenced_original"
+    },
+    {
+      "source": "reports/2026-10-30-docs-migration-audit.md",
+      "source_bytes": 27137,
+      "source_sha256": "c77fe8446dc0c0b6e1d5e7f41ea33e7719b88a7a3845e8a41f36b9f437486aaa",
+      "target": "docs/maintenance/deletion-readiness/prior-evidence/initial-audit.md",
+      "target_sha256": "f43fde5940fbdec559b39c342867f3ced66a221d163353a0acc596d61b0dd996",
+      "mode": "fenced_original"
+    },
+    {
+      "source": "reports/2026-10-30-migration-closure.md",
+      "source_bytes": 10387,
+      "source_sha256": "8365d4b92bb1351789bfb33002aa7a480710cfa09550379f6f82b3618fac6c9a",
+      "target": "docs/maintenance/deletion-readiness/prior-evidence/closure-report.md",
+      "target_sha256": "ccae07c47b3cdf78ac99265455f691f4b2a13c37a2e3d68a15e0a401e91f1659",
+      "mode": "fenced_original"
+    },
+    {
+      "source": "reports/2026-10-30-migration-audit/file-mapping.csv",
+      "source_bytes": 22764,
+      "source_sha256": "9b57358a33c8e963e1f7247e1e624acabc881434debbc79dd7ba1121ba147f7b",
+      "target": "docs/maintenance/deletion-readiness/prior-evidence/initial-file-mapping.csv",
+      "target_sha256": "9b57358a33c8e963e1f7247e1e624acabc881434debbc79dd7ba1121ba147f7b",
+      "mode": "bytes"
+    },
+    {
+      "source": "reports/2026-10-30-migration-closure/file-mapping.csv",
+      "source_bytes": 21020,
+      "source_sha256": "3fb8831277a919e8121cd857eca6b89cc54aef0cda3db8127efad9b3e990c248",
+      "target": "docs/maintenance/deletion-readiness/prior-evidence/closure-file-mapping.csv",
+      "target_sha256": "3fb8831277a919e8121cd857eca6b89cc54aef0cda3db8127efad9b3e990c248",
+      "mode": "bytes"
+    },
+    {
+      "source": "reports/2026-10-30-migration-audit/topic-mapping.md",
+      "source_bytes": 123211,
+      "source_sha256": "e0149186a48147f426c365cc0bd804bbb5c019183cf6b5aadbccd1e0622d369f",
+      "target": "docs/maintenance/deletion-readiness/prior-evidence/initial-topic-mapping.md",
+      "target_sha256": "7bd7b63d8a7ce61ea5957cc0ffb9e02076b5b1ba176469238c8f7500b0b686b6",
+      "mode": "fenced_original"
+    },
+    {
+      "source": "reports/2026-10-30-migration-closure/topic-mapping.md",
+      "source_bytes": 99169,
+      "source_sha256": "b685ca835fe4c290eb3973f8cfd4946fe8d71828f194e868acd795fc6974f38e",
+      "target": "docs/maintenance/deletion-readiness/prior-evidence/closure-topic-mapping.md",
+      "target_sha256": "2c15449430b6d685e67fefb754fce548ecb133a368646e976f2cacee50ada01d",
+      "mode": "fenced_original"
+    },
+    {
+      "source": "reports/2026-10-30-migration-closure/confirmed-question-sources.json",
+      "source_bytes": 33404,
+      "source_sha256": "da4ab9eb887ad6105b477dd27223d19dd8cf3b4783937e7516fbec54e58aa02c",
+      "target": "docs/maintenance/deletion-readiness/prior-evidence/confirmed-question-sources.json",
+      "target_sha256": "da4ab9eb887ad6105b477dd27223d19dd8cf3b4783937e7516fbec54e58aa02c",
+      "mode": "bytes"
+    },
+    {
+      "source": "reports/2026-10-30-migration-closure/review.md",
+      "source_bytes": 1306,
+      "source_sha256": "cbb2bba4f4ef80b2257c67971c64bf2612ba5337ebc49e5f32269459ddd6f5cb",
+      "target": "docs/maintenance/deletion-readiness/prior-evidence/prior-review.md",
+      "target_sha256": "c019f494fbb4efaa0a70a47aac50092c3725c896ff6f221d1a8fe678a380b3cb",
+      "mode": "fenced_original"
+    }
+  ],
+  "scan_history": {
+    "target": "docs/maintenance/deletion-readiness/prior-evidence/scan-history.json",
+    "target_sha256": "5b5a96d032c2177d2c68d11d0bd8b59d30e0a230579e7c24fc261be687ce390e",
+    "source_paths": [
+      "reports/2026-10-30-migration-audit/check-before.json",
+      "reports/2026-10-30-migration-audit/check-after.json",
+      "reports/2026-10-30-migration-closure/current-reference-check.json",
+      "reports/2026-10-30-migration-audit/verification-summary.json",
+      "reports/2026-10-30-migration-closure/verification.json",
+      "reports/2026-10-30-migration-closure/prototype-without-source-check.json"
+    ],
+    "semantic_roundtrip_verified": true,
+    "checkpoint_source_paths": [
+      "reports/2026-10-30-migration-audit/baseline-inventory.json",
+      "reports/2026-10-30-migration-closure/baseline.json"
+    ],
+    "inventory_identity_source": "reports/2026-10-30-migration-audit/current-inventory.md"
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "docs": {
+    "files": 93,
+    "subdirectories": 18,
+    "bytes": 2165105,
+    "extensions": {
+      ".md": 40,
+      ".json": 20,
+      ".png": 2,
+      ".svg": 15,
+      "(none)": 1,
+      ".tsv": 1,
+      ".js": 6,
+      ".html": 1,
+      ".css": 5,
+      ".py": 2
+    },
+    "system_metadata": [
+      "docs/prototype/.DS_Store"
+    ],
+    "symlinks": []
+  },
+  "docs_bak": {
+    "files": 60,
+    "subdirectories": 14,
+    "bytes": 1271964,
+    "extensions": {
+      "(none)": 3,
+      ".md": 12,
+      ".png": 2,
+      ".svg": 13,
+      ".js": 6,
+      ".html": 1,
+      ".css": 5,
+      ".json": 17,
+      ".py": 1
+    },
+    "system_metadata": [
+      "docs_bak/docs/.DS_Store",
+      "docs_bak/docs/icons/.DS_Store",
+      "docs_bak/prototype/themes/.DS_Store"
+    ],
+    "symlinks": []
+  },
+  "reports": {
+    "files": 26,
+    "subdirectories": 2,
+    "bytes": 1605038,
+    "extensions": {
+      ".md": 10,
+      ".json": 11,
+      ".py": 3,
+      ".csv": 2
+    },
+    "system_metadata": [],
+    "symlinks": []
+  }
+}

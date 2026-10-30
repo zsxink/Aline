@@ -1,0 +1,424 @@
+{
+  "date": "2026-10-30",
+  "decision": "PROTO-06 A",
+  "source_directory_is_not_runtime_dependency": true,
+  "records": [
+    {
+      "source": "docs_bak/docs/engine-design.md",
+      "source_bytes": 109655,
+      "source_sha256": "9e9efc583355c159ef19527319f8526248532f98d6c442494fcf37ea45699339",
+      "target": "docs/archive/migration-evidence/engine-design.md",
+      "target_sha256": "25fbc3e477d4c1ab9010ceb02613a132aaf2f9ce2b41c1c0b692afbbc261a3d2",
+      "excerpts": [
+        {
+          "start_line": 1,
+          "end_line": 10,
+          "topic": "原稿身份",
+          "sha256": "f3b9bce6f1b0a8b3a132ff27dbfc8e7199bb6d76a2316e6c58770828e3514fdd"
+        },
+        {
+          "start_line": 38,
+          "end_line": 934,
+          "topic": "Ely完整逆向研究，含HTML栈/实体/owed/LineMap/点击与拒绝原例",
+          "sha256": "d932e1c2de67ae58812330a5677484e666e86587f1332f1c8096e5ae9d1bde78"
+        },
+        {
+          "start_line": 1328,
+          "end_line": 1352,
+          "topic": "历史依赖清单与版本理由（非当前准入）",
+          "sha256": "dbd621593a3aa1bf961be9e350a1ae4fe1b05f928513261a9ffcbd459b6ac60b"
+        },
+        {
+          "start_line": 1587,
+          "end_line": 1630,
+          "topic": "完整Ely关键文件索引",
+          "sha256": "04ca34bd1a316d3a374559b6fb5a6aac99590513d7b5e6686a7e2eaca70bd0b0"
+        },
+        {
+          "start_line": 1427,
+          "end_line": 1435,
+          "topic": "平台输入风险原表：AltGr/Ctrl+Alt等历史线索，须V-01/V-09复验",
+          "sha256": "0cd46d9426eb319448136637cee546e99fdbcbd145f153d7d65198fe20be65e9"
+        },
+        {
+          "start_line": 1444,
+          "end_line": 1586,
+          "topic": "旧HTML实施论证/限制/失败测试/决定与未来研究；旧估算和路线无现行效力",
+          "sha256": "1212e0dc94ec9a58224ce9c4e7040f08965007ed5ba8a81ba36c5124e8196c7e"
+        },
+        {
+          "start_line": 1129,
+          "end_line": 1203,
+          "topic": "旧四档映射与折叠编辑候选研究：成本理由/原子区间/IME草图，不恢复产品承诺",
+          "sha256": "d19f1de790b97b5ebc7555bf5ceb5c1fca432ad2c71f4b80882540b4fce52f1a"
+        }
+      ]
+    },
+    {
+      "source": "docs_bak/docs/architecture-guide.md",
+      "source_bytes": 42050,
+      "source_sha256": "21b33172947617380ae639ea374b15561a99a639b9a7aa827c7326c2f8e095b3",
+      "target": "docs/archive/migration-evidence/architecture-guide.md",
+      "target_sha256": "80e226622c2d43e80e0d639f08cea447187dbb1aaf995ff8caf39b1bc1422baf",
+      "excerpts": [
+        {
+          "start_line": 1,
+          "end_line": 14,
+          "topic": "原规范身份",
+          "sha256": "00617067c10fc53b10af4ad4e6daf7a4a45b28c7273950c26257a8144f11f300"
+        },
+        {
+          "start_line": 42,
+          "end_line": 58,
+          "topic": "旧文档一致性政策，已被现行权威规则替代",
+          "sha256": "f3328b439d8046ccfeb67bd1c2c94a18b0d75ec42b77cdf5392ea6d183ff50bd"
+        },
+        {
+          "start_line": 135,
+          "end_line": 168,
+          "topic": "旧映射/命令/调度/缓存约束原始证据",
+          "sha256": "bcc3af24b34a266db01d6cc3f8cfccbe9e48618b8e1c8fe234f394e838c36e8e"
+        },
+        {
+          "start_line": 236,
+          "end_line": 278,
+          "topic": "MarkFlow三病根和引擎约束原始证据",
+          "sha256": "42ed7c06e2328b605f4292da7437188d2a88fec12bb67e39dc9bba280f654267"
+        },
+        {
+          "start_line": 342,
+          "end_line": 382,
+          "topic": "Ely/ADR/测试完整索引与历史分阶段门禁",
+          "sha256": "427530f1a22e6afa7ffdda61847d5228d2568f29a04c6b5a7bae10a39647f68f"
+        },
+        {
+          "start_line": 89,
+          "end_line": 92,
+          "topic": "Ely拆crate的旧测量与隔离研究依据；不是Aline成绩或拆分阈值",
+          "sha256": "7bec3c62939c9e3ffd7ca6b54e88dfb146a5c802c07825d36be35a1995e60c1e"
+        }
+      ]
+    },
+    {
+      "source": "docs_bak/docs/rust-style-guide.md",
+      "source_bytes": 28041,
+      "source_sha256": "417c8d1d68d45c367a0d3cac4868f60250e0dd8c420dc9b0c7a15c75efbb3383",
+      "target": "docs/archive/migration-evidence/rust-style-guide.md",
+      "target_sha256": "e9923bda98f37741e03862d961d7693e45258440b6763dc5f779e28a43588539",
+      "excerpts": [
+        {
+          "start_line": 1,
+          "end_line": 15,
+          "topic": "原规范身份",
+          "sha256": "c1fe0449c92c04266e6c221434234b30773615cf65e3d4026ddec7eb21930f17"
+        },
+        {
+          "start_line": 117,
+          "end_line": 145,
+          "topic": "旧坐标/类型规则原始片段",
+          "sha256": "df7e5eb1bb7961a1cd24af2e7c86ff780cabd90087445ab165cc99618fcbcf1f"
+        },
+        {
+          "start_line": 151,
+          "end_line": 175,
+          "topic": "旧错误/拒绝边界原文",
+          "sha256": "181c2d2e91a58fba4c5a54b0262be472a6d056daa2b985dfbb9e46499bd15498"
+        },
+        {
+          "start_line": 204,
+          "end_line": 216,
+          "topic": "旧unsafe/注释规则",
+          "sha256": "52a412b5c44194480911a354d20a776ce60ee04aa31747500e27b8c81e5b7d3e"
+        },
+        {
+          "start_line": 284,
+          "end_line": 401,
+          "topic": "参考项目证据/完整索引及旧rustfmt/lint/CI样例",
+          "sha256": "93bede3bb9451328ea16373f5f9c1e3511da382d38a9d3205b5a4f8c5b822dfd"
+        }
+      ]
+    },
+    {
+      "source": "docs_bak/docs/v1-architecture.md",
+      "source_bytes": 59552,
+      "source_sha256": "8af1cb1e1d854d0c897271402e51b98f0026dbba7656fda29a56680091aee30b",
+      "target": "docs/archive/migration-evidence/v1-architecture.md",
+      "target_sha256": "ae85a0aadf18d1bd0a7a6809d367f7eba7c8bd2503cd305d9bed7eacbf00f759",
+      "excerpts": [
+        {
+          "start_line": 1,
+          "end_line": 10,
+          "topic": "原蓝图身份",
+          "sha256": "b775db278f9ed93c87bf57c43e7f3e26259cb97abb12ef511ce837da670abd7a"
+        },
+        {
+          "start_line": 570,
+          "end_line": 645,
+          "topic": "旧外置插件宿主研究/索引（Wasmtime等路线无当前效力）",
+          "sha256": "f05685682a2303a2253fda031c9e9ef70505797c123bc75a2b07791fd27a91d7"
+        },
+        {
+          "start_line": 734,
+          "end_line": 787,
+          "topic": "Ely原始GPUI要点/测试索引/类型速查",
+          "sha256": "bd46537cd0a7bf66992684d34449e048a365be9f1492078e601faacd26201a66"
+        }
+      ]
+    },
+    {
+      "source": "docs_bak/docs/wordcraft-study.md",
+      "source_bytes": 37209,
+      "source_sha256": "9bc8058419c77cff4f48083bc3725be6225c06d5757e55d40644f59ff0a56b9a",
+      "target": "docs/archive/migration-evidence/wordcraft-study.md",
+      "target_sha256": "ec9a8b5c937e55fb982c1975c777a263c9342a8f12f5987ffb0abf82cdd8db63",
+      "excerpts": [
+        {
+          "start_line": 1,
+          "end_line": 367,
+          "topic": "完整原始研究：工程证据/21条W原案/旧案例/完整附录；历史提案不自动采纳",
+          "sha256": "9bc8058419c77cff4f48083bc3725be6225c06d5757e55d40644f59ff0a56b9a"
+        }
+      ]
+    },
+    {
+      "source": "docs_bak/docs/zed-notes.md",
+      "source_bytes": 26117,
+      "source_sha256": "ed4ba2ffe05b5232a55aceedd57218b1ca173f43e58fa91052c4a37491222713",
+      "target": "docs/archive/migration-evidence/zed-notes.md",
+      "target_sha256": "63153eb9adb3444a7398856ae3eee2d420aea12bdcdcc8b4982570453116b634",
+      "excerpts": [
+        {
+          "start_line": 1,
+          "end_line": 240,
+          "topic": "完整原始Zed研究/逐领域清单/源码索引；与当前gpui-pre代差须保留",
+          "sha256": "ed4ba2ffe05b5232a55aceedd57218b1ca173f43e58fa91052c4a37491222713"
+        }
+      ]
+    },
+    {
+      "source": "docs_bak/docs/ui-spec.md",
+      "source_bytes": 25957,
+      "source_sha256": "505b236f5eecccb5806b14c2c216884299f8792c53b971af79186ca87e519efa",
+      "target": "docs/archive/migration-evidence/ui-spec.md",
+      "target_sha256": "f3fcbf830572ffa68bd2d48332edf3edd033bc67d0c185a666844178d97167e2",
+      "excerpts": [
+        {
+          "start_line": 1,
+          "end_line": 51,
+          "topic": "原参照/基准色/图标/代码块及设计理由",
+          "sha256": "ed52a867e4d292f202d923e40c2426e66b817b747059711bcd4f0b5ad150e57b"
+        },
+        {
+          "start_line": 77,
+          "end_line": 114,
+          "topic": "标签/树/滚动及设计理由",
+          "sha256": "bbc4f5965245fff432c2be27c787bd63b66cda5fc5f222d4ffe9435804823211"
+        },
+        {
+          "start_line": 124,
+          "end_line": 142,
+          "topic": "菜单设计理由与旧对象菜单",
+          "sha256": "945a52c1f43438ceb869ced32de6784c82e9e5cf8b4b8a58287d9b4f14cf4be0"
+        },
+        {
+          "start_line": 163,
+          "end_line": 181,
+          "topic": "主题外部参照来源及原插件设置",
+          "sha256": "417f092b97361d8f3cc97e3f453db6d05f5ebf2f3f43bffb3c742a7aca059d1b"
+        }
+      ]
+    },
+    {
+      "source": "docs_bak/docs/theme-package-spec.md",
+      "source_bytes": 20756,
+      "source_sha256": "52e0e591a5968da90ae0eb0a918b26c3e5ff428630d7773c92bac4beaa44b353",
+      "target": "docs/archive/migration-evidence/theme-package-spec.md",
+      "target_sha256": "eec9956da8be22f5353daf68acd2bc1b64c9a1364e86bf9977987d6f1dcc1541",
+      "excerpts": [
+        {
+          "start_line": 1,
+          "end_line": 115,
+          "topic": "旧四JSON/目录/字段/原限制/继承；正式规则已改写",
+          "sha256": "0b18f91ab6c8e825311b1a52b200bc36492be186f6c512edf128a32c9ce28a1e"
+        },
+        {
+          "start_line": 227,
+          "end_line": 252,
+          "topic": "旧ZIP/目录/schema3及字体API版本警告",
+          "sha256": "b80d792fed2cce8ffabf1262a5c310417f213191adf429b10efbb9deacbab504"
+        }
+      ]
+    },
+    {
+      "source": "docs_bak/docs/plugin-system.md",
+      "source_bytes": 13176,
+      "source_sha256": "f539dbfc3acc7ef9099e8fd83400fd5b20e4210552d57711a1f1eb1ed27574ba",
+      "target": "docs/archive/migration-evidence/plugin-system.md",
+      "target_sha256": "dc96ecb2074d5051f2023625f9ae8f4564da3ddb7f981c1321bcfddc450d707a",
+      "excerpts": [
+        {
+          "start_line": 1,
+          "end_line": 25,
+          "topic": "旧五插件/启停/设置原背景",
+          "sha256": "db8123895bb601682ead65d9352fc5d9fef64b667ce49959e3ad5be72e47131f"
+        },
+        {
+          "start_line": 98,
+          "end_line": 150,
+          "topic": "旧扩展点/未来AI提案/验收与范围边界",
+          "sha256": "60301db014bed63fe257e4a47f15ea9acfb792f798ebdf9ec0a3997dc486384b"
+        }
+      ]
+    },
+    {
+      "source": "docs_bak/docs/decisions.md",
+      "source_bytes": 14569,
+      "source_sha256": "70bd18f88393d329264d9df6bedc6bb5916875ff83529fa57042fef095dbcccb",
+      "target": "docs/archive/migration-evidence/decisions.md",
+      "target_sha256": "d4fe07b7cafde5e0fae4cc79a19fedf42a2e258e523f791717267bd633e6ca00",
+      "excerpts": [
+        {
+          "start_line": 1,
+          "end_line": 8,
+          "topic": "旧权威/编号背景（较新日期优先不再适用）",
+          "sha256": "45b0c77468f359ab67e57d8227e310ea17acd1481a891f93d9c68ca124f352d6"
+        },
+        {
+          "start_line": 20,
+          "end_line": 24,
+          "topic": "旧技术复核批次背景",
+          "sha256": "53cb5be21e5524ca1afc4c61e4aa9b1a790f3b7d9b1bfe76dfb8c06fa626c55b"
+        },
+        {
+          "start_line": 47,
+          "end_line": 54,
+          "topic": "四条旧常设决定；21条D原文已逐条保存在现行decisions §4",
+          "sha256": "eadeb51140aefc50fb13a11c41398633699efdc7d687341c4580691aecc8630d"
+        }
+      ]
+    },
+    {
+      "source": "docs_bak/docs/v1-features.md",
+      "source_bytes": 9453,
+      "source_sha256": "68adf84b25c2a7950bee96c525c5e953c7f4ef1c4794306ccb86a867f2d9c310",
+      "target": "docs/archive/migration-evidence/v1-features.md",
+      "target_sha256": "31ee06890a87108f80c97c299c02f1da74fb84600808ff9926af660ec657c6a0",
+      "excerpts": [
+        {
+          "start_line": 1,
+          "end_line": 9,
+          "topic": "原范围/非目标/九功能组及67项原条目",
+          "sha256": "aa44debf9fd8efa8cac7e7a2e17cdb9f986b8f89ff178838f26a560ddbea33d9"
+        },
+        {
+          "start_line": 11,
+          "end_line": 11,
+          "topic": "原范围/非目标/九功能组及67项原条目",
+          "sha256": "625ce0a6d0a89d3481928d7d9a7518658d11cdd3de3d0bc4b083bd079ec4bba6"
+        },
+        {
+          "start_line": 13,
+          "end_line": 25,
+          "topic": "原范围/非目标/九功能组及67项原条目",
+          "sha256": "418c8b42096a2d4eff26e506e985ad1dccabda077494a7b3219895331573038c"
+        },
+        {
+          "start_line": 27,
+          "end_line": 27,
+          "topic": "原范围/非目标/九功能组及67项原条目",
+          "sha256": "77f9ce4b711c8bc18de5cfec4d8c9bc5606ac727d5db06761e8322b429c930ff"
+        },
+        {
+          "start_line": 29,
+          "end_line": 31,
+          "topic": "原范围/非目标/九功能组及67项原条目",
+          "sha256": "18ff73f08996c29b2d38a23bd8484a9c90f29dffe71e6e374709c6c59560e044"
+        },
+        {
+          "start_line": 33,
+          "end_line": 33,
+          "topic": "原范围/非目标/九功能组及67项原条目",
+          "sha256": "b1a6d6972cdc1f2cba52afeea617b96231549c87a49b250e2b5f864a0be11e18"
+        },
+        {
+          "start_line": 35,
+          "end_line": 37,
+          "topic": "原范围/非目标/九功能组及67项原条目",
+          "sha256": "a359841f99c72c499ce74063cb0e9169550dfda62848d6d3116638f7f568815c"
+        },
+        {
+          "start_line": 39,
+          "end_line": 39,
+          "topic": "原范围/非目标/九功能组及67项原条目",
+          "sha256": "60e8d7a63b350184b261d5cbee42ba158cee74f7885982836b5b76ee174cea3d"
+        },
+        {
+          "start_line": 41,
+          "end_line": 51,
+          "topic": "原范围/非目标/九功能组及67项原条目",
+          "sha256": "f4ba333f356933254851dc405f2b4c34e2e87f0dd7f3bfa49ffb1a449b8bf43a"
+        },
+        {
+          "start_line": 53,
+          "end_line": 53,
+          "topic": "原范围/非目标/九功能组及67项原条目",
+          "sha256": "e3c37ccbf4b2707532c950dea64a4ea1affba9d0c94fe751173c85dee447ef73"
+        },
+        {
+          "start_line": 55,
+          "end_line": 66,
+          "topic": "原范围/非目标/九功能组及67项原条目",
+          "sha256": "870807543054a94ade7afc4f4c36c6446d7927319cbfebda2824c5c8259797b1"
+        },
+        {
+          "start_line": 68,
+          "end_line": 68,
+          "topic": "原范围/非目标/九功能组及67项原条目",
+          "sha256": "2ae8a620bd5d7be3bd3b7d78d540df767d3965ba18131fb15ba153bb067596ca"
+        },
+        {
+          "start_line": 70,
+          "end_line": 79,
+          "topic": "原范围/非目标/九功能组及67项原条目",
+          "sha256": "82cae82ff9a806b7df57ce1324187163763e96c1dd5a2c23785fa83a76c43ca9"
+        },
+        {
+          "start_line": 81,
+          "end_line": 81,
+          "topic": "原范围/非目标/九功能组及67项原条目",
+          "sha256": "a3547281e0d23059d52415aa6752f6acfbf5d0bbb6a307e9e4c8757dd41036c6"
+        },
+        {
+          "start_line": 83,
+          "end_line": 88,
+          "topic": "原范围/非目标/九功能组及67项原条目",
+          "sha256": "ae4646ae02a6db7d4d65af9e06a3b949dd57cda7a1af60f78431edd0d42ff523"
+        },
+        {
+          "start_line": 90,
+          "end_line": 90,
+          "topic": "原范围/非目标/九功能组及67项原条目",
+          "sha256": "cb19802d36a2545e250f4027a4b25af734f952820dd6f97f511658d94177b83d"
+        },
+        {
+          "start_line": 92,
+          "end_line": 96,
+          "topic": "原范围/非目标/九功能组及67项原条目",
+          "sha256": "646d59a9d81752a5ef971348dbc3408a7935d776ac4e6f30f84a17abcaba36e0"
+        },
+        {
+          "start_line": 98,
+          "end_line": 98,
+          "topic": "原范围/非目标/九功能组及67项原条目",
+          "sha256": "63e3c0a7722e6a65583156de673e127f64f7107b46055e965772cb2464e21a0a"
+        },
+        {
+          "start_line": 100,
+          "end_line": 103,
+          "topic": "原范围/非目标/九功能组及67项原条目",
+          "sha256": "9d5e301a6d7d0c709c34ea6b23f1ad96829938701a2d4d0163c892abb9db441c"
+        }
+      ]
+    }
+  ]
+}

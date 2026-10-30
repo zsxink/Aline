@@ -1,0 +1,184 @@
+{
+  "scope": "只读副本/静态资源/本机 HTTP，不执行 JS，不等于主题规范或 V 验收",
+  "inventory_entries": 48,
+  "legacy_files": 45,
+  "target_hashes_checked": 46,
+  "missing_originals": [
+    "docs_bak/prototype/README.md",
+    "docs_bak/prototype/assets/aline.png",
+    "docs_bak/prototype/assets/showcase-landscape.svg",
+    "docs_bak/prototype/icons.js",
+    "docs_bak/prototype/index.html",
+    "docs_bak/prototype/interactions.js",
+    "docs_bak/prototype/light.css",
+    "docs_bak/prototype/measure.css",
+    "docs_bak/prototype/menus.css",
+    "docs_bak/prototype/menus.js",
+    "docs_bak/prototype/prototype.css",
+    "docs_bak/prototype/prototype.js",
+    "docs_bak/prototype/showcase.js",
+    "docs_bak/prototype/theme-gallery.css",
+    "docs_bak/prototype/theme-library.js",
+    "docs_bak/prototype/themes/.DS_Store",
+    "docs_bak/prototype/themes/feishu/application.json",
+    "docs_bak/prototype/themes/feishu/highlight.json",
+    "docs_bak/prototype/themes/feishu/markdown.json",
+    "docs_bak/prototype/themes/feishu/previews/dark.svg",
+    "docs_bak/prototype/themes/feishu/previews/light.svg",
+    "docs_bak/prototype/themes/feishu/previews/sepia.svg",
+    "docs_bak/prototype/themes/feishu/theme.json",
+    "docs_bak/prototype/themes/github/application.json",
+    "docs_bak/prototype/themes/github/highlight.json",
+    "docs_bak/prototype/themes/github/markdown.json",
+    "docs_bak/prototype/themes/github/previews/dark.svg",
+    "docs_bak/prototype/themes/github/previews/light.svg",
+    "docs_bak/prototype/themes/github/previews/sepia.svg",
+    "docs_bak/prototype/themes/github/theme.json",
+    "docs_bak/prototype/themes/index.json",
+    "docs_bak/prototype/themes/notion/application.json",
+    "docs_bak/prototype/themes/notion/highlight.json",
+    "docs_bak/prototype/themes/notion/markdown.json",
+    "docs_bak/prototype/themes/notion/previews/dark.svg",
+    "docs_bak/prototype/themes/notion/previews/light.svg",
+    "docs_bak/prototype/themes/notion/previews/sepia.svg",
+    "docs_bak/prototype/themes/notion/theme.json",
+    "docs_bak/prototype/themes/vue/application.json",
+    "docs_bak/prototype/themes/vue/highlight.json",
+    "docs_bak/prototype/themes/vue/markdown.json",
+    "docs_bak/prototype/themes/vue/previews/dark.svg",
+    "docs_bak/prototype/themes/vue/previews/light.svg",
+    "docs_bak/prototype/themes/vue/previews/sepia.svg",
+    "docs_bak/prototype/themes/vue/theme.json",
+    "docs_bak/prototype/tools/generate-theme-previews.py",
+    "docs_bak/docs/icons/.DS_Store",
+    "docs_bak/docs/icons/Aline.png"
+  ],
+  "static_references": [
+    {
+      "from": "docs/prototype/legacy/index.html",
+      "to": "docs/prototype/legacy/measure.css"
+    },
+    {
+      "from": "docs/prototype/legacy/index.html",
+      "to": "docs/prototype/legacy/prototype.css"
+    },
+    {
+      "from": "docs/prototype/legacy/index.html",
+      "to": "docs/prototype/legacy/light.css"
+    },
+    {
+      "from": "docs/prototype/legacy/index.html",
+      "to": "docs/prototype/legacy/menus.css"
+    },
+    {
+      "from": "docs/prototype/legacy/index.html",
+      "to": "docs/prototype/legacy/theme-gallery.css"
+    },
+    {
+      "from": "docs/prototype/legacy/index.html",
+      "to": "docs/prototype/legacy/assets/aline.png"
+    },
+    {
+      "from": "docs/prototype/legacy/index.html",
+      "to": "docs/prototype/legacy/assets/aline.png"
+    },
+    {
+      "from": "docs/prototype/legacy/index.html",
+      "to": "docs/prototype/legacy/assets/aline.png"
+    },
+    {
+      "from": "docs/prototype/legacy/index.html",
+      "to": "docs/prototype/legacy/prototype.js"
+    },
+    {
+      "from": "docs/prototype/legacy/index.html",
+      "to": "docs/prototype/legacy/icons.js"
+    },
+    {
+      "from": "docs/prototype/legacy/index.html",
+      "to": "docs/prototype/legacy/menus.js"
+    },
+    {
+      "from": "docs/prototype/legacy/index.html",
+      "to": "docs/prototype/legacy/showcase.js"
+    },
+    {
+      "from": "docs/prototype/legacy/index.html",
+      "to": "docs/prototype/legacy/interactions.js"
+    },
+    {
+      "from": "docs/prototype/legacy/index.html",
+      "to": "docs/prototype/legacy/theme-library.js"
+    },
+    {
+      "from": "docs/prototype/legacy/showcase.js",
+      "to": "docs/prototype/legacy/assets/showcase-landscape.svg"
+    }
+  ],
+  "external_hyperlinks": [
+    "https://github.com"
+  ],
+  "themes": [
+    {
+      "id": "github",
+      "schemaVersion": 3,
+      "resources": [
+        "markdown.json",
+        "application.json",
+        "highlight.json",
+        "previews/light.svg",
+        "previews/dark.svg",
+        "previews/sepia.svg"
+      ]
+    },
+    {
+      "id": "notion",
+      "schemaVersion": 3,
+      "resources": [
+        "markdown.json",
+        "application.json",
+        "highlight.json",
+        "previews/light.svg",
+        "previews/dark.svg",
+        "previews/sepia.svg"
+      ]
+    },
+    {
+      "id": "vue",
+      "schemaVersion": 3,
+      "resources": [
+        "markdown.json",
+        "application.json",
+        "highlight.json",
+        "previews/light.svg",
+        "previews/dark.svg",
+        "previews/sepia.svg"
+      ]
+    },
+    {
+      "id": "feishu",
+      "schemaVersion": 3,
+      "resources": [
+        "markdown.json",
+        "application.json",
+        "highlight.json",
+        "previews/light.svg",
+        "previews/dark.svg",
+        "previews/sepia.svg"
+      ]
+    }
+  ],
+  "http_files_checked": 45,
+  "errors": [],
+  "simulation": {
+    "hidden_directories": [
+      "docs_bak/",
+      "reports/"
+    ],
+    "method": "pathlib is_file/exists/is_dir 对被屏蔽路径返回 False；Path.open 如读取被屏蔽路径则失败；原目录未操作",
+    "masked_queries": {
+      "is_file": 48
+    },
+    "exit_code": false
+  }
+}

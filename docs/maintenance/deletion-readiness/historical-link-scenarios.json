@@ -1,0 +1,35 @@
+{
+  "A": {
+    "hidden": [
+      "docs_bak"
+    ],
+    "surviving_historical_links_to_hidden": [
+      {
+        "source": "reports/2026-10-29-v1-features-review.md",
+        "line": 3,
+        "reference": "../docs_bak/docs/v1-features.md",
+        "target": "docs_bak/docs/v1-features.md",
+        "exists": true
+      }
+    ],
+    "count": 1,
+    "classification": "冻结历史报告/旧稿的当时来源链接；非现行入口，已保全的原文与替代导航见prior-evidence/README。原链接不会因归档而变成有效链接；本表明示删除后会失效。"
+  },
+  "B": {
+    "hidden": [
+      "reports"
+    ],
+    "surviving_historical_links_to_hidden": [],
+    "count": 0,
+    "classification": "冻结历史报告/旧稿的当时来源链接；非现行入口，已保全的原文与替代导航见prior-evidence/README。原链接不会因归档而变成有效链接；本表明示删除后会失效。"
+  },
+  "C": {
+    "hidden": [
+      "docs_bak",
+      "reports"
+    ],
+    "surviving_historical_links_to_hidden": [],
+    "count": 0,
+    "classification": "冻结历史报告/旧稿的当时来源链接；非现行入口，已保全的原文与替代导航见prior-evidence/README。原链接不会因归档而变成有效链接；本表明示删除后会失效。"
+  }
+}

@@ -1,0 +1,24 @@
+[
+  {
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "/Users/xian/Project/editor/Aline/docs/maintenance/deletion-readiness/check.py"
+    ],
+    "exit_code": 0,
+    "errors": [],
+    "output": "document-check.json"
+  },
+  {
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "/Users/xian/Project/editor/Aline/docs/prototype/tools/verify-reference.py"
+    ],
+    "exit_code": 0,
+    "errors": [],
+    "output": "prototype-check.json"
+  },
+  {
+    "output": "additional-checks.json",
+    "errors": []
+  }
+]

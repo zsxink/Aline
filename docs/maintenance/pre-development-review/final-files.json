@@ -1,0 +1,89 @@
+{
+  "date": "2026-10-30",
+  "timezone": "Asia/Shanghai",
+  "audit_files": [
+    {
+      "path": "docs/maintenance/pre-development-review/README.md",
+      "bytes": 1983,
+      "sha256": "c187ddbbf6586abcf026cab6fa279401efdf25f4928650e4c45f34d83b10e0f3"
+    },
+    {
+      "path": "docs/maintenance/pre-development-review/additional-checks.json",
+      "bytes": 3963,
+      "sha256": "52cf161cc9316d2ad91cb7a9f3dff75dcf8d4ed35c63073a2fec7272d6cd3dff"
+    },
+    {
+      "path": "docs/maintenance/pre-development-review/baseline-files.json",
+      "bytes": 31414,
+      "sha256": "b44b9a890d9bb625e321b45336f0a0d87c6f220881eaf3abbb0d2f25216bbe50"
+    },
+    {
+      "path": "docs/maintenance/pre-development-review/changes.json",
+      "bytes": 8907,
+      "sha256": "4fc1ab7b389cbd626fb71d711f252ccab794891694379c22cce0b76c23fec228"
+    },
+    {
+      "path": "docs/maintenance/pre-development-review/check-summary.json",
+      "bytes": 574,
+      "sha256": "9120348584eaf239daa8cc945f51c59f50edaf759bf12f54987e65ba3d0c8c63"
+    },
+    {
+      "path": "docs/maintenance/pre-development-review/coverage.md",
+      "bytes": 6464,
+      "sha256": "a62155e59c6fc50a5641385f6f14e3d754f99c60fdd82cd831157c45aa1abb66"
+    },
+    {
+      "path": "docs/maintenance/pre-development-review/document-check.json",
+      "bytes": 235193,
+      "sha256": "ad8642ecba929b8736c224e48cc96bf219fd3ecfc2015928546a8c3890075066"
+    },
+    {
+      "path": "docs/maintenance/pre-development-review/external-links.json",
+      "bytes": 3351,
+      "sha256": "a83e69a8eb33f9f53a4d58c520d78a3abf3ce5fab869d8290bcb73c2e4705c39"
+    },
+    {
+      "path": "docs/maintenance/pre-development-review/initial-document-check.json",
+      "bytes": 227062,
+      "sha256": "5fa594d187448a76eba0319448628f71536ee3120cfa752d0acee0c22a4c4a35"
+    },
+    {
+      "path": "docs/maintenance/pre-development-review/initial-git-status.txt",
+      "bytes": 2515,
+      "sha256": "9c2f835aaac1e8e62158f993805e0473ec18071e7b29c6affbb6d161859af6a3"
+    },
+    {
+      "path": "docs/maintenance/pre-development-review/m0-task-order.md",
+      "bytes": 11456,
+      "sha256": "bb122ab087761beaf70b73f4c017bc9c40385162b067fb70f44e9fd2ebdf0587"
+    },
+    {
+      "path": "docs/maintenance/pre-development-review/prototype-check.json",
+      "bytes": 5464,
+      "sha256": "65b231aaa6f42f6b26d5672ec2b737f1da2b2c75b665b62aeddbd6c8906b9a3b"
+    },
+    {
+      "path": "docs/maintenance/pre-development-review/report.md",
+      "bytes": 17209,
+      "sha256": "74050624ddae40a3ebf885eabc5b06cba9e855fd0b806444bfc8fbd60394a237"
+    },
+    {
+      "path": "docs/maintenance/pre-development-review/requirement-trace.csv",
+      "bytes": 25045,
+      "sha256": "bf9827ebb1ed24a3a91133caea862bdad387b53d1b255c3c3d250e4a499b0965"
+    },
+    {
+      "path": "docs/maintenance/pre-development-review/run-checks.py",
+      "bytes": 5633,
+      "sha256": "66aad1e04cd23ae65f5edff138cef9a4ccf38d8a68f8f68de0a415579f9a00bd"
+    },
+    {
+      "path": "docs/maintenance/pre-development-review/traceability.md",
+      "bytes": 7829,
+      "sha256": "be4e9f30192ee73f4d0ec83da0c2e492048c5237dd410d5ebfd6e92844a2f6d5"
+    }
+  ],
+  "existing_documents_changed_by_review": 10,
+  "parallel_asset_changes": 19,
+  "application_implementation_started": false
+}

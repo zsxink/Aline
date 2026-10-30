@@ -1,0 +1,183 @@
+{
+  "modified_existing": [
+    {
+      "path": "docs/README.md",
+      "before_sha256": "6accbe3f61dd55ebf143194a4f6380a778a84fb41278ec457afb309baf6d1dce",
+      "after_sha256": "fe72afa4f58b0651bc8f38aeecb34ff96032c311421eeade3301e41f821cb5df",
+      "owner": "本审计必要文档修订"
+    },
+    {
+      "path": "docs/architecture-guide.md",
+      "before_sha256": "4e3d34d065fa56a85473d73f965598c4c131a69a89a20751d637b45ff7b04ffb",
+      "after_sha256": "62219415d02f74578a69dffcd64254e13fff9900ff794cd6ceaf528fcc66272f",
+      "owner": "本审计必要文档修订"
+    },
+    {
+      "path": "docs/assets/README.md",
+      "before_sha256": "11e2e7bd2a30dbebdfa64ccfca174f2e9ee2bf13574379d77307870aee9b087f",
+      "after_sha256": "33ca665c4926727162b6cfe532c6e708944b7e787f432083bdbcffd057454bf6",
+      "owner": "外部并行变更；本审计保留"
+    },
+    {
+      "path": "docs/assets/app-icon/README.md",
+      "before_sha256": "f99e133729b5aecdd055575a9124008f3d1609738b8fc36fa13c25e2f8473f88",
+      "after_sha256": "6c2b777f3deb75ce7f1f3e757512083308e5d470a446ef5d86843a6944c5ae6f",
+      "owner": "外部并行变更；本审计保留"
+    },
+    {
+      "path": "docs/assets/app-icon/aline-cutout.png",
+      "before_sha256": "e514c471d5ac786ced8c27aa1f99120b259f44da7e0154857608638a49f241be",
+      "after_sha256": "98f985fa444d7cca6f163d4ef9fcecf262be5426c8452050e67f5a2f5f7f4e27",
+      "owner": "外部并行变更；本审计保留"
+    },
+    {
+      "path": "docs/assets/app-icon/aline-macos.png",
+      "before_sha256": "08bc0d2114e0a8d2bf71256e7de37d99a61e128ebefba789e9ceb20155ced58a",
+      "after_sha256": "e220e3d020504390ea1f7ac548f1997fe896233ce9f36954c40a3ab9242d2e2d",
+      "owner": "外部并行变更；本审计保留"
+    },
+    {
+      "path": "docs/assets/app-icon/aline-windows.png",
+      "before_sha256": "fef8a5d7864ea81496bcc48a9bcbf0f581ddc97158dcff900e3736177f6b8472",
+      "after_sha256": "7ee208457e969cae336008e1b90a51dfbd5de8c6b58240475946145e788f1b50",
+      "owner": "外部并行变更；本审计保留"
+    },
+    {
+      "path": "docs/assets/app-icon/aline.icns",
+      "before_sha256": "2409f59bef0ef13fcf5fbb2bc789c127fe984196f59aad107b6fec26b2becd81",
+      "after_sha256": "d51bf2a842cd146f86aa8bf2e1d279af1b59d4b0b6ff1691f2a436411775bdcc",
+      "owner": "外部并行变更；本审计保留"
+    },
+    {
+      "path": "docs/assets/app-icon/aline.ico",
+      "before_sha256": "d41a2c8426a1e73b97f106b3eaacd2ee2710edf14861ac643b61fb1a3b0425d6",
+      "after_sha256": "7743ec4afb192f701e4dba8f8f9092933924ee504caec55f4397db62eca8ace2",
+      "owner": "外部并行变更；本审计保留"
+    },
+    {
+      "path": "docs/assets/app-icon/aline.iconset/icon_128x128.png",
+      "before_sha256": "57d9c1a089970642ac35765233f7960c581bca22296f10f7378473be4f298322",
+      "after_sha256": "2836e9793a2418fb250c6d129d237401d2763cec2f08c9a5c36bdb315873265d",
+      "owner": "外部并行变更；本审计保留"
+    },
+    {
+      "path": "docs/assets/app-icon/aline.iconset/icon_128x128@2x.png",
+      "before_sha256": "cf2fb3994e5aad0b9edcac23065a71fe8e5ebd880d7603cf785851bc5ff7b49b",
+      "after_sha256": "46a777eafce31519c9a0cda89720b18c082900ef000873a3e98cb3effa540d99",
+      "owner": "外部并行变更；本审计保留"
+    },
+    {
+      "path": "docs/assets/app-icon/aline.iconset/icon_16x16.png",
+      "before_sha256": "2c9360c0322d8f0705a282b653daf50368741aabc56e81e250965f4450434389",
+      "after_sha256": "d0c7dd64998c904a652e497f494dd4ae15fc8e39a149b65233ba134f45556005",
+      "owner": "外部并行变更；本审计保留"
+    },
+    {
+      "path": "docs/assets/app-icon/aline.iconset/icon_16x16@2x.png",
+      "before_sha256": "97b322c359268315b01b0b64f88831eb6dbb991a262c343a0480660813d154dd",
+      "after_sha256": "b444c74d45642ac7d24c3d527b026fda338cf1961714b121534c302fdf579226",
+      "owner": "外部并行变更；本审计保留"
+    },
+    {
+      "path": "docs/assets/app-icon/aline.iconset/icon_256x256.png",
+      "before_sha256": "cf2fb3994e5aad0b9edcac23065a71fe8e5ebd880d7603cf785851bc5ff7b49b",
+      "after_sha256": "46a777eafce31519c9a0cda89720b18c082900ef000873a3e98cb3effa540d99",
+      "owner": "外部并行变更；本审计保留"
+    },
+    {
+      "path": "docs/assets/app-icon/aline.iconset/icon_256x256@2x.png",
+      "before_sha256": "7e5d57ebb0f28ab0c6afa5599f950591424fe30fb58dfac80d31398f12c0b821",
+      "after_sha256": "13bc05bebe7ca01849e3a8a3e5622681253fa3a6052eb03d9ecfa41e6215dc26",
+      "owner": "外部并行变更；本审计保留"
+    },
+    {
+      "path": "docs/assets/app-icon/aline.iconset/icon_32x32.png",
+      "before_sha256": "97b322c359268315b01b0b64f88831eb6dbb991a262c343a0480660813d154dd",
+      "after_sha256": "b444c74d45642ac7d24c3d527b026fda338cf1961714b121534c302fdf579226",
+      "owner": "外部并行变更；本审计保留"
+    },
+    {
+      "path": "docs/assets/app-icon/aline.iconset/icon_32x32@2x.png",
+      "before_sha256": "e5220bfa8a79385e6fc124eefdc5b5788165853fc22f022bd5c892aced9f7db4",
+      "after_sha256": "873c1feedd863422f038ab305716edcb0f9bc9deccc488ea4d221bc2eb377af3",
+      "owner": "外部并行变更；本审计保留"
+    },
+    {
+      "path": "docs/assets/app-icon/aline.iconset/icon_512x512.png",
+      "before_sha256": "7e5d57ebb0f28ab0c6afa5599f950591424fe30fb58dfac80d31398f12c0b821",
+      "after_sha256": "13bc05bebe7ca01849e3a8a3e5622681253fa3a6052eb03d9ecfa41e6215dc26",
+      "owner": "外部并行变更；本审计保留"
+    },
+    {
+      "path": "docs/assets/app-icon/aline.iconset/icon_512x512@2x.png",
+      "before_sha256": "08bc0d2114e0a8d2bf71256e7de37d99a61e128ebefba789e9ceb20155ced58a",
+      "after_sha256": "e220e3d020504390ea1f7ac548f1997fe896233ce9f36954c40a3ab9242d2e2d",
+      "owner": "外部并行变更；本审计保留"
+    },
+    {
+      "path": "docs/assets/app-icon/aline.png",
+      "before_sha256": "03a175ff37c48c8658eb6a2944f5c3797c2798e5663560f0e08bfea188c20207",
+      "after_sha256": "fed6b07ef4e94d48d14cb70a19b91d2f17c1650834d7dbf620ada94ca6cbfd37",
+      "owner": "外部并行变更；本审计保留"
+    },
+    {
+      "path": "docs/assets/app-icon/preview.png",
+      "before_sha256": "d94ed2a961c1d1f821289e9cf7c3389494e1e4d815c39f15961fb683281d8dca",
+      "after_sha256": "3625476a4e7abbbd7dd2f4167149e39309937912c8df9bae761832b3a2894544",
+      "owner": "外部并行变更；本审计保留"
+    },
+    {
+      "path": "docs/engine-design.md",
+      "before_sha256": "698536c27f1b343ee0ee7740cb105fd59fc9a1487baca84af36a7bce38c84881",
+      "after_sha256": "af10fd78bdaf239a6bac31ab7064d93d4e071b616fd75afc6b3fb954012ec697",
+      "owner": "本审计必要文档修订"
+    },
+    {
+      "path": "docs/plugin-system.md",
+      "before_sha256": "5098bcb83a71877c668f8b8e4693b43d0b996ed0f3e5d41200b366994a33124c",
+      "after_sha256": "e81558d7d906df62bdc75ca0fad2ba28221d3eea2c93b2ea8fc3e941b2883456",
+      "owner": "本审计必要文档修订"
+    },
+    {
+      "path": "docs/prototype/README.md",
+      "before_sha256": "9acb5ba4d03ca5c166482384539aeeca8bc5c7719c0e4aa17e3cb94fbb1c68a5",
+      "after_sha256": "c5ae35c57310715576d77b65d95139635772fc3f25cc84ff8ab6df1ac2d09f84",
+      "owner": "本审计必要文档修订"
+    },
+    {
+      "path": "docs/rust-style-guide.md",
+      "before_sha256": "c7ea691621867183e4a95ad2c611c54924d03268efa236003a06f1cfaa4b7fff",
+      "after_sha256": "f4bf498ff4a68f98cc235699249bd74d32f39b4d08554c337223449509d661a2",
+      "owner": "本审计必要文档修订"
+    },
+    {
+      "path": "docs/theme-package-spec.md",
+      "before_sha256": "8bc321747fd000ffeb14f81d1ca5d8420aabe65d08b4d5a57e6ecfe52857292d",
+      "after_sha256": "31f425320cf5c839f473766c81c1ea8669e6a436a13e145322aab222350b65b0",
+      "owner": "本审计必要文档修订"
+    },
+    {
+      "path": "docs/ui-spec.md",
+      "before_sha256": "544e95a331d640f382c29fbc7068ea856032202b8bcd2677fe51afad4fb3d79b",
+      "after_sha256": "a7ba52363aa4b46668eaee18546772d62e80a0af37c0e27eb79345647081e562",
+      "owner": "本审计必要文档修订"
+    },
+    {
+      "path": "docs/v1-architecture.md",
+      "before_sha256": "b8f10c6d1566ac7cf0a6aa59f4568e859737019a97ac4f163a0270f41b03acae",
+      "after_sha256": "812d35a79c668122c75ac978f757015626cd08a7b64fe6ef7f6a4d8b2f270553",
+      "owner": "本审计必要文档修订"
+    },
+    {
+      "path": "docs/v1-validation-plan.md",
+      "before_sha256": "6b9032dc52a5921d97095191ca91604ed2375b77d7750735790595e36b0a557c",
+      "after_sha256": "363c28989618d03d49ea2509445e6e7745822e8d9f17bf49066f54b23198de22",
+      "owner": "本审计必要文档修订"
+    }
+  ],
+  "externally_added_asset_files": [],
+  "audit_output_directory": "docs/maintenance/pre-development-review",
+  "application_files_created": [],
+  "existing_confirmations_modified": false,
+  "deleted_directories_restored": false
+}

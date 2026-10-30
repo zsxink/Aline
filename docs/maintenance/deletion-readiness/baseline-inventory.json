@@ -1,0 +1,2163 @@
+{
+  "date": "2026-10-30",
+  "excluded": [
+    ".git/**",
+    "docs/maintenance/deletion-readiness/** (本轮新产物，不属于起始快照)"
+  ],
+  "entries": [
+    {
+      "path": ".DS_Store",
+      "kind": "file",
+      "bytes": 6148,
+      "mode": "0o644",
+      "system_metadata": true,
+      "sha256": "e4e97f6b59373874b78c4020c67975c7007a7fa9eca909249a05ec0a9c863db7",
+      "type": "(none)",
+      "ignored": true
+    },
+    {
+      "path": ".gitignore",
+      "kind": "file",
+      "bytes": 199,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "2bc9c20a68636bdd88109c102bb9a48b9ca80d2e5a1123448917f8b5aada43a7",
+      "type": "(none)",
+      "ignored": false
+    },
+    {
+      "path": ".impeccable",
+      "kind": "directory",
+      "bytes": 128,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": true
+    },
+    {
+      "path": ".impeccable/config.json",
+      "kind": "file",
+      "bytes": 1160,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "db3752b770dd27ec889f7abd8d16780446b5ac8a9b52293747464af5790dff27",
+      "type": ".json",
+      "ignored": true
+    },
+    {
+      "path": ".impeccable/hook.cache.json",
+      "kind": "file",
+      "bytes": 1182,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "53fb092042cf39302f4c073ea49805d21d0f3ee907ccdb56449175cfc8bc9fb5",
+      "type": ".json",
+      "ignored": true
+    },
+    {
+      "path": "AGENTS.md",
+      "kind": "file",
+      "bytes": 9663,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "b192ac83a985b86a9f8adc78384974f30adc3640250ed3d76bc2ea72940fc2d4",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "CLAUDE.md",
+      "kind": "file",
+      "bytes": 332,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "36224bc0c814d320c44de916e661ca66dc52f6f31265e98da8a20c7cd9c00c35",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs",
+      "kind": "directory",
+      "bytes": 608,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs/README.md",
+      "kind": "file",
+      "bytes": 15167,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "e876126782a81cb445939f3decd3a84c315da49e6205907b3c4c2100c4dc991d",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/architecture-guide.md",
+      "kind": "file",
+      "bytes": 72424,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "ee86f392c449a166913d34e5eba304390bc2a44cc375f765130fab3545d9e765",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/archive",
+      "kind": "directory",
+      "bytes": 352,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs/archive/2026-10-28-v1-open-questions.md",
+      "kind": "file",
+      "bytes": 20562,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "ad941cbfb654b5a8f5af7fdc8ddb6ab718b25f0b011cdd21d8d550004506ae09",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/archive/2026-10-29-plugin-decisions.md",
+      "kind": "file",
+      "bytes": 7932,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "b1a92f055999e1db3a6a1fafd6cc66f3d24ddcfcf0656dc7c6c3f94a4b0d8a04",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/archive/2026-10-29-plugin-extensibility.md",
+      "kind": "file",
+      "bytes": 1999,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "26d3c78108297a8afb15f42849b18f6b523bec5b1f02ff9594a9b428073262a1",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/archive/2026-10-29-rust-style-decisions.md",
+      "kind": "file",
+      "bytes": 16488,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "47c733f92656cf4401f92d9e86cb61fb8e6602b1f29ba5be95f6ee09e28d0470",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/archive/2026-10-29-theme-decisions.md",
+      "kind": "file",
+      "bytes": 17497,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "a50414fff7eebdd39dcbaf65ed9fefc113b7afe163a096e197683cb5c11ddd9b",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/archive/2026-10-29-ui-decisions.md",
+      "kind": "file",
+      "bytes": 14631,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "a833ebcd3cfd3b3abafd8739a0675c039b485177b87818404cb1deaaea628026",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/archive/2026-10-29-v1-architecture-decisions.md",
+      "kind": "file",
+      "bytes": 9273,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "3dded4002d19bed7894d623fab0b65aab862a6a42b2b11bec252c66f9ce579c1",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/archive/2026-10-30-migration-decisions.md",
+      "kind": "file",
+      "bytes": 20111,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "9ec31e878ffe26625b1f6e163395cf5488ab586a15410128929e6f42c7068d3d",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/archive/migration-evidence",
+      "kind": "directory",
+      "bytes": 480,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs/archive/migration-evidence/README.md",
+      "kind": "file",
+      "bytes": 5423,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "59f52f6f501ddd61283444e1652660f159753e902b795a4fa7bbeee7b960d20a",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/archive/migration-evidence/architecture-guide.md",
+      "kind": "file",
+      "bytes": 20404,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "03ca492045092cb19b32b94b88b986cb35a90fdbae57189ae06d4288fd3686f9",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/archive/migration-evidence/decisions.md",
+      "kind": "file",
+      "bytes": 2871,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "d4fe07b7cafde5e0fae4cc79a19fedf42a2e258e523f791717267bd633e6ca00",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/archive/migration-evidence/engine-design.md",
+      "kind": "file",
+      "bytes": 56830,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "1dfd08f27b9f48bcffaf26a9ff9438ce5c468c83fb9aff9f30937fcdb6b59a98",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/archive/migration-evidence/index.json",
+      "kind": "file",
+      "bytes": 15581,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "127ba917f8936292ce3136336e7cdbfc8eec8ff6cc964fea117c64c98c8ded1a",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs/archive/migration-evidence/plugin-system.md",
+      "kind": "file",
+      "bytes": 9678,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "dc96ecb2074d5051f2023625f9ae8f4564da3ddb7f981c1321bcfddc450d707a",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/archive/migration-evidence/rust-style-guide.md",
+      "kind": "file",
+      "bytes": 14749,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "e9923bda98f37741e03862d961d7693e45258440b6763dc5f779e28a43588539",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/archive/migration-evidence/theme-package-spec.md",
+      "kind": "file",
+      "bytes": 18336,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "eec9956da8be22f5353daf68acd2bc1b64c9a1364e86bf9977987d6f1dcc1541",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/archive/migration-evidence/ui-spec.md",
+      "kind": "file",
+      "bytes": 17662,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "f3fcbf830572ffa68bd2d48332edf3edd033bc67d0c185a666844178d97167e2",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/archive/migration-evidence/v1-architecture.md",
+      "kind": "file",
+      "bytes": 12131,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "ae85a0aadf18d1bd0a7a6809d367f7eba7c8bd2503cd305d9bed7eacbf00f759",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/archive/migration-evidence/v1-features.md",
+      "kind": "file",
+      "bytes": 13634,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "31ee06890a87108f80c97c299c02f1da74fb84600808ff9926af660ec657c6a0",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/archive/migration-evidence/wordcraft-study.md",
+      "kind": "file",
+      "bytes": 38137,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "ec9a8b5c937e55fb982c1975c777a263c9342a8f12f5987ffb0abf82cdd8db63",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/archive/migration-evidence/zed-notes.md",
+      "kind": "file",
+      "bytes": 27019,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "63153eb9adb3444a7398856ae3eee2d420aea12bdcdcc8b4982570453116b634",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/assets",
+      "kind": "directory",
+      "bytes": 224,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs/assets/README.md",
+      "kind": "file",
+      "bytes": 1124,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "11e2e7bd2a30dbebdfa64ccfca174f2e9ee2bf13574379d77307870aee9b087f",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/assets/aline.png",
+      "kind": "file",
+      "bytes": 235494,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "252fe12bbaa6af7c6738cbc089ad9c8c27e6e4beb97ed760aea9732a6f838317",
+      "type": ".png",
+      "ignored": false
+    },
+    {
+      "path": "docs/assets/provenance.md",
+      "kind": "file",
+      "bytes": 2775,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "5f44226252f5bf746c1ee5e6f2d558d3d6ead31ed877e945eb37627ea820abc7",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/assets/v1-architecture.svg",
+      "kind": "file",
+      "bytes": 30655,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "c6ae88e7f20e41438e89e61ef4d1c4580a230a230fe33faa2ef255077f07d34e",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs/assets/v1-modules.svg",
+      "kind": "file",
+      "bytes": 44875,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "2ed937f02a85b94c270fefdf378252180e5a61c7b2edc244b947392d4af9d94d",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs/decisions.md",
+      "kind": "file",
+      "bytes": 65058,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "bb94b641332022a388071fa4d600ee63ae4c597b81984f82eec95908d92809a1",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/engine-design.md",
+      "kind": "file",
+      "bytes": 83956,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "3ccc442064cd0912e20ea047cc5d907f44ea18845297397e035798710ec3ca42",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/maintenance",
+      "kind": "directory",
+      "bytes": 96,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs/plugin-system.md",
+      "kind": "file",
+      "bytes": 57215,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "f500b2c07b1f1c8f97e489bef4a1a24a97029e6a17c5c5d6c87c6ecdd4cd189c",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype",
+      "kind": "directory",
+      "bytes": 384,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/.DS_Store",
+      "kind": "file",
+      "bytes": 6148,
+      "mode": "0o644",
+      "system_metadata": true,
+      "sha256": "985e0568fbc2218c2e240ca88398620eea60d3d7e59f675cc3fb975a1db19dff",
+      "type": "(none)",
+      "ignored": true
+    },
+    {
+      "path": "docs/prototype/README.md",
+      "kind": "file",
+      "bytes": 5143,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "9acb5ba4d03ca5c166482384539aeeca8bc5c7719c0e4aa17e3cb94fbb1c68a5",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/backup-references.tsv",
+      "kind": "file",
+      "bytes": 35191,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "fa97735311e323d765e154439ef9fb11d77e55b71ddc1f94082471db07c3cb4d",
+      "type": ".tsv",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/inventory.json",
+      "kind": "file",
+      "bytes": 16955,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "851c31a3d390999781c679b9992bf008a3820253705e9f3bb863751b26ea3f3f",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/inventory.md",
+      "kind": "file",
+      "bytes": 19645,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "e35058abbdcf250e9c084250c70056fbbdd007d03b9af9c7c7762125dc88ba0a",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy",
+      "kind": "directory",
+      "bytes": 576,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/README.md",
+      "kind": "file",
+      "bytes": 2514,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "3ab54f587781594277de597210669f7dfb187210377812075bae6612fff5237d",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/assets",
+      "kind": "directory",
+      "bytes": 128,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/assets/aline.png",
+      "kind": "file",
+      "bytes": 235494,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "252fe12bbaa6af7c6738cbc089ad9c8c27e6e4beb97ed760aea9732a6f838317",
+      "type": ".png",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/assets/showcase-landscape.svg",
+      "kind": "file",
+      "bytes": 488,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "3904cf1b8a8cbd224520ce3a28bb81f1c86e3452825c03c8521a59b661193179",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/icons.js",
+      "kind": "file",
+      "bytes": 3623,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "f592ef2e556f382be48672f2bb43e6861a5b70bd0bb7eedf29019268155644ea",
+      "type": ".js",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/index.html",
+      "kind": "file",
+      "bytes": 14801,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "56e23befc02c5520151bd763e80de0531ef3bbc26dd6f6bc683b1b79bef20234",
+      "type": ".html",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/interactions.js",
+      "kind": "file",
+      "bytes": 36149,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "60afb32f169344d5bd5adc80e6763b5bd969d3aa75632e67ed828bf9fcecdd29",
+      "type": ".js",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/light.css",
+      "kind": "file",
+      "bytes": 33055,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "7017b7103e1853c0318eb2c3bd1f13b625408f88f6bc635fcd237df6efc7fa26",
+      "type": ".css",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/measure.css",
+      "kind": "file",
+      "bytes": 1121,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "cc0ba1e4da554d44e1a1a753512a1e52e78c7901debdc5c44d97c948b2a826a4",
+      "type": ".css",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/menus.css",
+      "kind": "file",
+      "bytes": 5472,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "6999beccf63997fec665d8bc2d76b68b0f5f618f4c147c79a79dcd65dce5ce3b",
+      "type": ".css",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/menus.js",
+      "kind": "file",
+      "bytes": 16798,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "4bb285c15a492a45417e405084bad2b854b2cc03d756baaaa7eb6ce5da6bcb2a",
+      "type": ".js",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/prototype.css",
+      "kind": "file",
+      "bytes": 25461,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "70a298f836ec4bdf051f8cf80ca46d9f6407c7daab8e269f08dc205205c6c403",
+      "type": ".css",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/prototype.js",
+      "kind": "file",
+      "bytes": 29183,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "ceacef60d03c13d21ae7012972d1430004fb30aa7a0118c8406b8a8c507d03d6",
+      "type": ".js",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/showcase.js",
+      "kind": "file",
+      "bytes": 18272,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "b42d5313031390263e981195ea8ef9ed0d41b04906d8d685f474be54e21f33b6",
+      "type": ".js",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/theme-gallery.css",
+      "kind": "file",
+      "bytes": 13668,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "3f2fd8991c2352a6ca415fd25ccd21657626c6adc485a11d69582f9b17fe9aec",
+      "type": ".css",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/theme-library.js",
+      "kind": "file",
+      "bytes": 46833,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "46cce9de96f19a9ddd5f6c85dc8e3c06218ab01a9e728b8365610ea4f44cccc4",
+      "type": ".js",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes",
+      "kind": "directory",
+      "bytes": 224,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/feishu",
+      "kind": "directory",
+      "bytes": 224,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/feishu/application.json",
+      "kind": "file",
+      "bytes": 4403,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "79358bd753347b32c45799239650cf37504d2373dbdc59895aaef0c1fefbd262",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/feishu/highlight.json",
+      "kind": "file",
+      "bytes": 2033,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "d929fad55853861b9d6ca5bb9ac65c0c8ab06464403f668f09e63c19d8295c1c",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/feishu/markdown.json",
+      "kind": "file",
+      "bytes": 10114,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "424507777ba754b9b2d31576d00a8a35bf9413398b1b380ba77881f79a7055ab",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/feishu/previews",
+      "kind": "directory",
+      "bytes": 160,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/feishu/previews/dark.svg",
+      "kind": "file",
+      "bytes": 6080,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "4a14a22a81b3adfb43526c5b806c1cf3ddb52c24cee2446bce9d8fcce65554e7",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/feishu/previews/light.svg",
+      "kind": "file",
+      "bytes": 6081,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "e72a826f8eda1291d4fff14dbd5859a4d6cbbaf58fe8ab60455bb78aad013cb9",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/feishu/previews/sepia.svg",
+      "kind": "file",
+      "bytes": 6081,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "ef93e01c26cc17b5380e8bc5606436bc7fd93c25aeee93ec14de019b7b188dc9",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/feishu/theme.json",
+      "kind": "file",
+      "bytes": 377,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "e514b91fdb7687994026b3cbbb57fb2ab531aad87f7f84c62225a288f103aa13",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/github",
+      "kind": "directory",
+      "bytes": 224,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/github/application.json",
+      "kind": "file",
+      "bytes": 4403,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "ae3cf7f75ba7fd0ee399c01ec50e39408024aab68442bca7d387d81cfc35fc1d",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/github/highlight.json",
+      "kind": "file",
+      "bytes": 2033,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "51603798cd046f5fb247ffb26d59652327f60debf7054a003388fbf5f70bbc07",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/github/markdown.json",
+      "kind": "file",
+      "bytes": 10114,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "76fd0fda0d2c29e4f7f12ce6d563f2636fa1fa3d8be058cc3fd59a3ece30fa7b",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/github/previews",
+      "kind": "directory",
+      "bytes": 160,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/github/previews/dark.svg",
+      "kind": "file",
+      "bytes": 6080,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "e92932ed23667249ae1498cd78e6c2faa8d1acfb93c7cae35754d750fa14dca8",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/github/previews/light.svg",
+      "kind": "file",
+      "bytes": 6081,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "ef666c5db6ce1a7a6ef92c3914467d63de6b0c453eab362247a70e07fa95fa1e",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/github/previews/sepia.svg",
+      "kind": "file",
+      "bytes": 6081,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "4399c3a0b79b7b0413045c80c788b8a97de030e0f8c17e5bb787fa6adf150d5d",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/github/theme.json",
+      "kind": "file",
+      "bytes": 377,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "14dc851ff6560e520ca4e18d3568249cc995680883d23b4b206cfc6dd79c978e",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/index.json",
+      "kind": "file",
+      "bytes": 329,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "9584c70f0cf857d62895a730fec8fea4b184dbf558a6217134a3ba0c905dbbea",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/notion",
+      "kind": "directory",
+      "bytes": 224,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/notion/application.json",
+      "kind": "file",
+      "bytes": 4403,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "3dda422830d83b05e50193ca32836c8f41ba116d06e807cf2433a1871313d28d",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/notion/highlight.json",
+      "kind": "file",
+      "bytes": 2033,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "37dc5364a969ab2e66e456bc0f44cb01c44d02e3cbf070c4045dac1a9e4ac94c",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/notion/markdown.json",
+      "kind": "file",
+      "bytes": 10114,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "8b509e148760f04d0d0cbeae9daaa3c5162c3503aee62c077a7dad1cb9684652",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/notion/previews",
+      "kind": "directory",
+      "bytes": 160,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/notion/previews/dark.svg",
+      "kind": "file",
+      "bytes": 5292,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "e85973dda35535d7b6fa489a719283a88dd5387e6e5dd8c4786584198c6cdaf3",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/notion/previews/light.svg",
+      "kind": "file",
+      "bytes": 5293,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "744417dc559b067519c6a4260d003dc878a3c6b5370f60a059931827382bd918",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/notion/previews/sepia.svg",
+      "kind": "file",
+      "bytes": 5293,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "61d3eb2d1082291f5f6740b151974fdff4ed6b91dd48c0407933b94a65dad036",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/notion/theme.json",
+      "kind": "file",
+      "bytes": 377,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "48845f18652635e4ad8dc7e4b8b3f7db902930d785cdb3f7e36aaf910fe4b2ce",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/vue",
+      "kind": "directory",
+      "bytes": 224,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/vue/application.json",
+      "kind": "file",
+      "bytes": 4403,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "02ba59d6c5d91b1a7990647065d1a716fdeabb68cb12717ee775c9d21872c8c8",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/vue/highlight.json",
+      "kind": "file",
+      "bytes": 2033,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "103ec3a79519e984ce8d5097aaba341ff60686006e82691d336b7b9a936edef1",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/vue/markdown.json",
+      "kind": "file",
+      "bytes": 10114,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "2743d6a18545c804c674421b37a58a85599851388be47f686c603fd512618393",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/vue/previews",
+      "kind": "directory",
+      "bytes": 160,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/vue/previews/dark.svg",
+      "kind": "file",
+      "bytes": 6069,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "eafe6ecab60b2283e821840b8bcf9d5b251693315d0f6bcb4fbdb3182051a9ff",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/vue/previews/light.svg",
+      "kind": "file",
+      "bytes": 6070,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "5c1f4b77202530f300f450deb2179de7970541517af118f45acb57e831715384",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/vue/previews/sepia.svg",
+      "kind": "file",
+      "bytes": 6070,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "cb9895afc2f9238e518eb22b46183a3545f43d6e8ca68e1ab113f5e1a0816877",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/themes/vue/theme.json",
+      "kind": "file",
+      "bytes": 371,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "c3ec23fbc6da84ea082e6990b761cd56442bf82fc7879e7fc05cb8006afd7253",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/tools",
+      "kind": "directory",
+      "bytes": 96,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/legacy/tools/generate-theme-previews.py",
+      "kind": "file",
+      "bytes": 9957,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "91b1a6581e33953a46db0214035c8ad0ff20cf06cc089fd1ff645a208704e0be",
+      "type": ".py",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/open-questions.md",
+      "kind": "file",
+      "bytes": 3222,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "ebdd3a04ca53765e30bca5dbab4d4d757da7402f3bf8dad0c24bc77f04777b01",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/reference-check.json",
+      "kind": "file",
+      "bytes": 3093,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "41322e49c2ccc5b865a223eed69445448b51902b3ee70e1b41e9ff6b0e035934",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/review.md",
+      "kind": "file",
+      "bytes": 25096,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "30113891e5c4722b84e17c378dfe48611c73eb86a0169d3079fce73eafb033f3",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/tools",
+      "kind": "directory",
+      "bytes": 96,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs/prototype/tools/verify-reference.py",
+      "kind": "file",
+      "bytes": 4948,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "a0f3281ee2d8490d963e6f18e406611f8757b226da153d049a1f77e518ddb666",
+      "type": ".py",
+      "ignored": false
+    },
+    {
+      "path": "docs/rust-style-guide.md",
+      "kind": "file",
+      "bytes": 65167,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "c39e9395a033f30a2a636480948168af8b1298dcf0c13d955d78d4c772a3d026",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/theme-package-spec.md",
+      "kind": "file",
+      "bytes": 71697,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "2a49d024b480ca0abd9553e211b085c3b5965f1f7e8bbdc0fa38925943bebda2",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/ui-spec.md",
+      "kind": "file",
+      "bytes": 80664,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "2dce1150491aa4f60c770e258ec78515635c11137e4a522e3cd2732a18f0a151",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/v1-architecture.md",
+      "kind": "file",
+      "bytes": 102957,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "93d26777b1795fbc9aaafc5c07219068d57a09afb3f0fa14b15af31dad2f05e6",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/v1-prd.md",
+      "kind": "file",
+      "bytes": 56653,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "376552261e386c31b14986054e030cc80efd1091c24229ee318b01bf70b63113",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/v1-validation-plan.md",
+      "kind": "file",
+      "bytes": 17487,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "c614c3680f3da5eec77a840a31fe7bb48ad312fc0bf15d365cc32b15c2d5785c",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/wordcraft-study.md",
+      "kind": "file",
+      "bytes": 40176,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "b7e17ad46af7506bcb34a73893477c3915f4075da68090b8b011f3eafe49ea0f",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs/zed-notes.md",
+      "kind": "file",
+      "bytes": 9681,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "63f1b140005c3a920d8d9f0aa8d5012db508f8592db4383cd253cb4575d34652",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak",
+      "kind": "directory",
+      "bytes": 128,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/docs",
+      "kind": "directory",
+      "bytes": 480,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/docs/.DS_Store",
+      "kind": "file",
+      "bytes": 6148,
+      "mode": "0o644",
+      "system_metadata": true,
+      "sha256": "7fed985fd8c3cfe15e518b58176c213ae39cca2fb329bddcc1c9c7bc9201dd50",
+      "type": "(none)",
+      "ignored": true
+    },
+    {
+      "path": "docs_bak/docs/architecture-guide.md",
+      "kind": "file",
+      "bytes": 42050,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "21b33172947617380ae639ea374b15561a99a639b9a7aa827c7326c2f8e095b3",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/docs/decisions.md",
+      "kind": "file",
+      "bytes": 14569,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "70bd18f88393d329264d9df6bedc6bb5916875ff83529fa57042fef095dbcccb",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/docs/engine-design.md",
+      "kind": "file",
+      "bytes": 109655,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "9e9efc583355c159ef19527319f8526248532f98d6c442494fcf37ea45699339",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/docs/icons",
+      "kind": "directory",
+      "bytes": 128,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/docs/icons/.DS_Store",
+      "kind": "file",
+      "bytes": 6148,
+      "mode": "0o644",
+      "system_metadata": true,
+      "sha256": "d65165279105ca6773180500688df4bdc69a2c7b771752f0a46ef120b7fd8ec3",
+      "type": "(none)",
+      "ignored": true
+    },
+    {
+      "path": "docs_bak/docs/icons/Aline.png",
+      "kind": "file",
+      "bytes": 235494,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "252fe12bbaa6af7c6738cbc089ad9c8c27e6e4beb97ed760aea9732a6f838317",
+      "type": ".png",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/docs/plugin-system.md",
+      "kind": "file",
+      "bytes": 13176,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "f539dbfc3acc7ef9099e8fd83400fd5b20e4210552d57711a1f1eb1ed27574ba",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/docs/rust-style-guide.md",
+      "kind": "file",
+      "bytes": 28041,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "417c8d1d68d45c367a0d3cac4868f60250e0dd8c420dc9b0c7a15c75efbb3383",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/docs/theme-package-spec.md",
+      "kind": "file",
+      "bytes": 20756,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "52e0e591a5968da90ae0eb0a918b26c3e5ff428630d7773c92bac4beaa44b353",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/docs/ui-spec.md",
+      "kind": "file",
+      "bytes": 25957,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "505b236f5eecccb5806b14c2c216884299f8792c53b971af79186ca87e519efa",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/docs/v1-architecture.md",
+      "kind": "file",
+      "bytes": 59552,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "8af1cb1e1d854d0c897271402e51b98f0026dbba7656fda29a56680091aee30b",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/docs/v1-features.md",
+      "kind": "file",
+      "bytes": 9453,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "68adf84b25c2a7950bee96c525c5e953c7f4ef1c4794306ccb86a867f2d9c310",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/docs/wordcraft-study.md",
+      "kind": "file",
+      "bytes": 37209,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "9bc8058419c77cff4f48083bc3725be6225c06d5757e55d40644f59ff0a56b9a",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/docs/zed-notes.md",
+      "kind": "file",
+      "bytes": 26117,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "ed4ba2ffe05b5232a55aceedd57218b1ca173f43e58fa91052c4a37491222713",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype",
+      "kind": "directory",
+      "bytes": 576,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/README.md",
+      "kind": "file",
+      "bytes": 2514,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "3ab54f587781594277de597210669f7dfb187210377812075bae6612fff5237d",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/assets",
+      "kind": "directory",
+      "bytes": 128,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/assets/aline.png",
+      "kind": "file",
+      "bytes": 235494,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "252fe12bbaa6af7c6738cbc089ad9c8c27e6e4beb97ed760aea9732a6f838317",
+      "type": ".png",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/assets/showcase-landscape.svg",
+      "kind": "file",
+      "bytes": 488,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "3904cf1b8a8cbd224520ce3a28bb81f1c86e3452825c03c8521a59b661193179",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/icons.js",
+      "kind": "file",
+      "bytes": 3623,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "f592ef2e556f382be48672f2bb43e6861a5b70bd0bb7eedf29019268155644ea",
+      "type": ".js",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/index.html",
+      "kind": "file",
+      "bytes": 14801,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "56e23befc02c5520151bd763e80de0531ef3bbc26dd6f6bc683b1b79bef20234",
+      "type": ".html",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/interactions.js",
+      "kind": "file",
+      "bytes": 36149,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "60afb32f169344d5bd5adc80e6763b5bd969d3aa75632e67ed828bf9fcecdd29",
+      "type": ".js",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/light.css",
+      "kind": "file",
+      "bytes": 33055,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "7017b7103e1853c0318eb2c3bd1f13b625408f88f6bc635fcd237df6efc7fa26",
+      "type": ".css",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/measure.css",
+      "kind": "file",
+      "bytes": 1121,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "cc0ba1e4da554d44e1a1a753512a1e52e78c7901debdc5c44d97c948b2a826a4",
+      "type": ".css",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/menus.css",
+      "kind": "file",
+      "bytes": 5472,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "6999beccf63997fec665d8bc2d76b68b0f5f618f4c147c79a79dcd65dce5ce3b",
+      "type": ".css",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/menus.js",
+      "kind": "file",
+      "bytes": 16798,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "4bb285c15a492a45417e405084bad2b854b2cc03d756baaaa7eb6ce5da6bcb2a",
+      "type": ".js",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/prototype.css",
+      "kind": "file",
+      "bytes": 25461,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "70a298f836ec4bdf051f8cf80ca46d9f6407c7daab8e269f08dc205205c6c403",
+      "type": ".css",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/prototype.js",
+      "kind": "file",
+      "bytes": 29183,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "ceacef60d03c13d21ae7012972d1430004fb30aa7a0118c8406b8a8c507d03d6",
+      "type": ".js",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/showcase.js",
+      "kind": "file",
+      "bytes": 18272,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "b42d5313031390263e981195ea8ef9ed0d41b04906d8d685f474be54e21f33b6",
+      "type": ".js",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/theme-gallery.css",
+      "kind": "file",
+      "bytes": 13668,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "3f2fd8991c2352a6ca415fd25ccd21657626c6adc485a11d69582f9b17fe9aec",
+      "type": ".css",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/theme-library.js",
+      "kind": "file",
+      "bytes": 46833,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "46cce9de96f19a9ddd5f6c85dc8e3c06218ab01a9e728b8365610ea4f44cccc4",
+      "type": ".js",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes",
+      "kind": "directory",
+      "bytes": 256,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/.DS_Store",
+      "kind": "file",
+      "bytes": 6148,
+      "mode": "0o644",
+      "system_metadata": true,
+      "sha256": "8ab98817eb0726711ceac693287d77af69f06dabed3835b4f51c0edf56798e8d",
+      "type": "(none)",
+      "ignored": true
+    },
+    {
+      "path": "docs_bak/prototype/themes/feishu",
+      "kind": "directory",
+      "bytes": 224,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/feishu/application.json",
+      "kind": "file",
+      "bytes": 4403,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "79358bd753347b32c45799239650cf37504d2373dbdc59895aaef0c1fefbd262",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/feishu/highlight.json",
+      "kind": "file",
+      "bytes": 2033,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "d929fad55853861b9d6ca5bb9ac65c0c8ab06464403f668f09e63c19d8295c1c",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/feishu/markdown.json",
+      "kind": "file",
+      "bytes": 10114,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "424507777ba754b9b2d31576d00a8a35bf9413398b1b380ba77881f79a7055ab",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/feishu/previews",
+      "kind": "directory",
+      "bytes": 160,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/feishu/previews/dark.svg",
+      "kind": "file",
+      "bytes": 6080,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "4a14a22a81b3adfb43526c5b806c1cf3ddb52c24cee2446bce9d8fcce65554e7",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/feishu/previews/light.svg",
+      "kind": "file",
+      "bytes": 6081,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "e72a826f8eda1291d4fff14dbd5859a4d6cbbaf58fe8ab60455bb78aad013cb9",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/feishu/previews/sepia.svg",
+      "kind": "file",
+      "bytes": 6081,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "ef93e01c26cc17b5380e8bc5606436bc7fd93c25aeee93ec14de019b7b188dc9",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/feishu/theme.json",
+      "kind": "file",
+      "bytes": 377,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "e514b91fdb7687994026b3cbbb57fb2ab531aad87f7f84c62225a288f103aa13",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/github",
+      "kind": "directory",
+      "bytes": 224,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/github/application.json",
+      "kind": "file",
+      "bytes": 4403,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "ae3cf7f75ba7fd0ee399c01ec50e39408024aab68442bca7d387d81cfc35fc1d",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/github/highlight.json",
+      "kind": "file",
+      "bytes": 2033,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "51603798cd046f5fb247ffb26d59652327f60debf7054a003388fbf5f70bbc07",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/github/markdown.json",
+      "kind": "file",
+      "bytes": 10114,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "76fd0fda0d2c29e4f7f12ce6d563f2636fa1fa3d8be058cc3fd59a3ece30fa7b",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/github/previews",
+      "kind": "directory",
+      "bytes": 160,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/github/previews/dark.svg",
+      "kind": "file",
+      "bytes": 6080,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "e92932ed23667249ae1498cd78e6c2faa8d1acfb93c7cae35754d750fa14dca8",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/github/previews/light.svg",
+      "kind": "file",
+      "bytes": 6081,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "ef666c5db6ce1a7a6ef92c3914467d63de6b0c453eab362247a70e07fa95fa1e",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/github/previews/sepia.svg",
+      "kind": "file",
+      "bytes": 6081,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "4399c3a0b79b7b0413045c80c788b8a97de030e0f8c17e5bb787fa6adf150d5d",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/github/theme.json",
+      "kind": "file",
+      "bytes": 377,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "14dc851ff6560e520ca4e18d3568249cc995680883d23b4b206cfc6dd79c978e",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/index.json",
+      "kind": "file",
+      "bytes": 329,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "9584c70f0cf857d62895a730fec8fea4b184dbf558a6217134a3ba0c905dbbea",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/notion",
+      "kind": "directory",
+      "bytes": 224,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/notion/application.json",
+      "kind": "file",
+      "bytes": 4403,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "3dda422830d83b05e50193ca32836c8f41ba116d06e807cf2433a1871313d28d",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/notion/highlight.json",
+      "kind": "file",
+      "bytes": 2033,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "37dc5364a969ab2e66e456bc0f44cb01c44d02e3cbf070c4045dac1a9e4ac94c",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/notion/markdown.json",
+      "kind": "file",
+      "bytes": 10114,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "8b509e148760f04d0d0cbeae9daaa3c5162c3503aee62c077a7dad1cb9684652",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/notion/previews",
+      "kind": "directory",
+      "bytes": 160,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/notion/previews/dark.svg",
+      "kind": "file",
+      "bytes": 5292,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "e85973dda35535d7b6fa489a719283a88dd5387e6e5dd8c4786584198c6cdaf3",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/notion/previews/light.svg",
+      "kind": "file",
+      "bytes": 5293,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "744417dc559b067519c6a4260d003dc878a3c6b5370f60a059931827382bd918",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/notion/previews/sepia.svg",
+      "kind": "file",
+      "bytes": 5293,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "61d3eb2d1082291f5f6740b151974fdff4ed6b91dd48c0407933b94a65dad036",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/notion/theme.json",
+      "kind": "file",
+      "bytes": 377,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "48845f18652635e4ad8dc7e4b8b3f7db902930d785cdb3f7e36aaf910fe4b2ce",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/vue",
+      "kind": "directory",
+      "bytes": 224,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/vue/application.json",
+      "kind": "file",
+      "bytes": 4403,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "02ba59d6c5d91b1a7990647065d1a716fdeabb68cb12717ee775c9d21872c8c8",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/vue/highlight.json",
+      "kind": "file",
+      "bytes": 2033,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "103ec3a79519e984ce8d5097aaba341ff60686006e82691d336b7b9a936edef1",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/vue/markdown.json",
+      "kind": "file",
+      "bytes": 10114,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "2743d6a18545c804c674421b37a58a85599851388be47f686c603fd512618393",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/vue/previews",
+      "kind": "directory",
+      "bytes": 160,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/vue/previews/dark.svg",
+      "kind": "file",
+      "bytes": 6069,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "eafe6ecab60b2283e821840b8bcf9d5b251693315d0f6bcb4fbdb3182051a9ff",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/vue/previews/light.svg",
+      "kind": "file",
+      "bytes": 6070,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "5c1f4b77202530f300f450deb2179de7970541517af118f45acb57e831715384",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/vue/previews/sepia.svg",
+      "kind": "file",
+      "bytes": 6070,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "cb9895afc2f9238e518eb22b46183a3545f43d6e8ca68e1ab113f5e1a0816877",
+      "type": ".svg",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/themes/vue/theme.json",
+      "kind": "file",
+      "bytes": 371,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "c3ec23fbc6da84ea082e6990b761cd56442bf82fc7879e7fc05cb8006afd7253",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/tools",
+      "kind": "directory",
+      "bytes": 96,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "docs_bak/prototype/tools/generate-theme-previews.py",
+      "kind": "file",
+      "bytes": 9957,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "91b1a6581e33953a46db0214035c8ad0ff20cf06cc089fd1ff645a208704e0be",
+      "type": ".py",
+      "ignored": false
+    },
+    {
+      "path": "reports",
+      "kind": "directory",
+      "bytes": 224,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-29-v1-features-review.md",
+      "kind": "file",
+      "bytes": 35980,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "bca7ad96f2963727d563c6d86435c5c00ac6faf935d9614ce8a8b0a2965fd1de",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-docs-migration-audit.md",
+      "kind": "file",
+      "bytes": 27137,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "c77fe8446dc0c0b6e1d5e7f41ea33e7719b88a7a3845e8a41f36b9f437486aaa",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-migration-audit",
+      "kind": "directory",
+      "bytes": 448,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-migration-audit/baseline-inventory.json",
+      "kind": "file",
+      "bytes": 25497,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "a5ef94c59a6e0c9c749248ac94fcfb34cd2fe5611b12942d0b53481fcb9255dc",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-migration-audit/build-ledgers.py",
+      "kind": "file",
+      "bytes": 33309,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "50391bd500134c68911d696b107de3d2445255b1b459da193b23381180075a37",
+      "type": ".py",
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-migration-audit/check-after.json",
+      "kind": "file",
+      "bytes": 343662,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "6bc89b59886ec09936b31514010a910afb6f4111e934bf535c2a2d1280bbd7ca",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-migration-audit/check-before.json",
+      "kind": "file",
+      "bytes": 343192,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "188e857e24572a69223c68046ec76b684e21c841a3ef017ff2ffcfed9f421f8a",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-migration-audit/check.py",
+      "kind": "file",
+      "bytes": 5641,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "27cf5a0691a85076e480fc643bd4fb4da877e2757de601271b45d10bdd39c198",
+      "type": ".py",
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-migration-audit/current-inventory.md",
+      "kind": "file",
+      "bytes": 14155,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "575d6925e6fe94f17c71a320dd200fde558805f5ca779a30b27bbc048e369d3a",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-migration-audit/file-mapping.csv",
+      "kind": "file",
+      "bytes": 22764,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "9b57358a33c8e963e1f7247e1e624acabc881434debbc79dd7ba1121ba147f7b",
+      "type": ".csv",
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-migration-audit/file-mapping.md",
+      "kind": "file",
+      "bytes": 24170,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "a159b2ac03cd503d661d5ce0a7df4f65d7e1809011d1fb600411a1e393145b7c",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-migration-audit/open-questions.md",
+      "kind": "file",
+      "bytes": 15734,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "1a00449ef20429edd19f7448ae259896e08d9ef934528f80e4f412fd1e3ca6aa",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-migration-audit/prototype-check.json",
+      "kind": "file",
+      "bytes": 3093,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "41322e49c2ccc5b865a223eed69445448b51902b3ee70e1b41e9ff6b0e035934",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-migration-audit/topic-mapping.md",
+      "kind": "file",
+      "bytes": 123211,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "e0149186a48147f426c365cc0bd804bbb5c019183cf6b5aadbccd1e0622d369f",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-migration-audit/verification-summary.json",
+      "kind": "file",
+      "bytes": 879,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "3aa98ed71722e8b09352601a2db100ab68e1b4610e1a7103fee9a8e444596bd1",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-migration-closure",
+      "kind": "directory",
+      "bytes": 416,
+      "mode": "0o755",
+      "system_metadata": false,
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-migration-closure/baseline.json",
+      "kind": "file",
+      "bytes": 22335,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "4df2deebc98dc400172726db7740bd7d09cd196f86e146831d8b1a66006659d5",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-migration-closure/check.py",
+      "kind": "file",
+      "bytes": 6936,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "d8beb7163424cbdc8720f707087cd90736f81f35ecdb1ae333460e3d788ff80d",
+      "type": ".py",
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-migration-closure/confirmed-question-sources.json",
+      "kind": "file",
+      "bytes": 33404,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "da4ab9eb887ad6105b477dd27223d19dd8cf3b4783937e7516fbec54e58aa02c",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-migration-closure/current-reference-check.json",
+      "kind": "file",
+      "bytes": 360455,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "fd8f22d02ff23b2aa0b692272b99b1a258e2350f193872c3eeb5a4af18348045",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-migration-closure/file-mapping.csv",
+      "kind": "file",
+      "bytes": 21020,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "3fb8831277a919e8121cd857eca6b89cc54aef0cda3db8127efad9b3e990c248",
+      "type": ".csv",
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-migration-closure/file-mapping.md",
+      "kind": "file",
+      "bytes": 22335,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "08da34234a6b4cd6ef759af730c703c86933c85a2d021bca3ffc36da09fff3b2",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-migration-closure/prototype-check.json",
+      "kind": "file",
+      "bytes": 3093,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "41322e49c2ccc5b865a223eed69445448b51902b3ee70e1b41e9ff6b0e035934",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-migration-closure/prototype-without-source-check.json",
+      "kind": "file",
+      "bytes": 5464,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "65b231aaa6f42f6b26d5672ec2b737f1da2b2c75b665b62aeddbd6c8906b9a3b",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-migration-closure/review.md",
+      "kind": "file",
+      "bytes": 1306,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "cbb2bba4f4ef80b2257c67971c64bf2612ba5337ebc49e5f32269459ddd6f5cb",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-migration-closure/topic-mapping.md",
+      "kind": "file",
+      "bytes": 99169,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "b685ca835fe4c290eb3973f8cfd4946fe8d71828f194e868acd795fc6974f38e",
+      "type": ".md",
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-migration-closure/verification.json",
+      "kind": "file",
+      "bytes": 710,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "72b25055948980c1494a7087e8172ef863f7edd102a24ae9f32b31943c12a2ab",
+      "type": ".json",
+      "ignored": false
+    },
+    {
+      "path": "reports/2026-10-30-migration-closure.md",
+      "kind": "file",
+      "bytes": 10387,
+      "mode": "0o644",
+      "system_metadata": false,
+      "sha256": "8365d4b92bb1351789bfb33002aa7a480710cfa09550379f6f82b3618fac6c9a",
+      "type": ".md",
+      "ignored": false
+    }
+  ]
+}
