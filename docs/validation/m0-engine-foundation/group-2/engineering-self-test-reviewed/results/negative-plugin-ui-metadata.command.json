@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "cargo",
+    "metadata",
+    "--manifest-path",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/engineering-self-test-reviewed/fixtures/negative-plugin-ui/Cargo.toml",
+    "--offline",
+    "--format-version",
+    "1"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "started_utc": "2026-10-30T17:39:02.297297+00:00",
+  "finished_utc": "2026-10-30T17:39:02.415673+00:00",
+  "exit_code": 0,
+  "stdout_sha256": "0f736cf5ff66e6931e962f7393d308104146e8f1be2ecf67b6043dc18862639c",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "env_overrides": {
+    "CARGO_HOME": "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-admission-k4_p5j6a/cargo-home",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  }
+}

@@ -1,0 +1,5 @@
+   Compiling aline-source v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (target/debug/deps/aline_source-d6930c23ad8537fd)
+     Running tests/public_boundaries.rs (target/debug/deps/public_boundaries-b22ccc6ab1dd8f88)
+   Doc-tests aline_source

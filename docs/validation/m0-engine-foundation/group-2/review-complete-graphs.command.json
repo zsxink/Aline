@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "python3",
+    "docs/validation/m0-engine-foundation/group-2/review-complete-graphs.py"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "env_overrides": {
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "started_utc": "2026-10-30T17:34:49.955224+00:00",
+  "finished_utc": "2026-10-30T17:34:50.208199+00:00",
+  "exit_code": 0
+}

@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "scripts/engineering_regression.py"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "started_utc": "2026-10-30T17:27:59.319310+00:00",
+  "finished_utc": "2026-10-30T17:27:59.502330+00:00",
+  "exit_code": 0,
+  "stdout_sha256": "aedc437bb0ed09d237c6b0a99c68f04a9df749b1a6edb8af52e63daa0c3ace84",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "env_overrides": {}
+}

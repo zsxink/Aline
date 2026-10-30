@@ -1,0 +1,8 @@
+   Compiling pulldown-cmark v0.13.6
+   Compiling memchr v2.8.3
+   Compiling unicase v2.10.0
+   Compiling aline-markdown v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-markdown)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.01s
+     Running unittests src/lib.rs (target/debug/deps/aline_markdown-90346524485eca21)
+     Running tests/public_boundaries.rs (target/debug/deps/public_boundaries-88b79ebe551053c5)
+   Doc-tests aline_markdown

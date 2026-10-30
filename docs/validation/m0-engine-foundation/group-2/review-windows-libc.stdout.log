@@ -1,0 +1,12 @@
+libc v0.2.191
+└── cpufeatures v0.3.1
+    └── sha2 v0.11.1
+        └── rust-embed-utils v8.13.0
+            └── rust-embed-impl v8.13.0 (proc-macro)
+                └── rust-embed v8.13.0
+                    └── aline-app-core v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-app-core)
+                        ├── aline v0.1.0 (/Users/xian/Project/editor/Aline/app)
+                        ├── aline-plugin v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-plugin)
+                        │   └── aline-ui v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-ui)
+                        │       └── aline v0.1.0 (/Users/xian/Project/editor/Aline/app)
+                        └── aline-ui v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-ui) (*)

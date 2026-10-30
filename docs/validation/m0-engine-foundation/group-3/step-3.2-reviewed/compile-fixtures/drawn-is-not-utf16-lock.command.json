@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "cargo",
+    "generate-lockfile",
+    "--manifest-path",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-3/step-3.2-reviewed/compile-fixtures/fixtures/drawn-is-not-utf16/Cargo.toml",
+    "--offline"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-3/step-3.2-reviewed/compile-fixtures/fixtures/drawn-is-not-utf16",
+  "started_utc": "2026-10-30T23:23:20.977850+00:00",
+  "finished_utc": "2026-10-30T23:23:20.999667+00:00",
+  "exit_code": 0,
+  "env_overrides": {
+    "CARGO_HOME": "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-admission-k4_p5j6a/cargo-home",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_TARGET_DIR": "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-3/step-3.2-reviewed/compile-fixtures/cargo-target"
+  }
+}

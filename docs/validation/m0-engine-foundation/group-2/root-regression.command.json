@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "python3",
+    "scripts/engineering_regression.py"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "env_overrides": {
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "started_utc": "2026-10-30T17:29:30.872841+00:00",
+  "finished_utc": "2026-10-30T17:29:31.061771+00:00",
+  "exit_code": 0,
+  "limit": "局部合成图回归，不是完整2.2自测"
+}

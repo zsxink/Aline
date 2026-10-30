@@ -1,0 +1,19 @@
+installed-toolchains: exit=0
+installed-cargo: exit=0
+installed-rustfmt: exit=0
+installed-cargo-clippy: exit=0
+rustc-version: exit=0
+cargo-version: exit=0
+fmt-version: exit=0
+clippy-version: exit=0
+fmt-effective-config: exit=0
+fmt: exit=0
+clippy: exit=0
+test: exit=0
+dependency: exit=0
+dependency-self-test: exit=0
+lint: exit=0
+lint-self-test: exit=0
+safety: exit=0
+safety-self-test: exit=0
+证据：/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/workspace-gates/actual-fixed

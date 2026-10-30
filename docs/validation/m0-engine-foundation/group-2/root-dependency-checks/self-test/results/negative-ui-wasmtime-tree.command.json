@@ -1,0 +1,29 @@
+{
+  "argv": [
+    "cargo",
+    "tree",
+    "--manifest-path",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/root-dependency-checks/self-test/fixtures/negative-ui-wasmtime/Cargo.toml",
+    "--offline",
+    "--locked",
+    "--workspace",
+    "--target",
+    "all",
+    "-e",
+    "normal,build,dev",
+    "--prefix",
+    "none",
+    "--format",
+    "{p}"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "started_utc": "2026-10-30T17:38:35.687832+00:00",
+  "finished_utc": "2026-10-30T17:38:35.800090+00:00",
+  "exit_code": 0,
+  "stdout_sha256": "3eabb393f9ae0e91c9a939acea097f822ea87431469a9d659a979a6c4be50f1b",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "env_overrides": {
+    "CARGO_HOME": "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-admission-k4_p5j6a/cargo-home",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  }
+}

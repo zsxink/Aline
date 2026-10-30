@@ -1,0 +1,19 @@
+{
+  "failures": [
+    {
+      "file": "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/filename-is-not-test-scope/crates/aline-buffer/src/checks.rs",
+      "line": 1,
+      "rule": "engine-production-assert"
+    }
+  ],
+  "scanned": [
+    {
+      "file": "crates/aline-buffer/src/checks.rs",
+      "kind": "engine-production"
+    },
+    {
+      "file": "crates/aline-buffer/src/lib.rs",
+      "kind": "engine-production"
+    }
+  ]
+}

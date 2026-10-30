@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "python3",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/review-recheck.py"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "env_overrides": {
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "started_utc": "2026-10-30T17:29:53.124206+00:00",
+  "finished_utc": "2026-10-30T17:29:53.302453+00:00",
+  "exit_code": 1
+}

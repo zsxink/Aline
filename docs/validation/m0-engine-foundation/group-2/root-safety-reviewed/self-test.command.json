@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "scripts/check_safety.py",
+    "--self-test",
+    "--output-dir",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/root-safety-reviewed/self-test"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "env_overrides": {
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "started_utc": "2026-10-30T22:47:09.746328+00:00",
+  "finished_utc": "2026-10-30T22:47:11.612881+00:00",
+  "exit_code": 0
+}

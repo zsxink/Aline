@@ -1,0 +1,4 @@
+   Compiling aline-app-core v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-app-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.31s
+     Running unittests src/lib.rs (target/debug/deps/aline_app_core-145a8cad69e75560)
+   Doc-tests aline_app_core

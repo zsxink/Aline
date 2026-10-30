@@ -1,0 +1,8 @@
+[package]
+name = "aline-buffer"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+hidden_alias = { package = "fixture-helper", path = "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/root-dependency-checks/self-test/fixtures/packages/negative-engine-gpui-intermediate-helper" }

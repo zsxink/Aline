@@ -1,0 +1,20 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "-p",
+    "aline-ui",
+    "--locked",
+    "--offline"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "started_utc": "2026-10-30T22:53:56.226461+00:00",
+  "finished_utc": "2026-10-30T22:53:56.406442+00:00",
+  "exit_code": 0,
+  "stdout_sha256": "73ee1820d53ceb87d322ed08dce4cce28702433e8976ef5c5d10702595a61946",
+  "stderr_sha256": "702582bea5d3b3468b568c94b3cf0d58bdbaa55a412425efe4062e75eac8d029",
+  "env_overrides": {
+    "CARGO_HOME": "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-admission-k4_p5j6a/cargo-home",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  }
+}

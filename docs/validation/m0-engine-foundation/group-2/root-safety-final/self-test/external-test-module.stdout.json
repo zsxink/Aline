@@ -1,0 +1,13 @@
+{
+  "failures": [],
+  "scanned": [
+    {
+      "file": "crates/aline-buffer/src/checks.rs",
+      "kind": "engine-test"
+    },
+    {
+      "file": "crates/aline-buffer/src/lib.rs",
+      "kind": "engine-production"
+    }
+  ]
+}

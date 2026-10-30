@@ -1,0 +1,20 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "--manifest-path",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-3/review-public-consumer/Cargo.toml",
+    "--offline"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "env_overrides": {
+    "CARGO_HOME": "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-admission-k4_p5j6a/cargo-home",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_TARGET_DIR": "/Users/xian/Project/editor/Aline/target"
+  },
+  "started_utc": "2026-10-30T23:13:50.023387+00:00",
+  "finished_utc": "2026-10-30T23:13:51.979905+00:00",
+  "exit_code": 0,
+  "stdout_sha256": "ec6cbcff9f29d9d7cf8a00018a909631d2921ab501b615146c2cf10d8a0a2768",
+  "stderr_sha256": "f4050842e06c0284716c699a2093a57a1135f03fe8bce5a807254db38802bc5b"
+}

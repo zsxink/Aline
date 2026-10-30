@@ -1,0 +1,28 @@
+{
+  "argv": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "/Users/xian/Project/editor/Aline/scripts/check_engineering.py",
+    "--metadata",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/workspace-gates/actual/dependency-fixtures/fixtures/negative-wasip2-target/metadata.json",
+    "--tree",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/workspace-gates/actual/dependency-fixtures/fixtures/negative-wasip2-target/tree.log",
+    "--lock",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/workspace-gates/actual/dependency-fixtures/fixtures/negative-wasip2-target/Cargo.lock",
+    "--scenario",
+    "all",
+    "--metadata-command",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/workspace-gates/actual/dependency-fixtures/fixtures/negative-wasip2-target/metadata.synthetic-command.json",
+    "--tree-command",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/workspace-gates/actual/dependency-fixtures/fixtures/negative-wasip2-target/tree.synthetic-command.json"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "started_utc": "2026-10-30T22:57:09.946346+00:00",
+  "finished_utc": "2026-10-30T22:57:09.983399+00:00",
+  "exit_code": 1,
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "7351cc1fc32898c3bfb03343555dd03a2d92ca89b8d0e293d5c55d4cc26818b2",
+  "env_overrides": {
+    "CARGO_HOME": "/private/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-admission-k4_p5j6a/cargo-home",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  }
+}

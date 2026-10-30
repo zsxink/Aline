@@ -1,0 +1,24 @@
+{
+  "argv": [
+    "cargo",
+    "clippy",
+    "--manifest-path",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/root-lint-checks/self-test/fixtures/negative-unwrap-lib/Cargo.toml",
+    "--offline",
+    "--all-targets",
+    "--release",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/root-lint-checks/self-test/fixtures/negative-unwrap-lib",
+  "started_utc": "2026-10-30T17:45:48.062161+00:00",
+  "finished_utc": "2026-10-30T17:45:48.138452+00:00",
+  "exit_code": 101,
+  "env_overrides": {
+    "CARGO_HOME": "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-admission-k4_p5j6a/cargo-home",
+    "CARGO_TARGET_DIR": "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/root-lint-checks/self-test/cargo-target",
+    "CARGO_NET_OFFLINE": "true",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  }
+}

@@ -1,0 +1,10 @@
+[package]
+name="aline-m0-api-tuple-view-is-immutable"
+version="0.0.0"
+edition="2024"
+publish=false
+[workspace]
+[dependencies]
+aline-buffer = { path = "/Users/xian/Project/editor/Aline/crates/aline-buffer" }
+aline-markdown = { path = "/Users/xian/Project/editor/Aline/crates/aline-markdown" }
+aline-source = { path = "/Users/xian/Project/editor/Aline/crates/aline-source" }

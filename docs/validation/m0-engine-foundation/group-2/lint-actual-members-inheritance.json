@@ -1,0 +1,67 @@
+{
+  "source": "lint-actual-members.stderr.log 中实际 Cargo clippy-driver/rustc Running 命令，而非只检查manifest",
+  "required_flags": [
+    "--forbid=unsafe_code",
+    "--warn=missing_docs",
+    "--deny=clippy::unwrap_used",
+    "--deny=clippy::expect_used",
+    "--deny=clippy::panic",
+    "--deny=clippy::unreachable",
+    "--deny=clippy::cast_possible_truncation",
+    "--deny=clippy::cast_sign_loss",
+    "--deny=clippy::dbg_macro",
+    "--deny=clippy::todo",
+    "--deny=clippy::unimplemented"
+  ],
+  "results": [
+    {
+      "member": "aline",
+      "compiler_invocations": 2,
+      "every_invocation_inherits": true,
+      "test_invocations": 1
+    },
+    {
+      "member": "aline_app_core",
+      "compiler_invocations": 2,
+      "every_invocation_inherits": true,
+      "test_invocations": 1
+    },
+    {
+      "member": "aline_source",
+      "compiler_invocations": 2,
+      "every_invocation_inherits": true,
+      "test_invocations": 1
+    },
+    {
+      "member": "aline_buffer",
+      "compiler_invocations": 2,
+      "every_invocation_inherits": true,
+      "test_invocations": 1
+    },
+    {
+      "member": "aline_markdown",
+      "compiler_invocations": 2,
+      "every_invocation_inherits": true,
+      "test_invocations": 1
+    },
+    {
+      "member": "aline_edit",
+      "compiler_invocations": 2,
+      "every_invocation_inherits": true,
+      "test_invocations": 1
+    },
+    {
+      "member": "aline_plugin",
+      "compiler_invocations": 2,
+      "every_invocation_inherits": true,
+      "test_invocations": 1
+    },
+    {
+      "member": "aline_ui",
+      "compiler_invocations": 2,
+      "every_invocation_inherits": true,
+      "test_invocations": 1
+    }
+  ],
+  "passed": true
+}

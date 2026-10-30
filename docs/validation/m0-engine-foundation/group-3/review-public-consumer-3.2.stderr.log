@@ -1,0 +1,9 @@
+   Compiling aline-buffer v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-buffer)
+   Compiling aline-markdown v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-markdown)
+   Compiling aline-edit v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-edit)
+   Compiling aline-plugin v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-plugin)
+   Compiling aline-ui v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-ui)
+   Compiling aline-review-public-boundaries v0.0.0 (/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-3/review-public-consumer)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.68s
+     Running unittests src/lib.rs (target/debug/deps/aline_review_public_boundaries-2220cf3d366d9f30)
+   Doc-tests aline_review_public_boundaries

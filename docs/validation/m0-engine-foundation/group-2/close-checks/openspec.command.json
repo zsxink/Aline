@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "openspec",
+    "validate",
+    "m0-engine-foundation",
+    "--strict",
+    "--no-interactive"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "started_utc": "2026-10-30T23:02:48.190664+00:00",
+  "finished_utc": "2026-10-30T23:02:50.060217+00:00",
+  "exit_code": 0
+}

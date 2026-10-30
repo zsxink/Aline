@@ -1,0 +1,8 @@
+[package]
+name = "aline-markdown"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+hidden_alias = { package = "aline-edit", path = "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/engineering-self-test-reviewed/fixtures/negative-markdown-edit/aline-edit" }

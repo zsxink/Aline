@@ -1,0 +1,33 @@
+
+CodeGraph Status
+
+Project: /Users/xian/Project/editor/Aline
+
+Index Statistics:
+  Files:     1,650
+  Nodes:     2,454
+  Edges:     2,301
+  DB Size:   7.00 MB
+  Backend:   node:sqlite — built-in (full WAL)
+  Journal:   wal
+
+Nodes by Kind:
+  file            1,647
+  function        409
+  variable        193
+  import          157
+  enum_member     19
+  method          13
+  class           6
+  constant        4
+  enum            3
+  struct          3
+
+Files by Language:
+  rust            1,620
+  python          21
+  javascript      6
+  yaml            3
+
+✓ Index is up to date
+

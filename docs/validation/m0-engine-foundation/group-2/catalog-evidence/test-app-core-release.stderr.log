@@ -1,0 +1,3 @@
+    Finished `release` profile [optimized] target(s) in 0.03s
+     Running unittests src/lib.rs (target/release/deps/aline_app_core-9b7ffe3793955a4e)
+   Doc-tests aline_app_core

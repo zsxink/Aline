@@ -51,21 +51,25 @@ cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 
 ### 2.2 配置的落地边界
 
+2026-10-31 第 2 组已在正式八成员落地：Rust/Cargo 1.98.1、edition 2024；Rust `unsafe_code=forbid`、`missing_docs=warn`，Clippy 逐项 deny `unwrap_used`、`expect_used`、`panic`、`unreachable`、`cast_possible_truncation`、`cast_sign_loss`、`dbg_macro`、`todo`、`unimplemented`。八成员实际 clippy-driver 调用（含 test）均携带这 11 项参数；隔离正反例及 debug/release 诊断见[lint 与安全复核](./validation/m0-engine-foundation/group-2/lint-safety-summary.md)。没有全组 pedantic、全局转换 allow 或 unsafe 例外。`rustfmt --print-config current` 实际读取 `max_width=100`、`edition=2024`，无忽略选项警告；未声明 MSRV。
+
 | 编号 | 强制要求及例外 | 检查 |
 |---|---|---|
 | S-2-03 | Rust 格式交给登记环境的 rustfmt；新增选项须在该版本被支持且实际生效，不能提交“忽略并警告”的无效选项。默认格式以外的改变须记录理由 | C-01：格式检查、配置诊断及一次格式化后再检查；不以人工空白偏好覆盖工具输出 |
 | S-2-04 | Clippy 使用 `-D warnings`，不带警告合入；临时豁免按第 16 节。引擎禁 `unwrap()` 是独立铁律，不以 lint 未触发视为合规；按 RS-01 采用默认 lint + 逐项铁律/高价值 lint，pedantic 按项引入，不整组开启 | C-01/C-05：实际 lint 与调用路径审查，逐项登记适用层及正反样例 |
-| S-2-05 | workspace lint 落地时须确认每个成员实际继承或具有可审查的等价策略；按引擎/UI/测试区分的规则不得靠一份无效的成员覆盖样例实现 | C-01/C-05：清单审查及能故意触发诊断的最小实验；检查目前尚未建立 |
+| S-2-05 | workspace lint 落地时须确认每个成员实际继承或具有可审查的等价策略；按引擎/UI/测试区分的规则不得靠一份无效的成员覆盖样例实现 | C-01/C-05：清单审查及能故意触发诊断的最小实验；第 2 组已按实际参数和隔离反例验证 |
 
 旧附录 A 的 `imports_granularity`、`group_imports` 在复核时的[官方 rustfmt 选项表](https://rust-lang.github.io/rustfmt/)仍标为不稳定，本稿不沿用其配置片段；最终按锁定版本复验。workspace lint 是成员显式继承机制，根表的存在不等于每个 crate 已受约束，见 [Cargo workspace lint 文档](https://doc.rust-lang.org/cargo/reference/workspaces.html#the-lints-table)。成员差异应验证所选配置/源码属性确实生效，不照搬旧“继承后另加同名表即可覆盖”的写法。
 
-RS-01 已确认逐项配置策略；`missing_docs`、`expect_used`、打印/调试宏、转换 lint 的具体配置级别仍须 M0 验证登记。公共 API 文档和受检转换的语义要求已生效。禁止从旧白名单照抄全局 `cast_possible_truncation = allow` / `cast_sign_loss = allow` 来绕过坐标检查。
+RS-01 已确认逐项配置策略；当前实际级别与正反例已按本节 2026-10-31 记录登记，打印文案及隐式调用语义继续人工审查。公共 API 文档和受检转换的语义要求已生效。禁止从旧白名单照抄全局 `cast_possible_truncation = allow` / `cast_sign_loss = allow` 来绕过坐标检查。
 
 ### 2.3 CI 的要求与当前状态
 
 **S-2-06（CI 与出口证据，C-01～C-08）：**M0 接入 CI 时至少执行 S-2-01，并逐步接入实际建立的依赖/GPUI 闭包、禁用依赖、引擎安全和 catalog 检查。相关实现的保真、映射、拒绝与状态机回归必须有可执行入口；失败不能仅靠更新金样消掉。尚无自动化的规则保留具体人工记录，不宣称已受 CI 拦截。
 
-当前尚无应用工程的 workflow、Rust 检查脚本、hook 或依赖审计任务；现有文档/原型维护核对器不属于 Rust 实现门禁。旧附录 C 的 `macos-latest`、GitHub Actions 版本与缓存 action 均不复制为工程配置；macOS 作业不能代表 Windows/Linux 验证通过。按 V-01 先完成 macOS 验证，再验证 Windows/Linux，正式 V1 三平台门禁均须通过。CI runner、安装器和测试能力以实际矩阵登记。
+2026-10-31 已建立 `python3 scripts/check_workspace.py --output-dir <证据目录>`：分别执行三条 Cargo 门禁、实际依赖图与其正反例、lint 及安全守卫正反例；每条保存完整命令、退出码、环境和日志，任一失败整体非零。入口只使用已安装工具链与预热隔离 Cargo 缓存，不安装或下载，不修改全局配置。无缓存最小反例实际退出 1；完整本地入口实际退出 0，见[第 2 组记录](./validation/m0-engine-foundation/group-2/report.md)。
+
+`.github/workflows/m0.yml` 仅接线 self-hosted macOS ARM64 runner，须预装登记组件并设置 `ALINE_M0_CARGO_HOME`；官方 checkout 使用经只读核对的精确 SHA，不自动安装工具。远端 CI 未执行、runner 未验证，不能将本地结果写成 CI 通过。旧附录 C 的浮动 `macos-latest` 与 action 标签未沿用；macOS 作业不能代表 Windows/Linux。按 V-01 先 macOS、后 Windows/Linux，正式 V1 三平台门禁均须通过。
 
 `cargo audit` 是**建议**的后续依赖审计候选，不是当前必跑命令；安装、数据库、频率和失败处置尚未建立。旧 criterion/insta 命令也不进入现行门禁，见第 12/19 节。
 
@@ -332,7 +336,7 @@ RS-05 已确认有限真实 scope：纯文档用 `docs`，workspace 工程配置
 
 ## 17. 强制规则检查矩阵
 
-以下是未来检查计划及人工步骤，**当前均未建立自动门禁**。每次相关变更须给实际结果，不能只写“未来加 CI”。
+下表继续规定完整检查职责。2026-10-31 已建立 C-01 的工具/lint 门禁、C-02 的真实依赖闭包、C-05 的选定 lint/词法安全补充、C-06 的 catalog 校验，证据见[第 2 组记录](./validation/m0-engine-foundation/group-2/report.md)；领域坐标/补丁/历史、任务及平台机制仍按后续任务验证。静态守卫不是语义证明：每次变更仍须提供实际结果和人工步骤。
 
 | 检查组 | 覆盖规则 | 自动/类型/测试检查 | 必要人工检查与上游关联 |
 |---|---|---|---|
@@ -362,9 +366,9 @@ RS-05 已确认有限真实 scope：纯文档用 `docs`，workspace 工程配置
 
 ## 19. 待验证事项与收口时点
 
-下列均**未执行**。技术验证不代替用户政策裁决；具体版本/后端/工具的可用性应以实验收口，不为每个库新建产品选择题。
+下列完整 V 实验仍未完成，实际结果按分项记录。2026-10-31 第 2 组正式 workspace 的依赖/lint/catalog/完整 Cargo 门禁及格式配置实验已执行，见[工具实验分项](./validation/m0-engine-foundation/group-2/report.md)；不将该结果等同 V-01～V-09 通过。技术验证不代替用户政策裁决，版本/后端/工具由实际实验收口。
 
-第 1 组工具组合与 GPUI 核心库的实际分项见 §2.1 及候选审计；它们不代表下表完整实验通过。GPUI 精确例外已按 §13/15 及架构 §3.2 同步，正式五引擎闭包、成员 lint、真实平台能力仍待第 2 组及后续阶段验证。
+第 1 组工具组合与 GPUI 核心库的实际分项见 §2.1 及候选审计；它们不代表下表完整实验通过。GPUI 精确例外已按 §13/15 及架构 §3.2 同步，正式五引擎闭包、成员 lint 与 catalog 已获第 2 组实际证据；真实平台能力仍待后续阶段验证。
 
 第 1 组纯依赖消费者的 metadata/tree、五目标解析和 macOS aarch64 check/release build 见[纯候选证据](./validation/m0-engine-foundation/pure-candidates-2026-10-30/report.md)。拟用解析/catalog 版本及 TOML build metadata 的 lock 身份边界已登记；不因此认定 V-06/V-07 语法、catalog 键/插值、拒绝或正式引擎接口已验证。
 
@@ -379,7 +383,7 @@ RS-05 已确认有限真实 scope：纯文档用 `docs`，workspace 工程配置
 | V-07 | 坐标分型/补丁原生表示受检边界的金样、对齐/Unicode/保护/命令/格式化/输入分组/统计 | M0 纯机制，M2 输入，M3 命令，M4 前统计；RS-02 已定跨边界分型，具体类型/边界与算法仍须验证 |
 | V-08 | Result/领域拒绝与保存/恢复/资源故障、重载 Undo、时间/磁盘注入、队列/路径竞争 | M2 前身份/保存方案，M2 最小闭环，M4 资源，M5 多窗；不假称 OS 原子 CAS |
 | V-09 | 中英文文案、焦点/键盘、插件门控、有效主题及偏好状态 | M1 主窗，M4～M5 完整，M6 平台；模拟不替代真实输入/字体 |
-| 尚无 V 编号：M0 工具配置实验（建议新增） | 锁定 rustfmt 选项；lint 继承/最小覆盖、`expect` 诊断与 `-D warnings`、RS 已确认策略对应的 lint/unsafe 正反样例、edition/rust-version 声明及 debug/release profile 效果；测试/错误/审计工具的准入与实际命令 | M0 配置交付时提供小实验和完整 workspace 结果；本轮不擅增 V-10 或创建配置。涉及构建兼容/性能分别同时关联 V-01/V-05 |
+| 尚无 V 编号：M0 工具配置实验（建议新增） | 锁定 rustfmt 选项；lint 继承/最小覆盖、`expect` 诊断与 `-D warnings`、RS 已确认策略对应的 lint/unsafe 正反样例、edition/rust-version 声明及 debug/release profile 效果；测试/错误/审计工具的准入与实际命令 | 第 2 组已提供格式配置、lint 继承/unsafe 正反例与完整 workspace 结果；坐标类型/坏输入和 profile 相关领域机制继续分任务验证，不新增 V-10。构建兼容/性能分别关联 V-01/V-05 |
 
 ## 20. 待确认问题清单
 

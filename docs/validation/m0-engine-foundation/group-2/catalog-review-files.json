@@ -1,0 +1,8 @@
+{
+  "crates/aline-app-core/src/lib.rs": "7c067f51ae8f9cc7a02a87efd05168361198a12065ecb2953d87f970f524f1de",
+  "crates/aline-app-core/src/i18n.rs": "867d942bd74e1ed138833549c36014d12ccf7e26afd707a6eae818395df1e6d8",
+  "crates/aline-app-core/locales/zh-CN.toml": "95c313a26e162dac00e235e425c2c2bb53ad1d9106dee117bb9931b564792474",
+  "crates/aline-app-core/locales/en.toml": "95c313a26e162dac00e235e425c2c2bb53ad1d9106dee117bb9931b564792474",
+  "crates/aline-ui/src/lib.rs": "14d886ce1ae59466b3ca5df40a53741ea5f97a5b83a51c1ed2119c026dc0018a",
+  "app/src/main.rs": "5a1801f4ba2c57ceb700e92e392d7d5a707b9e89649838d3ea896de56917768a"
+}

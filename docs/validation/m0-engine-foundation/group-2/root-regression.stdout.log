@@ -1,0 +1,77 @@
+{
+  "scope": "局部回归，完整自测未执行",
+  "results": [
+    {
+      "synthetic_graph_mutation": {
+        "parent": "aline-buffer",
+        "child": "aline-source",
+        "intermediate": false
+      },
+      "expected_accept": false,
+      "accepted": false,
+      "diagnostic": "内部反向/非法依赖边: {\"from\": \"aline-buffer@0.1.0\", \"to\": \"aline-source@0.1.0\", \"alias\": \"hidden_alias\", \"kinds\": [{\"kind\": null, \"target\": null}]}",
+      "passed": true,
+      "independent_expectation": "架构 §4 允许方向与任务 2.2 明列反例；没有冒充实际 Cargo 采集"
+    },
+    {
+      "synthetic_graph_mutation": {
+        "parent": "aline-markdown",
+        "child": "aline-edit",
+        "intermediate": false
+      },
+      "expected_accept": false,
+      "accepted": false,
+      "diagnostic": "内部反向/非法依赖边: {\"from\": \"aline-markdown@0.1.0\", \"to\": \"aline-edit@0.1.0\", \"alias\": \"hidden_alias\", \"kinds\": [{\"kind\": null, \"target\": null}]}",
+      "passed": true,
+      "independent_expectation": "架构 §4 允许方向与任务 2.2 明列反例；没有冒充实际 Cargo 采集"
+    },
+    {
+      "synthetic_graph_mutation": {
+        "parent": "aline-plugin",
+        "child": "aline-ui",
+        "intermediate": false
+      },
+      "expected_accept": false,
+      "accepted": false,
+      "diagnostic": "内部反向/非法依赖边: {\"from\": \"aline-plugin@0.1.0\", \"to\": \"aline-ui@0.1.0\", \"alias\": \"hidden_alias\", \"kinds\": [{\"kind\": null, \"target\": null}]}",
+      "passed": true,
+      "independent_expectation": "架构 §4 允许方向与任务 2.2 明列反例；没有冒充实际 Cargo 采集"
+    },
+    {
+      "synthetic_graph_mutation": {
+        "parent": "aline-buffer",
+        "child": "aline-source",
+        "intermediate": true
+      },
+      "expected_accept": false,
+      "accepted": false,
+      "diagnostic": "完整闭包内部非法方向: aline-buffer@0.1.0 --hidden_alias[normal]--> synthetic-helper@0.0.0 --child_alias[normal]--> aline-source@0.1.0",
+      "passed": true,
+      "independent_expectation": "架构 §4 允许方向与任务 2.2 明列反例；没有冒充实际 Cargo 采集"
+    },
+    {
+      "synthetic_graph_mutation": {
+        "parent": "aline-plugin",
+        "child": "aline-ui",
+        "intermediate": true
+      },
+      "expected_accept": false,
+      "accepted": false,
+      "diagnostic": "完整闭包内部非法方向: aline-plugin@0.1.0 --hidden_alias[normal]--> synthetic-helper@0.0.0 --child_alias[normal]--> aline-ui@0.1.0",
+      "passed": true,
+      "independent_expectation": "架构 §4 允许方向与任务 2.2 明列反例；没有冒充实际 Cargo 采集"
+    },
+    {
+      "synthetic_graph_mutation": {
+        "parent": "aline-ui",
+        "child": "aline-source",
+        "intermediate": false
+      },
+      "expected_accept": true,
+      "accepted": true,
+      "diagnostic": "",
+      "passed": true,
+      "independent_expectation": "架构 §4 允许方向与任务 2.2 明列反例；没有冒充实际 Cargo 采集"
+    }
+  ]
+}

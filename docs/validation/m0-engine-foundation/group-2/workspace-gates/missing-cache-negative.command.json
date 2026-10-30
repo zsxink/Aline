@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "python3",
+    "scripts/check_workspace.py",
+    "--cargo-home",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/workspace-gates/not-configured-cache",
+    "--output-dir",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/workspace-gates/negative"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "env_overrides": {
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "started_utc": "2026-10-30T22:56:24.515856+00:00",
+  "finished_utc": "2026-10-30T22:56:24.544263+00:00",
+  "exit_code": 1
+}

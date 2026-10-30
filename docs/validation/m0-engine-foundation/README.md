@@ -1,10 +1,12 @@
 # M0 引擎地基验证记录
 
-日期：2026-10-30  
-范围：本次 apply 第 1 组（兼容目标与工具链/依赖候选登记）  
-状态：1.1～1.4 已完成；见[第 1 组完成与交接记录](./group-1-report.md)及[准入身份登记](./group-1-admission.json)。精确例外按用户继续指示已同步现行规范，主 Agent 与独立 reviewer 复核并修复问题后完成验收。第 2 组正式 workspace 尚未创建，M0 出口和 V 项未通过。
+日期：2026-10-31
 
-最新证据见第 1 组完成记录、[GPUI 隔离候选审计](./admission-2026-10-30/report.md)、[纯引擎依赖候选](./pure-candidates-2026-10-30/report.md)及[候选守卫](./admission-2026-10-30/guard-summary.md)。[最小例外草案](./admission-2026-10-30/proposed-policy.md)保留审阅时快照，已由现行架构 §3.2 承接。下方工具链/依赖及“本组状态与限制”保留开工初次检查的历史快照，其中“尚未下载/未解析/未完成”不是当前状态；最新结论以前述完成记录和原始日志为准。
+范围：本次 apply 第 1～2 组（候选准入、正式骨架/工程门禁/catalog）
+
+状态：1.1～1.4 已完成；见[第 1 组完成与交接记录](./group-1-report.md)及[准入身份登记](./group-1-admission.json)。精确例外按用户继续指示已同步现行规范，主 Agent 与独立 reviewer 复核并修复问题后完成验收。第 2 组已建立正式八成员、依赖/lint/安全守卫及 catalog，详见[第 2 组报告](./group-2/report.md)；四个文档引擎仍是骨架，完整 M0 出口和 V 项未通过。
+
+第 2 组最新证据见[工程门禁及 catalog](./group-2/report.md)，源码行尾定义已获用户确认，见[同步记录](./source-representation-decision.md)；第 1 组证据见第 1 组完成记录、[GPUI 隔离候选审计](./admission-2026-10-30/report.md)、[纯引擎依赖候选](./pure-candidates-2026-10-30/report.md)及[候选守卫](./admission-2026-10-30/guard-summary.md)。[最小例外草案](./admission-2026-10-30/proposed-policy.md)保留审阅时快照，已由现行架构 §3.2 承接。下方工具链/依赖及“本组状态与限制”保留开工初次检查的历史快照，其中“尚未下载/未解析/未完成”不是当前状态；最新结论以前述完成记录和原始日志为准。
 
 ## 环境与兼容目标（1.1）
 

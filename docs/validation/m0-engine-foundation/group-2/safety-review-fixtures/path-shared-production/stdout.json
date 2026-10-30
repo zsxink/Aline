@@ -1,0 +1,42 @@
+{
+  "failures": [
+    {
+      "file": "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-review-fixtures/path-shared-production/crates/aline-source/src/lib.rs",
+      "line": 1,
+      "rule": "test-module-resolution",
+      "detail": "production"
+    },
+    {
+      "file": "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-review-fixtures/path-shared-production/crates/aline-source/src/lib.rs",
+      "line": 2,
+      "rule": "unproven-module-path"
+    }
+  ],
+  "scanned": [
+    {
+      "file": "crates/aline-source/src/lib.rs",
+      "kind": "engine-production"
+    },
+    {
+      "file": "crates/aline-source/src/tests.rs",
+      "kind": "engine-test"
+    }
+  ],
+  "member_reads": [
+    {
+      "argv": [
+        "cargo",
+        "read-manifest",
+        "--manifest-path",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-review-fixtures/path-shared-production/crates/aline-source/Cargo.toml",
+        "--offline"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-review-fixtures/path-shared-production",
+      "started_utc": "2026-10-30T22:48:13.608628+00:00",
+      "finished_utc": "2026-10-30T22:48:13.631178+00:00",
+      "exit_code": 0,
+      "stdout": "{\"name\":\"aline-source\",\"version\":\"0.0.0\",\"id\":\"path+file:///Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-review-fixtures/path-shared-production/crates/aline-source#0.0.0\",\"license\":null,\"license_file\":null,\"description\":null,\"source\":null,\"dependencies\":[],\"targets\":[{\"kind\":[\"lib\"],\"crate_types\":[\"lib\"],\"name\":\"aline_source\",\"src_path\":\"/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-review-fixtures/path-shared-production/crates/aline-source/src/lib.rs\",\"edition\":\"2024\",\"doc\":true,\"doctest\":true,\"test\":true}],\"features\":{},\"manifest_path\":\"/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-review-fixtures/path-shared-production/crates/aline-source/Cargo.toml\",\"metadata\":null,\"publish\":null,\"authors\":[],\"categories\":[],\"keywords\":[],\"readme\":null,\"repository\":null,\"homepage\":null,\"documentation\":null,\"edition\":\"2024\",\"links\":null,\"default_run\":null,\"rust_version\":null}\n",
+      "stderr": ""
+    }
+  ]
+}

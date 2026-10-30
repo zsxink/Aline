@@ -108,6 +108,8 @@ GPUI：仅 app / aline-ui / aline-plugin 可以依赖
 
 M0 即建立八个 crate 的职责骨架；不要求一次实现所有功能，也不因尚无规范先填完整目录或加入闲置依赖。模块名可随实现调整，所有权不可悬空。
 
+2026-10-31 第 2 组已建立八成员：应用实际 package 名为 `aline`，其余为上述七个 `aline-*`。source/buffer/markdown/edit 目前仍为骨架，不能把空测试目标当领域实现；app-core 已消费内嵌双语 catalog，UI 将 `t("app.name")` 结果转换为 GPUI SharedString，app 仅返回 ExitCode，不建窗口/平台服务。公开面、真实五引擎完整闭包、工具/lint/守卫和无消费者后端的人工复核见[第 2 组记录](./validation/m0-engine-foundation/group-2/report.md)。没有新增第九 crate、插件注册框架或主题后端。
+
 ### 4.2 模块目录图
 
 下图按实际建议路径索引八个 crate。蓝色模块可依赖 GPUI，绿色模块为零 GPUI 的纯逻辑层；排列和目录连线不表示新增 Cargo 依赖。
@@ -448,7 +450,7 @@ Aline/
 | 窗口/标签/滚动/焦点 | Workspace、TabViewState | 标签引用 DocumentId；不各自持有可编辑副本或独立 dirty |
 | 主题/语言/设置 | app-core 数据，UI 的应用级服务发布快照 | `settings_generation`、字体/主题代次用于失效派生结果 |
 
-`Source` 不用一个 `crlf: bool` 代替行尾统计；也不把“是否修改过”“当前是否等于已保存内容”“是否正在写盘”合成一个标志。建议导入文本剥离 BOM、将 CRLF 规范为 LF，原 bytes 与原始行尾统计仅作存储基线；不吞孤立 CR，不增删末尾换行。src_off 始终指编辑器源码快照的 UTF-8 字节，不混用磁盘 bytes（含 BOM/CRLF）的偏移；如需原文件定位，由 source 的存储转换接口承担。编码时对未修改快照直接返回原 bytes，对已修改文本按读取基线的 BOM/多数派规则输出；成功写盘后更新对应基线，失败不得更新。`DocumentId` 不由文件名或路径哈希充当；恢复后的未命名文档也有独立身份。
+`Source` 不用一个 `crlf: bool` 代替行尾统计；也不把“是否修改过”“当前是否等于已保存内容”“是否正在写盘”合成一个标志。2026-10-31 用户批准导入文本仅剥离头部 BOM、保留原始 CR/LF，原 bytes 与原始行尾统计仅作存储基线；编码按 CRLF/LF 行尾单元多数派输出，包含编辑新拼接 CRLF，未配对 CR 保留，不增删末尾换行。存储往返只允许行尾表示等价，不用于吞掉真实补丁或改变历史/版本；源码补丁、选区和逆操作保持精确字节语义。src_off 始终指编辑器源码快照的 UTF-8 字节，不混用磁盘 bytes（含 BOM/CRLF）的偏移；如需原文件定位，由 source 的存储转换接口承担。编码时对未修改快照直接返回原 bytes，对已修改文本按读取基线的 BOM/多数派规则输出；成功写盘后更新对应基线，失败不得更新。`DocumentId` 不由文件名或路径哈希充当；恢复后的未命名文档也有独立身份。
 
 ### 5.2 当前文本与打开块
 
@@ -732,6 +734,8 @@ cargo test --workspace
 ```
 
 依赖门禁检查 GPUI 的实际 package 名 `gpui-pre` 及别名，五引擎 crate 的完整依赖闭包不得含 GPUI；检查禁用依赖、跨层反向依赖、引擎 unwrap、i18n key 集一致。不要把 `cargo tree -p engine -i gpui` 的无匹配/错误输出直接当依赖证明，应基于实际 Cargo metadata 生成可失败的检查。
+
+2026-10-31 已实际执行上述三条 Cargo 命令，退出均为 0。统一入口 `python3 scripts/check_workspace.py --output-dir <目录>` 同时执行 `check_engineering.py`、`check_lints.py`、`check_safety.py` 的正常图/源码及正反例，并记录每条退出码。依赖模型用完整 all-target metadata 保留目标与本机 host 宏/构建路径，目标 tree 限定实际选包，filtered metadata 仅交叉核查；精确 GPUI 例外按 §3.2 审查指纹和所有入边，不因合法路径忽略自有旁路。守卫缺口、手工路径、CI 尚未执行及平台限制见[实际证据](./validation/m0-engine-foundation/group-2/report.md)，这不是 M0 或三平台出口通过。
 
 阶段出口需相关用例通过并列出未执行平台，不凭 macOS 结果勾选 Windows/Linux。正式 V1 必须 PRD 全基线及 AC 全通过、V 发布阻塞项有产物并回填规范、本轮 TA 决定已落实到相关用例、冻结门禁三平台通过；先完成 macOS 验证，再完成 Windows/Linux，正式同发。内部预览必须标明尚缺能力和平台证据。
 

@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "scripts/check_engineering.py",
+    "--self-test",
+    "--output-dir",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/engineering-self-test-final"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "started_utc": "2026-10-30T17:36:39.606054+00:00",
+  "finished_utc": "2026-10-30T17:36:46.384846+00:00",
+  "exit_code": 1,
+  "stdout_sha256": "19938259f36d6995240f750d2692336ab9cd19024517945f58f101a3cf7e43c3",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "env_overrides": {
+    "CARGO_HOME": "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-admission-k4_p5j6a/cargo-home",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  }
+}

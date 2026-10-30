@@ -1,0 +1,10 @@
+    Checking backtrace v0.3.77
+    Checking image v0.25.10
+    Checking aline-source v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-source)
+    Checking aline-markdown v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-markdown)
+    Checking aline-buffer v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-buffer)
+    Checking gpui-pre-scheduler v0.3.9
+    Checking gpui-pre v0.3.9
+    Checking aline-ui v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-ui)
+    Checking aline v0.1.0 (/Users/xian/Project/editor/Aline/app)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.32s

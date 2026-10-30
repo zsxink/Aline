@@ -18,17 +18,17 @@
 范围：app 与七 aline crate，app-core/i18n；前置：1 准入组合合规。关联 workspace/engineering-gates 全部 requirement，E1；R-1/2/13/16、S-2/7/10/11/12/13/15，K-01/K-06/K-08。
 
 - [x] 2.1 建八成员最小 Cargo 骨架、统一依赖/精确 GPUI 来源及锁文件、登记工具链，app 不打开窗口；只建被当前任务消费的模块。用 cargo metadata --format-version 1 核八成员/真实包名，五引擎逐包无头构建/测试，验证 source/app-core 无反向依赖，保存实际命令和结果。
-- [ ] 2.2 建拟定 `scripts/check_engineering.py` 的 metadata 依赖守卫及隔离图夹具：正例允许主链向下/source 独立及架构 §3.2 的精确 GPUI 例外；最小负例分别 buffer→source、markdown→edit、plugin→ui、引擎经别名/中间包/dev/build/target/feature 泄漏 GPUI，以及未获精确例外的全闭包禁用依赖、同包旁路/身份校验和/target 漂移。第 1 组候选准入检查不得替代实际 workspace 守卫。运行 `python3 scripts/check_engineering.py --self-test`（实现时确认实际 CLI），断言每个反例非零且指明目标边；移除反例重跑正常图。说明未解析目标/feature 是缺口，检查器不能把 Cargo 报错当合规。
-- [ ] 2.3 配置默认 lint+逐项高价值项，验证每成员实际继承、自有 unsafe forbid、五引擎测试/示例/基准均禁 unwrap，生产禁 expect/panic!/unreachable!/发布 assert；在隔离最小样例逐一故意触发诊断、包括成员漏继承和非法坐标转换，debug/release 分列；正例测试预期断言/不可变实体常量可用，运行期 OnceLock/线程/全局 locale 须被守卫或人工路径审查发现。记录 lint 级别/作用域和宏/调用语义盲区，不整组开启 pedantic、不全局放行转换。
-- [ ] 2.4 在 app-core 建显式 locale 的 t(key)、zh-CN/en TOML 与 rust-embed 实际消费测试；`cargo test -p aline-app-core` 核对相同 key/插值正例及缺键、未知键、缺/多插值、损坏 TOML 反例按既定错误协议失败，实例切换语言互不污染。人工检查引擎错误枚举不携已翻译文案，UI 用户字符串消费 key。
-- [ ] 2.5 建实际检查入口和 CI 最小接线：逐条运行 `cargo fmt --all --check`、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo test --workspace`，分别记录退出码/日志，前条失败后的命令不得记通过；另保存 metadata 守卫/catalog/lint 正反例结果。验证格式选项生效且无忽略警告。`--all-targets` 只代表当前目标，CI 未实际运行记未执行，不能沿用此规划的结构校验成绩。
-- [ ] 2.6 回填 Rust §2/17/19、架构 §4/10.3 及工程证据入口，写清检查器执行命令/依赖范围/人工核查步骤；人工复核公开面、线程/全局调用、异常豁免（本方案未授权任何 unsafe 例外），确认不预装无消费者后端。
+- [x] 2.2 建拟定 `scripts/check_engineering.py` 的 metadata 依赖守卫及隔离图夹具：正例允许主链向下/source 独立及架构 §3.2 的精确 GPUI 例外；最小负例分别 buffer→source、markdown→edit、plugin→ui、引擎经别名/中间包/dev/build/target/feature 泄漏 GPUI，以及未获精确例外的全闭包禁用依赖、同包旁路/身份校验和/target 漂移。第 1 组候选准入检查不得替代实际 workspace 守卫。运行 `python3 scripts/check_engineering.py --self-test`（实现时确认实际 CLI），断言每个反例非零且指明目标边；移除反例重跑正常图。说明未解析目标/feature 是缺口，检查器不能把 Cargo 报错当合规。
+- [x] 2.3 配置默认 lint+逐项高价值项，验证每成员实际继承、自有 unsafe forbid、五引擎测试/示例/基准均禁 unwrap，生产禁 expect/panic!/unreachable!/发布 assert；在隔离最小样例逐一故意触发诊断、包括成员漏继承和非法坐标转换，debug/release 分列；正例测试预期断言/不可变实体常量可用，运行期 OnceLock/线程/全局 locale 须被守卫或人工路径审查发现。记录 lint 级别/作用域和宏/调用语义盲区，不整组开启 pedantic、不全局放行转换。
+- [x] 2.4 在 app-core 建显式 locale 的 t(key)、zh-CN/en TOML 与 rust-embed 实际消费测试；`cargo test -p aline-app-core` 核对相同 key/插值正例及缺键、未知键、缺/多插值、损坏 TOML 反例按既定错误协议失败，实例切换语言互不污染。人工检查引擎错误枚举不携已翻译文案，UI 用户字符串消费 key。
+- [x] 2.5 建实际检查入口和 CI 最小接线：逐条运行 `cargo fmt --all --check`、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo test --workspace`，分别记录退出码/日志，前条失败后的命令不得记通过；另保存 metadata 守卫/catalog/lint 正反例结果。验证格式选项生效且无忽略警告。`--all-targets` 只代表当前目标，CI 未实际运行记未执行，不能沿用此规划的结构校验成绩。
+- [x] 2.6 回填 Rust §2/17/19、架构 §4/10.3 及工程证据入口，写清检查器执行命令/依赖范围/人工核查步骤；人工复核公开面、线程/全局调用、异常豁免（本方案未授权任何 unsafe 例外），确认不预装无消费者后端。
 
 ## 3. 坐标、身份与公共输入输出边界冻结
 
 范围：五引擎公开边界、UI document；前置：2 无头构建与守卫有效。关联六 capability 的版本/范围场景，E1/E2/E5/E7；R-2～4/6、S-5/7，K-01～03/K-08，RS-02/03。
 
-- [ ] 3.1 按 design/Public Boundaries 定义受检源码/绘制/UTF-16/存储范围与版本 home，记录 DocumentId/WorkingVersion/草稿代次/投影/磁盘身份消费签名及生成范围；用外部消费测试和依赖守卫证明无反向边，source 仅接文本视图/自有元数据，跨层不导入 UI 类型。
+- [x] 3.1 按 design/Public Boundaries 定义受检源码/绘制/UTF-16/存储范围与版本 home，记录 DocumentId/WorkingVersion/草稿代次/投影/磁盘身份消费签名及生成范围；用外部消费测试和依赖守卫证明无反向边，source 仅接文本视图/自有元数据，跨层不导入 UI 类型。
 - [ ] 3.2 保持 tuple 补丁底层形状并封装受检构造/转换；正例合法空区间、末端、反向选区通过；最小反例类型混传、半 UTF-8、UTF-16 中间代理对、越界/溢出、错文档/错版本/错投影失败。用 cargo test -p aline-buffer 和 -p aline-markdown 的外部 API 用例及编译失败夹具分别留证，不以 type alias 当分型。
 - [ ] 3.3 冻结 decode/encode/parse/映射/plan/validate/apply/snapshot 的输入输出、错误类别、唯一写入口及相等证据来源；人工追踪实际公开消费者，验证恒等转换也走映射、调用方不手算局部差或 UTF-16 表。回填 Rust §5、引擎 §3/4/7、架构 §4/5/7.1、V-07 接口基础记录，未实现接口只写契约未验证。
 
@@ -36,8 +36,8 @@
 
 范围：decode/encode/metadata 及最小受检 I/O；前置：3 的存储/源码与相等证据语义。关联 engine/source 三 requirement，E2/E4；R-3/15、S-5/7/12，K-02/K-08（K-04 仅最小故障样例）。
 
-- [ ] 4.1 先建独立 bytes→源码/元数据→bytes 金样，再实现预算先验与解码：空/BOM/正文 U+FEFF/LF/CRLF/混合双方多数及平票/孤立 CR/无尾换行/有效 %PDF 与 PK；非法 UTF-8、UTF-16 BOM、截断多字节与输入超限受检失败，cargo test -p aline-source 解码用例确认无有损替换、无原文件写入。
-- [ ] 4.2 实现原 bytes 通道与改后 BOM/多数派编码；先验证 CR-X-LF 删除 X、边界插入/删除/粘贴形成 CRLF 的反例，逐项检查当前源码、编码、再次 decode、逆操作。正常操作必须可表示且不丢字；候选表示不自洽先修 design/夹具并评审，阻塞步骤 5，不用全局 trim/replace 或拒绝正常输入规避。
+- [ ] 4.1 按 2026-10-31 已批准原始行尾表示，先建独立 bytes→保留 CR/LF 的源码/元数据→bytes 金样，再实现预算先验与解码：空/BOM/正文 U+FEFF/LF/CRLF/混合双方多数及平票/孤立 CR/无尾换行/有效 %PDF 与 PK；非法 UTF-8、UTF-16 BOM、截断多字节与输入超限受检失败，cargo test -p aline-source 解码用例确认无有损替换、无原文件写入。
+- [ ] 4.2 实现原 bytes 通道与改后 BOM/多数派编码；按已批准语义扫描 CRLF/LF 行尾单元（含编辑新拼接 CRLF），未配对 CR 保留；先验证 CR-X-LF 删除 X、边界插入/删除/粘贴，分别检查冻结源码精确值、编码、再次 decode 的限定行尾等价、逆补丁精确恢复；LF 策略下 `"\r\n"` 重开 `"\n"` 不声称 String 相同。正常操作须可表示，其余字符不丢；不得隐式整理 Buffer、用存储等价吞掉历史或拒绝正常输入。
 - [ ] 4.3 用 `cargo test -p aline-source roundtrip` 验原字节逐字节相同、局部修改限定范围、混合例外及 Undo 回原基线；反例无来源 unchanged bool/旧基线相等证据不能放行。模拟新基线替代后不恢复过期原 bytes，保存成功/失败仅按实际输入事实更新由宿主持有的基线。
 - [ ] 4.4 建最小受检文件原语及可控故障边界，正例完整写入、反例临时创建/写入/替换前失败保全目标；运行 `cargo test -p aline-source atomic` 并记录文件系统与故障步骤，不回退为截断写、不宣称完整 V-08 或全平台断电保证。
 - [ ] 4.5 回填引擎 §5、架构 §5.1、V-06/V-07 编码基础证据，记录边界表示取舍与未测权限/替换竞争，K-08 人工复核源码与磁盘偏移未混用。

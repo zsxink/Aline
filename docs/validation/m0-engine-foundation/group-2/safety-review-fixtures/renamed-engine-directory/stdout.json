@@ -1,0 +1,11 @@
+{
+  "failures": [
+    {
+      "file": "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-review-fixtures/renamed-engine-directory/crates/source",
+      "line": 1,
+      "rule": "unrecognized-member-path"
+    }
+  ],
+  "scanned": [],
+  "member_reads": []
+}

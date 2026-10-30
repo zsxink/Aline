@@ -1,0 +1,18 @@
+{
+  "argv": [
+    "python3",
+    "scripts/check_lints.py",
+    "--self-test",
+    "--output-dir",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/lint-self-test"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "env_overrides": {
+    "CARGO_HOME": "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-admission-k4_p5j6a/cargo-home",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "started_utc": "2026-10-30T17:45:10.315930+00:00",
+  "finished_utc": "2026-10-30T17:45:12.575870+00:00",
+  "exit_code": 0
+}
