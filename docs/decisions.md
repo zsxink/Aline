@@ -544,4 +544,6 @@ PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02
 
 效力与验证：工程基线自本次初始化起约束后续开发；现行产品和专项契约继续按职责负责，拟议 change 不能自动覆盖已确认决定。M0 仍需实际建立并以正反例证明依赖闭包、成员 lint 等自动守卫；OpenSpec 格式检查不代替 Cargo、平台或 V 验证。未创建应用代码、Cargo workspace、CI 或新的依赖，V-01～V-09 与阶段出口状态保持不变。
 
+文档版本标签：本批改动未引入新的产品或专项确认，故 `docs/` 各稿首部的 版本/日期 保留原确认语境，与[开发前终审维护记录](./maintenance/pre-development-review/report.md)“版本/日期保留原专项确认语境……不以改版本标签伪装新确认”一致；Splat 非规范回写与本次 OpenSpec 回写的差异分别由[调研 §10](./splat-study.md#10-文档回写与验证边界)和本节及[文档入口](./README.md)追踪，`AGENTS.md` 首段据此明确 OpenSpec 不改变权威分工（只说“同时必读”，不说“高于”）。
+
 本次检查：OpenSpec CLI 1.13.2 执行 `openspec validate --all --strict --no-interactive`，工程治理主规格 1/1 通过（12 项要求）；PyYAML 解析配置及字段类型通过；在临时项目验证 proposal/specs/design/tasks 的 context/rules 和 apply/archive 的 guidance 均被 CLI 实际加载，临时项目已移除；所涉八份 Markdown 的 395 处本地目标/锚点引用通过，`git diff --check` 通过。独立审查提出的热路径措辞和 S 规则索引问题已修正并复核关闭，无剩余审查阻塞项。上述为文档和配置证据，未运行 Cargo 或平台实验。

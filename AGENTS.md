@@ -1,6 +1,6 @@
 # AGENTS.md
 
-本文件为所有 AI 编码代理（Claude Code / Codex / …）提供本仓库的工作指引。产品范围以 `docs/v1-prd.md` 为准；架构和实现遵守本文件的铁律及已确认架构规范；验证状态以 `docs/v1-validation-plan.md` 为准。`docs/README.md` 区分现行规范、调研、归档与原型；同级资料无法裁决的冲突列入待确认，不按日期或历史措辞自行取舍。后续编码与评审必须先读 [OpenSpec 代码与架构执行规范](openspec/CODE_STANDARDS.md)及其[工程治理规格](openspec/specs/engineering-governance/spec.md)，同时遵守受影响的现行专项规范；局部修复也适用。
+本文件为所有 AI 编码代理（Claude Code / Codex / …）提供本仓库的工作指引。产品范围以 `docs/v1-prd.md` 为准；架构和实现遵守本文件的铁律及已确认架构规范；验证状态以 `docs/v1-validation-plan.md` 为准。`docs/README.md` 区分现行规范、调研、归档与原型；同级资料无法裁决的冲突列入待确认，不按日期或历史措辞自行取舍。后续编码与评审同时必读 [OpenSpec 代码与架构执行规范](openspec/CODE_STANDARDS.md)及其[工程治理规格](openspec/specs/engineering-governance/spec.md)和受影响的现行专项规范，局部修复同样适用；三者职责不相等：本文铁律、已确认 PRD 与专项规范继续各自负责，OpenSpec 提供工程基线并承载拟议变更，不能覆盖已确认决定，无法解释的冲突列入待确认并暂停依赖该决定的实现。
 
 ## 项目是什么
 
@@ -57,7 +57,7 @@ cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 
 ## 工作方式
 
-- **规范是实现约束**：按 `openspec/CODE_STANDARDS.md` 和工程治理规格检查职责、依赖、唯一状态所有者及可测试边界；模块行数仅提示复核，不机械拆文件或 crate。相关 change 的 design 必须解释模式解决的问题、最简单可行方案、代价和验证；允许直接使用具体类型/函数，禁止无需求的模式包装。工程规则调整同步本文入口、OpenSpec 与相关现行文档，不能以局部 allow 或 design 绕过铁律。
+- **规范是实现约束（不改变上述权威分工）**：按 `openspec/CODE_STANDARDS.md` 和工程治理规格检查职责、依赖、唯一状态所有者及可测试边界；模块行数仅提示复核，不机械拆文件或 crate。相关 change 的 design 必须解释模式解决的问题、最简单可行方案、代价和验证；允许直接使用具体类型/函数，禁止无需求的模式包装。工程规则调整同步本文入口、OpenSpec 与相关现行文档，不能以局部 allow 或 design 绕过铁律。
 - **按里程碑推进**（v1-architecture 第 13 章）：M0 引擎地基 → M1 单文档只读 → M2 可编辑核心（可日用）→ M3 命令与表格 → M4 插件与主题 → M5 应用壳 → M6 收尾。阶段可形成内部预览，验收按三平台分别取证；先 macOS 后 Windows/Linux 验证，正式 V1 三平台同发（PRD §9、V-01）。
 - 新增依赖先对照 engine-design §18.2 和 v1-architecture §3.2 的准入规则，同类功能不得引入第二个库。
 - 实现期对照：ElyMark 完整历史关键文件索引已保全于 `docs/archive/migration-evidence/engine-design.md`，当前入口见 engine-design §18.3；Zed 克隆在 `/Users/xian/Project/book/zed`（gpui 新架构与锁定的 gpui-pre 存在 API 代差，机制线索参考 docs/zed-notes.md §0及其完整历史证据，具体 API 及性能结论须重新取证）。Aline 全部自写实现，外部源码只作对照参考。
