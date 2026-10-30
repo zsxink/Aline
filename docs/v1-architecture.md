@@ -761,6 +761,7 @@ cargo test --workspace
 | [主题包规范](./theme-package-spec.md) / [主题确认归档](./archive/2026-10-29-theme-decisions.md) | schema 1、封闭字段、静态 PNG、合并/管理行为已按 TH-01～10 采纳；数值/资源限额和原生能力仍验 V-04/V-06/V-09，旧样例仅证据 |
 | [zed-notes.md](./archive/migration-evidence/zed-notes.md) | 原生生命周期/焦点/IME/虚拟化的机制证据；API 签名核对锁定快照，不照抄主线 |
 | [WordCraft 调研](./wordcraft-study.md) | 反退化扫描、敌意输入、权限/原子保存、保真棘轮与案例库；原文实际 21 条提案，W22～W24 缺项；WC-01～WC-07已确认A并回写，V实验仍未执行，不自动全部立项，旧“无导出/无 ZIP”废弃 |
+| [Splat 可视化编辑调研](./splat-study.md) | 非规范静态源码研究；原生富文本预览到源码补丁、紧凑映射、局部/全量差分和陈旧输入/表格重排反例。实施建议见引擎 §7/12，样本归 V-05/07/08；不采用其连续富文本双 pane、Comrak、AppKit 历史、WebKit 或全局分配器，不改变本稿 §5 的模型 |
 | [决定原文与逐条复核](./decisions.md#4-历史时间线与逐条复核) / [v1-features.md](./archive/migration-evidence/v1-features.md) | 历史决定与功能来源；当前决定追溯到 PRD/本轮归档，不回写历史掩盖变化 |
 
 插件扩展方向与当前交付边界见[PA-01 决定](./archive/2026-10-29-plugin-extensibility.md)。当前决定记录入口为[产品批阅归档](./archive/2026-10-28-v1-open-questions.md)和[架构问题确认归档](./archive/2026-10-29-v1-architecture-decisions.md)；第 14 节列出已确认摘要。后续决定变更同步 PRD、本文与相关验收，另记新决定，不改写原始批注或旧备份。
