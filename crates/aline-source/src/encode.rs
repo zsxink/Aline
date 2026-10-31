@@ -44,11 +44,21 @@ impl fmt::Display for EncodeError {
 impl std::error::Error for EncodeError {}
 
 /// 编码得到的完整待写 bytes 及其来源基线身份。
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct EncodedBytes {
     bytes: Vec<u8>,
     baseline: BaselineId,
     reused_original: bool,
+}
+
+impl fmt::Debug for EncodedBytes {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("EncodedBytes")
+            .field("bytes_len", &self.bytes.len())
+            .field("reused_original", &self.reused_original)
+            .finish()
+    }
 }
 
 impl EncodedBytes {
