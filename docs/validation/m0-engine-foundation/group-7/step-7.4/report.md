@@ -61,6 +61,8 @@
 
 **复核 F3-8 的缺口**：组 6/7 的证据目录在本轮写报告时仍全部未跟踪（`git status` 显示 `??`）。这与组 6 第二轮复核的同一观察一致；证据只有提交后才有版本身份。
 
+**round-2 处置（F3-8）**：证据已提交——`aline-edit` 实现为 `a476a94` `feat(aline-edit): 实现组 7 纯 plan/validate 与候选复读`，组 6/7 证据目录为 `55bd376` `docs(workspace): 组 6/7 证据、双轮独立复核与调度者处置`，文档回填为 `45d4324`。提交前基线 HEAD `99867bf2…` 保留在本文各处原始记录中。提交时只暂存 `crates/aline-markdown`、`crates/aline-edit`、`group-6`、`group-7`、`commit-gates` 与 4 份文档，未提交 `.codegraph/`。是否关闭 F3-8 由独立复核判定。
+
 ## 4. R/S 覆盖映射
 
 | 条目 | 本组证据 | 状态 |

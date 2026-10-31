@@ -93,4 +93,16 @@ $ git status --porcelain docs/validation/m0-engine-foundation/group-6/
 ?? docs/validation/m0-engine-foundation/group-6/
 ```
 
-组 6 证据目录在写入时整体未被跟踪；本文件也属于该未跟踪目录。提交后将在本节追加提交 SHA；写入时尚无提交 SHA。
+组 6 证据目录在写入时整体未被跟踪；本文件也属于该未跟踪目录。
+
+**提交后回填（F3-8 处置）**：证据已提交，版本身份如下。
+
+| 内容 | 提交 | 说明 |
+|---|---|---|
+| `aline-markdown` 实现（src、tests、examples） | `58fa382` `feat(aline-markdown): 实现组 6 解析、映射、预算与复用` | 不含文档与证据 |
+| 组 6 证据目录（含本文件、双轮复核与门禁原始日志） | `55bd376` `docs(workspace): 组 6/7 证据、双轮独立复核与调度者处置` | 与组 7 证据同一提交 |
+| 引擎/架构/PRD/验证计划回填 | `45d4324` `docs(workspace): 回填组 6/7 记录到引擎、架构、PRD 与验证计划` | 只追加，删除行为 0 |
+
+提交前基线 HEAD 为 `99867bf2c5775aae4e8ed910713496d4ff84323c`（本节上方保留为写入时快照）。提交后 `git status --porcelain docs/validation/m0-engine-foundation/group-6/` 为空。提交时只暂存 `docs/validation/m0-engine-foundation/group-6`、`group-7` 与 `commit-gates`；未提交 `.codegraph/`。本次提交范围的检查见 `commit-gates/commands.log`（`aline-markdown` + `aline-edit` 的 fmt/clippy 各 exit 0、`cargo test` 合计 134 passed），因组 8 改动同时在工作区，全工作区三条门禁留待组 8 完成后执行。
+
+是否因此关闭 F3-8 由独立复核判定，本节只记录版本身份。
