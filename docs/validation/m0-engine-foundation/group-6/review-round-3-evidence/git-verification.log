@@ -1,0 +1,68 @@
+# 组 6 round-3 只读 git 核对
+# start_utc: 2026-10-31T11:17:56Z
+
+### git rev-parse HEAD
+7916cea59247d4678765c8e66f69e9f33f680e6e
+exit=0
+
+### git log --oneline -6
+7916cea docs(workspace): 按独立复核逐任务结论更新组 6/7 勾选
+419ac0e docs(workspace): 组 6/7 报告回填提交 SHA 以闭合 F3-8
+45d4324 docs(workspace): 回填组 6/7 记录到引擎、架构、PRD 与验证计划
+55bd376 docs(workspace): 组 6/7 证据、双轮独立复核与调度者处置
+a476a94 feat(aline-edit): 实现组 7 纯 plan/validate 与候选复读
+58fa382 feat(aline-markdown): 实现组 6 解析、映射、预算与复用
+exit=0
+
+### git cat-file -t 58fa382
+commit
+exit=0
+
+### git cat-file -t 55bd376
+commit
+exit=0
+
+### git cat-file -t 45d4324
+commit
+exit=0
+
+### git ls-tree --name-only 55bd376 docs/validation/m0-engine-foundation/group-6/
+docs/validation/m0-engine-foundation/group-6/commands-post-fix.log
+docs/validation/m0-engine-foundation/group-6/commands.log
+docs/validation/m0-engine-foundation/group-6/evidence
+docs/validation/m0-engine-foundation/group-6/follow-ups.md
+docs/validation/m0-engine-foundation/group-6/leader-verify-round-2
+docs/validation/m0-engine-foundation/group-6/report.md
+docs/validation/m0-engine-foundation/group-6/review-round-2.md
+docs/validation/m0-engine-foundation/group-6/review.md
+docs/validation/m0-engine-foundation/group-6/run-post-fix-tests.sh
+docs/validation/m0-engine-foundation/group-6/run-targeted-tests.sh
+docs/validation/m0-engine-foundation/group-6/step-6.1
+docs/validation/m0-engine-foundation/group-6/step-6.2
+docs/validation/m0-engine-foundation/group-6/step-6.3
+docs/validation/m0-engine-foundation/group-6/step-6.4
+docs/validation/m0-engine-foundation/group-6/step-6.5
+docs/validation/m0-engine-foundation/group-6/step-6.6
+docs/validation/m0-engine-foundation/group-6/step-6.7
+docs/validation/m0-engine-foundation/group-6/step-6.8
+docs/validation/m0-engine-foundation/group-6/verify_goldens.py
+exit=0
+
+### git ls-tree 55bd376 docs/validation/m0-engine-foundation/group-6/report.md docs/validation/m0-engine-foundation/group-6/review-round-2.md docs/validation/m0-engine-foundation/group-6/step-6.6/fix-n-f2-2-n-f2-3/probe-after.log
+100644 blob 665c9745aef3d580f3ad86509f7227f770fcc6f5	docs/validation/m0-engine-foundation/group-6/report.md
+100644 blob 5e9aadff971d6bff1280c57daa84cffe492245a9	docs/validation/m0-engine-foundation/group-6/review-round-2.md
+100644 blob f6b80defb2b5a09d452c16e535e5a251b0bb540a	docs/validation/m0-engine-foundation/group-6/step-6.6/fix-n-f2-2-n-f2-3/probe-after.log
+exit=0
+
+### git ls-tree -r --name-only 55bd376 | rg -c '^\.codegraph/'
+count=0 exit=0
+
+### git show --stat 45d4324 -- docs/
+45d4324 docs(workspace): 回填组 6/7 记录到引擎、架构、PRD 与验证计划
+ docs/engine-design.md      | 22 ++++++++++++++++++++++
+ docs/v1-architecture.md    |  6 ++++++
+ docs/v1-prd.md             |  4 ++++
+ docs/v1-validation-plan.md | 12 ++++++++++++
+ 4 files changed, 44 insertions(+)
+exit=0
+# end_utc: 2026-10-31T11:17:56Z

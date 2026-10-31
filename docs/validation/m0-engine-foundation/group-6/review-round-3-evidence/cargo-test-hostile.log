@@ -1,0 +1,29 @@
+UTC 2026-10-31T11:13:35Z
+CMD cargo test -p aline-markdown --locked --offline --test hostile
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running tests/hostile.rs (target/debug/deps/hostile-a192e5710e5dc231)
+
+running 19 tests
+test cooperative_cancel_stops_deep_nesting_without_hanging ... ok
+test deep_nesting_terminates_with_raw_fallback ... ok
+test mapping_point_budget_is_counted_in_stats_and_enforced ... ok
+test injected_node_budget_terminates_before_publishing_partial_tree ... ok
+test filtered_html_scan_steps_match_the_real_scanner ... ok
+test deep_nesting_within_budget_keeps_full_text ... ok
+test pre_cancelled_parse_returns_cancelled_without_tree ... ok
+test mapping_point_budget_also_caps_projection_segments ... ok
+test repeated_unclosed_tags_fall_back_to_whole_source_without_truncation ... ok
+test rewritten_budget_failure_returns_budget_error_not_partial_text ... ok
+test source_budget_is_checked_before_reading ... ok
+test repeated_unclosed_quotes_stay_linear_and_keep_source ... ok
+test uncancelled_token_preserves_default_parse_result ... ok
+test unfiltered_html_scan_steps_match_the_real_scanner ... ok
+test scan_step_budget_failure_falls_back_to_whole_source ... ok
+test cooperative_cancel_stops_huge_input_without_hanging ... ok
+test scan_steps_are_measured_by_the_budget_threshold ... ok
+test huge_table_is_not_truncated_within_budget ... ok
+test huge_paragraph_is_not_truncated ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+EXIT 0

@@ -1,0 +1,69 @@
+# 组 7 round-3 只读 git 核对
+# start_utc: 2026-10-31T11:17:58Z
+
+### git rev-parse HEAD
+7916cea59247d4678765c8e66f69e9f33f680e6e
+exit=0
+
+### git log --oneline -6
+7916cea docs(workspace): 按独立复核逐任务结论更新组 6/7 勾选
+419ac0e docs(workspace): 组 6/7 报告回填提交 SHA 以闭合 F3-8
+45d4324 docs(workspace): 回填组 6/7 记录到引擎、架构、PRD 与验证计划
+55bd376 docs(workspace): 组 6/7 证据、双轮独立复核与调度者处置
+a476a94 feat(aline-edit): 实现组 7 纯 plan/validate 与候选复读
+58fa382 feat(aline-markdown): 实现组 6 解析、映射、预算与复用
+exit=0
+
+### git cat-file -t a476a94
+commit
+exit=0
+
+### git cat-file -t 55bd376
+commit
+exit=0
+
+### git cat-file -t 45d4324
+commit
+exit=0
+
+### git ls-tree 55bd376 docs/validation/m0-engine-foundation/group-7/step-7.1/goldens/edit-goldens.tsv docs/validation/m0-engine-foundation/group-7/review-round-2.md docs/validation/m0-engine-foundation/group-7/step-7.4/fix-f3-3-f3-6/commands.log
+100644 blob ba5da7a75d8a59862f0fea4d813f265b38519ba3	docs/validation/m0-engine-foundation/group-7/review-round-2.md
+100644 blob 2d3703f42f89f64b667321b4ced93ac216111e5b	docs/validation/m0-engine-foundation/group-7/step-7.1/goldens/edit-goldens.tsv
+100644 blob 983465cf9a58612048b6944d704b049070acd1f0	docs/validation/m0-engine-foundation/group-7/step-7.4/fix-f3-3-f3-6/commands.log
+exit=0
+
+### git log --all --oneline -- docs/validation/m0-engine-foundation/group-7/step-7.1/goldens/edit-goldens.tsv
+55bd376 docs(workspace): 组 6/7 证据、双轮独立复核与调度者处置
+exit=0
+
+### git ls-files --stage -- docs/validation/m0-engine-foundation/group-7/step-7.1/goldens/edit-goldens.tsv
+100644 2d3703f42f89f64b667321b4ced93ac216111e5b 0	docs/validation/m0-engine-foundation/group-7/step-7.1/goldens/edit-goldens.tsv
+exit=0
+
+### shasum -a 256 docs/validation/m0-engine-foundation/group-7/step-7.1/goldens/edit-goldens.tsv
+cf2504f2aa6c107021118ce0bb8bd0e5d32b1f65842a00fb8d918ce1d3dec743  docs/validation/m0-engine-foundation/group-7/step-7.1/goldens/edit-goldens.tsv
+exit=0
+
+### summary.json (leader-verify-post-fix/workspace-gates)
+passed True
+n_results 19
+earliest 2026-10-31T10:04:27.889574+00:00
+latest 2026-10-31T10:04:53.722236+00:00
+exit_codes [0]
+exit=0
+
+### docs hashes at 45d4324 vs worktree
+-- docs/engine-design.md
+commit 2c9d2eab933467ae5ba707c309a932349ffa117364fba0a14280389ba13ae2ab
+now    2c9d2eab933467ae5ba707c309a932349ffa117364fba0a14280389ba13ae2ab
+-- docs/v1-architecture.md
+commit 5b6aa421609c3a9b02784bcdcb92e26f74f09f39b757c6daaaa440dff16e78f8
+now    5b6aa421609c3a9b02784bcdcb92e26f74f09f39b757c6daaaa440dff16e78f8
+-- docs/v1-prd.md
+commit e6cadea4263ea08eaaaf1c3e4f0a5195ca785a9901aa8fcec1a683860fbfb8f4
+now    e6cadea4263ea08eaaaf1c3e4f0a5195ca785a9901aa8fcec1a683860fbfb8f4
+-- docs/v1-validation-plan.md
+commit b6210cf70372c3681c0b1ab0e1e8d51d7f903135953c363dfaa80fd3a285625d
+now    b6210cf70372c3681c0b1ab0e1e8d51d7f903135953c363dfaa80fd3a285625d
+
+# end_utc: 2026-10-31T11:17:59Z
