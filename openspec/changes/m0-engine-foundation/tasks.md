@@ -56,22 +56,22 @@
 
 范围：pre/build/tree/blocks/protection/budget；前置：3～5，解析器版本/features 准入。关联 engine/markdown 全部 requirement，E2/E3/E5；R-3/4/7/12/16、S-5/7/12/13，K-01/K-02/K-08（K-07 仅预算基础）。
 
-- [ ] 6.1 先建 CommonMark/GFM 与 MD-01～06 基础夹具，再接显式 Cargo features/运行期 Options；记录各语法走原生选项或必要 pass 的依据。`cargo test -p aline-markdown spec` 验字面代码区避让、配对文首 Front matter、未闭合不吞全文，公式/Mermaid 只识别来源不引渲染后端。
-- [ ] 6.2 建必要 RewriteMap 逐级复合/跨片段事件来源与构树，控制字节 U+0001～U+0008 碰撞、合成围栏、重叠改写及映射失败有原文回退反例；`cargo test -p aline-markdown rewrite` 比较独立源范围预期，不仅比较可见字符。
-- [ ] 6.3 建块/Gap 与无头 dump 入口（拟 `cargo run -p aline-markdown --example dump_tree -- tests/fixtures/m0/basic.md`）；空文档、嵌套/多空行/无尾换行覆盖测试确认顶层分区精确覆盖且块不含尾分隔。保存 dump 含版本/块/间隙/来源/保护/诊断并人工对独立金样审查，示例同样禁 unwrap。
-- [ ] 6.4 建 source_at/drawn_at/aligned、局部/全文和 UTF-16 统一映射；`cargo test -p aline-markdown mapping` 验转义、实体/多字符实体、中文/emoji/ZWJ/组合字符、隐藏/合成、重复文字/空白、SoftBreak/HardBreak/br 来源、选区方向；原样精确往返、规范锚点稳定/对齐幂等。最小非法半字符/代理对/旧投影失败，不能要求全源码双射或靠 clamp/backscan 修补。
-- [ ] 6.5 建有限 HTML 与保护子区间金样：支持标签、无 href、引号内 >、交叉嵌套、注释/空白、实体、过滤标签、不完整尾部；`cargo test -p aline-markdown html` 与 protection 过滤验证来源/文字/语义/精确性/保护；脚注引用与普通正文相邻时仅保护子区间，HTML 原文语义不因展示成段落消失。
-- [ ] 6.6 建扫描步数/嵌套/节点/改写/映射预算与取消检查；敌意深栈、重复未闭合 HTML/引号、巨段/巨表及超限反例在分配/循环中终止，保持源快照、不截断；`cargo test -p aline-markdown hostile` 记录注入预算/实际步数和第三方长调用限额盲区，数值不是 V-06 发布限额。
-- [ ] 6.7 建全量路径与最小头尾配对/重定位差分用例：前文插入、引用定义/脚注/围栏/配置变化，比较树/Gap/范围/映射/保护/导航；用 reuse 过滤测试记录实际复用命中与安全回退，旧绝对范围反例须失败，不以所有样例全回退冒充优化证明。
+- [x] 6.1 先建 CommonMark/GFM 与 MD-01～06 基础夹具，再接显式 Cargo features/运行期 Options；记录各语法走原生选项或必要 pass 的依据。`cargo test -p aline-markdown spec` 验字面代码区避让、配对文首 Front matter、未闭合不吞全文，公式/Mermaid 只识别来源不引渲染后端。
+- [x] 6.2 建必要 RewriteMap 逐级复合/跨片段事件来源与构树，控制字节 U+0001～U+0008 碰撞、合成围栏、重叠改写及映射失败有原文回退反例；`cargo test -p aline-markdown rewrite` 比较独立源范围预期，不仅比较可见字符。
+- [x] 6.3 建块/Gap 与无头 dump 入口（拟 `cargo run -p aline-markdown --example dump_tree -- tests/fixtures/m0/basic.md`）；空文档、嵌套/多空行/无尾换行覆盖测试确认顶层分区精确覆盖且块不含尾分隔。保存 dump 含版本/块/间隙/来源/保护/诊断并人工对独立金样审查，示例同样禁 unwrap。
+- [x] 6.4 建 source_at/drawn_at/aligned、局部/全文和 UTF-16 统一映射；`cargo test -p aline-markdown mapping` 验转义、实体/多字符实体、中文/emoji/ZWJ/组合字符、隐藏/合成、重复文字/空白、SoftBreak/HardBreak/br 来源、选区方向；原样精确往返、规范锚点稳定/对齐幂等。最小非法半字符/代理对/旧投影失败，不能要求全源码双射或靠 clamp/backscan 修补。
+- [x] 6.5 建有限 HTML 与保护子区间金样：支持标签、无 href、引号内 >、交叉嵌套、注释/空白、实体、过滤标签、不完整尾部；`cargo test -p aline-markdown html` 与 protection 过滤验证来源/文字/语义/精确性/保护；脚注引用与普通正文相邻时仅保护子区间，HTML 原文语义不因展示成段落消失。
+- [x] 6.6 建扫描步数/嵌套/节点/改写/映射预算与取消检查；敌意深栈、重复未闭合 HTML/引号、巨段/巨表及超限反例在分配/循环中终止，保持源快照、不截断；`cargo test -p aline-markdown hostile` 记录注入预算/实际步数和第三方长调用限额盲区，数值不是 V-06 发布限额。
+- [x] 6.7 建全量路径与最小头尾配对/重定位差分用例：前文插入、引用定义/脚注/围栏/配置变化，比较树/Gap/范围/映射/保护/导航；用 reuse 过滤测试记录实际复用命中与安全回退，旧绝对范围反例须失败，不以所有样例全回退冒充优化证明。
 - [ ] 6.8 回填引擎 §6/7/11/12、解析配置及 V-06/V-07 基础夹具；将 SoftBreak、有限 HTML 尚未固化金样逐项列实验结果/缺口，不变更 MD 口径或宣称公式图表能力/AC-09 完成。
 
 ## 7. aline-edit Change、拒绝与最小编辑协议
 
 范围：change/check/refusal/代表性命令；前置：5/6 补丁、匹配版本 Parsed 和保护范围。关联 engine/edit 两 requirement，E2/E4；R-4/5/12、S-5/7/12，K-02/K-03。
 
-- [ ] 7.1 先写普通源码替换、可证明安全的行内格式 toggle 和一批多补丁的独立输入→补丁→选区金样，再实现纯 plan/validate、候选预演与应用前 reread；`cargo test -p aline-edit` 验实际消费方不获得可写真实 Buffer，保留隐藏源片段，重读按命令语义比较。
-- [ ] 7.2 验成功/无变化/错工作版本/错预期片段/错投影/越界/预算/重读失败；最小反例为可见文字相同但隐藏链接目标丢失，必须拒绝。`cargo test -p aline-edit refusal` 核完整状态不变，无空步/no redo 清除，计划变化后重验，不套旧范围。
-- [ ] 7.3 测普通正文与脚注引用交错、MD-11 跨区删除/替换/粘贴、HTML 触及/跨界格式拒绝、Source 修改及 HTML 原文修改允许；拒绝与独立 Source 定位分开，pending 组/组合/选区/undo/redo 均不被预检改变；为查找旧计划及多补丁一步历史保留可消费协议，不提前实现全量 M3 命令。
+- [x] 7.1 先写普通源码替换、可证明安全的行内格式 toggle 和一批多补丁的独立输入→补丁→选区金样，再实现纯 plan/validate、候选预演与应用前 reread；`cargo test -p aline-edit` 验实际消费方不获得可写真实 Buffer，保留隐藏源片段，重读按命令语义比较。
+- [x] 7.2 验成功/无变化/错工作版本/错预期片段/错投影/越界/预算/重读失败；最小反例为可见文字相同但隐藏链接目标丢失，必须拒绝。`cargo test -p aline-edit refusal` 核完整状态不变，无空步/no redo 清除，计划变化后重验，不套旧范围。
+- [x] 7.3 测普通正文与脚注引用交错、MD-11 跨区删除/替换/粘贴、HTML 触及/跨界格式拒绝、Source 修改及 HTML 原文修改允许；拒绝与独立 Source 定位分开，pending 组/组合/选区/undo/redo 均不被预检改变；为查找旧计划及多补丁一步历史保留可消费协议，不提前实现全量 M3 命令。
 - [ ] 7.4 回填引擎 §8/9/14、架构 §7.1/7.2、V-07/AC-04 基础覆盖及未覆盖列表/表格/格式化命令；人工审查 DocCore 以外无实际写入通道，记录 R/S 与场景覆盖。
 
 ## 8. 无窗口 DocCore 草稿、输入组与当前快照
