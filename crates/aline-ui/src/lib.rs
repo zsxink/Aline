@@ -2,7 +2,11 @@
 
 mod document;
 
-pub use document::{DocumentId, DraftGeneration, IdentityError, InputIdentity, WorkingVersion};
+pub use document::{
+    CommitOutcome, CompositionView, CurrentSnapshot, DocCore, DocError, DocLimits, DocumentId,
+    DraftGeneration, IdentityError, InputIdentity, PublicationKind, PublicationOutcome,
+    PublicationResult, WaitHandle, WaitStatus, WaitView, WorkingVersion,
+};
 
 use aline_app_core::{CatalogError, Locale, Translator};
 

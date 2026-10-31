@@ -1,0 +1,18 @@
+# 组 8 命令证据（UTC）
+# 格式：start<TAB>end<TAB>exit<TAB>command
+# 门禁原始日志在 gate-logs/，定向用例原始日志在 step-8.N/targeted-tests/。
+2026-10-31T11:13:03Z	2026-10-31T11:13:04Z	0	cargo test -p aline-ui --test document --locked --offline
+2026-10-31T11:13:04Z	2026-10-31T11:13:04Z	0	cargo test -p aline-ui --test document_typing --locked --offline
+2026-10-31T11:13:04Z	2026-10-31T11:13:04Z	0	cargo test -p aline-ui --test document_composition --locked --offline
+2026-10-31T11:13:04Z	2026-10-31T11:13:04Z	0	cargo test -p aline-ui --test document_results --locked --offline
+2026-10-31T11:13:11Z	2026-10-31T11:13:11Z	0	zsh -c env snapshot: date -u; uname -a; rustc -Vv; cargo -V; printenv CARGO_HOME RUSTUP_TOOLCHAIN CARGO_NET_OFFLINE; git rev-parse HEAD; git status --porcelain > gate-logs/environment.log
+2026-10-31T11:11:43Z	2026-10-31T11:11:44Z	0	cargo clippy -p aline-ui --all-targets --locked --offline -- -D warnings
+2026-10-31T11:11:49Z	2026-10-31T11:11:49Z	1	cargo fmt --all --check  # 失败尝试原样保留于 gate-logs/fmt-attempt-1.log；随后仅对 -p aline-ui 执行 rustfmt 后重跑
+2026-10-31T11:12:01Z	2026-10-31T11:12:01Z	0	cargo fmt --all --check
+2026-10-31T11:12:05Z	2026-10-31T11:12:11Z	0	cargo test -p aline-ui --locked --offline
+2026-10-31T11:12:31Z	2026-10-31T11:12:31Z	0	cargo test -p aline-ui document
+# 以下为最终按任务顺序重跑的三门禁与字面定向命令（全部退出 0）；run-1 日志保留为早前同命令结果。
+2026-10-31T11:14:05Z	2026-10-31T11:14:05Z	0	cargo test -p aline-ui --locked --offline
+2026-10-31T11:14:05Z	2026-10-31T11:14:06Z	0	cargo clippy -p aline-ui --all-targets --locked --offline -- -D warnings
+2026-10-31T11:14:06Z	2026-10-31T11:14:06Z	0	cargo fmt --all --check
+2026-10-31T11:14:06Z	2026-10-31T11:14:07Z	0	cargo test -p aline-ui document

@@ -1,0 +1,515 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 5 tests
+test i18n::i18n_tests::catalogs_reject_key_placeholder_and_brace_mismatches ... ok
+test i18n::i18n_tests::locale_is_owned_by_each_translator_instance ... ok
+test i18n::i18n_tests::interpolation_requires_exact_unique_arguments ... ok
+test i18n::i18n_tests::lookup_interpolation_and_catalog_shape_fail_explicitly ... ok
+test i18n::i18n_tests::embedded_catalog_is_borrowed_and_translates_app_name ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 5 tests
+test text::tests::composed_length_overflow_is_checked_before_allocation ... ok
+test line_index::tests::offset_at_line_start_belongs_to_new_line ... ok
+test batch::tests::output_length_arithmetic_refuses_overflow_and_underflow ... ok
+test line_index::tests::line_budget_is_checked_before_publication ... ok
+test line_index::tests::line_ranges_exclude_crlf_and_keep_isolated_cr ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 5 tests
+test anchors_reject_foreign_snapshot_and_stale_batch ... ok
+test anchors_transform_multiple_patches_by_cumulative_delta ... ok
+test anchors_transform_insertions_and_adjacent_replacement_start ... ok
+test anchors_transform_selection_preserves_direction_and_rejects_partial_validity ... ok
+test anchors_transform_replacement_with_before_and_after_affinity ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test checked_tuple_batch_keeps_original_shape_and_context ... ok
+test checked_tuple_batch_rejects_invalid_endpoints_order_and_budgets ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 9 tests
+test history_content_equal_redo_keeps_new_identity_dirty ... ok
+test history_undo_and_redo_budget_failures_leave_state_unchanged ... ok
+test history_same_stack_depth_after_save_undo_new_edit_is_not_save_point ... ok
+test history_reload_is_independent_memory_boundary ... ok
+test history_redo_branch_is_discarded_by_new_edit ... ok
+test history_records_source_selections_and_monotonic_revisions ... ok
+test history_typing_merge_window_and_seal_boundaries ... ok
+test history_handles_keep_trimmed_patch_resources_alive ... ok
+test history_trimming_protects_save_point_and_current_node ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test line_index_goldens_match_handwritten_boundaries ... ok
+test forward_inverse_patch_goldens_round_trip_after_coordinates ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test source_coordinates_keep_snapshot_identity_and_selection_direction ... ok
+test single_overlay_shares_base_and_only_materializes_when_requested ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test no_change_after_undo_does_not_clear_redo_branch ... ok
+test rejection_cases_leave_text_index_selection_revision_and_history_unchanged ... ok
+test apply_rejections_are_atomic_for_baseline_selection_and_capacities ... ok
+test legal_empty_insertion_and_no_change_replacement_are_distinct ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+test golden_contains_all_required_refusal_classes ... ok
+test golden_validate_changed_selection ... ok
+test golden_validate_reparsed ... ok
+test golden_validate_after_change ... ok
+test golden_consume_single_history_step ... ok
+test golden_plan_cases ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 4 tests
+test front_matter_visual_refused_source_allowed ... ok
+test visual_cross_region_replacement_refused_source_allowed ... ok
+test visual_body_beside_front_matter_allowed ... ok
+test toc_visual_refused_source_allowed ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 16 tests
+test identity_replace_creates_no_history_step ... ok
+test budget_exceeded_refusal_keeps_buffer_state ... ok
+test html_boundary_refusal_keeps_buffer_state ... ok
+test refusal_keeps_redo_branch_and_history_intact ... ok
+test refusal_keeps_pending_typing_group_open ... ok
+test protected_range_refusal_keeps_buffer_state ... ok
+test hidden_fragment_internal_whitespace_change_is_refused ... ok
+test refusal_keeps_composition_state_untouched ... ok
+test already_formatted_creates_no_history_step ... ok
+test pure_whitespace_hidden_separator_is_accepted_limitation ... ok
+test stale_plan_wrong_version_does_not_touch_buffer ... ok
+test reread_failure_refusal_keeps_buffer_state ... ok
+test visual_multi_edit_batch_refused_without_state_change ... ok
+test visual_replace_range_is_command_authority ... ok
+test successful_plan_and_validation_leave_buffer_untouched ... ok
+test visual_replace_validates_bound_selection_only ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 5 tests
+test raw_fallback_diagnostic_type_and_dump_name_are_stable ... ok
+test synthetic_fence_maps_to_empty_source_anchor_not_real_source ... ok
+test node_budget_fallback_keeps_full_source_without_partial_tree ... ok
+test segment_budget_fallback_keeps_full_source_and_reports_budget_exceeded ... ok
+test mermaid_fence_is_source_only_code_block_without_render_backend ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 19 tests
+test cooperative_cancel_stops_deep_nesting_without_hanging ... ok
+test deep_nesting_terminates_with_raw_fallback ... ok
+test mapping_point_budget_also_caps_projection_segments ... ok
+test injected_node_budget_terminates_before_publishing_partial_tree ... ok
+test mapping_point_budget_is_counted_in_stats_and_enforced ... ok
+test deep_nesting_within_budget_keeps_full_text ... ok
+test pre_cancelled_parse_returns_cancelled_without_tree ... ok
+test filtered_html_scan_steps_match_the_real_scanner ... ok
+test repeated_unclosed_tags_fall_back_to_whole_source_without_truncation ... ok
+test rewritten_budget_failure_returns_budget_error_not_partial_text ... ok
+test scan_step_budget_failure_falls_back_to_whole_source ... ok
+test repeated_unclosed_quotes_stay_linear_and_keep_source ... ok
+test source_budget_is_checked_before_reading ... ok
+test uncancelled_token_preserves_default_parse_result ... ok
+test unfiltered_html_scan_steps_match_the_real_scanner ... ok
+test cooperative_cancel_stops_huge_input_without_hanging ... ok
+test scan_steps_are_measured_by_the_budget_threshold ... ok
+test huge_table_is_not_truncated_within_budget ... ok
+test huge_paragraph_is_not_truncated ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 21 tests
+test entities_inside_html_keep_aligned_mapping ... ok
+test block_whitespace_is_collapsed_and_trimmed_at_edges ... ok
+test comments_and_processing_instructions_are_hidden ... ok
+test cross_nesting_pops_through_outer_tag ... ok
+test html_block_fixture_stays_protected_and_styled ... ok
+test html_budget_failure_falls_back_to_whole_source ... ok
+test filtered_block_tags_display_literal_text ... ok
+test filtered_tags_remain_visible_literal_text ... ok
+test block_tag_boundaries_insert_synthetic_newlines ... ok
+test filtered_inline_tags_display_literal_text ... ok
+test html_entities_decode_with_aligned_mapping ... ok
+test html_whitespace_collapses_with_full_source_coverage ... ok
+test nested_filtered_tags_do_not_leak_styles ... ok
+test nested_supported_tags_merge_styles ... ok
+test quoted_greater_than_does_not_end_tag_early ... ok
+test supported_tags_map_to_styles_and_hide_markup ... ok
+test links_require_allowed_href_schemes ... ok
+test tags_only_html_produces_no_visible_text ... ok
+test unclosed_filtered_tags_keep_remaining_source_visible ... ok
+test unclosed_supported_tag_keeps_style_without_panicking ... ok
+test unsupported_non_void_tags_record_the_v07_pending_asymmetry ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test identity_mapping_refuses_foreign_projection_snapshot_and_invalid_units ... ok
+test identity_mapping_converts_local_global_and_utf16_through_one_service ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 16 tests
+test local_projection_rejects_sources_outside_its_range ... ok
+test local_projection_combines_utf16_offsets_with_source_ranges ... ok
+test hidden_and_synthetic_segments_anchor_without_pretending_bijection ... ok
+test identity_roundtrip_covers_all_char_boundaries ... ok
+test entities_and_escapes_map_as_aligned_segments ... ok
+test br_tag_produces_synthetic_newline ... ok
+test repeated_text_keeps_distinct_segments_and_canonical_anchors ... ok
+test stale_projection_and_snapshot_are_rejected ... ok
+test selections_preserve_direction_and_entity_alignment ... ok
+test consecutive_spaces_stay_exact_and_trailing_newline_hidden ... ok
+test multichar_and_numeric_entities_keep_drawn_width ... ok
+test soft_and_hard_breaks_are_exact_or_aligned ... ok
+test tab_and_combining_character_keep_utf8_boundaries ... ok
+test utf16_offsets_reject_surrogate_middles ... ok
+test zwj_family_emoji_stays_exact_before_hidden_newline ... ok
+test mapping_goldens_tsv_matches_parser_output ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+test literal_code_does_not_trigger_protection_or_front_matter ... ok
+test html_block_is_protected_as_one_range ... ok
+test front_matter_and_toc_are_protected_independently ... ok
+test inline_html_tags_are_protected_per_tag ... ok
+test adjacent_footnote_references_stay_separate_subranges ... ok
+test raw_fallback_protects_the_whole_source ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test immutable_projection_can_be_carried_by_future_host_tasks ... ok
+test projection_coordinates_are_typed_and_bound_to_one_instance ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 18 tests
+test deleting_multiline_definition_refuses_reuse ... ok
+test insertion_before_rebases_matching_suffix_blocks ... ok
+test config_change_and_raw_fallback_refuse_reuse ... ok
+test edit_inside_one_paragraph_keeps_only_outer_blocks ... ok
+test changing_multiline_definition_target_refuses_reuse ... ok
+test block_quote_fence_changes_refuse_reuse ... ok
+test global_dependencies_refuse_reuse ... ok
+test list_global_dependencies_refuse_reuse ... ok
+test multiline_reference_definitions_refuse_reuse ... ok
+test ordinary_multiline_paragraph_text_still_reuses ... ok
+test html_and_footnote_refuse_reuse_in_both_directions ... ok
+test multiline_label_without_definition_still_reuses ... ok
+test old_absolute_ranges_fail_against_new_snapshot ... ok
+test unrelated_documents_reuse_nothing ... ok
+test block_quote_reference_definition_changes_refuse_reuse ... ok
+test reused_text_matches_full_reparse_block_by_block ... ok
+test plain_block_quote_text_still_reuses ... ok
+test reused_blocks_match_full_reparse_mapping_protection_and_navigation ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 9 tests
+test pre_cancelled_front_matter_rewrite_returns_cancelled ... ok
+test pre_cancelled_rewrite_returns_cancelled_without_text ... ok
+test cancellable_rewrite_stops_between_edits ... ok
+test control_bytes_do_not_collide_with_synthetic_markers ... ok
+test multi_edit_map_preserves_each_source_segment ... ok
+test maps_compose_through_two_rewrite_levels ... ok
+test reversed_overlapping_and_non_boundary_edits_are_rejected ... ok
+test front_matter_is_hidden_in_parse_copy_and_maps_back_to_source ... ok
+test parse_budget_failure_falls_back_to_original_text ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 10 tests
+test literal_code_block_avoids_front_matter_toc_footnote_and_html ... ok
+test empty_document_has_no_blocks_or_gaps ... ok
+test unclosed_front_matter_is_not_swallowed ... ok
+test leading_and_trailing_blank_lines_are_gaps ... ok
+test multiple_blank_lines_are_gaps_between_paragraphs ... ok
+test gfm_features_are_enabled_explicitly ... ok
+test dump_contains_config_blocks_gaps_source_protection_and_diagnostics ... ok
+test basic_blocks_and_gaps_match_handwritten_goldens ... ok
+test front_matter_plus_and_yaml_are_paired ... ok
+test fixture_blocks_and_gaps_match_handwritten_goldens ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 10 tests
+test atomic::tests::atomic_zero_write_is_rejected_as_write_zero_without_sync ... ok
+test atomic::tests::atomic_write_cancellation_stops_before_next_write ... ok
+test atomic::tests::atomic_cancellation_after_complete_write_stops_before_sync ... ok
+test atomic::tests::atomic_interrupted_write_is_retried_without_losing_bytes ... ok
+test atomic::tests::atomic_partial_write_failure_reports_write_stage_without_sync ... ok
+test atomic::tests::atomic_write_budget_rejects_before_any_write ... ok
+test atomic::tests::atomic_sync_failure_reports_sync_stage_after_full_write ... ok
+test atomic::tests::atomic_existing_target_survives_staging_partial_write_failure ... ok
+test atomic::tests::atomic_existing_target_survives_staging_sync_failure_after_full_write ... ok
+test atomic::tests::atomic_target_race_after_check_is_conflict_and_preserves_racer_bytes ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 7 tests
+test atomic_invalid_paths_budget_and_prepare_cancellation_create_nothing ... ok
+test atomic_staging_creation_failure_preserves_target_and_existing_staging ... ok
+test atomic_replaced_staging_path_is_rejected_without_touching_target ... ok
+test atomic_pre_publish_cancellation_preserves_target_and_staging ... ok
+test atomic_large_source_crosses_write_chunks_and_publishes_exact_bytes ... ok
+test atomic_existing_symlink_and_directory_are_rejected_without_touching_target ... ok
+test atomic_golden_publish_new_and_existing_target_match_independent_expectation ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+
+running 3 tests
+test snapshot_and_decode_budgets_are_distinct_layers ... ok
+test decode_golden_cases_match_independent_expectations ... ok
+test decode_does_not_write_the_original_file ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+test public_encoding_types_are_send_and_sync ... ok
+test budget_boundary_and_categories_are_distinct ... ok
+test encoded_bytes_carry_their_own_baseline_identity ... ok
+test inverse_patches_restore_exact_source_and_original_bytes ... ok
+test encode_golden_cases_match_independent_expectations ... ok
+test guard_rule_roundtrips_all_small_cr_lf_sources ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test storage_snapshot_can_be_carried_by_future_host_tasks ... ok
+test storage_ranges_are_bound_to_their_own_baseline ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 7 tests
+test roundtrip_success_cannot_substitute_requested_text_for_actual_bytes ... ok
+test roundtrip_success_uses_written_bytes_and_keeps_newer_input_unsaved ... ok
+test roundtrip_undo_after_success_never_restores_expired_original_bytes ... ok
+test roundtrip_reload_replaces_identity_policy_and_rejects_old_ranges ... ok
+test roundtrip_failed_save_preserves_host_baseline_and_input_facts ... ok
+test roundtrip_protective_bom_becomes_new_baseline_storage_fact ... ok
+test roundtrip_golden_preserves_bytes_and_local_patch_with_exact_inverse ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test catalog_tests::application_name_consumes_embedded_catalog ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 22 tests
+test case_8_1_09_repeated_snapshot_keeps_same_id ... ok
+test case_8_1_11_first_commit_makes_node_one ... ok
+test case_8_1_05_commit_group_keeps_block_open ... ok
+test case_8_1_06_snapshot_after_commit_has_no_side_effects ... ok
+test case_8_1_10_redo_sequence_starts_from_fresh_draft ... ok
+test case_8_1_08_snapshot_after_new_draft ... ok
+test case_8_1_07_typing_after_commit_opens_new_draft ... ok
+test case_8_1_01_typing_enters_unique_draft ... ok
+test case_8_1_04_snapshot_text_equals_latest_draft ... ok
+test case_8_1_03_adjacent_input_merges_within_900ms ... ok
+test case_8_1_02_snapshot_keeps_identity_and_does_not_commit ... ok
+test case_8_1_12_sealed_group_is_not_merged_again ... ok
+test case_8_1_13_second_commit_makes_node_two ... ok
+test case_8_1_14_undo_restores_before_selection ... ok
+test case_8_1_15_snapshot_preserves_redo ... ok
+test case_8_1_16_redo_restores_after_selection ... ok
+test case_8_1_17_snapshot_rejects_stale_baseline ... ok
+test case_8_1_18_typing_rejects_stale_baseline ... ok
+test case_8_1_19_commit_rejects_stale_baseline ... ok
+test case_8_1_20_leave_rejects_stale_baseline_without_dropping_block ... ok
+test case_8_1_22_non_boundary_typing_is_rejected ... ok
+test case_8_1_21_commit_after_close_returns_no_open_block ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 25 tests
+test case_8_3_07_cancelled_composition_identity_is_stale ... ok
+test case_8_3_09_cancel_keeps_existing_committed_input ... ok
+test case_8_3_01_first_update_opens_composition_implicitly ... ok
+test case_8_3_05_update_after_commit_opens_new_composition ... ok
+test case_8_3_02_update_replaces_candidate ... ok
+test case_8_3_10_empty_candidate_commit_is_unchanged ... ok
+test case_8_3_06_cancel_restores_pre_composition_state ... ok
+test case_8_3_03_identical_update_advances_draft_generation ... ok
+test case_8_3_04_commit_makes_single_ime_node ... ok
+test case_8_3_08_ime_commit_does_not_merge_adjacent_typing_node ... ok
+test case_8_3_11_begin_wait_has_no_snapshot_side_effect ... ok
+test case_8_3_12_second_wait_is_rejected ... ok
+test case_8_3_13_wait_does_not_freeze_candidate_updates ... ok
+test case_8_3_14_finish_during_composition_is_rejected ... ok
+test case_8_3_15_commit_keeps_wait_pending ... ok
+test case_8_3_17_save_as_wait_is_established ... ok
+test case_8_3_16_finish_returns_post_composition_snapshot ... ok
+test case_8_3_18_export_wait_is_established ... ok
+test case_8_3_20_finish_cancelled_wait_is_unknown ... ok
+test case_8_3_19_cancel_request_only_changes_wait ... ok
+test case_8_3_21_update_clears_cancelled_wait ... ok
+test case_8_3_23_autosave_has_no_doc_core_entry ... ok
+test case_8_3_22_cancel_after_wait_restores_pre_composition ... ok
+test case_8_3_24_restore_read_keeps_snapshot_identity ... ok
+test case_8_3_25_composition_does_not_merge_pending_typing_draft ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 17 tests
+test case_8_4_09_rejects_result_for_closed_target ... ok
+test case_8_4_04_rejects_bad_draft_generation ... ok
+test case_8_4_05_rejects_request_captured_before_commit ... ok
+test case_8_4_08_missing_request_identity_field ... ok
+test case_8_4_02_rejects_stale_initial_identity ... ok
+test case_8_4_11_commit_rejects_stale_baseline_without_dropping_block ... ok
+test case_8_4_10_snapshot_rejects_stale_baseline ... ok
+test case_8_4_07_missing_parse_config_identity_field ... ok
+test case_8_4_01_accepts_current_result_without_side_effects ... ok
+test case_8_4_06_rejects_identity_after_pending_undo ... ok
+test case_8_4_03_rejects_other_document_identity ... ok
+test case_8_4_12_rejects_old_projection_and_keeps_input ... ok
+test case_8_4_13_reload_forms_independent_history_boundary ... ok
+test case_8_4_14_undo_reload_restores_previous_text ... ok
+test case_8_4_15_redo_reload_restores_reloaded_text ... ok
+test case_8_4_17_file_coordination_has_no_doc_core_entry ... ok
+test case_8_4_16_unchanged_reload_preserves_redo ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 25 tests
+test case_8_2_05_commit_after_900_merge_makes_one_node ... ok
+test case_8_2_06_commit_after_split_makes_second_node ... ok
+test case_8_2_04_commit_after_899_merge_makes_one_node ... ok
+test case_8_2_10_non_adjacent_group_commits_independently ... ok
+test case_8_2_07_explicit_commit_is_group_boundary ... ok
+test case_8_2_02_900ms_merges_on_closed_boundary ... ok
+test case_8_2_09_non_adjacent_input_splits_group ... ok
+test case_8_2_01_899ms_merges ... ok
+test case_8_2_03_901ms_splits_and_commits_old_group ... ok
+test case_8_2_08_seal_prevents_merge_of_commits ... ok
+test case_8_2_11_commit_without_pending_group_is_unchanged ... ok
+test case_8_2_12_leave_commits_remaining_group_and_closes ... ok
+test case_8_2_13_escape_commits_remaining_group_and_closes ... ok
+test case_8_2_15_undo_prefers_pending_draft ... ok
+test case_8_2_14_escape_after_close_is_rejected ... ok
+test case_8_2_16_redo_restores_pending_group ... ok
+test case_8_2_17_undo_pending_draft_before_committed_node ... ok
+test case_8_2_18_second_undo_undoes_node_one ... ok
+test case_8_2_19_redo_restores_node_one ... ok
+test case_8_2_20_snapshot_does_not_seal_group ... ok
+test case_8_2_21_typing_after_snapshot_still_merges ... ok
+test case_8_2_23_mode_switch_has_no_doc_core_entry ... ok
+test case_8_2_22_snapshot_and_typing_produce_one_node ... ok
+test case_8_2_24_typing_after_ime_commit_is_ordinary ... ok
+test case_8_2_25_post_ime_input_commits_as_one_step ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test input_identity_can_be_carried_by_future_host_tasks ... ok
+test input_identity_rejects_wrong_document_or_working_version ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

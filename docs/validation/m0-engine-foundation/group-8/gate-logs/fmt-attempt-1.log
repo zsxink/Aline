@@ -1,0 +1,889 @@
+=== 2026-10-31T11:11:49Z cargo fmt --all --check ===
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/src/document/doc_core.rs:14:
+ 
+ use aline_buffer::{
+     ApplyOutcome, BufferError, CheckedBatch, DocumentRevision, LineIndexBudget, OperationSource,
+[31m-    PatchBudget, ReloadOutcome, SelectionSpec, StringBuffer, TextBudget, TextSnapshot,
+(B[m[31m-    TYPING_MERGE_WINDOW_MILLIS,
+(B[m[32m+    PatchBudget, ReloadOutcome, SelectionSpec, StringBuffer, TYPING_MERGE_WINDOW_MILLIS,
+(B[m[32m+    TextBudget, TextSnapshot,
+(B[m };
+ 
+ use crate::document::composition::{CompositionState, CompositionView};
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/src/document/doc_core.rs:44:
+         index: LineIndexBudget,
+         history: aline_buffer::HistoryBudget,
+     ) -> Self {
+[31m-        Self { text, index, history }
+(B[m[32m+        Self {
+(B[m[32m+            text,
+(B[m[32m+            index,
+(B[m[32m+            history,
+(B[m[32m+        }
+(B[m     }
+ 
+     /// 返回文本字节预算。
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/src/document/doc_core.rs:291:
+         }
+         let base = self.buffer.snapshot();
+         base.src_range(range.clone()).map_err(DocError::Buffer)?;
+[31m-        base.src_offset(selection.anchor()).map_err(DocError::Buffer)?;
+(B[m[31m-        base.src_offset(selection.head()).map_err(DocError::Buffer)?;
+(B[m[32m+        base.src_offset(selection.anchor())
+(B[m[32m+            .map_err(DocError::Buffer)?;
+(B[m[32m+        base.src_offset(selection.head())
+(B[m[32m+            .map_err(DocError::Buffer)?;
+(B[m         let fragment = slice_buffer(&self.buffer, range.clone(), self.limits.text)?;
+         self.open = Some(OpenBlock {
+             baseline_revision: self.buffer.revision(),
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/src/document/doc_core.rs:329:
+     ///
+     /// 到达 900ms 边界时先提交旧组并封口，再以本次输入开启新组；无打开块、
+     /// 基线冲突、组合活动或非法字符边界都拒绝且不改变状态。
+[31m-    pub fn type_text(
+(B[m[31m-        &mut self,
+(B[m[31m-        at: usize,
+(B[m[31m-        text: &str,
+(B[m[31m-        now_millis: u64,
+(B[m[31m-    ) -> Result<(), DocError> {
+(B[m[32m+    pub fn type_text(&mut self, at: usize, text: &str, now_millis: u64) -> Result<(), DocError> {
+(B[m         self.ensure_ready()?;
+         if self.is_composition_active() {
+             return Err(DocError::CompositionActive);
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/src/document/doc_core.rs:424:
+     ///
+     /// 若已有普通输入组，本实现先提交并封口该组再进入组合（T-8-05 的实现决定），
+     /// 保证二者不误并；规范未裁决该状态。
+[31m-    pub fn composition_start(
+(B[m[31m-        &mut self,
+(B[m[31m-        candidate: &str,
+(B[m[31m-        now_millis: u64,
+(B[m[31m-    ) -> Result<(), DocError> {
+(B[m[32m+    pub fn composition_start(&mut self, candidate: &str, now_millis: u64) -> Result<(), DocError> {
+(B[m         self.ensure_ready()?;
+         if self.is_composition_active() {
+             return Err(DocError::CompositionActive);
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/src/document/doc_core.rs:439:
+     /// 更新组合候选；首次更新隐式以当前选区开启组合，之后是候选替换。
+     ///
+     /// 每次更新推进草稿代次，即使候选文本相同（T-8-06 的实现决定）。
+[31m-    pub fn composition_update(
+(B[m[31m-        &mut self,
+(B[m[31m-        candidate: &str,
+(B[m[31m-        now_millis: u64,
+(B[m[31m-    ) -> Result<(), DocError> {
+(B[m[32m+    pub fn composition_update(&mut self, candidate: &str, now_millis: u64) -> Result<(), DocError> {
+(B[m         self.ensure_ready()?;
+         if self.is_composition_active() {
+             self.replace_candidate(candidate)
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/src/document/doc_core.rs:464:
+                 .as_ref()
+                 .and_then(OpenBlock::composition)
+                 .ok_or(DocError::NoComposition)?;
+[31m-            (state.range.clone(), state.candidate.clone(), state.selection)
+(B[m[32m+            (
+(B[m[32m+                state.range.clone(),
+(B[m[32m+                state.candidate.clone(),
+(B[m[32m+                state.selection,
+(B[m[32m+            )
+(B[m         };
+         let batch = CheckedBatch::new(
+             self.buffer.snapshot(),
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/src/document/doc_core.rs:612:
+             return Err(DocError::ClosedTarget);
+         }
+         let snapshot = self.current_snapshot(self.limits.text)?;
+[31m-        let current = InputIdentity::new(
+(B[m[31m-            self.document.clone(),
+(B[m[31m-            self.version,
+(B[m[31m-            snapshot.text(),
+(B[m[31m-        )
+(B[m[31m-        .map_err(DocError::Identity)?;
+(B[m[32m+        let current = InputIdentity::new(self.document.clone(), self.version, snapshot.text())
+(B[m[32m+            .map_err(DocError::Identity)?;
+(B[m         match identity.validate(&current) {
+             Ok(()) => Ok(()),
+             Err(IdentityError::WrongDocument) => Err(DocError::WrongDocument),
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/src/document/doc_core.rs:639:
+             return Err(DocError::CompositionActive);
+         }
+         let next_version = self.version.next_draft().map_err(DocError::Identity)?;
+[31m-        let pending = self
+(B[m[31m-            .open
+(B[m[31m-            .as_ref()
+(B[m[31m-            .and_then(OpenBlock::typing)
+(B[m[31m-            .is_some();
+(B[m[32m+        let pending = self.open.as_ref().and_then(OpenBlock::typing).is_some();
+(B[m         if pending {
+             let (group, range, before_selection) = {
+                 let group = self
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/src/document/doc_core.rs:664:
+             self.snapshot_cache = None;
+             return Ok(());
+         }
+[31m-        let revision = self.buffer.undo(self.limits.text).map_err(DocError::Buffer)?;
+(B[m[32m+        let revision = self
+(B[m[32m+            .buffer
+(B[m[32m+            .undo(self.limits.text)
+(B[m[32m+            .map_err(DocError::Buffer)?;
+(B[m         self.version = self
+             .version
+             .after_commit(revision)
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/src/document/doc_core.rs:705:
+             self.snapshot_cache = None;
+             return Ok(());
+         }
+[31m-        let revision = self.buffer.redo(self.limits.text).map_err(DocError::Buffer)?;
+(B[m[32m+        let revision = self
+(B[m[32m+            .buffer
+(B[m[32m+            .redo(self.limits.text)
+(B[m[32m+            .map_err(DocError::Buffer)?;
+(B[m         self.version = self
+             .version
+             .after_commit(revision)
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/src/document/doc_core.rs:798:
+                 } else if offset <= inserted_end {
+                     let local = offset - group.range.start;
+                     if !group.draft.is_char_boundary(local) {
+[31m-                        return Err(DocError::Buffer(BufferError::NotCharBoundary {
+(B[m[31m-                            offset,
+(B[m[31m-                        }));
+(B[m[32m+                        return Err(DocError::Buffer(BufferError::NotCharBoundary { offset }));
+(B[m                     }
+                 } else {
+                     let shifted = offset
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/src/document/doc_core.rs:826:
+         self.validate_position(block, selection.head())
+     }
+ 
+[31m-    fn append_to_group(
+(B[m[31m-        &mut self,
+(B[m[31m-        at: usize,
+(B[m[31m-        text: &str,
+(B[m[31m-        now_millis: u64,
+(B[m[31m-    ) -> Result<(), DocError> {
+(B[m[32m+    fn append_to_group(&mut self, at: usize, text: &str, now_millis: u64) -> Result<(), DocError> {
+(B[m         let next_version = self.version.next_draft().map_err(DocError::Identity)?;
+         let (start, draft_len, old_draft) = {
+             let group = self
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/src/document/doc_core.rs:872:
+     }
+ 
+     fn start_group(&mut self, at: usize, text: &str, now_millis: u64) -> Result<(), DocError> {
+[31m-        let has_group = self
+(B[m[31m-            .open
+(B[m[31m-            .as_ref()
+(B[m[31m-            .and_then(OpenBlock::typing)
+(B[m[31m-            .is_some();
+(B[m[32m+        let has_group = self.open.as_ref().and_then(OpenBlock::typing).is_some();
+(B[m         let committed_len = {
+             let block = self.open.as_ref().ok_or(DocError::NoOpenBlock)?;
+             match block.typing() {
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/src/document/doc_core.rs:1028:
+     }
+ 
+     fn start_composition(&mut self, candidate: &str, now_millis: u64) -> Result<(), DocError> {
+[31m-        let has_group = self
+(B[m[31m-            .open
+(B[m[31m-            .as_ref()
+(B[m[31m-            .and_then(OpenBlock::typing)
+(B[m[31m-            .is_some();
+(B[m[32m+        let has_group = self.open.as_ref().and_then(OpenBlock::typing).is_some();
+(B[m         let (logical_base, selection) = {
+             let block = self.open.as_ref().ok_or(DocError::NoOpenBlock)?;
+             let base = match block.typing() {
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/src/document/doc_core.rs:1125:
+         let candidate = copy_bounded(candidate, self.limits.text)?;
+         let after_selection = SelectionSpec::new(after, after);
+         let block = self.open.as_mut().ok_or(DocError::NoOpenBlock)?;
+[31m-        let state = block
+(B[m[31m-            .composition_mut()
+(B[m[31m-            .ok_or(DocError::NoComposition)?;
+(B[m[32m+        let state = block.composition_mut().ok_or(DocError::NoComposition)?;
+(B[m         state.candidate = candidate;
+         state.selection = after_selection;
+         block.selection = after_selection;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/src/document/doc_core.rs:1179:
+         }
+     }
+ 
+[31m-    fn build_current_snapshot(
+(B[m[31m-        &self,
+(B[m[31m-        text_budget: TextBudget,
+(B[m[31m-    ) -> Result<CurrentSnapshot, DocError> {
+(B[m[32m+    fn build_current_snapshot(&self, text_budget: TextBudget) -> Result<CurrentSnapshot, DocError> {
+(B[m         let base = self.buffer.snapshot();
+         let Some(block) = self.open.as_ref() else {
+             check_len(base.len_bytes(), text_budget)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/src/document/doc_core.rs:1205:
+         let replaced = base
+             .src_range(block.range.clone())
+             .map_err(DocError::Buffer)?;
+[31m-        let text = TextSnapshot::with_overlay(
+(B[m[31m-            base,
+(B[m[31m-            replaced,
+(B[m[31m-            Arc::new(draft.to_owned()),
+(B[m[31m-            text_budget,
+(B[m[31m-        )
+(B[m[31m-        .map_err(DocError::Buffer)?;
+(B[m[32m+        let text =
+(B[m[32m+            TextSnapshot::with_overlay(base, replaced, Arc::new(draft.to_owned()), text_budget)
+(B[m[32m+                .map_err(DocError::Buffer)?;
+(B[m         let selection = bind_selection(&text, block.selection)?;
+         Ok(CurrentSnapshot::new(
+             self.document.clone(),
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/src/document/doc_core.rs:1276:
+     selection: SelectionSpec,
+ ) -> Result<aline_buffer::SrcSelection, DocError> {
+     aline_buffer::SrcSelection::new(
+[31m-        snapshot.src_offset(selection.anchor()).map_err(DocError::Buffer)?,
+(B[m[31m-        snapshot.src_offset(selection.head()).map_err(DocError::Buffer)?,
+(B[m[32m+        snapshot
+(B[m[32m+            .src_offset(selection.anchor())
+(B[m[32m+            .map_err(DocError::Buffer)?,
+(B[m[32m+        snapshot
+(B[m[32m+            .src_offset(selection.head())
+(B[m[32m+            .map_err(DocError::Buffer)?,
+(B[m     )
+     .map_err(DocError::Buffer)
+ }
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/src/document/publication.rs:60:
+ 
+ impl WaitView {
+     /// 构造等待视图；仅由文档核心使用。
+[31m-    pub(crate) const fn new(
+(B[m[31m-        handle: WaitHandle,
+(B[m[31m-        kind: PublicationKind,
+(B[m[31m-        status: WaitStatus,
+(B[m[31m-    ) -> Self {
+(B[m[32m+    pub(crate) const fn new(handle: WaitHandle, kind: PublicationKind, status: WaitStatus) -> Self {
+(B[m         Self {
+             handle,
+             kind,
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/src/document/snapshot.rs:5:
+ //! 形成覆盖视图，快照身份随工作版本缓存，保证同一工作版本重复读取得到同一
+ //! `SnapshotId`。
+ 
+[31m-use aline_buffer::{
+(B[m[31m-    BufferError, SrcSelection, SnapshotId, TextBudget, TextSnapshot,
+(B[m[31m-};
+(B[m[32m+use aline_buffer::{BufferError, SnapshotId, SrcSelection, TextBudget, TextSnapshot};
+(B[m 
+ use crate::document::identity::{DocumentId, WorkingVersion};
+ 
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/common/mod.rs:7:
+ 
+ use std::ops::Range;
+ 
+[31m-use aline_buffer::{
+(B[m[31m-    DocumentRevision, HistoryBudget, LineIndexBudget, SelectionSpec, TextBudget,
+(B[m[31m-};
+(B[m[32m+use aline_buffer::{DocumentRevision, HistoryBudget, LineIndexBudget, SelectionSpec, TextBudget};
+(B[m use aline_ui::{
+     CommitOutcome, DocCore, DocError, DocLimits, DocumentId, DraftGeneration, InputIdentity,
+     PublicationKind, PublicationResult, WaitHandle, WaitStatus, WorkingVersion,
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/common/mod.rs:89:
+ }
+ 
+ /// 断言打开块基线、草稿与逻辑选区。
+[31m-pub fn assert_open(
+(B[m[31m-    doc: &DocCore,
+(B[m[31m-    baseline: u64,
+(B[m[31m-    draft: Option<&str>,
+(B[m[31m-    anchor: usize,
+(B[m[31m-    head: usize,
+(B[m[31m-) {
+(B[m[32m+pub fn assert_open(doc: &DocCore, baseline: u64, draft: Option<&str>, anchor: usize, head: usize) {
+(B[m     assert!(doc.has_open_block());
+     assert_eq!(
+         doc.open_block_baseline().map(DocumentRevision::value),
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document.rs:11:
+ use common::{
+     TEXT, assert_buffer, assert_closed, assert_committed, assert_composition, assert_history,
+     assert_new_snapshot, assert_open, assert_rejected_without_change, assert_revision,
+[31m-    assert_same_snapshot, assert_snapshot, assert_version, assert_wait, capture, collapsed, new_doc,
+(B[m[31m-    snapshot_id,
+(B[m[32m+    assert_same_snapshot, assert_snapshot, assert_version, assert_wait, capture, collapsed,
+(B[m[32m+    new_doc, snapshot_id,
+(B[m };
+ 
+ fn f1() -> Result<DocCore, DocError> {
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document.rs:111:
+ fn fixture_x() -> Result<DocCore, DocError> {
+     let mut doc = after_8_1_01()?;
+     let outcome = doc.reload("xZ\n", collapsed(2), 30)?;
+[31m-    assert!(matches!(outcome, aline_buffer::ReloadOutcome::Changed { .. }));
+(B[m[32m+    assert!(matches!(
+(B[m[32m+        outcome,
+(B[m[32m+        aline_buffer::ReloadOutcome::Changed { .. }
+(B[m[32m+    ));
+(B[m     Ok(doc)
+ }
+ 
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document.rs:135:
+ }
+ 
+ #[test]
+[31m-fn case_8_1_02_snapshot_keeps_identity_and_does_not_commit() -> Result<(), Box<dyn std::error::Error>>
+(B[m[31m-{
+(B[m[32m+fn case_8_1_02_snapshot_keeps_identity_and_does_not_commit()
+(B[m[32m+-> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.1-02：同一工作版本重复读取保留同一 SnapshotId。
+     let mut doc = after_8_1_01()?;
+     let first = snapshot_id(&mut doc)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document.rs:202:
+ }
+ 
+ #[test]
+[31m-fn case_8_1_06_snapshot_after_commit_has_no_side_effects()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_1_06_snapshot_after_commit_has_no_side_effects() -> Result<(), Box<dyn std::error::Error>>
+(B[m[32m+{
+(B[m     // TSV 8.1-06：快照不压缩历史、不封口、不清 redo。
+     let mut doc = after_8_1_05()?;
+     let first = snapshot_id(&mut doc)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document.rs:426:
+ }
+ 
+ #[test]
+[31m-fn case_8_1_21_commit_after_close_returns_no_open_block()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_1_21_commit_after_close_returns_no_open_block() -> Result<(), Box<dyn std::error::Error>>
+(B[m[32m+{
+(B[m     // TSV 8.1-21：唯一打开槽位已关闭，拒绝且状态零变化。
+     let mut doc = after_8_1_21()?;
+     assert_buffer(&doc, "xa\n")?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/common/mod.rs:7:
+ 
+ use std::ops::Range;
+ 
+[31m-use aline_buffer::{
+(B[m[31m-    DocumentRevision, HistoryBudget, LineIndexBudget, SelectionSpec, TextBudget,
+(B[m[31m-};
+(B[m[32m+use aline_buffer::{DocumentRevision, HistoryBudget, LineIndexBudget, SelectionSpec, TextBudget};
+(B[m use aline_ui::{
+     CommitOutcome, DocCore, DocError, DocLimits, DocumentId, DraftGeneration, InputIdentity,
+     PublicationKind, PublicationResult, WaitHandle, WaitStatus, WorkingVersion,
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/common/mod.rs:89:
+ }
+ 
+ /// 断言打开块基线、草稿与逻辑选区。
+[31m-pub fn assert_open(
+(B[m[31m-    doc: &DocCore,
+(B[m[31m-    baseline: u64,
+(B[m[31m-    draft: Option<&str>,
+(B[m[31m-    anchor: usize,
+(B[m[31m-    head: usize,
+(B[m[31m-) {
+(B[m[32m+pub fn assert_open(doc: &DocCore, baseline: u64, draft: Option<&str>, anchor: usize, head: usize) {
+(B[m     assert!(doc.has_open_block());
+     assert_eq!(
+         doc.open_block_baseline().map(DocumentRevision::value),
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_composition.rs:5:
+ 
+ mod common;
+ 
+[31m-use aline_ui::{
+(B[m[31m-    CommitOutcome, DocCore, DocError, PublicationKind, PublicationOutcome, WaitStatus,
+(B[m[31m-};
+(B[m[32m+use aline_ui::{CommitOutcome, DocCore, DocError, PublicationKind, PublicationOutcome, WaitStatus};
+(B[m use common::{
+[31m-    TEXT, State, assert_buffer, assert_committed, assert_composition, assert_handle, assert_history,
+(B[m[31m-    assert_new_snapshot, assert_open, assert_rejected_without_change, assert_same_snapshot,
+(B[m[31m-    assert_snapshot, assert_version, assert_wait, capture, current_identity, new_doc,
+(B[m[31m-    publication_snapshot, snapshot_id,
+(B[m[32m+    State, TEXT, assert_buffer, assert_committed, assert_composition, assert_handle,
+(B[m[32m+    assert_history, assert_new_snapshot, assert_open, assert_rejected_without_change,
+(B[m[32m+    assert_same_snapshot, assert_snapshot, assert_version, assert_wait, capture, current_identity,
+(B[m[32m+    new_doc, publication_snapshot, snapshot_id,
+(B[m };
+ 
+ fn f1() -> Result<DocCore, DocError> {
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_composition.rs:74:
+ }
+ 
+ #[test]
+[31m-fn case_8_3_01_first_update_opens_composition_implicitly()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_3_01_first_update_opens_composition_implicitly() -> Result<(), Box<dyn std::error::Error>>
+(B[m[32m+{
+(B[m     // TSV 8.3-01：首次 update 以当前选区隐式开启组合（T-8-08）。
+     let mut doc = f1()?;
+     let base = snapshot_id(&mut doc)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_composition.rs:111:
+ }
+ 
+ #[test]
+[31m-fn case_8_3_03_identical_update_advances_draft_generation()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_3_03_identical_update_advances_draft_generation() -> Result<(), Box<dyn std::error::Error>>
+(B[m[32m+{
+(B[m     // TSV 8.3-03：同等文本仍推进 dg（T-8-06），历史与 revision 不变。
+     let mut doc = c1_composition_zhong()?;
+     doc.composition_update("中国", 10)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_composition.rs:152:
+ }
+ 
+ #[test]
+[31m-fn case_8_3_05_update_after_commit_opens_new_composition()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_3_05_update_after_commit_opens_new_composition() -> Result<(), Box<dyn std::error::Error>>
+(B[m[32m+{
+(B[m     // TSV 8.3-05：确认后再输入开启新组合；候选不落盘。
+     let mut doc = after_8_3_04()?;
+     let before = snapshot_id(&mut doc)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_composition.rs:171:
+ }
+ 
+ #[test]
+[31m-fn case_8_3_06_cancel_restores_pre_composition_state()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_3_06_cancel_restores_pre_composition_state() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.3-06：取消恢复组合前选区；无空史步，dg 推进。
+     let mut doc = c1_composition_zhong()?;
+     let before = snapshot_id(&mut doc)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_composition.rs:190:
+ }
+ 
+ #[test]
+[31m-fn case_8_3_07_cancelled_composition_identity_is_stale()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_3_07_cancelled_composition_identity_is_stale() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.3-07：取消后旧候选身份的 SnapshotId/WorkingVersion 不得复活。
+     let mut doc = c1_composition_zhong()?;
+     let old_identity = current_identity(&mut doc)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_composition.rs:230:
+ }
+ 
+ #[test]
+[31m-fn case_8_3_09_cancel_keeps_existing_committed_input()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_3_09_cancel_keeps_existing_committed_input() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.3-09：既有输入 "a" 不丢；取消不新增历史步。
+     let mut doc = setup_8_3_08()?;
+     let before = snapshot_id(&mut doc)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_composition.rs:249:
+ }
+ 
+ #[test]
+[31m-fn case_8_3_10_empty_candidate_commit_is_unchanged()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_3_10_empty_candidate_commit_is_unchanged() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.3-10：空候选确认走 apply 的 Unchanged；组合结束推进 dg（T-8-07）。
+     let mut doc = f1()?;
+     doc.composition_update("", 0)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_composition.rs:276:
+ }
+ 
+ #[test]
+[31m-fn case_8_3_11_begin_wait_has_no_snapshot_side_effect()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_3_11_begin_wait_has_no_snapshot_side_effect() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.3-11：begin 不取快照、不封口、不改输入/历史/版本。
+     let mut doc = c1_composition_zhong()?;
+     let before = capture(&mut doc)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_composition.rs:296:
+     assert_handle(handle);
+     assert_rejected_without_change(
+         &mut doc,
+[31m-        |doc| doc.begin_publication_wait(PublicationKind::SaveAs).map(|_| ()),
+(B[m[32m+        |doc| {
+(B[m[32m+            doc.begin_publication_wait(PublicationKind::SaveAs)
+(B[m[32m+                .map(|_| ())
+(B[m[32m+        },
+(B[m         |error| matches!(error, DocError::PublicationInFlight),
+     )?;
+     assert_wait(&doc, Some((PublicationKind::Save, WaitStatus::Pending)));
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_composition.rs:304:
+ }
+ 
+ #[test]
+[31m-fn case_8_3_13_wait_does_not_freeze_candidate_updates()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_3_13_wait_does_not_freeze_candidate_updates() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.3-13：发布等待不冻结输入；确认时须取最终快照。
+     let (mut doc, _) = after_8_3_11()?;
+     let before = snapshot_id(&mut doc)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_composition.rs:323:
+ }
+ 
+ #[test]
+[31m-fn case_8_3_14_finish_during_composition_is_rejected()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_3_14_finish_during_composition_is_rejected() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.3-14：平台自然结束前不得发布候选，等待保持。
+     let (mut doc, handle) = after_8_3_13()?;
+     assert_rejected_without_change(
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_composition.rs:360:
+ }
+ 
+ #[test]
+[31m-fn case_8_3_16_finish_returns_post_composition_snapshot()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_3_16_finish_returns_post_composition_snapshot() -> Result<(), Box<dyn std::error::Error>>
+(B[m[32m+{
+(B[m     // TSV 8.3-16：取自然结束后的当前快照；发布不新增步、不封口、不清 redo。
+     let (mut doc, handle) = after_8_3_13()?;
+     doc.composition_commit(30)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_composition.rs:368:
+     let before = snapshot_id(&mut doc)?;
+     let result = doc.finish_publication(handle, PublicationOutcome::PlatformConfirmed, 40)?;
+[31m-    let current = publication_snapshot(result, PublicationKind::Save, PublicationOutcome::PlatformConfirmed);
+(B[m[32m+    let current = publication_snapshot(
+(B[m[32m+        result,
+(B[m[32m+        PublicationKind::Save,
+(B[m[32m+        PublicationOutcome::PlatformConfirmed,
+(B[m[32m+    );
+(B[m     let after = current.snapshot_id().clone();
+     assert_same_snapshot(&before, &after);
+     assert_eq!(current.full_text(TEXT)?, "x中国\n");
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_composition.rs:418:
+ }
+ 
+ #[test]
+[31m-fn case_8_3_20_finish_cancelled_wait_is_unknown()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_3_20_finish_cancelled_wait_is_unknown() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.3-20：取消请求后同一等待不再有效；状态不变。
+     let (mut doc, handle) = after_8_3_11()?;
+     doc.request_cancel_wait(handle)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_composition.rs:455:
+ }
+ 
+ #[test]
+[31m-fn case_8_3_22_cancel_after_wait_restores_pre_composition()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_3_22_cancel_after_wait_restores_pre_composition() -> Result<(), Box<dyn std::error::Error>>
+(B[m[32m+{
+(B[m     // TSV 8.3-22：无空史步、revision 不前进；无发布发生。
+     let (mut doc, handle) = after_8_3_11()?;
+     doc.request_cancel_wait(handle)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_composition.rs:491:
+ }
+ 
+ #[test]
+[31m-fn case_8_3_24_restore_read_keeps_snapshot_identity()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_3_24_restore_read_keeps_snapshot_identity() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.3-24：恢复读取返回含候选的快照；不建立等待、不结束组合。
+     let mut doc = c1_composition_zhong()?;
+     let first = snapshot_id(&mut doc)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/common/mod.rs:7:
+ 
+ use std::ops::Range;
+ 
+[31m-use aline_buffer::{
+(B[m[31m-    DocumentRevision, HistoryBudget, LineIndexBudget, SelectionSpec, TextBudget,
+(B[m[31m-};
+(B[m[32m+use aline_buffer::{DocumentRevision, HistoryBudget, LineIndexBudget, SelectionSpec, TextBudget};
+(B[m use aline_ui::{
+     CommitOutcome, DocCore, DocError, DocLimits, DocumentId, DraftGeneration, InputIdentity,
+     PublicationKind, PublicationResult, WaitHandle, WaitStatus, WorkingVersion,
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/common/mod.rs:89:
+ }
+ 
+ /// 断言打开块基线、草稿与逻辑选区。
+[31m-pub fn assert_open(
+(B[m[31m-    doc: &DocCore,
+(B[m[31m-    baseline: u64,
+(B[m[31m-    draft: Option<&str>,
+(B[m[31m-    anchor: usize,
+(B[m[31m-    head: usize,
+(B[m[31m-) {
+(B[m[32m+pub fn assert_open(doc: &DocCore, baseline: u64, draft: Option<&str>, anchor: usize, head: usize) {
+(B[m     assert!(doc.has_open_block());
+     assert_eq!(
+         doc.open_block_baseline().map(DocumentRevision::value),
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_results.rs:150:
+ }
+ 
+ #[test]
+[31m-fn case_8_4_05_rejects_request_captured_before_commit()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_4_05_rejects_request_captured_before_commit() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.4-05：revision 0 != 1；提交结果保留，旧请求不得回退文本。
+     let mut doc = p_a()?;
+     let i1 = current_identity(&mut doc)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_results.rs:175:
+ }
+ 
+ #[test]
+[31m-fn case_8_4_06_rejects_identity_after_pending_undo()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_4_06_rejects_identity_after_pending_undo() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.4-06：文本回到 "x\n" 但 dg0 != dg2；不能按内容相等接受。
+     // 撤销待定组不触碰 Buffer，故撤销后的快照复用未变 Buffer 的 SnapshotId；
+     // 这里的 snapshot_id=new 相对撤销前的草稿快照成立。
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_results.rs:207:
+ }
+ 
+ #[test]
+[31m-fn case_8_4_07_missing_parse_config_identity_field()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_4_07_missing_parse_config_identity_field() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.4-07：规范要求结果身份含解析配置代次，identity.rs 未暴露。
+     // outcome/error 列为“待定”（T-8-10），测试不调用采纳，也不断言该列；
+     // 只断言已确定的状态列。
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_results.rs:223:
+ }
+ 
+ #[test]
+[31m-fn case_8_4_08_missing_request_identity_field()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_4_08_missing_request_identity_field() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.4-08：旧请求身份字段缺口；状态本身不变。
+     // outcome/error 列为“待定”（T-8-10），测试不调用采纳，也不断言该列。
+     let mut doc = p_a()?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_results.rs:238:
+ }
+ 
+ #[test]
+[31m-fn case_8_4_09_rejects_result_for_closed_target()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_4_09_rejects_result_for_closed_target() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.4-09：版本/快照均匹配但目标已关闭；不复活关闭对象。
+     let mut doc = p_a()?;
+     doc.commit_open_block(10)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_results.rs:267:
+ }
+ 
+ #[test]
+[31m-fn case_8_4_10_snapshot_rejects_stale_baseline()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_4_10_snapshot_rejects_stale_baseline() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.4-10：基线 rev0 != 当前 rev1；保留草稿/选区；dg 为“待定”。
+     let mut doc = fixture_x()?;
+     assert_buffer(&doc, "xZ\n")?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_results.rs:305:
+ }
+ 
+ #[test]
+[31m-fn case_8_4_12_rejects_old_projection_and_keeps_input()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_4_12_rejects_old_projection_and_keeps_input() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.4-12：中间版本 S1 的投影不得套到新草稿；"ab" 与选区保留。
+     let mut doc = p_a()?;
+     let i1 = current_identity(&mut doc)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_results.rs:326:
+ }
+ 
+ #[test]
+[31m-fn case_8_4_13_reload_forms_independent_history_boundary()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_4_13_reload_forms_independent_history_boundary() -> Result<(), Box<dyn std::error::Error>>
+(B[m[32m+{
+(B[m     // TSV 8.4-13：节点 source=Reload，不并入 Typing；只改内存。
+     // dg 为“待定”（T-8-13），按实现 after_commit 推进，故不断言该值。
+     let mut doc = after_8_4_09()?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_results.rs:350:
+ }
+ 
+ #[test]
+[31m-fn case_8_4_14_undo_reload_restores_previous_text()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_4_14_undo_reload_restores_previous_text() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.4-14：取 Reload 首步 before_selection 2:2；节点不删除。
+     let mut doc = after_8_4_13()?;
+     let before = snapshot_id(&mut doc)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_results.rs:369:
+ }
+ 
+ #[test]
+[31m-fn case_8_4_15_redo_reload_restores_reloaded_text()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_4_15_redo_reload_restores_reloaded_text() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.4-15：取 Reload 末步 after_selection 2:2；节点不删除。
+     let mut doc = after_8_4_14()?;
+     let before = snapshot_id(&mut doc)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_results.rs:388:
+ }
+ 
+ #[test]
+[31m-fn case_8_4_16_unchanged_reload_preserves_redo()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_4_16_unchanged_reload_preserves_redo() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.4-16：旧文本==新文本时返回 Unchanged，不调用 prepare_record，
+     // redo 分支不截断；节点/版本/选区不变，snapshot_id=same。
+     let mut doc = after_8_4_14()?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_results.rs:411:
+ }
+ 
+ #[test]
+[31m-fn case_8_4_17_file_coordination_has_no_doc_core_entry()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_4_17_file_coordination_has_no_doc_core_entry() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.4-17：磁盘写回执归宿主；DocCore 不承担文件协调（M0 范围外）。
+     // outcome/error 列为“待定（无入口）”，测试不调用文件协调，也不断言该列。
+     let mut doc = after_8_4_09()?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/common/mod.rs:7:
+ 
+ use std::ops::Range;
+ 
+[31m-use aline_buffer::{
+(B[m[31m-    DocumentRevision, HistoryBudget, LineIndexBudget, SelectionSpec, TextBudget,
+(B[m[31m-};
+(B[m[32m+use aline_buffer::{DocumentRevision, HistoryBudget, LineIndexBudget, SelectionSpec, TextBudget};
+(B[m use aline_ui::{
+     CommitOutcome, DocCore, DocError, DocLimits, DocumentId, DraftGeneration, InputIdentity,
+     PublicationKind, PublicationResult, WaitHandle, WaitStatus, WorkingVersion,
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/common/mod.rs:89:
+ }
+ 
+ /// 断言打开块基线、草稿与逻辑选区。
+[31m-pub fn assert_open(
+(B[m[31m-    doc: &DocCore,
+(B[m[31m-    baseline: u64,
+(B[m[31m-    draft: Option<&str>,
+(B[m[31m-    anchor: usize,
+(B[m[31m-    head: usize,
+(B[m[31m-) {
+(B[m[32m+pub fn assert_open(doc: &DocCore, baseline: u64, draft: Option<&str>, anchor: usize, head: usize) {
+(B[m     assert!(doc.has_open_block());
+     assert_eq!(
+         doc.open_block_baseline().map(DocumentRevision::value),
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_typing.rs:135:
+ }
+ 
+ #[test]
+[31m-fn case_8_2_03_901ms_splits_and_commits_old_group()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_2_03_901ms_splits_and_commits_old_group() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.2-03：901 > 900，旧组提交并封口，dg 从 1→3（T-8-04）。
+     let mut doc = p_a()?;
+     let before = snapshot_id(&mut doc)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_typing.rs:153:
+ }
+ 
+ #[test]
+[31m-fn case_8_2_04_commit_after_899_merge_makes_one_node()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_2_04_commit_after_899_merge_makes_one_node() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.2-04：899 侧提交为一个节点，提交后块仍打开。
+     let mut doc = after_8_2_01()?;
+     let before = snapshot_id(&mut doc)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_typing.rs:172:
+ }
+ 
+ #[test]
+[31m-fn case_8_2_05_commit_after_900_merge_makes_one_node()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_2_05_commit_after_900_merge_makes_one_node() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.2-05：900 侧只产生一个节点，闭区间边界不拆组。
+     let mut doc = after_8_2_02()?;
+     let outcome = doc.commit_open_block(902)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_typing.rs:187:
+ }
+ 
+ #[test]
+[31m-fn case_8_2_06_commit_after_split_makes_second_node()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_2_06_commit_after_split_makes_second_node() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.2-06：901 侧为第二个节点，node=2。
+     let mut doc = after_8_2_03()?;
+     let outcome = doc.commit_open_block(903)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_typing.rs:240:
+ }
+ 
+ #[test]
+[31m-fn case_8_2_10_non_adjacent_group_commits_independently()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_2_10_non_adjacent_group_commits_independently() -> Result<(), Box<dyn std::error::Error>>
+(B[m[32m+{
+(B[m     // TSV 8.2-10：node=2，非相邻输入形成独立组。
+     let mut doc = after_8_2_09()?;
+     let outcome = doc.commit_open_block(110)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_typing.rs:255:
+ }
+ 
+ #[test]
+[31m-fn case_8_2_11_commit_without_pending_group_is_unchanged()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_2_11_commit_without_pending_group_is_unchanged() -> Result<(), Box<dyn std::error::Error>>
+(B[m[32m+{
+(B[m     // TSV 8.2-11：无待定组时不产生空步；snapshot_id 保持 same。
+     let mut doc = after_8_2_08()?;
+     let before = snapshot_id(&mut doc)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_typing.rs:273:
+ }
+ 
+ #[test]
+[31m-fn case_8_2_12_leave_commits_remaining_group_and_closes()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_2_12_leave_commits_remaining_group_and_closes() -> Result<(), Box<dyn std::error::Error>>
+(B[m[32m+{
+(B[m     // TSV 8.2-12：离块只处理剩余组 Y，node=2。
+     let mut doc = after_8_2_12()?;
+     let before = snapshot_id(&mut doc)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_typing.rs:291:
+ }
+ 
+ #[test]
+[31m-fn case_8_2_13_escape_commits_remaining_group_and_closes()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_2_13_escape_commits_remaining_group_and_closes() -> Result<(), Box<dyn std::error::Error>>
+(B[m[32m+{
+(B[m     // TSV 8.2-13：非组合 Escape 提交剩余组而非丢弃。
+     let mut doc = after_8_2_12()?;
+     doc.escape(200)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_typing.rs:357:
+ }
+ 
+ #[test]
+[31m-fn case_8_2_17_undo_pending_draft_before_committed_node()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_2_17_undo_pending_draft_before_committed_node() -> Result<(), Box<dyn std::error::Error>>
+(B[m[32m+{
+(B[m     // TSV 8.2-17：有已提交节点时仍先撤销待定草稿，节点 1 保持。
+     let mut doc = after_8_2_17()?;
+     assert_buffer(&doc, "xa\n")?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_typing.rs:411:
+ }
+ 
+ #[test]
+[31m-fn case_8_2_21_typing_after_snapshot_still_merges()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_2_21_typing_after_snapshot_still_merges() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.2-21：快照后 100ms 相邻输入仍并入同一组，历史仍 0/0/0。
+     let mut doc = after_8_2_20()?;
+     let before = snapshot_id(&mut doc)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_typing.rs:429:
+ }
+ 
+ #[test]
+[31m-fn case_8_2_22_snapshot_and_typing_produce_one_node()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_2_22_snapshot_and_typing_produce_one_node() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.2-22：快照与继续输入交错后只产生 1 个节点。
+     let mut doc = after_8_2_20()?;
+     doc.type_text(2, "b", 100)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_typing.rs:445:
+ }
+ 
+ #[test]
+[31m-fn case_8_2_23_mode_switch_has_no_doc_core_entry()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_2_23_mode_switch_has_no_doc_core_entry() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.2-23：宿主模式切换有协议性期望，但 DocCore 无入口（T-8-15）；
+     // outcome/error 列为“待定”，测试不调用任何模式切换，也不断言该列。
+     let mut doc = f1()?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_typing.rs:463:
+ }
+ 
+ #[test]
+[31m-fn case_8_2_24_typing_after_ime_commit_is_ordinary()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_2_24_typing_after_ime_commit_is_ordinary() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.2-24：平台自然确认后，剩余输入走普通协议。
+     let mut doc = f1()?;
+     doc.composition_update("中", 0)?;
+Diff in /Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_typing.rs:483:
+ }
+ 
+ #[test]
+[31m-fn case_8_2_25_post_ime_input_commits_as_one_step()
+(B[m[31m--> Result<(), Box<dyn std::error::Error>> {
+(B[m[32m+fn case_8_2_25_post_ime_input_commits_as_one_step() -> Result<(), Box<dyn std::error::Error>> {
+(B[m     // TSV 8.2-25：切换后剩余输入提交为 1 步；切换未追加历史步。
+     let mut doc = f1()?;
+     doc.composition_update("中", 0)?;
+=== exit=1 at 2026-10-31T11:11:49Z ===

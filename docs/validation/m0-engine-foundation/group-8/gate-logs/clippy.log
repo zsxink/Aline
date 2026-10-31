@@ -1,0 +1,4 @@
+=== 2026-10-31T11:14:05Z cargo clippy -p aline-ui --all-targets --locked --offline -- -D warnings ===
+    Checking aline-ui v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-ui)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.97s
+=== exit=0 at 2026-10-31T11:14:06Z ===

@@ -1,0 +1,10 @@
+[package]
+name = "fixture-helper"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+hidden_alias = { package = "gpui-pre", path = "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-8/leader-verify/workspace-gates/dependency-fixtures/fixtures/packages/gpui-pre" }

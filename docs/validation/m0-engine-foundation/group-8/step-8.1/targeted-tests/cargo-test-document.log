@@ -1,0 +1,31 @@
+=== 2026-10-31T11:13:03Z cargo test -p aline-ui --test document --locked --offline ===
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running tests/document.rs (target/debug/deps/document-dd7c035db3535f29)
+
+running 22 tests
+test case_8_1_02_snapshot_keeps_identity_and_does_not_commit ... ok
+test case_8_1_03_adjacent_input_merges_within_900ms ... ok
+test case_8_1_01_typing_enters_unique_draft ... ok
+test case_8_1_04_snapshot_text_equals_latest_draft ... ok
+test case_8_1_10_redo_sequence_starts_from_fresh_draft ... ok
+test case_8_1_05_commit_group_keeps_block_open ... ok
+test case_8_1_09_repeated_snapshot_keeps_same_id ... ok
+test case_8_1_06_snapshot_after_commit_has_no_side_effects ... ok
+test case_8_1_07_typing_after_commit_opens_new_draft ... ok
+test case_8_1_08_snapshot_after_new_draft ... ok
+test case_8_1_12_sealed_group_is_not_merged_again ... ok
+test case_8_1_11_first_commit_makes_node_one ... ok
+test case_8_1_13_second_commit_makes_node_two ... ok
+test case_8_1_14_undo_restores_before_selection ... ok
+test case_8_1_15_snapshot_preserves_redo ... ok
+test case_8_1_16_redo_restores_after_selection ... ok
+test case_8_1_17_snapshot_rejects_stale_baseline ... ok
+test case_8_1_18_typing_rejects_stale_baseline ... ok
+test case_8_1_19_commit_rejects_stale_baseline ... ok
+test case_8_1_20_leave_rejects_stale_baseline_without_dropping_block ... ok
+test case_8_1_21_commit_after_close_returns_no_open_block ... ok
+test case_8_1_22_non_boundary_typing_is_rejected ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+=== exit=0 at 2026-10-31T11:13:04Z ===

@@ -1,0 +1,28 @@
+=== 2026-10-31T11:13:11Z environment snapshot ===
+2026-10-31T11:13:11Z
+Darwin XianMac.local 27.2.0 Darwin Kernel Version 27.2.0: Wed Oct 14 23:48:06 PDT 2026; root:xnu-13432.41.4~25/RELEASE_ARM64_T8142 arm64
+rustc 1.98.1 (48a229cea 2026-09-01)
+binary: rustc
+commit-hash: 48a229ceaefd4985c50990b14116b6d856af0985
+commit-date: 2026-09-01
+host: aarch64-apple-darwin
+release: 1.98.1
+LLVM version: 22.1.8
+cargo 1.98.1 (797e8a9bc 2026-08-05)
+7916cea59247d4678765c8e66f69e9f33f680e6e
+ M crates/aline-ui/src/document/mod.rs
+ M crates/aline-ui/src/lib.rs
+?? crates/aline-ui/src/document/composition.rs
+?? crates/aline-ui/src/document/doc_core.rs
+?? crates/aline-ui/src/document/open_block.rs
+?? crates/aline-ui/src/document/publication.rs
+?? crates/aline-ui/src/document/snapshot.rs
+?? crates/aline-ui/tests/common/
+?? crates/aline-ui/tests/document.rs
+?? crates/aline-ui/tests/document_composition.rs
+?? crates/aline-ui/tests/document_results.rs
+?? crates/aline-ui/tests/document_typing.rs
+?? docs/validation/m0-engine-foundation/group-6/review-round-3-evidence/
+?? docs/validation/m0-engine-foundation/group-7/review-round-3-evidence/
+?? docs/validation/m0-engine-foundation/group-8/
+=== exit=0 at 2026-10-31T11:13:11Z ===

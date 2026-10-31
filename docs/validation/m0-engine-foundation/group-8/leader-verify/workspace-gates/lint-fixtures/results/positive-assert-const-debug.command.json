@@ -1,0 +1,23 @@
+{
+  "argv": [
+    "cargo",
+    "clippy",
+    "--manifest-path",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-8/leader-verify/workspace-gates/lint-fixtures/fixtures/positive-assert-const/Cargo.toml",
+    "--offline",
+    "--all-targets",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-8/leader-verify/workspace-gates/lint-fixtures/fixtures/positive-assert-const",
+  "started_utc": "2026-10-31T11:17:15.847480+00:00",
+  "finished_utc": "2026-10-31T11:17:15.975646+00:00",
+  "exit_code": 0,
+  "env_overrides": {
+    "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+    "CARGO_TARGET_DIR": "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-8/leader-verify/workspace-gates/lint-fixtures/cargo-target",
+    "CARGO_NET_OFFLINE": "true",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  }
+}

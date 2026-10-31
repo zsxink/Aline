@@ -1,0 +1,4 @@
+# 组 8.4 命令证据（UTC）
+# 格式：start<TAB>end<TAB>exit<TAB>command
+# 原始 stdout/stderr：targeted-tests/cargo-test-document_results.log
+2026-10-31T11:13:04Z	2026-10-31T11:13:04Z	0	cargo test -p aline-ui --test document_results --locked --offline
