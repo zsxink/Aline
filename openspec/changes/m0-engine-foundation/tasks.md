@@ -30,7 +30,7 @@
 
 - [x] 3.1 按 design/Public Boundaries 定义受检源码/绘制/UTF-16/存储范围与版本 home，记录 DocumentId/WorkingVersion/草稿代次/投影/磁盘身份消费签名及生成范围；用外部消费测试和依赖守卫证明无反向边，source 仅接文本视图/自有元数据，跨层不导入 UI 类型。
 - [x] 3.2 保持 tuple 补丁底层形状并封装受检构造/转换；正例合法空区间、末端、反向选区通过；最小反例类型混传、半 UTF-8、UTF-16 中间代理对、越界/溢出、错文档/错版本/错投影失败。用 cargo test -p aline-buffer 和 -p aline-markdown 的外部 API 用例及编译失败夹具分别留证，不以 type alias 当分型。
-- [ ] 3.3 冻结 decode/encode/parse/映射/plan/validate/apply/snapshot 的输入输出、错误类别、唯一写入口及相等证据来源；人工追踪实际公开消费者，验证恒等转换也走映射、调用方不手算局部差或 UTF-16 表。回填 Rust §5、引擎 §3/4/7、架构 §4/5/7.1、V-07 接口基础记录，未实现接口只写契约未验证。
+- [x] 3.3 冻结 decode/encode/parse/映射/plan/validate/apply/snapshot 的输入输出、错误类别、唯一写入口及相等证据来源；人工追踪实际公开消费者，验证恒等转换也走映射、调用方不手算局部差或 UTF-16 表。回填 Rust §5、引擎 §3/4/7、架构 §4/5/7.1、V-07 接口基础记录，未实现接口只写契约未验证。
 
 ## 4. aline-source 字节与行尾往返
 

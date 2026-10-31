@@ -1,0 +1,3 @@
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/projection.rs:302:            .checked_sub(range.start)
+/Users/xian/Project/editor/Aline/crates/aline-buffer/src/text.rs:176:            .checked_sub(range.end)
+/Users/xian/Project/editor/Aline/crates/aline-buffer/src/batch.rs:125:        .checked_sub(removed)

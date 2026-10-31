@@ -107,6 +107,8 @@ Mermaid 护眼模式使用亮色映射；固定主题不跟随应用，主题是
 
 时点：M0 解析夹具，M2 输入/选择/搜索边界，M3 命令和格式化；M4 前冻结统计口径。对应 EDIT-01～14、FIND-01～03、MD-11、FORMAT-01～02。
 
+**接口基础记录（2026-10-31，任务 3.3）：** 八接口（decode/encode/parse/映射/plan/validate/apply/snapshot）的输入输出、错误类别、唯一写入口与相等证据来源已按已确认架构/引擎规范冻结；实际落地的包括 `TextSnapshot`/`StorageSnapshot`、受检坐标/身份、`CheckedBatch` 构造/校验、恒等 `Projection` 与 `InputIdentity`，decode/encode、完整 parse、edit 层 plan/validate、apply 与 `snapshot_current` 内容快照仍仅契约未验证。公开面追踪未发现映射 API 的 UI 生产消费者，当前仓库扫描也未发现映射外手算局部差或自建 UTF-16 表，但公开坐标访问器仍可被绕过；这不证明真实命中、IME、保存或本节任何用例通过。完整记录见[任务 3.3 记录](./validation/m0-engine-foundation/group-3/step-3.3/report.md)。本节上方“补充可视化机制回归矩阵”仍全部未执行。
+
 ## V-08 · 文件操作、临时图片与恢复事务
 
 产物：文件树拖拽源/目标、目录移动、跨卷/外部拖放、冲突/取消/权限失败、回收站不可用、打开文件移动时的保存与关联行为。文档路径、图片预览和资源引用的同步需有实际样例；不能静默覆盖重名目标或破坏源文件。

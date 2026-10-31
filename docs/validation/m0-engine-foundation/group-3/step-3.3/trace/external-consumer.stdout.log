@@ -1,0 +1,15 @@
+
+running 5 tests
+test tests::checked_batches_keep_tuple_context_and_refuse_invalid_plans ... ok
+test tests::overlay_unicode_boundaries_and_old_draft_are_immutable ... ok
+test tests::local_identity_mapping_uses_checked_global_and_utf16_coordinates ... ok
+test tests::projection_construction_keeps_units_and_budget_boundaries ... ok
+test tests::storage_and_document_identities_do_not_follow_equal_values ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

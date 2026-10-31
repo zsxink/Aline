@@ -1,0 +1,11 @@
+2026-10-31T02:43:40Z	2026-10-31T02:43:40Z	zsh -c date -u; uname -a; rustc -Vv; cargo -V; printenv CARGO_HOME	exit=0
+2026-10-31T02:43:40Z	2026-10-31T02:43:40Z	zsh -c git -C /Users/xian/Project/editor/Aline rev-parse HEAD; git -C /Users/xian/Project/editor/Aline status --porcelain	exit=0
+2026-10-31T02:43:40Z	2026-10-31T02:43:40Z	rg -n -e ^\s*pub (struct|enum|fn|const fn|type|use|mod) /Users/xian/Project/editor/Aline/crates /Users/xian/Project/editor/Aline/app -g *.rs	exit=0
+2026-10-31T02:43:40Z	2026-10-31T02:43:40Z	rg -n -e source_at|drawn_at|\.aligned\(|source_from_utf16|utf16_from_source|drawn_offset|utf16_offset|drawn_range|utf16_range /Users/xian/Project/editor/Aline/crates /Users/xian/Project/editor/Aline/app -g *.rs	exit=0
+2026-10-31T02:43:40Z	2026-10-31T02:43:40Z	rg -n -e utf16|Utf16|encode_utf16|len_utf16 /Users/xian/Project/editor/Aline/crates /Users/xian/Project/editor/Aline/app -g *.rs	exit=0
+2026-10-31T02:43:40Z	2026-10-31T02:43:40Z	rg -n -e - *[a-zA-Z_]+\.(start|end) /Users/xian/Project/editor/Aline/crates /Users/xian/Project/editor/Aline/app -g *.rs	exit=1
+2026-10-31T02:43:40Z	2026-10-31T02:43:40Z	rg -n -e checked_sub|saturating_sub|wrapping_sub /Users/xian/Project/editor/Aline/crates /Users/xian/Project/editor/Aline/app -g *.rs	exit=0
+2026-10-31T02:43:40Z	2026-10-31T02:43:40Z	rg -n -e \.(start|end) /Users/xian/Project/editor/Aline/crates/aline-ui /Users/xian/Project/editor/Aline/crates/aline-edit /Users/xian/Project/editor/Aline/crates/aline-plugin /Users/xian/Project/editor/Aline/crates/aline-app-core /Users/xian/Project/editor/Aline/app -g *.rs	exit=1
+2026-10-31T02:43:40Z	2026-10-31T02:43:40Z	rg -n -e TextSnapshot|StorageSnapshot|CheckedBatch|InputIdentity /Users/xian/Project/editor/Aline/crates /Users/xian/Project/editor/Aline/app -g *.rs	exit=0
+2026-10-31T02:43:40Z	2026-10-31T02:43:40Z	cargo test --workspace --locked --offline -- --list	exit=0
+2026-10-31T02:43:40Z	2026-10-31T02:43:41Z	cargo test --manifest-path /Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-3/review-public-consumer/Cargo.toml --locked --offline	exit=0

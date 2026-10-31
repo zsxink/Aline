@@ -108,7 +108,7 @@ GPUI：仅 app / aline-ui / aline-plugin 可以依赖
 
 M0 即建立八个 crate 的职责骨架；不要求一次实现所有功能，也不因尚无规范先填完整目录或加入闲置依赖。模块名可随实现调整，所有权不可悬空。
 
-2026-10-31 第 2 组已建立八成员：应用实际 package 名为 `aline`，其余为上述七个 `aline-*`。source/buffer/markdown/edit 目前仍为骨架，不能把空测试目标当领域实现；app-core 已消费内嵌双语 catalog，UI 将 `t("app.name")` 结果转换为 GPUI SharedString，app 仅返回 ExitCode，不建窗口/平台服务。公开面、真实五引擎完整闭包、工具/lint/守卫和无消费者后端的人工复核见[第 2 组记录](./validation/m0-engine-foundation/group-2/report.md)。没有新增第九 crate、插件注册框架或主题后端。
+2026-10-31 第 2 组已建立八成员：应用实际 package 名为 `aline`，其余为上述七个 `aline-*`。第 3 组随后落地 source 只读存储身份、buffer `TextSnapshot`/`CheckedBatch`、markdown 恒等 `Projection` 与 UI `InputIdentity`；`decode`/`encode`、完整 Markdown 解析、edit 的 `plan_change`/`validate_change`、apply/历史与 DocCore 当前快照仍仅契约未验证，edit/plugin 无公开接口。app-core 已消费内嵌双语 catalog，UI 将 `t("app.name")` 结果转换为 GPUI SharedString，app 仅返回 ExitCode，不建窗口/平台服务。公开面、真实五引擎完整闭包、工具/lint/守卫和无消费者后端的人工复核见[第 2 组记录](./validation/m0-engine-foundation/group-2/report.md)；接口冻结与消费者追踪见[第 3 组 3.3 记录](./validation/m0-engine-foundation/group-3/step-3.3/report.md)。没有新增第九 crate、插件注册框架或主题后端。
 
 ### 4.2 模块目录图
 
@@ -493,6 +493,8 @@ History 使用正/逆补丁及 before/after 源码选区，不保存每次全文
 
 `dirty`、保存中和保存错误从同一会话状态派生，所有标签/状态栏/关闭 guard 共用；保存回调仅登记其实际落盘快照。存储编码策略独立记录，不能为更新保存点而改掉未编辑原字节通道。
 
+**2026-10-31 M0 接口基础记录（任务 3.3）：** `SourceBaseline`、`OpenBlock`、DocCore、`Parsed`、`Change`、`HistoryStep` 与 `snapshot_current` 的内容快照仍仅契约未验证；已落地的包括 `TextSnapshot`/`CheckedBatch`/`SrcSelection`、`StorageSnapshot`、恒等 `Projection` 和 `InputIdentity` 身份信封，以及它们使用的 `DocumentRevision`/`WorkingVersion` 身份。`InputIdentity` 只携带文档、工作版本与快照身份，不含草稿内容；不能把它当作当前文本快照。完整冻结与消费者追踪见[任务 3.3 记录](./validation/m0-engine-foundation/group-3/step-3.3/report.md)。
+
 ## 6. 功能分配与需求追踪
 
 表中阶段是首次具备相关链路及完整交付阶段；更细边界由 V 产物冻结。每个需求的测试记录应保存需求号、输入、操作、预期、实际证据和平台，不能只写“同上/全绿”。
@@ -530,17 +532,19 @@ History 使用正/逆补丁及 before/after 源码选区，不保存每次全文
 
 ### 7.1 公共契约草图
 
-| 接口 | 输入 → 输出 | 校验 / 错误 / 所有者 |
-|---|---|---|
-| `decode` / `encode` | 原 bytes → UTF-8 文本与存储元数据；当前快照 + 元数据 → 待写 bytes | 无效 UTF-8 拒收，不替换字符；未改用原 bytes；source |
-| `parse` | 不可变源码快照 + 解析配置 + 预算 → Parsed/降级诊断 | 产物带输入版本；超限原文回退；markdown，不 spawn |
-| `map_position`（映射 API 统称） | 源码/绘制/UTF-16 坐标与方向偏好 → 对齐坐标/失败 | 非法边界不应用编辑；markdown 映射层 |
-| `plan_change` / `validate_change` | 当前源码/Parsed/选区/Command → Change 或 EditRefusal | 基线版本、补丁排序、保护区间、预期内容/语义；edit |
-| `apply_change` | 通过校验的补丁、选区、历史分组原因 → 新 revision / 事件 | 单一 DocCore 写入口；拒绝零副作用；buffer 原子应用 |
-| `snapshot_current` | 当前 Buffer、唯一草稿、工作版本 → 不可变当前文本与资源引用快照 | 包括打开块最新内容；不隐式生成撤销步；UI 编排，遵守 TA-01；ED-01 的显式保存/另存为/导出请求先等待平台自然结束组合再取快照 |
-| `save` | DocumentId、路径代次、快照、存储策略、预期磁盘版本、资源计划 → SaveResult | Conflict/Io/Resource/Cancelled 分开；UI 编排，source 提供受检写原语 |
-| `recover` | 恢复记录 + 资源清单 → 内存会话或损坏诊断 | 不直写原文件、不按旧路径覆盖其他文件；UI |
-| `render_asset` / `export` | 纯快照、有效主题/插件配置、预算 → 资产/产物计划/诊断 | 不持有可变 Buffer；结果带 request_id；plugin 计算、UI 接纳/落盘 |
+| 接口 | 输入 → 输出 | 校验 / 错误 / 所有者 | M0 接口基础状态（2026-10-31） |
+|---|---|---|---|
+| `decode` / `encode` | 原 bytes → UTF-8 文本与存储元数据；当前快照 + 元数据 → 待写 bytes | 无效 UTF-8 拒收，不替换字符；未改用原 bytes；source | 仅契约未验证；`StorageSnapshot` 只有只读原 bytes/基线身份，无解码/编码/写盘（第 4 组） |
+| `parse` | 不可变源码快照 + 解析配置 + 预算 → Parsed/降级诊断 | 产物带输入版本；超限原文回退；markdown，不 spawn | 仅契约未验证；当前只有恒等 `Projection`，无 Markdown 解析（第 6 组） |
+| `map_position`（映射 API 统称） | 源码/绘制/UTF-16 坐标与方向偏好 → 对齐坐标/失败 | 非法边界不应用编辑；markdown 映射层 | 恒等路径已实现并有 3.2 外部/编译证据；复杂来源关系仅契约（第 6 组） |
+| `plan_change` / `validate_change` | 当前源码/Parsed/选区/Command → Change 或 EditRefusal | 基线版本、补丁排序、保护区间、预期内容/语义；edit | 仅契约未验证；`plan_change` 与 edit 层 `validate_change` 均未实现，edit 无公开接口（第 7 组）；buffer/markdown/UI 的 validate 三层已实现 |
+| `apply_change` | 通过校验的补丁、选区、历史分组原因 → 新 revision / 事件 | 单一 DocCore 写入口；拒绝零副作用；buffer 原子应用 | 仅契约未验证；`CheckedBatch` 只校验不 apply（第 5/8 组） |
+| `snapshot_current` | 当前 Buffer、唯一草稿、工作版本 → 不可变当前文本与资源引用快照 | 包括打开块最新内容；不隐式生成撤销步；UI 编排，遵守 TA-01；ED-01 的显式保存/另存为/导出请求先等待平台自然结束组合再取快照 | 仅 `InputIdentity` 身份信封；内容快照仅契约（第 8 组） |
+| `save` | DocumentId、路径代次、快照、存储策略、预期磁盘版本、资源计划 → SaveResult | Conflict/Io/Resource/Cancelled 分开；UI 编排，source 提供受检写原语 | 仅契约未验证（后续任务） |
+| `recover` | 恢复记录 + 资源清单 → 内存会话或损坏诊断 | 不直写原文件、不按旧路径覆盖其他文件；UI | 仅契约未验证（后续任务） |
+| `render_asset` / `export` | 纯快照、有效主题/插件配置、预算 → 资产/产物计划/诊断 | 不持有可变 Buffer；结果带 request_id；plugin 计算、UI 接纳/落盘 | 仅契约未验证（后续任务） |
+
+上表状态列只记录 2026-10-31 实际落地，不改变“输入 → 输出/校验/所有者”的已确认契约；完整冻结、错误类别、唯一写入口与相等证据见[任务 3.3 记录](./validation/m0-engine-foundation/group-3/step-3.3/report.md)。未实现接口是契约未验证，不是已完成。
 
 `Change` 至少包含同一快照下的补丁、目标源码选区、预期版本和分组原因；不能只返回裸区间而不说明来源。菜单、快捷键、右键共用命令表的 id/文案 key/前置条件。前置条件还须在执行时重验，不能信任菜单打开时的状态。
 

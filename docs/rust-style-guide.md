@@ -133,6 +133,8 @@ AGENTS.md 规定的补丁存储形状 `Vec<(Range<usize>, String)>` 保持不变
 
 字符列/字素边界/像素是不同量；引擎中的纯 LineMap 或映射服务可持有行信息，不能照搬旧“行列号绝不进入任何引擎 API”的禁令。显示列按 V-07 的用户字符口径，不用 src_off 冒充。具体来源关系和合法锚点见[引擎 §7](./engine-design.md#7-源码绘制文本与其他坐标)。
 
+**2026-10-31 M0 接口基础记录（任务 3.3）：** 已落地 `SrcOffset`/`SrcRange`/`SrcSelection`、`DrawnOffset`/`DrawnRange`/`Utf16Offset`/`Utf16Range`、`StorageRange` 等受检 newtype，以及 `TextSnapshot`、恒等 `Projection`、`InputIdentity` 的身份校验；恒等映射的源码/绘制/UTF-16 转换全部走映射模块；当前仓库扫描未发现正式生产代码中的映射外调用点或自建 UTF-16 表，但公开坐标访问器仍可绕过扫描。`decode`/`encode`、完整 `parse`、edit 层 `plan_change`/`validate_change`、`apply_change` 与 `snapshot_current` 内容快照仍仅契约未验证。该记录不改变 S-5-01～06，也不表示 V-07 或 M0 出口通过。详见[任务 3.3 记录](./validation/m0-engine-foundation/group-3/step-3.3/report.md)。
+
 ## 6. 格式、表达与代码组织
 
 | 编号 | 强制要求及边界 | 检查 |

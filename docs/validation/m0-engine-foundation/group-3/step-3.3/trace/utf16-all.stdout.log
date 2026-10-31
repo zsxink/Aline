@@ -1,0 +1,32 @@
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/lib.rs:7:    ProjectionId, Utf16Offset, Utf16Range,
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/projection.rs:10:use super::coordinates::{DrawnOffset, DrawnRange, ProjectionId, Utf16Offset, Utf16Range};
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/projection.rs:174:                .checked_add(character.len_utf16())
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/projection.rs:222:    pub fn utf16_offset(&self, utf16_off: usize) -> Result<Utf16Offset, MappingError> {
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/projection.rs:224:        if utf16_off > total {
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/projection.rs:226:                offset: utf16_off,
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/projection.rs:231:            .binary_search_by_key(&utf16_off, |&(_, unit)| unit)
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/projection.rs:233:        Ok(Utf16Offset {
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/projection.rs:235:            unit: utf16_off,
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/projection.rs:248:    pub fn utf16_range(&self, units: Range<usize>) -> Result<Utf16Range, MappingError> {
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/projection.rs:249:        Utf16Range::new(
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/projection.rs:250:            self.utf16_offset(units.start)?,
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/projection.rs:251:            self.utf16_offset(units.end)?,
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/projection.rs:318:    pub fn source_from_utf16(
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/projection.rs:320:        offset: &Utf16Offset,
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/projection.rs:326:        self.utf16_offset(offset.unit)?;
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/projection.rs:340:    pub fn utf16_from_source(
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/projection.rs:344:    ) -> Result<Mapped<Utf16Offset>, MappingError> {
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/projection.rs:356:            value: self.utf16_offset(units)?,
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/coordinates.rs:45:pub struct Utf16Offset {
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/coordinates.rs:50:impl Utf16Offset {
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/coordinates.rs:94:pub struct Utf16Range {
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/coordinates.rs:99:impl Utf16Range {
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/coordinates.rs:101:    pub fn new(start: Utf16Offset, end: Utf16Offset) -> Result<Self, MappingError> {
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/mod.rs:6:pub use coordinates::{DrawnOffset, DrawnRange, ProjectionId, Utf16Offset, Utf16Range};
+/Users/xian/Project/editor/Aline/crates/aline-markdown/tests/public_boundaries.rs:15:    assert_eq!(first.utf16_range(1..3)?.code_unit_range(), 1..3);
+/Users/xian/Project/editor/Aline/crates/aline-markdown/tests/public_boundaries.rs:21:        first.utf16_offset(2),
+/Users/xian/Project/editor/Aline/crates/aline-markdown/tests/identity_mapping.rs:7:fn identity_mapping_converts_local_global_and_utf16_through_one_service()
+/Users/xian/Project/editor/Aline/crates/aline-markdown/tests/identity_mapping.rs:25:    let end = local.source_from_utf16(&local.utf16_offset(3)?, Affinity::After)?;
+/Users/xian/Project/editor/Aline/crates/aline-markdown/tests/identity_mapping.rs:29:            .utf16_from_source(end.value(), Affinity::After)?
+/Users/xian/Project/editor/Aline/crates/aline-markdown/tests/identity_mapping.rs:75:        first.source_from_utf16(&second.utf16_offset(0)?, Affinity::Before),
+/Users/xian/Project/editor/Aline/crates/aline-markdown/tests/identity_mapping.rs:90:        first.utf16_offset(2),

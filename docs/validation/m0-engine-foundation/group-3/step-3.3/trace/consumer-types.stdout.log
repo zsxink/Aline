@@ -1,0 +1,68 @@
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/projection.rs:13:    Affinity, BufferError, SnapshotId, SrcOffset, SrcRange, SrcSelection, TextBudget, TextSnapshot,
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/projection.rs:130:    snapshot: TextSnapshot,
+/Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/projection.rs:151:        snapshot: TextSnapshot,
+/Users/xian/Project/editor/Aline/crates/aline-source/src/storage.rs:3://! StorageSnapshot 只是宿主提供的字节视图，不代表这些 bytes 已通过 UTF-8 验证，
+/Users/xian/Project/editor/Aline/crates/aline-source/src/storage.rs:139:pub struct StorageSnapshot {
+/Users/xian/Project/editor/Aline/crates/aline-source/src/storage.rs:145:impl fmt::Debug for StorageSnapshot {
+/Users/xian/Project/editor/Aline/crates/aline-source/src/storage.rs:148:            .debug_struct("StorageSnapshot")
+/Users/xian/Project/editor/Aline/crates/aline-source/src/storage.rs:156:impl StorageSnapshot {
+/Users/xian/Project/editor/Aline/crates/aline-source/src/lib.rs:6:    BaselineId, DiskVersion, StorageBudget, StorageError, StorageRange, StorageSnapshot,
+/Users/xian/Project/editor/Aline/crates/aline-markdown/tests/public_boundaries.rs:3:use aline_buffer::{TextBudget, TextSnapshot};
+/Users/xian/Project/editor/Aline/crates/aline-markdown/tests/public_boundaries.rs:9:    let text = TextSnapshot::new(String::from("前甲😀后"), TextBudget::new(64))?;
+/Users/xian/Project/editor/Aline/crates/aline-markdown/tests/public_boundaries.rs:34:    require_send_sync::<TextSnapshot>();
+/Users/xian/Project/editor/Aline/crates/aline-source/tests/public_boundaries.rs:3:use aline_source::{DiskVersion, StorageBudget, StorageError, StorageSnapshot};
+/Users/xian/Project/editor/Aline/crates/aline-source/tests/public_boundaries.rs:8:    require_send_sync::<StorageSnapshot>();
+/Users/xian/Project/editor/Aline/crates/aline-source/tests/public_boundaries.rs:13:    let first = StorageSnapshot::new(
+/Users/xian/Project/editor/Aline/crates/aline-source/tests/public_boundaries.rs:19:    let second = StorageSnapshot::new(
+/Users/xian/Project/editor/Aline/crates/aline-markdown/tests/identity_mapping.rs:3:use aline_buffer::{Affinity, BufferError, SrcSelection, TextBudget, TextSnapshot};
+/Users/xian/Project/editor/Aline/crates/aline-markdown/tests/identity_mapping.rs:9:    let snapshot = TextSnapshot::new(String::from("前甲😀后"), TextBudget::new(64))?;
+/Users/xian/Project/editor/Aline/crates/aline-markdown/tests/identity_mapping.rs:59:    let source = TextSnapshot::new(String::from("甲😀"), TextBudget::new(64))?;
+/Users/xian/Project/editor/Aline/crates/aline-markdown/tests/identity_mapping.rs:79:    let replacement = TextSnapshot::new(String::from("甲😀"), TextBudget::new(64))?;
+/Users/xian/Project/editor/Aline/crates/aline-buffer/src/text.rs:124:pub struct TextSnapshot {
+/Users/xian/Project/editor/Aline/crates/aline-buffer/src/text.rs:131:impl fmt::Debug for TextSnapshot {
+/Users/xian/Project/editor/Aline/crates/aline-buffer/src/text.rs:134:            .debug_struct("TextSnapshot")
+/Users/xian/Project/editor/Aline/crates/aline-buffer/src/text.rs:142:impl TextSnapshot {
+/Users/xian/Project/editor/Aline/crates/aline-buffer/src/lib.rs:7:pub use batch::{CheckedBatch, PatchBudget};
+/Users/xian/Project/editor/Aline/crates/aline-buffer/src/lib.rs:9:pub use text::{BufferError, TextBudget, TextSnapshot};
+/Users/xian/Project/editor/Aline/crates/aline-buffer/src/batch.rs:5:use crate::{BufferError, DocumentRevision, SnapshotId, TextBudget, TextSnapshot};
+/Users/xian/Project/editor/Aline/crates/aline-buffer/src/batch.rs:32:pub struct CheckedBatch {
+/Users/xian/Project/editor/Aline/crates/aline-buffer/src/batch.rs:39:impl CheckedBatch {
+/Users/xian/Project/editor/Aline/crates/aline-buffer/src/batch.rs:42:        before: &TextSnapshot,
+/Users/xian/Project/editor/Aline/crates/aline-buffer/src/batch.rs:88:    pub fn validate(&self, current: &TextSnapshot) -> Result<(), BufferError> {
+/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/checked_batch.rs:6:use aline_buffer::{BufferError, CheckedBatch, PatchBudget, TextBudget, TextSnapshot};
+/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/checked_batch.rs:11:    let before = TextSnapshot::new(String::from("abcXYZ"), TextBudget::new(64))?;
+/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/checked_batch.rs:14:    let batch = CheckedBatch::new(&before, patches, PatchBudget::new(8, 64, 64))?;
+/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/checked_batch.rs:22:    let other = TextSnapshot::new(String::from("abcXYZ"), TextBudget::new(64))?;
+/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/checked_batch.rs:27:    let revised = TextSnapshot::from_shared(
+/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/checked_batch.rs:42:    let before = TextSnapshot::new(String::from("甲😀Z"), TextBudget::new(64))?;
+/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/checked_batch.rs:44:    assert!(CheckedBatch::new(&before, vec![(8..8, String::from("!"))], budget).is_ok());
+/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/checked_batch.rs:45:    assert!(CheckedBatch::new(&before, vec![(0..0, String::new())], budget).is_ok());
+/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/checked_batch.rs:47:        CheckedBatch::new(&before, vec![(1..3, String::new())], budget),
+/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/checked_batch.rs:51:        CheckedBatch::new(&before, vec![(8..9, String::new())], budget),
+/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/checked_batch.rs:55:        CheckedBatch::new(
+/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/checked_batch.rs:63:        CheckedBatch::new(
+/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/checked_batch.rs:71:        CheckedBatch::new(
+/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/checked_batch.rs:79:        CheckedBatch::new(
+/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/checked_batch.rs:87:        CheckedBatch::new(
+/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/checked_batch.rs:95:        CheckedBatch::new(
+/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/public_boundaries.rs:5:use aline_buffer::{BufferError, DocumentRevision, SrcSelection, TextBudget, TextSnapshot};
+/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/public_boundaries.rs:10:    let source = TextSnapshot::new(String::from("甲😀Z"), TextBudget::new(64))?;
+/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/public_boundaries.rs:12:    let other = TextSnapshot::new(String::from("甲😀Z"), TextBudget::new(64))?;
+/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/public_boundaries.rs:37:    let base = TextSnapshot::new(String::from("甲-old-尾"), TextBudget::new(64))?;
+/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/public_boundaries.rs:40:        TextSnapshot::with_overlay(&base, base.src_range(4..7)?, draft, TextBudget::new(64))?;
+/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/public_boundaries.rs:52:        TextSnapshot::with_overlay(&overlay, full, Arc::new(String::new()), TextBudget::new(64)),
+/Users/xian/Project/editor/Aline/crates/aline-ui/src/document/mod.rs:5:pub use identity::{DocumentId, DraftGeneration, IdentityError, InputIdentity, WorkingVersion};
+/Users/xian/Project/editor/Aline/crates/aline-ui/tests/public_boundaries.rs:3:use aline_buffer::{DocumentRevision, TextBudget, TextSnapshot};
+/Users/xian/Project/editor/Aline/crates/aline-ui/tests/public_boundaries.rs:4:use aline_ui::{DocumentId, DraftGeneration, IdentityError, InputIdentity, WorkingVersion};
+/Users/xian/Project/editor/Aline/crates/aline-ui/tests/public_boundaries.rs:9:    require_send_sync::<InputIdentity>();
+/Users/xian/Project/editor/Aline/crates/aline-ui/tests/public_boundaries.rs:16:    let source = TextSnapshot::new(String::from("正文"), TextBudget::new(64))?;
+/Users/xian/Project/editor/Aline/crates/aline-ui/tests/public_boundaries.rs:19:    let input = InputIdentity::new(document.clone(), version, &source)?;
+/Users/xian/Project/editor/Aline/crates/aline-ui/tests/public_boundaries.rs:21:    let wrong_document = InputIdentity::new(DocumentId::new(), version, &source)?;
+/Users/xian/Project/editor/Aline/crates/aline-ui/tests/public_boundaries.rs:26:    let later = InputIdentity::new(document, version.next_draft()?, &source)?;
+/Users/xian/Project/editor/Aline/crates/aline-ui/tests/public_boundaries.rs:35:    let same_text_new_snapshot = TextSnapshot::new(String::from("正文"), TextBudget::new(64))?;
+/Users/xian/Project/editor/Aline/crates/aline-ui/tests/public_boundaries.rs:36:    let wrong_snapshot = InputIdentity::new(
+/Users/xian/Project/editor/Aline/crates/aline-ui/src/document/identity.rs:6:use aline_buffer::{DocumentRevision, SnapshotId, TextSnapshot};
+/Users/xian/Project/editor/Aline/crates/aline-ui/src/document/identity.rs:136:pub struct InputIdentity {
+/Users/xian/Project/editor/Aline/crates/aline-ui/src/document/identity.rs:142:impl InputIdentity {
+/Users/xian/Project/editor/Aline/crates/aline-ui/src/document/identity.rs:147:        snapshot: &TextSnapshot,
+/Users/xian/Project/editor/Aline/crates/aline-ui/src/lib.rs:5:pub use document::{DocumentId, DraftGeneration, IdentityError, InputIdentity, WorkingVersion};

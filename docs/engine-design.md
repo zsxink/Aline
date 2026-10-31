@@ -60,6 +60,8 @@
 
 解析扩展契约定义在 markdown 的纯数据 API，由宿主注入配置快照；不要求 V1 运行任意插件解析代码。PA-01 已确认未来外部接入方向，加载环境、权限和阶段另行设计，不能恢复旧 Wasmtime/WIT/tokio 路线。
 
+**2026-10-31 M0 接口基础记录（任务 3.3）：** 与本任务八接口相关的已落地公开面包括 source 的只读 `StorageSnapshot`/`StorageRange`/`BaselineId`/`DiskVersion`/`StorageBudget`、buffer 的 `TextSnapshot`/`SrcOffset`/`SrcRange`/`SrcSelection`/`DocumentRevision`/`CheckedBatch` 及预算/错误类型、markdown 的恒等 `Projection` 与坐标/预算/错误类型、UI 的 `DocumentId`/`WorkingVersion`/`InputIdentity`；app-core 的 catalog 与 app 的 `ExitCode` 入口不属于八接口（完整公开面见 3.3 记录第 2 节）。`decode`/`encode` 与最小写盘原语未实现，buffer 不 apply，edit/plugin 无公开接口，DocCore 未实现。上表中各所有者的输入输出是已确认契约，不是已实现能力。完整冻结与消费者追踪见[任务 3.3 记录](./validation/m0-engine-foundation/group-3/step-3.3/report.md)。
+
 ## 4. 核心模型与版本
 
 ### 4.1 数据所有权
@@ -91,6 +93,8 @@
 保护范围包含 Front matter、目录/脚注内容和脚注引用；HTML 区域、代码、公式、未知/降级片段另有语义身份与命令能力。保护不是布尔的“全部只读”：MD-11 可视化内容修改拒绝，Source 可改；HTML 可原始编辑但格式/块命令拒绝。原始语义范围不能因展示树合并为 Paragraph 而消失。
 
 脚注引用可嵌在普通段落内；不能因一个引用就把整段正文变成只读。建议打开该段的源码输入投影并保护引用子区间，其余正文可改；输入规划使用字符边界安全的共同前后缀收窄单区间补丁，使未变的保护片段不被整块替换范围误判为修改。若实际删除、插入或粘贴的作用范围触及保护子区间，仍必须拒绝并定位 Source；不能只比较编辑后引用字符相同就放行跨保护区操作。直接修改引用或定义统一切 Source，具体边界插入样例归 V-07。
+
+**2026-10-31 M0 接口基础记录（任务 3.3）：** `SourceBaseline`、`Parsed`、`OpenBlock`、`Change`、`HistoryStep` 仍仅契约未验证；已落地的包括 `TextSnapshot`、`SrcOffset`/`SrcRange`/`SrcSelection`、`DocumentRevision`、`CheckedBatch`、`StorageSnapshot`、恒等 `Projection` 与 `InputIdentity`（`WorkingVersion` 是 `InputIdentity` 使用的身份类型）。块、Gap、保护范围及其金样留第 6 组；本记录不把上述任何模型写成已完成。详见[任务 3.3 记录](./validation/m0-engine-foundation/group-3/step-3.3/report.md)。
 
 ## 5. 文件文本进入引擎与存储保真
 
@@ -196,6 +200,8 @@ pulldown 一个事件可能跨多片段，必须保留子段来源，不能仅�
 建议映射结果除目标坐标还含 `Exact / Aligned / Hidden / Synthetic` 等精确性信息及来源范围，错误使用单独 Result 表示。具体类型可调整，但调用者必须能区分“合法近似锚点”和“可直接用于编辑的精确区间”。
 
 **存储实现建议（待 V-05/V-07）：**原样片段可仅存源起点及长度，变换片段再存相对偏移/来源记录，避免所有文本逐字分配映射表。[Splat 源码案例与限制](./splat-study.md#43-坐标映射光标与选择)提供了实际紧凑表示，不能据此采用其字符扫描对齐或静默吸附末尾的算法。压缩前后必须具有相同的来源范围、精确性和合法锚点；相对偏移位宽及累计运算受检，不因压缩丢掉一源多字符、隐藏/合成或版本信息。
+
+**2026-10-31 M0 接口基础记录（任务 3.3）：** 恒等投影的 `source_at`/`drawn_at`/`aligned`、局部/全文与 UTF-16 转换已实现并有外部消费者与编译夹具证据；当前仓库扫描未发现调用方手算 `at - range.start`、自建 UTF-16 表或映射外转换，但公开坐标访问器仍可被绕过，扫描不构成结构保证。`Aligned`/`Hidden`/`Synthetic`、实体/HTML/合成换行与块局部映射仍仅契约未验证（第 6 组）；当前没有 UI 生产消费者，不证明真实命中或 IME。详见[任务 3.3 记录](./validation/m0-engine-foundation/group-3/step-3.3/report.md)。
 
 ### 7.2 操作语义
 
