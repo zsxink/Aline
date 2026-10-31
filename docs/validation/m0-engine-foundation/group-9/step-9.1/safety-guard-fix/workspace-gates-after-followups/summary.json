@@ -1,0 +1,368 @@
+{
+  "passed": true,
+  "scope": "当前 macOS 主机；目标图解析不等于跨平台构建；CI 是否执行另行记录",
+  "catalog": "cargo test --workspace 实际发现 app-core 正反例与 UI 消费测试",
+  "results": [
+    {
+      "argv": [
+        "rustup",
+        "toolchain",
+        "list"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T13:43:39.613919+00:00",
+      "finished_utc": "2026-10-31T13:43:39.627327+00:00",
+      "exit_code": 0,
+      "toolchain_bin": null,
+      "env_overrides": {
+        "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.98.1",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    {
+      "argv": [
+        "rustup",
+        "which",
+        "--toolchain",
+        "1.98.1",
+        "cargo"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T13:43:39.627461+00:00",
+      "finished_utc": "2026-10-31T13:43:39.637568+00:00",
+      "exit_code": 0,
+      "toolchain_bin": null,
+      "env_overrides": {
+        "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.98.1",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    {
+      "argv": [
+        "rustup",
+        "which",
+        "--toolchain",
+        "1.98.1",
+        "rustfmt"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T13:43:39.637686+00:00",
+      "finished_utc": "2026-10-31T13:43:39.647436+00:00",
+      "exit_code": 0,
+      "toolchain_bin": "/Users/xian/.rustup/toolchains/1.98.1-aarch64-apple-darwin/bin",
+      "env_overrides": {
+        "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.98.1",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    {
+      "argv": [
+        "rustup",
+        "which",
+        "--toolchain",
+        "1.98.1",
+        "cargo-clippy"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T13:43:39.647553+00:00",
+      "finished_utc": "2026-10-31T13:43:39.656598+00:00",
+      "exit_code": 0,
+      "toolchain_bin": "/Users/xian/.rustup/toolchains/1.98.1-aarch64-apple-darwin/bin",
+      "env_overrides": {
+        "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.98.1",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    {
+      "argv": [
+        "rustc",
+        "-Vv"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T13:43:39.656728+00:00",
+      "finished_utc": "2026-10-31T13:43:39.754242+00:00",
+      "exit_code": 0,
+      "toolchain_bin": "/Users/xian/.rustup/toolchains/1.98.1-aarch64-apple-darwin/bin",
+      "env_overrides": {
+        "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.98.1",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "-V"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T13:43:39.754377+00:00",
+      "finished_utc": "2026-10-31T13:43:39.764124+00:00",
+      "exit_code": 0,
+      "toolchain_bin": "/Users/xian/.rustup/toolchains/1.98.1-aarch64-apple-darwin/bin",
+      "env_overrides": {
+        "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.98.1",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "fmt",
+        "--version"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T13:43:39.764397+00:00",
+      "finished_utc": "2026-10-31T13:43:39.800111+00:00",
+      "exit_code": 0,
+      "toolchain_bin": "/Users/xian/.rustup/toolchains/1.98.1-aarch64-apple-darwin/bin",
+      "env_overrides": {
+        "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.98.1",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--version"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T13:43:39.800257+00:00",
+      "finished_utc": "2026-10-31T13:43:39.827706+00:00",
+      "exit_code": 0,
+      "toolchain_bin": "/Users/xian/.rustup/toolchains/1.98.1-aarch64-apple-darwin/bin",
+      "env_overrides": {
+        "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.98.1",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    {
+      "argv": [
+        "rustfmt",
+        "--config-path",
+        "/Users/xian/Project/editor/Aline/rustfmt.toml",
+        "--print-config",
+        "current",
+        "/Users/xian/Project/editor/Aline/app/src/main.rs"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T13:43:39.827933+00:00",
+      "finished_utc": "2026-10-31T13:43:39.848279+00:00",
+      "exit_code": 0,
+      "toolchain_bin": "/Users/xian/.rustup/toolchains/1.98.1-aarch64-apple-darwin/bin",
+      "env_overrides": {
+        "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.98.1",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T13:43:39.848779+00:00",
+      "finished_utc": "2026-10-31T13:43:40.011373+00:00",
+      "exit_code": 0,
+      "toolchain_bin": "/Users/xian/.rustup/toolchains/1.98.1-aarch64-apple-darwin/bin",
+      "env_overrides": {
+        "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.98.1",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T13:43:40.011648+00:00",
+      "finished_utc": "2026-10-31T13:43:40.397982+00:00",
+      "exit_code": 0,
+      "toolchain_bin": "/Users/xian/.rustup/toolchains/1.98.1-aarch64-apple-darwin/bin",
+      "env_overrides": {
+        "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.98.1",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--workspace"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T13:43:40.398099+00:00",
+      "finished_utc": "2026-10-31T13:43:41.491455+00:00",
+      "exit_code": 0,
+      "toolchain_bin": "/Users/xian/.rustup/toolchains/1.98.1-aarch64-apple-darwin/bin",
+      "env_overrides": {
+        "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.98.1",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    {
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_engineering.py",
+        "--output-dir",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-9/step-9.1/safety-guard-fix/workspace-gates-after-followups/dependency-graphs"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T13:43:41.491575+00:00",
+      "finished_utc": "2026-10-31T13:43:43.439900+00:00",
+      "exit_code": 0,
+      "toolchain_bin": "/Users/xian/.rustup/toolchains/1.98.1-aarch64-apple-darwin/bin",
+      "env_overrides": {
+        "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.98.1",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    {
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_engineering.py",
+        "--self-test",
+        "--output-dir",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-9/step-9.1/safety-guard-fix/workspace-gates-after-followups/dependency-fixtures"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T13:43:43.440024+00:00",
+      "finished_utc": "2026-10-31T13:43:48.875476+00:00",
+      "exit_code": 0,
+      "toolchain_bin": "/Users/xian/.rustup/toolchains/1.98.1-aarch64-apple-darwin/bin",
+      "env_overrides": {
+        "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.98.1",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    {
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_lints.py"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T13:43:48.875598+00:00",
+      "finished_utc": "2026-10-31T13:43:48.902687+00:00",
+      "exit_code": 0,
+      "toolchain_bin": "/Users/xian/.rustup/toolchains/1.98.1-aarch64-apple-darwin/bin",
+      "env_overrides": {
+        "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.98.1",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    {
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_lints.py",
+        "--self-test",
+        "--output-dir",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-9/step-9.1/safety-guard-fix/workspace-gates-after-followups/lint-fixtures"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T13:43:48.902804+00:00",
+      "finished_utc": "2026-10-31T13:43:51.150425+00:00",
+      "exit_code": 0,
+      "toolchain_bin": "/Users/xian/.rustup/toolchains/1.98.1-aarch64-apple-darwin/bin",
+      "env_overrides": {
+        "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.98.1",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    {
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T13:43:51.150541+00:00",
+      "finished_utc": "2026-10-31T13:43:52.942168+00:00",
+      "exit_code": 0,
+      "toolchain_bin": "/Users/xian/.rustup/toolchains/1.98.1-aarch64-apple-darwin/bin",
+      "env_overrides": {
+        "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.98.1",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    {
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--self-test",
+        "--output-dir",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-9/step-9.1/safety-guard-fix/workspace-gates-after-followups/safety-fixtures"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T13:43:52.942316+00:00",
+      "finished_utc": "2026-10-31T13:43:56.663747+00:00",
+      "exit_code": 0,
+      "toolchain_bin": "/Users/xian/.rustup/toolchains/1.98.1-aarch64-apple-darwin/bin",
+      "env_overrides": {
+        "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.98.1",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    {
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_public_api.py",
+        "--self-test",
+        "--output-dir",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-9/step-9.1/safety-guard-fix/workspace-gates-after-followups/public-api"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T13:43:56.663914+00:00",
+      "finished_utc": "2026-10-31T13:43:59.811639+00:00",
+      "exit_code": 0,
+      "toolchain_bin": "/Users/xian/.rustup/toolchains/1.98.1-aarch64-apple-darwin/bin",
+      "env_overrides": {
+        "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.98.1",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    }
+  ]
+}

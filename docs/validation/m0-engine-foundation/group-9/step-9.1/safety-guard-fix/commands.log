@@ -1,0 +1,24 @@
+# commands.log — safety 守卫修复（用户裁决 A：修改守卫）
+# 时间 UTC；命令原文；exit 为逐条实测（每条命令单独执行并立即捕获 $?）。
+# 原始 stdout/stderr 同目录保存。
+#
+# 更正记录（2026-10-31T13:09Z）：本文件早先版本有两条不可信记录——
+#   (1) 前三条 `git rev-parse/show/hash-object` 的 exit=0 是写日志时硬编码的占位值，不是实测；
+#   (2) `2026-10-31T13:06:26Z exit=128` 那条 Python 命令实际从未执行：它所在的 `&&` 链因
+#       `git show … > /tmp/…` 失败而中断，128 是 shell 链的退出码被错误归到 Python 行。
+# 早先版本已整体替换为下面的逐条实测记录，不保留错值。
+2026-10-31T13:09:06Z exit=0 cmd=git -C /Users/xian/Project/editor/Aline rev-parse HEAD
+2026-10-31T13:09:06Z exit=0 cmd=git -C /Users/xian/Project/editor/Aline show HEAD:scripts/check_safety.py
+2026-10-31T13:09:06Z exit=128 cmd=git -C /Users/xian/Project/editor/Aline hash-object HEAD:scripts/check_safety.py
+# 上一条 exit=128 是真实失败：`git hash-object` 不接受 `HEAD:<path>` 语法（stderr 见 hash-pre-fix.stderr.log）。
+# 随后改用 `git rev-parse HEAD:scripts/check_safety.py` 取得旧版 blob，结果写入 hash-pre-fix.stdout.log。
+2026-10-31T13:09:06Z exit=0 cmd=git -C /Users/xian/Project/editor/Aline hash-object scripts/check_safety.py
+2026-10-31T13:09:06Z exit=0 cmd=python3 --version
+2026-10-31T13:09:06Z exit=1 cmd=python3 /tmp/aline-guard-evidence/pre-fix/check_safety.py --root /Users/xian/Project/editor/Aline
+2026-10-31T13:09:08Z exit=0 cmd=python3 /Users/xian/Project/editor/Aline/scripts/check_safety.py --root /Users/xian/Project/editor/Aline
+2026-10-31T13:09:10Z exit=0 cmd=python3 /Users/xian/Project/editor/Aline/scripts/check_safety.py --self-test --output-dir /Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-9/step-9.1/safety-guard-fix/self-test
+2026-10-31T13:10:09Z exit=0 cmd=git rev-parse HEAD:scripts/check_safety.py
+2026-10-31T13:10:09Z exit=0 cmd=git hash-object scripts/check_safety.py
+2026-10-31T13:12:42Z exit=0 cmd=CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home RUSTUP_TOOLCHAIN=1.98.1 CARGO_NET_OFFLINE=true python3 scripts/check_workspace.py --cargo-home /Users/xian/Library/Caches/aline-m0/cargo-home --output-dir docs/validation/m0-engine-foundation/group-9/step-9.1/safety-guard-fix/workspace-gates > docs/validation/m0-engine-foundation/group-9/step-9.1/safety-guard-fix/workspace-gates.stdout.log 2> docs/validation/m0-engine-foundation/group-9/step-9.1/safety-guard-fix/workspace-gates.stderr.log
+# 该行 exit 为 shell 实测（13:12:42Z 完成）；门禁起点与逐项起止见 workspace-gates/summary.json
+# （最早 started_utc 13:12:24.130290Z，最晚 finished_utc 13:12:42.054451Z）。19/19 exit 0。

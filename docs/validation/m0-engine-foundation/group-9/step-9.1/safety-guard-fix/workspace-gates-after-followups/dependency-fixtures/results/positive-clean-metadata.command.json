@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "cargo",
+    "metadata",
+    "--manifest-path",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-9/step-9.1/safety-guard-fix/workspace-gates-after-followups/dependency-fixtures/fixtures/positive-clean/Cargo.toml",
+    "--offline",
+    "--format-version",
+    "1"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "started_utc": "2026-10-31T13:43:43.470993+00:00",
+  "finished_utc": "2026-10-31T13:43:43.549741+00:00",
+  "exit_code": 0,
+  "stdout_sha256": "a7c382fe4afc7d9b35a01c2b3c720af0e16a0f5ede7e33462fe598f1df15a287",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "env_overrides": {
+    "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "failures": [
+    {
+      "file": "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/nested-module-does-not-authorize-sibling/crates/aline-buffer/src/lib.rs",
+      "line": 1,
+      "rule": "test-module-resolution",
+      "detail": "@nested:@nested:checks"
+    },
+    {
+      "file": "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/nested-module-does-not-authorize-sibling/crates/aline-buffer/src/checks.rs",
+      "line": 1,
+      "rule": "engine-production-assert"
+    }
+  ],
+  "scanned": [
+    {
+      "file": "crates/aline-buffer/src/checks.rs",
+      "kind": "engine-production"
+    },
+    {
+      "file": "crates/aline-buffer/src/lib.rs",
+      "kind": "engine-production"
+    }
+  ],
+  "member_reads": [
+    {
+      "argv": [
+        "cargo",
+        "read-manifest",
+        "--manifest-path",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/nested-module-does-not-authorize-sibling/crates/aline-buffer/Cargo.toml",
+        "--offline"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/nested-module-does-not-authorize-sibling",
+      "started_utc": "2026-10-31T13:43:54.302780+00:00",
+      "finished_utc": "2026-10-31T13:43:54.313399+00:00",
+      "exit_code": 0,
+      "stdout": "{\"name\":\"aline-buffer\",\"version\":\"0.0.0\",\"id\":\"path+file:///Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/nested-module-does-not-authorize-sibling/crates/aline-buffer#0.0.0\",\"license\":null,\"license_file\":null,\"description\":null,\"source\":null,\"dependencies\":[],\"targets\":[{\"kind\":[\"lib\"],\"crate_types\":[\"lib\"],\"name\":\"aline_buffer\",\"src_path\":\"/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/nested-module-does-not-authorize-sibling/crates/aline-buffer/src/lib.rs\",\"edition\":\"2015\",\"doc\":true,\"doctest\":true,\"test\":true}],\"features\":{},\"manifest_path\":\"/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/nested-module-does-not-authorize-sibling/crates/aline-buffer/Cargo.toml\",\"metadata\":null,\"publish\":null,\"authors\":[],\"categories\":[],\"keywords\":[],\"readme\":null,\"repository\":null,\"homepage\":null,\"documentation\":null,\"edition\":\"2015\",\"links\":null,\"default_run\":null,\"rust_version\":null}\n",
+      "stderr": ""
+    }
+  ]
+}

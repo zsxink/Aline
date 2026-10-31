@@ -1,0 +1,8 @@
+[package]
+name = "aline"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+hidden_alias = { package = "aline-ui", path = "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-9/step-9.1/safety-guard-fix/workspace-gates-after-followups/dependency-fixtures/fixtures/positive-downward/aline-ui" }

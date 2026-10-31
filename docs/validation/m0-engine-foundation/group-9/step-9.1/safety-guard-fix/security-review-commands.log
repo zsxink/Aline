@@ -1,0 +1,606 @@
+# 安全守卫评审命令日志（security-review-commands.log）
+
+评审对象：工作区未提交的 scripts/check_safety.py 修改（HEAD 1dd0174ca8fca975209ee5d6c3169c36695fad）。
+环境：Python 3.9.6；cargo/rustc 1.98.1；macOS；UTC 时区。
+
+说明：
+- Section A 与 Section B 由评审者最终复核脚本实际执行，逐条记录真实 UTC 起止与 exit code；
+  对应 stdout/stderr 保存在 /tmp/aline-review-logs/（临时目录，不在仓库内）。
+- Section C 为评审过程中早先实际执行的命令，当时未捕获 UTC 时间戳，故如实标注
+  “timestamp not captured”，只记录实际观察到的 exit code；这些命令在 Section A/B 中有
+  对应的最终带时间戳复跑。
+- 日志中的 exit code 均为命令真实退出码，未补写、未修改。
+
+
+================================================================================
+Section C. 早先实际执行、未捕获 UTC 的命令（preliminary pass）
+================================================================================
+
+--- 提取旧版守卫
+command: git show HEAD:scripts/check_safety.py > /tmp/old_check_safety.py
+timestamp: not captured (preliminary pass)
+exit: 0
+command: cp scripts/safety_lex.py /tmp/safety_lex.py
+timestamp: not captured (preliminary pass)
+exit: 0
+
+--- 旧版对仓库根（背景事实复现）
+command: python3 /tmp/old_check_safety.py --root /Users/xian/Project/editor/Aline
+timestamp: not captured (preliminary pass)
+exit: 1
+observed: 4 failures, rule=test-module-resolution, detail=common, files:
+  crates/aline-ui/tests/document.rs, document_composition.rs, document_results.rs, document_typing.rs
+
+--- 新版对仓库根
+command: python3 scripts/check_safety.py --root /Users/xian/Project/editor/Aline
+timestamp: not captured (preliminary pass)
+exit: 0
+observed: 0 failures, 84 scanned
+
+--- 首次 self-test
+command: python3 scripts/check_safety.py --self-test --output-dir /tmp/aline-review-selftest
+timestamp: not captured (preliminary pass)
+exit: 0
+observed: 50/50 cases passed; workspace_after_fixtures 0 failures / 84 scanned
+
+--- 生成评审者对抗 fixture（仓库外）
+command: python3 /tmp/aline-review-scripts/gen.py
+timestamp: not captured (preliminary pass)
+exit: 0
+command: python3 /tmp/aline-review-scripts/gen2.py
+timestamp: not captured (preliminary pass)
+exit: 0
+
+--- 新版守卫逐 fixture（第一批 11 个）
+command: python3 scripts/check_safety.py --root /tmp/aline-review-fixtures/<case>
+timestamp: not captured (preliminary pass)
+observed exits: a-pass=0, a-fail=1, b-src-only=1, c-cfgtest=0, d-nocfg=0,
+  e-nested-wrong-root=1, e-nested-correct=0, f-bin-helper-present=1,
+  f-bin-missing=1, f-example-helper-present=1, g-ambiguous=1
+
+--- 旧版守卫逐 fixture（用于区分“引入”与“既有”）
+command: python3 /tmp/old_check_safety.py --root /tmp/aline-review-fixtures/<case>
+timestamp: not captured (preliminary pass)
+observed exits: a-pass=1, a-fail=1, b-src-only=1, c-cfgtest=1, d-nocfg=1,
+  e-nested-wrong-root=1, e-nested-correct=0, f-bin-helper-present=1,
+  f-bin-missing=1, f-example-helper-present=1, g-ambiguous=1
+
+--- 新版守卫逐 fixture（第二批 6 个）
+command: python3 scripts/check_safety.py --root /tmp/aline-review-fixtures2/<case>
+timestamp: not captured (preliminary pass)
+observed exits: h-old-layout-only=1, i-self-reference=0, j-dir-main=0,
+  j-dir-main-missing=1, k-src-tests-dir=1 (engine-production-assert), l-production-wins=1
+command: python3 /tmp/old_check_safety.py --root /tmp/aline-review-fixtures2/<case>
+observed exits: h-old-layout-only=0 (旧规则接受 rustc 会拒绝的布局),
+  i-self-reference=1 (旧规则拒绝), j-dir-main=0, j-dir-main-missing=1,
+  k-src-tests-dir=1, l-production-wins=1
+
+--- 新旧分类对比（(file, kind) 集合）
+command: inline python comparison over /tmp/aline-review-fixtures*/**.{old,out}.json
+timestamp: not captured (preliminary pass)
+exit: 0
+observed: 全部 17 个 fixture 的 (file, kind) classdiff 均为 none
+
+--- 变异测试（/tmp/aline-mut 隔离副本，运行后恢复副本，未改仓库）
+command: python3 /tmp/aline-mut/scripts/check_safety.py --self-test --output-dir /tmp/aline-mut/out-<mutant>
+timestamp: not captured (preliminary pass)
+observed:
+  M1 revert-old-home: exit=1, failed cases=[integration-test-crate-root,
+     integration-nested-module-resolution, integration-sibling-file-is-own-root]
+  M2 any-tests-path-is-root: exit=0, all passed
+  M3b broaden-test-files: exit=0, all passed (probe: src/tests/helper.rs became
+     engine-test and its assert! was not reported — fail-open under this mutation)
+  M4 accept-ambiguous: exit=0, all passed
+  M5 src-fallback: exit=1, failed=[integration-root-does-not-see-src-module]
+  M6 skip-unresolved-on-roots: parent crashed on empty JSON (IndexError in child);
+     child exit=1; fail-closed preserved
+  M7 dual-home-fallback: exit=0, all passed; accepted h-old-layout-only (rustc E0583)
+
+--- examples/src/bin 既有行为探针（守卫）
+command: python3 scripts/check_safety.py --root /tmp/aline-review-fixtures2/<m-example-wrong|n-bin-wrong>
+timestamp: not captured (preliminary pass)
+exit: 0 for both (错误位置 examples/x/helper.rs、src/bin/tool/helper.rs 被静默接受)
+observed: 旧版同样 exit 0；对应 Cargo 实测为 exit 101 E0583（见 Section B）
+
+================================================================================
+Section A. 最终复核 pass（带 UTC 与真实 exit；由 final_verify.py 执行）
+================================================================================
+
+---
+label: v1-git-rev-parse
+start_utc: 2026-10-31T13:22:10.462570+00:00
+end_utc: 2026-10-31T13:22:10.469573+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: git rev-parse HEAD
+exit: 0
+stdout_file: v1-git-rev-parse.stdout.log
+---
+label: v2-python-version
+start_utc: 2026-10-31T13:22:10.469753+00:00
+end_utc: 2026-10-31T13:22:10.478508+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 --version
+exit: 0
+stdout_file: v2-python-version.stdout.log
+---
+label: v3-git-status
+start_utc: 2026-10-31T13:22:10.478682+00:00
+end_utc: 2026-10-31T13:22:10.783623+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: git status --porcelain
+exit: 0
+stdout_file: v3-git-status.stdout.log
+---
+label: v4-git-diff
+start_utc: 2026-10-31T13:22:10.783886+00:00
+end_utc: 2026-10-31T13:22:10.794252+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: git diff scripts/check_safety.py
+exit: 0
+stdout_file: v4-git-diff.stdout.log
+---
+label: v4b-sha256
+start_utc: 2026-10-31T13:22:10.794480+00:00
+end_utc: 2026-10-31T13:22:10.797017+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: sha256sum scripts/check_safety.py scripts/safety_lex.py
+exit: 0
+stdout_file: v4b-sha256.stdout.log
+---
+label: v5-old-workspace
+start_utc: 2026-10-31T13:22:10.797176+00:00
+end_utc: 2026-10-31T13:22:12.632325+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 /tmp/old_check_safety.py --root /Users/xian/Project/editor/Aline
+exit: 1
+stdout_file: v5-old-workspace.stdout.json
+---
+label: v6-new-workspace
+start_utc: 2026-10-31T13:22:12.632688+00:00
+end_utc: 2026-10-31T13:22:14.434386+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 scripts/check_safety.py --root /Users/xian/Project/editor/Aline
+exit: 0
+stdout_file: v6-new-workspace.stdout.json
+---
+label: v7-self-test
+start_utc: 2026-10-31T13:22:14.434792+00:00
+end_utc: 2026-10-31T13:22:17.826160+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 scripts/check_safety.py --self-test --output-dir /tmp/aline-review-selftest-final
+exit: 0
+stdout_file: v7-self-test.stdout.json
+---
+label: v8-a-fail
+start_utc: 2026-10-31T13:22:17.827018+00:00
+end_utc: 2026-10-31T13:22:17.872023+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 scripts/check_safety.py --root /tmp/aline-review-fixtures/a-fail
+exit: 1
+stdout_file: v8-a-fail.stdout.json
+---
+label: v8-a-pass
+start_utc: 2026-10-31T13:22:17.872245+00:00
+end_utc: 2026-10-31T13:22:17.918243+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 scripts/check_safety.py --root /tmp/aline-review-fixtures/a-pass
+exit: 0
+stdout_file: v8-a-pass.stdout.json
+---
+label: v8-b-src-only
+start_utc: 2026-10-31T13:22:17.918486+00:00
+end_utc: 2026-10-31T13:22:17.964300+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 scripts/check_safety.py --root /tmp/aline-review-fixtures/b-src-only
+exit: 1
+stdout_file: v8-b-src-only.stdout.json
+---
+label: v8-c-cfgtest
+start_utc: 2026-10-31T13:22:17.964548+00:00
+end_utc: 2026-10-31T13:22:18.009763+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 scripts/check_safety.py --root /tmp/aline-review-fixtures/c-cfgtest
+exit: 0
+stdout_file: v8-c-cfgtest.stdout.json
+---
+label: v8-d-nocfg
+start_utc: 2026-10-31T13:22:18.010010+00:00
+end_utc: 2026-10-31T13:22:18.081466+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 scripts/check_safety.py --root /tmp/aline-review-fixtures/d-nocfg
+exit: 0
+stdout_file: v8-d-nocfg.stdout.json
+---
+label: v8-e-nested-correct
+start_utc: 2026-10-31T13:22:18.081715+00:00
+end_utc: 2026-10-31T13:22:18.130567+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 scripts/check_safety.py --root /tmp/aline-review-fixtures/e-nested-correct
+exit: 0
+stdout_file: v8-e-nested-correct.stdout.json
+---
+label: v8-e-nested-wrong-root
+start_utc: 2026-10-31T13:22:18.130820+00:00
+end_utc: 2026-10-31T13:22:18.179606+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 scripts/check_safety.py --root /tmp/aline-review-fixtures/e-nested-wrong-root
+exit: 1
+stdout_file: v8-e-nested-wrong-root.stdout.json
+---
+label: v8-f-bin-helper-present
+start_utc: 2026-10-31T13:22:18.179855+00:00
+end_utc: 2026-10-31T13:22:18.228305+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 scripts/check_safety.py --root /tmp/aline-review-fixtures/f-bin-helper-present
+exit: 1
+stdout_file: v8-f-bin-helper-present.stdout.json
+---
+label: v8-f-bin-missing
+start_utc: 2026-10-31T13:22:18.228563+00:00
+end_utc: 2026-10-31T13:22:18.277281+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 scripts/check_safety.py --root /tmp/aline-review-fixtures/f-bin-missing
+exit: 1
+stdout_file: v8-f-bin-missing.stdout.json
+---
+label: v8-f-example-helper-present
+start_utc: 2026-10-31T13:22:18.277551+00:00
+end_utc: 2026-10-31T13:22:18.327112+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 scripts/check_safety.py --root /tmp/aline-review-fixtures/f-example-helper-present
+exit: 1
+stdout_file: v8-f-example-helper-present.stdout.json
+---
+label: v8-g-ambiguous
+start_utc: 2026-10-31T13:22:18.327377+00:00
+end_utc: 2026-10-31T13:22:18.376656+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 scripts/check_safety.py --root /tmp/aline-review-fixtures/g-ambiguous
+exit: 1
+stdout_file: v8-g-ambiguous.stdout.json
+---
+label: v8-h-old-layout-only
+start_utc: 2026-10-31T13:22:18.376917+00:00
+end_utc: 2026-10-31T13:22:18.425514+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 scripts/check_safety.py --root /tmp/aline-review-fixtures2/h-old-layout-only
+exit: 1
+stdout_file: v8-h-old-layout-only.stdout.json
+---
+label: v8-i-self-reference
+start_utc: 2026-10-31T13:22:18.426025+00:00
+end_utc: 2026-10-31T13:22:18.475100+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 scripts/check_safety.py --root /tmp/aline-review-fixtures2/i-self-reference
+exit: 0
+stdout_file: v8-i-self-reference.stdout.json
+---
+label: v8-j-dir-main
+start_utc: 2026-10-31T13:22:18.475357+00:00
+end_utc: 2026-10-31T13:22:18.524418+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 scripts/check_safety.py --root /tmp/aline-review-fixtures2/j-dir-main
+exit: 0
+stdout_file: v8-j-dir-main.stdout.json
+---
+label: v8-j-dir-main-missing
+start_utc: 2026-10-31T13:22:18.524682+00:00
+end_utc: 2026-10-31T13:22:18.574203+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 scripts/check_safety.py --root /tmp/aline-review-fixtures2/j-dir-main-missing
+exit: 1
+stdout_file: v8-j-dir-main-missing.stdout.json
+---
+label: v8-k-src-tests-dir
+start_utc: 2026-10-31T13:22:18.574454+00:00
+end_utc: 2026-10-31T13:22:18.623367+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 scripts/check_safety.py --root /tmp/aline-review-fixtures2/k-src-tests-dir
+exit: 1
+stdout_file: v8-k-src-tests-dir.stdout.json
+---
+label: v8-l-production-wins
+start_utc: 2026-10-31T13:22:18.623634+00:00
+end_utc: 2026-10-31T13:22:18.672750+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 scripts/check_safety.py --root /tmp/aline-review-fixtures2/l-production-wins
+exit: 1
+stdout_file: v8-l-production-wins.stdout.json
+---
+label: v9-a-fail
+start_utc: 2026-10-31T13:22:18.673005+00:00
+end_utc: 2026-10-31T13:22:18.722254+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 /tmp/old_check_safety.py --root /tmp/aline-review-fixtures/a-fail
+exit: 1
+stdout_file: v9-a-fail.stdout.json
+---
+label: v9-a-pass
+start_utc: 2026-10-31T13:22:18.722516+00:00
+end_utc: 2026-10-31T13:22:18.770775+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 /tmp/old_check_safety.py --root /tmp/aline-review-fixtures/a-pass
+exit: 1
+stdout_file: v9-a-pass.stdout.json
+---
+label: v9-b-src-only
+start_utc: 2026-10-31T13:22:18.771089+00:00
+end_utc: 2026-10-31T13:22:18.818992+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 /tmp/old_check_safety.py --root /tmp/aline-review-fixtures/b-src-only
+exit: 1
+stdout_file: v9-b-src-only.stdout.json
+---
+label: v9-c-cfgtest
+start_utc: 2026-10-31T13:22:18.819259+00:00
+end_utc: 2026-10-31T13:22:18.867401+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 /tmp/old_check_safety.py --root /tmp/aline-review-fixtures/c-cfgtest
+exit: 1
+stdout_file: v9-c-cfgtest.stdout.json
+---
+label: v9-d-nocfg
+start_utc: 2026-10-31T13:22:18.867663+00:00
+end_utc: 2026-10-31T13:22:18.916307+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 /tmp/old_check_safety.py --root /tmp/aline-review-fixtures/d-nocfg
+exit: 1
+stdout_file: v9-d-nocfg.stdout.json
+---
+label: v9-e-nested-correct
+start_utc: 2026-10-31T13:22:18.916626+00:00
+end_utc: 2026-10-31T13:22:18.965871+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 /tmp/old_check_safety.py --root /tmp/aline-review-fixtures/e-nested-correct
+exit: 0
+stdout_file: v9-e-nested-correct.stdout.json
+---
+label: v9-e-nested-wrong-root
+start_utc: 2026-10-31T13:22:18.966177+00:00
+end_utc: 2026-10-31T13:22:19.016435+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 /tmp/old_check_safety.py --root /tmp/aline-review-fixtures/e-nested-wrong-root
+exit: 1
+stdout_file: v9-e-nested-wrong-root.stdout.json
+---
+label: v9-f-bin-helper-present
+start_utc: 2026-10-31T13:22:19.016739+00:00
+end_utc: 2026-10-31T13:22:19.089424+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 /tmp/old_check_safety.py --root /tmp/aline-review-fixtures/f-bin-helper-present
+exit: 1
+stdout_file: v9-f-bin-helper-present.stdout.json
+---
+label: v9-f-bin-missing
+start_utc: 2026-10-31T13:22:19.089733+00:00
+end_utc: 2026-10-31T13:22:19.138264+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 /tmp/old_check_safety.py --root /tmp/aline-review-fixtures/f-bin-missing
+exit: 1
+stdout_file: v9-f-bin-missing.stdout.json
+---
+label: v9-f-example-helper-present
+start_utc: 2026-10-31T13:22:19.138551+00:00
+end_utc: 2026-10-31T13:22:19.186053+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 /tmp/old_check_safety.py --root /tmp/aline-review-fixtures/f-example-helper-present
+exit: 1
+stdout_file: v9-f-example-helper-present.stdout.json
+---
+label: v9-g-ambiguous
+start_utc: 2026-10-31T13:22:19.186339+00:00
+end_utc: 2026-10-31T13:22:19.234068+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 /tmp/old_check_safety.py --root /tmp/aline-review-fixtures/g-ambiguous
+exit: 1
+stdout_file: v9-g-ambiguous.stdout.json
+---
+label: v9-h-old-layout-only
+start_utc: 2026-10-31T13:22:19.234340+00:00
+end_utc: 2026-10-31T13:22:19.282704+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 /tmp/old_check_safety.py --root /tmp/aline-review-fixtures2/h-old-layout-only
+exit: 0
+stdout_file: v9-h-old-layout-only.stdout.json
+---
+label: v9-i-self-reference
+start_utc: 2026-10-31T13:22:19.282986+00:00
+end_utc: 2026-10-31T13:22:19.330855+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 /tmp/old_check_safety.py --root /tmp/aline-review-fixtures2/i-self-reference
+exit: 1
+stdout_file: v9-i-self-reference.stdout.json
+---
+label: v9-j-dir-main
+start_utc: 2026-10-31T13:22:19.331140+00:00
+end_utc: 2026-10-31T13:22:19.378014+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 /tmp/old_check_safety.py --root /tmp/aline-review-fixtures2/j-dir-main
+exit: 0
+stdout_file: v9-j-dir-main.stdout.json
+---
+label: v9-j-dir-main-missing
+start_utc: 2026-10-31T13:22:19.378265+00:00
+end_utc: 2026-10-31T13:22:19.424305+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 /tmp/old_check_safety.py --root /tmp/aline-review-fixtures2/j-dir-main-missing
+exit: 1
+stdout_file: v9-j-dir-main-missing.stdout.json
+---
+label: v9-k-src-tests-dir
+start_utc: 2026-10-31T13:22:19.424568+00:00
+end_utc: 2026-10-31T13:22:19.469515+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 /tmp/old_check_safety.py --root /tmp/aline-review-fixtures2/k-src-tests-dir
+exit: 1
+stdout_file: v9-k-src-tests-dir.stdout.json
+---
+label: v9-l-production-wins
+start_utc: 2026-10-31T13:22:19.469765+00:00
+end_utc: 2026-10-31T13:22:19.514672+00:00
+cwd: /Users/xian/Project/editor/Aline
+command: python3 /tmp/old_check_safety.py --root /tmp/aline-review-fixtures2/l-production-wins
+exit: 1
+stdout_file: v9-l-production-wins.stdout.json
+---
+label: v11-M1-revert-old-home
+start_utc: 2026-10-31T13:22:19.515104+00:00
+end_utc: 2026-10-31T13:22:21.029347+00:00
+cwd: /tmp/aline-mut
+command: python3 scripts/check_safety.py --self-test --output-dir /tmp/aline-mut/out-M1-revert-old-home
+exit: 1
+stdout_file: v11-M1-revert-old-home.stdout.json
+---
+label: v11-M2-any-tests-path-is-root
+start_utc: 2026-10-31T13:22:21.029798+00:00
+end_utc: 2026-10-31T13:22:22.541150+00:00
+cwd: /tmp/aline-mut
+command: python3 scripts/check_safety.py --self-test --output-dir /tmp/aline-mut/out-M2-any-tests-path-is-root
+exit: 0
+stdout_file: v11-M2-any-tests-path-is-root.stdout.json
+---
+label: v11-M3b-broaden-test-files
+start_utc: 2026-10-31T13:22:22.541599+00:00
+end_utc: 2026-10-31T13:22:24.055748+00:00
+cwd: /tmp/aline-mut
+command: python3 scripts/check_safety.py --self-test --output-dir /tmp/aline-mut/out-M3b-broaden-test-files
+exit: 0
+stdout_file: v11-M3b-broaden-test-files.stdout.json
+---
+label: v11-M5-src-fallback
+start_utc: 2026-10-31T13:22:24.056193+00:00
+end_utc: 2026-10-31T13:22:25.585626+00:00
+cwd: /tmp/aline-mut
+command: python3 scripts/check_safety.py --self-test --output-dir /tmp/aline-mut/out-M5-src-fallback
+exit: 1
+stdout_file: v11-M5-src-fallback.stdout.json
+---
+label: v11-M6-skip-unresolved-on-roots
+start_utc: 2026-10-31T13:22:25.586077+00:00
+end_utc: 2026-10-31T13:22:26.694447+00:00
+cwd: /tmp/aline-mut
+command: python3 scripts/check_safety.py --self-test --output-dir /tmp/aline-mut/out-M6-skip-unresolved-on-roots
+exit: 1
+stdout_file: v11-M6-skip-unresolved-on-roots.stdout.json
+---
+label: v11-M7-dual-home-fallback
+start_utc: 2026-10-31T13:22:26.694804+00:00
+end_utc: 2026-10-31T13:22:28.216557+00:00
+cwd: /tmp/aline-mut
+command: python3 scripts/check_safety.py --self-test --output-dir /tmp/aline-mut/out-M7-dual-home-fallback
+exit: 0
+stdout_file: v11-M7-dual-home-fallback.stdout.json
+
+================================================================================
+Section B. Cargo/rustc 语义基准（带 UTC 与真实 exit；由 cargo_proof.sh 执行）
+================================================================================
+
+---
+label: a-pass
+start_utc: 2026-10-31T13:34:45.988425+00:00
+end_utc: 2026-10-31T13:34:46.178087+00:00
+cwd: /tmp/aline-cargo-groundtruth/a-pass
+command: cargo check --tests --offline -q
+exit: 0
+output_file: /tmp/aline-review-logs/a-pass.cargo.log
+---
+label: old-layout
+start_utc: 2026-10-31T13:34:46.203610+00:00
+end_utc: 2026-10-31T13:34:46.383451+00:00
+cwd: /tmp/aline-cargo-groundtruth/old-layout
+command: cargo check --tests --offline -q
+exit: 101
+output_file: /tmp/aline-review-logs/old-layout.cargo.log
+---
+label: src-only
+start_utc: 2026-10-31T13:34:46.409955+00:00
+end_utc: 2026-10-31T13:34:46.615646+00:00
+cwd: /tmp/aline-cargo-groundtruth/src-only
+command: cargo check --tests --offline -q
+exit: 101
+output_file: /tmp/aline-review-logs/src-only.cargo.log
+---
+label: self-ref
+start_utc: 2026-10-31T13:34:46.639986+00:00
+end_utc: 2026-10-31T13:34:46.820776+00:00
+cwd: /tmp/aline-cargo-groundtruth/self-ref
+command: cargo check --tests --offline -q
+exit: 101
+output_file: /tmp/aline-review-logs/self-ref.cargo.log
+---
+label: dir-main
+start_utc: 2026-10-31T13:34:46.842373+00:00
+end_utc: 2026-10-31T13:34:47.027105+00:00
+cwd: /tmp/aline-cargo-groundtruth/dir-main
+command: cargo check --tests --offline -q
+exit: 0
+output_file: /tmp/aline-review-logs/dir-main.cargo.log
+---
+label: dir-main-targets
+start_utc: 2026-10-31T13:34:47.047686+00:00
+end_utc: 2026-10-31T13:34:47.080840+00:00
+cwd: /tmp/aline-cargo-groundtruth/dir-main
+command: cargo read-manifest --offline
+exit: 0
+output_file: /tmp/aline-review-logs/dir-main-targets.cargo.log
+---
+label: nested-wrong
+start_utc: 2026-10-31T13:34:47.104984+00:00
+end_utc: 2026-10-31T13:34:47.282554+00:00
+cwd: /tmp/aline-cargo-groundtruth/nested-wrong
+command: cargo check --tests --offline -q
+exit: 101
+output_file: /tmp/aline-review-logs/nested-wrong.cargo.log
+---
+label: nested-correct
+start_utc: 2026-10-31T13:34:47.305436+00:00
+end_utc: 2026-10-31T13:34:47.482028+00:00
+cwd: /tmp/aline-cargo-groundtruth/nested-correct
+command: cargo check --tests --offline -q
+exit: 0
+output_file: /tmp/aline-review-logs/nested-correct.cargo.log
+---
+label: examples-correct-location
+start_utc: 2026-10-31T13:34:47.503665+00:00
+end_utc: 2026-10-31T13:34:47.854887+00:00
+cwd: /tmp/aline-cargo-groundtruth/examples-probe
+command: cargo check --examples --offline -q
+exit: 0
+output_file: /tmp/aline-review-logs/examples-correct-location.cargo.log
+---
+label: examples-wrong-location
+start_utc: 2026-10-31T13:34:47.897319+00:00
+end_utc: 2026-10-31T13:34:47.977579+00:00
+cwd: /tmp/aline-cargo-groundtruth/examples-probe
+command: cargo check --examples --offline -q
+exit: 101
+output_file: /tmp/aline-review-logs/examples-wrong-location.cargo.log
+---
+label: bin-correct-location
+start_utc: 2026-10-31T13:34:48.004896+00:00
+end_utc: 2026-10-31T13:34:48.192193+00:00
+cwd: /tmp/aline-cargo-groundtruth/bin-probe
+command: cargo check --bins --offline -q
+exit: 0
+output_file: /tmp/aline-review-logs/bin-correct-location.cargo.log
+---
+label: bin-wrong-location
+start_utc: 2026-10-31T13:34:48.216835+00:00
+end_utc: 2026-10-31T13:34:48.289935+00:00
+cwd: /tmp/aline-cargo-groundtruth/bin-probe
+command: cargo check --bins --offline -q
+exit: 101
+output_file: /tmp/aline-review-logs/bin-wrong-location.cargo.log
+
+================================================================================
+附：Section A 中 v10 条目的说明
+================================================================================
+v10 条目对应的 cargo 基准在 Section B 中以带时间戳方式实际执行；Section A 的
+final_verify.py 未重复执行 cargo 子命令，仅打印提示，未将其伪装为已执行结果。
+Section B 的每条 cargo 命令均真实执行并记录 exit code 与输出文件。
+
+附：输出文件位置
+================================================================================
+/tmp/aline-review-logs/ 下保存 Section A/B 各命令的 stdout/stderr 与 cargo 输出；
+临时目录不属仓库，评审结束不清理。self-test 的固定 fixture 按既有设计位于
+docs/validation/m0-engine-foundation/group-2/safety-fixtures/（既有未跟踪目录）。

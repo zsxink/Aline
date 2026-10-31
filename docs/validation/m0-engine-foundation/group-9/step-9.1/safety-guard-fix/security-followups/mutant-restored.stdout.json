@@ -1,0 +1,1157 @@
+{
+  "cases": [
+    {
+      "name": "constant-table",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/constant-table.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.042853+00:00",
+      "finished_utc": "2026-10-31T13:43:17.070366+00:00",
+      "exit_code": 0,
+      "expected_rules": [],
+      "actual_rules": [],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "test-assertions",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/test-assertions.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.070485+00:00",
+      "finished_utc": "2026-10-31T13:43:17.097017+00:00",
+      "exit_code": 0,
+      "expected_rules": [],
+      "actual_rules": [],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "test-function",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/test-function.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.097140+00:00",
+      "finished_utc": "2026-10-31T13:43:17.124276+00:00",
+      "exit_code": 0,
+      "expected_rules": [],
+      "actual_rules": [],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "integration-assert",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/integration-assert.rs",
+        "--kind",
+        "engine-test"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.124389+00:00",
+      "finished_utc": "2026-10-31T13:43:17.151248+00:00",
+      "exit_code": 0,
+      "expected_rules": [],
+      "actual_rules": [],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "strings-comments",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/strings-comments.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.151365+00:00",
+      "finished_utc": "2026-10-31T13:43:17.177419+00:00",
+      "exit_code": 0,
+      "expected_rules": [],
+      "actual_rules": [],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "unwrap-production",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/unwrap-production.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.177665+00:00",
+      "finished_utc": "2026-10-31T13:43:17.204021+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-unwrap"
+      ],
+      "actual_rules": [
+        "engine-unwrap"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "unwrap-test",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/unwrap-test.rs",
+        "--kind",
+        "engine-test"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.204136+00:00",
+      "finished_utc": "2026-10-31T13:43:17.231169+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-unwrap"
+      ],
+      "actual_rules": [
+        "engine-unwrap"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "unwrap-cfg-test",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/unwrap-cfg-test.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.231283+00:00",
+      "finished_utc": "2026-10-31T13:43:17.258241+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-unwrap"
+      ],
+      "actual_rules": [
+        "engine-unwrap"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "unwrap-example",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/unwrap-example.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.258352+00:00",
+      "finished_utc": "2026-10-31T13:43:17.284702+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-unwrap"
+      ],
+      "actual_rules": [
+        "engine-unwrap"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "unwrap-bench",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/unwrap-bench.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.284819+00:00",
+      "finished_utc": "2026-10-31T13:43:17.311591+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-unwrap"
+      ],
+      "actual_rules": [
+        "engine-unwrap"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "production-expect",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/production-expect.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.311705+00:00",
+      "finished_utc": "2026-10-31T13:43:17.338005+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-expect"
+      ],
+      "actual_rules": [
+        "engine-production-expect"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "production-panic",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/production-panic.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.338109+00:00",
+      "finished_utc": "2026-10-31T13:43:17.364146+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-panic"
+      ],
+      "actual_rules": [
+        "engine-production-panic"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "production-unreachable",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/production-unreachable.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.364261+00:00",
+      "finished_utc": "2026-10-31T13:43:17.391662+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-unreachable"
+      ],
+      "actual_rules": [
+        "engine-production-unreachable"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "production-assert",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/production-assert.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.391780+00:00",
+      "finished_utc": "2026-10-31T13:43:17.418762+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-assert"
+      ],
+      "actual_rules": [
+        "engine-production-assert"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "production-assert-eq",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/production-assert-eq.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.418875+00:00",
+      "finished_utc": "2026-10-31T13:43:17.445411+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-assert_eq"
+      ],
+      "actual_rules": [
+        "engine-production-assert_eq"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "production-assert-ne",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/production-assert-ne.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.445525+00:00",
+      "finished_utc": "2026-10-31T13:43:17.472557+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-assert_ne"
+      ],
+      "actual_rules": [
+        "engine-production-assert_ne"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "release-only-production-assert",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/release-only-production-assert.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.472672+00:00",
+      "finished_utc": "2026-10-31T13:43:17.499954+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-assert"
+      ],
+      "actual_rules": [
+        "engine-production-assert"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "test-scope-does-not-leak",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/test-scope-does-not-leak.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.500078+00:00",
+      "finished_utc": "2026-10-31T13:43:17.527107+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-assert"
+      ],
+      "actual_rules": [
+        "engine-production-assert"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "complex-cfg-conservative",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/complex-cfg-conservative.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.527233+00:00",
+      "finished_utc": "2026-10-31T13:43:17.555759+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-assert"
+      ],
+      "actual_rules": [
+        "engine-production-assert"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "macro-body-panic",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/macro-body-panic.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.555911+00:00",
+      "finished_utc": "2026-10-31T13:43:17.585101+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-panic"
+      ],
+      "actual_rules": [
+        "engine-production-panic"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "debug-assert-positive",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/debug-assert-positive.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.585218+00:00",
+      "finished_utc": "2026-10-31T13:43:17.612722+00:00",
+      "exit_code": 0,
+      "expected_rules": [],
+      "actual_rules": [],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "once-lock",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/once-lock.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.612834+00:00",
+      "finished_utc": "2026-10-31T13:43:17.640254+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-runtime-state"
+      ],
+      "actual_rules": [
+        "engine-runtime-state"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "lazy-lock",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/lazy-lock.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.640375+00:00",
+      "finished_utc": "2026-10-31T13:43:17.667996+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-runtime-state"
+      ],
+      "actual_rules": [
+        "engine-runtime-state"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "thread-spawn",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/thread-spawn.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.668108+00:00",
+      "finished_utc": "2026-10-31T13:43:17.695895+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-thread"
+      ],
+      "actual_rules": [
+        "engine-thread"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "thread-import-alias",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/thread-import-alias.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.696006+00:00",
+      "finished_utc": "2026-10-31T13:43:17.723843+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-thread"
+      ],
+      "actual_rules": [
+        "engine-thread"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "thread-group-import",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/thread-group-import.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.723960+00:00",
+      "finished_utc": "2026-10-31T13:43:17.752055+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-thread"
+      ],
+      "actual_rules": [
+        "engine-thread"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "global-atomic-u32",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/global-atomic-u32.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.752185+00:00",
+      "finished_utc": "2026-10-31T13:43:17.781108+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-mutable-static"
+      ],
+      "actual_rules": [
+        "engine-mutable-static"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "thread-local",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/thread-local.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.781228+00:00",
+      "finished_utc": "2026-10-31T13:43:17.808957+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-thread-local"
+      ],
+      "actual_rules": [
+        "engine-thread-local"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "global-locale",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/global-locale.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.809061+00:00",
+      "finished_utc": "2026-10-31T13:43:17.836457+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-runtime-state",
+        "engine-mutable-static"
+      ],
+      "actual_rules": [
+        "engine-mutable-static",
+        "engine-runtime-state"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "static-mut",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/static-mut.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.836577+00:00",
+      "finished_utc": "2026-10-31T13:43:17.863326+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "mutable-static"
+      ],
+      "actual_rules": [
+        "mutable-static"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "unsafe-owned",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/unsafe-owned.rs",
+        "--kind",
+        "ui"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.863438+00:00",
+      "finished_utc": "2026-10-31T13:43:17.890760+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "unsafe-owned"
+      ],
+      "actual_rules": [
+        "unsafe-owned"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "ui-production-assert",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/ui-production-assert.rs",
+        "--kind",
+        "ui-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.890895+00:00",
+      "finished_utc": "2026-10-31T13:43:17.918525+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "owned-production-assert"
+      ],
+      "actual_rules": [
+        "owned-production-assert"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "ui-test-assert",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/ui-test-assert.rs",
+        "--kind",
+        "ui-test"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.918643+00:00",
+      "finished_utc": "2026-10-31T13:43:17.945655+00:00",
+      "exit_code": 0,
+      "expected_rules": [],
+      "actual_rules": [],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "ui-unproven-path",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/ui-unproven-path.rs",
+        "--kind",
+        "ui-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.945758+00:00",
+      "finished_utc": "2026-10-31T13:43:17.973394+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "unproven-module-path"
+      ],
+      "actual_rules": [
+        "unproven-module-path"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "unproven-path",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/unproven-path.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:17.973524+00:00",
+      "finished_utc": "2026-10-31T13:43:18.001329+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "unproven-module-path"
+      ],
+      "actual_rules": [
+        "unproven-module-path"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "unproven-cfg-attr-path",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/unproven-cfg-attr-path.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:18.001453+00:00",
+      "finished_utc": "2026-10-31T13:43:18.028353+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "unproven-module-path"
+      ],
+      "actual_rules": [
+        "unproven-module-path"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "unterminated-comment",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--file",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/unterminated-comment.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:18.028473+00:00",
+      "finished_utc": "2026-10-31T13:43:18.056802+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "lexical-failure"
+      ],
+      "actual_rules": [
+        "lexical-failure"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "external-test-module",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--root",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/external-test-module"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:18.057107+00:00",
+      "finished_utc": "2026-10-31T13:43:18.101209+00:00",
+      "exit_code": 0,
+      "expected_rules": [],
+      "actual_rules": [],
+      "passed": true,
+      "independent_expectation": "精确 cfg(test) 声明才授予测试断言范围；文件名不构成证据"
+    },
+    {
+      "name": "filename-is-not-test-scope",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--root",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/filename-is-not-test-scope"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:18.101441+00:00",
+      "finished_utc": "2026-10-31T13:43:18.146920+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-assert"
+      ],
+      "actual_rules": [
+        "engine-production-assert"
+      ],
+      "passed": true,
+      "independent_expectation": "精确 cfg(test) 声明才授予测试断言范围；文件名不构成证据"
+    },
+    {
+      "name": "nested-module-does-not-authorize-sibling",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--root",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/nested-module-does-not-authorize-sibling"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:18.147181+00:00",
+      "finished_utc": "2026-10-31T13:43:18.191094+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-assert",
+        "test-module-resolution"
+      ],
+      "actual_rules": [
+        "engine-production-assert",
+        "test-module-resolution"
+      ],
+      "passed": true,
+      "independent_expectation": "精确 cfg(test) 声明才授予测试断言范围；文件名不构成证据"
+    },
+    {
+      "name": "production-consumer-wins",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--root",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/production-consumer-wins"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:18.191328+00:00",
+      "finished_utc": "2026-10-31T13:43:18.236856+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-assert"
+      ],
+      "actual_rules": [
+        "engine-production-assert"
+      ],
+      "passed": true,
+      "independent_expectation": "精确 cfg(test) 声明才授予测试断言范围；文件名不构成证据"
+    },
+    {
+      "name": "binary-and-lib-shared",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--root",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/binary-and-lib-shared"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:18.237113+00:00",
+      "finished_utc": "2026-10-31T13:43:18.281743+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-assert"
+      ],
+      "actual_rules": [
+        "engine-production-assert"
+      ],
+      "passed": true,
+      "independent_expectation": "精确 cfg(test) 声明才授予测试断言范围；文件名不构成证据"
+    },
+    {
+      "name": "unrecognized-member-path",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--root",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/unrecognized-member-path"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:18.282000+00:00",
+      "finished_utc": "2026-10-31T13:43:18.309899+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "unrecognized-member-path"
+      ],
+      "actual_rules": [
+        "unrecognized-member-path"
+      ],
+      "passed": true,
+      "independent_expectation": "精确 cfg(test) 声明才授予测试断言范围；文件名不构成证据"
+    },
+    {
+      "name": "wrong-package-in-known-ui-path",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--root",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/wrong-package-in-known-ui-path"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:18.310133+00:00",
+      "finished_utc": "2026-10-31T13:43:18.353201+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "member-package-identity"
+      ],
+      "actual_rules": [
+        "member-package-identity"
+      ],
+      "passed": true,
+      "independent_expectation": "精确 cfg(test) 声明才授予测试断言范围；文件名不构成证据"
+    },
+    {
+      "name": "quoted-package-and-description-decoy",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--root",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/quoted-package-and-description-decoy"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:18.353735+00:00",
+      "finished_utc": "2026-10-31T13:43:18.400049+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "member-package-identity"
+      ],
+      "actual_rules": [
+        "member-package-identity"
+      ],
+      "passed": true,
+      "independent_expectation": "精确 cfg(test) 声明才授予测试断言范围；文件名不构成证据"
+    },
+    {
+      "name": "integration-test-crate-root",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--root",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/integration-test-crate-root"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:18.400500+00:00",
+      "finished_utc": "2026-10-31T13:43:18.445006+00:00",
+      "exit_code": 0,
+      "expected_rules": [],
+      "actual_rules": [],
+      "passed": true,
+      "independent_expectation": "Cargo 集成测试根：tests/<name>.rs 的 mod 相对 tests/ 解析；缺失模块必须拒绝"
+    },
+    {
+      "name": "integration-test-missing-module",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--root",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/integration-test-missing-module"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:18.445231+00:00",
+      "finished_utc": "2026-10-31T13:43:18.491282+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "test-module-resolution"
+      ],
+      "actual_rules": [
+        "test-module-resolution"
+      ],
+      "passed": true,
+      "independent_expectation": "Cargo 集成测试根：tests/<name>.rs 的 mod 相对 tests/ 解析；缺失模块必须拒绝"
+    },
+    {
+      "name": "integration-nested-module-resolution",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--root",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/integration-nested-module-resolution"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:18.491814+00:00",
+      "finished_utc": "2026-10-31T13:43:18.535326+00:00",
+      "exit_code": 0,
+      "expected_rules": [],
+      "actual_rules": [],
+      "passed": true,
+      "independent_expectation": "Cargo 集成测试根：tests/<name>.rs 的 mod 相对 tests/ 解析；缺失模块必须拒绝"
+    },
+    {
+      "name": "integration-sibling-file-is-own-root",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--root",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/integration-sibling-file-is-own-root"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:18.535600+00:00",
+      "finished_utc": "2026-10-31T13:43:18.579380+00:00",
+      "exit_code": 0,
+      "expected_rules": [],
+      "actual_rules": [],
+      "passed": true,
+      "independent_expectation": "Cargo 集成测试根：tests/<name>.rs 的 mod 相对 tests/ 解析；缺失模块必须拒绝"
+    },
+    {
+      "name": "integration-root-does-not-see-src-module",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--root",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/integration-root-does-not-see-src-module"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:18.579793+00:00",
+      "finished_utc": "2026-10-31T13:43:18.624296+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "test-module-resolution"
+      ],
+      "actual_rules": [
+        "test-module-resolution"
+      ],
+      "passed": true,
+      "independent_expectation": "Cargo 集成测试根：tests/<name>.rs 的 mod 相对 tests/ 解析；缺失模块必须拒绝"
+    },
+    {
+      "name": "integration-self-reference-is-rejected",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--root",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/integration-self-reference-is-rejected"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:18.624663+00:00",
+      "finished_utc": "2026-10-31T13:43:18.668357+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "test-module-resolution"
+      ],
+      "actual_rules": [
+        "test-module-resolution"
+      ],
+      "passed": true,
+      "independent_expectation": "Cargo 集成测试根：tests/<name>.rs 的 mod 相对 tests/ 解析；缺失模块必须拒绝"
+    },
+    {
+      "name": "integration-nested-file-is-not-crate-root",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--root",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/integration-nested-file-is-not-crate-root"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:18.668798+00:00",
+      "finished_utc": "2026-10-31T13:43:18.712754+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "test-module-resolution"
+      ],
+      "actual_rules": [
+        "test-module-resolution"
+      ],
+      "passed": true,
+      "independent_expectation": "Cargo 集成测试根：tests/<name>.rs 的 mod 相对 tests/ 解析；缺失模块必须拒绝"
+    },
+    {
+      "name": "integration-old-wrong-location-is-rejected",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/private/tmp/aline-mut-followups/repo/scripts/check_safety.py",
+        "--root",
+        "/private/tmp/aline-mut-followups/repo/docs/validation/m0-engine-foundation/group-2/safety-fixtures/integration-old-wrong-location-is-rejected"
+      ],
+      "cwd": "/private/tmp/aline-mut-followups/repo",
+      "started_utc": "2026-10-31T13:43:18.713208+00:00",
+      "finished_utc": "2026-10-31T13:43:18.758882+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "test-module-resolution"
+      ],
+      "actual_rules": [
+        "test-module-resolution"
+      ],
+      "passed": true,
+      "independent_expectation": "Cargo 集成测试根：tests/<name>.rs 的 mod 相对 tests/ 解析；缺失模块必须拒绝"
+    }
+  ],
+  "workspace_after_fixtures": {
+    "failures": [],
+    "scanned": [],
+    "member_reads": []
+  },
+  "passed": true
+}
