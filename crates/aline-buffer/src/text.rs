@@ -59,6 +59,33 @@ pub enum BufferError {
         /// 注入的数量上限。
         limit: usize,
     },
+    /// 行索引行数超出注入预算。
+    LineCountExceeded {
+        /// 实际行数，包含末尾空行。
+        count: usize,
+        /// 注入的行数上限。
+        limit: usize,
+    },
+    /// 历史节点数量或补丁字节数超出注入预算，且不允许安全裁剪。
+    HistoryBudgetExceeded {
+        /// 本次需要的节点数或字节数。
+        needed: usize,
+        /// 注入的对应上限。
+        limit: usize,
+    },
+    /// 历史步骤的文本长度或补丁边界不属于当前上下文。
+    HistoryContextMismatch,
+    /// 没有可撤销的历史节点。
+    NothingToUndo,
+    /// 没有可重做的历史节点。
+    NothingToRedo,
+    /// 批次预检长度与实际生成长度不一致，拒绝发布。
+    PatchOutputMismatch {
+        /// 批次声明的结果长度。
+        expected: usize,
+        /// 实际生成的结果长度。
+        actual: usize,
+    },
     /// 连续文本的受检预留失败。
     Allocation(std::collections::TryReserveError),
 }
