@@ -1,0 +1,21 @@
+# 手工金样：basic.md 的顶层块与间隙（UTF-8 字节半开区间）
+# 块尾不含分隔空行；front matter 含首尾 --- 行；公式块按顶层 Math 块记录。
+block	0..19	FrontMatter
+gap	19..21	-
+block	21..29	Heading
+gap	29..31	-
+block	31..118	Paragraph
+gap	118..120	-
+block	120..141	BlockQuote
+gap	141..143	-
+block	143..200	CodeBlock
+gap	200..202	-
+block	202..237	Table
+gap	237..239	-
+block	239..258	Paragraph
+gap	258..260	-
+block	260..278	FootnoteDefinition
+gap	278..280	-
+block	280..294	Math
+gap	294..296	-
+block	296..319	Paragraph
