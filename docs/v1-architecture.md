@@ -452,6 +452,8 @@ Aline/
 
 `Source` 不用一个 `crlf: bool` 代替行尾统计；也不把“是否修改过”“当前是否等于已保存内容”“是否正在写盘”合成一个标志。2026-10-31 用户批准导入文本仅剥离头部 BOM、保留原始 CR/LF，原 bytes 与原始行尾统计仅作存储基线；编码按 CRLF/LF 行尾单元多数派输出，包含编辑新拼接 CRLF，未配对 CR 保留，不增删末尾换行。LF 策略下紧跟在孤立 CR 之后的 CRLF 单元保留 CRLF，以免重开时吞掉孤立 CR。存储往返只允许行尾表示等价，不用于吞掉真实补丁或改变历史/版本；源码补丁、选区和逆操作保持精确字节语义。src_off 始终指编辑器源码快照的 UTF-8 字节，不混用磁盘 bytes（含 BOM/CRLF）的偏移；如需原文件定位，由 source 的存储转换接口承担。编码时对未修改快照直接返回原 bytes，对已修改文本按读取基线的 BOM/多数派规则输出；成功写盘后更新对应基线，失败不得更新。`DocumentId` 不由文件名或路径哈希充当；恢复后的未命名文档也有独立身份。
 
+2026-10-31 回填：4.1～4.4 已实现 source 侧 `StorageSnapshot`/`StorageRange`、`decode`/`encode`、`SourceBaseline` 与 create-only `prepare_atomic`。`StorageRange` 显式绑定基线身份并注明是存储字节范围，source 不提供以磁盘偏移索引编辑源码的接口；当前 crate 外尚无 `aline_source` 代码级消费者（`aline-ui` 仅在 manifest 声明未使用的依赖），因此未出现跨层偏移混用。现有普通文件覆盖、ACL/xattr/权限复制、目录同步/断电、跨进程 CAS、Windows/Linux 与真实保存闭环均未验证；目标已存在时原语拒绝：普通文件返回 `MetadataPreservationUnverified`，符号链接/目录/其他非普通文件返回 `ExistingTarget{kind}`，不构成现有文件保存能力。证据与 K-08 人工复核见 [group-4/step-4.5/report.md](./validation/m0-engine-foundation/group-4/step-4.5/report.md)。
+
 ### 5.2 当前文本与打开块
 
 ```text

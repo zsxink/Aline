@@ -1,0 +1,28 @@
+{
+  "argv": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "/Users/xian/Project/editor/Aline/scripts/check_engineering.py",
+    "--metadata",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-4/step-4.5/workspace-gates-execution-1/dependency-fixtures/results/negative-ui-regex-metadata.stdout.log",
+    "--tree",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-4/step-4.5/workspace-gates-execution-1/dependency-fixtures/results/negative-ui-regex-tree.stdout.log",
+    "--lock",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-4/step-4.5/workspace-gates-execution-1/dependency-fixtures/fixtures/negative-ui-regex/Cargo.lock",
+    "--scenario",
+    "all",
+    "--metadata-command",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-4/step-4.5/workspace-gates-execution-1/dependency-fixtures/results/negative-ui-regex-metadata.command.json",
+    "--tree-command",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-4/step-4.5/workspace-gates-execution-1/dependency-fixtures/results/negative-ui-regex-tree.command.json"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "started_utc": "2026-10-31T05:48:20.331271+00:00",
+  "finished_utc": "2026-10-31T05:48:20.361500+00:00",
+  "exit_code": 1,
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "049193a10b26fe5134c1ca4284dbbfd16df9d669288836c2c82de5a955588fe9",
+  "env_overrides": {
+    "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  }
+}

@@ -1,0 +1,410 @@
+utc_start=2026-10-31T05:46:35Z
+pwd=/Users/xian/Project/editor/Aline
+head=fd26bd8
+toolchain=rustc 1.98.1 (48a229cea 2026-09-01)
+
+===== 1. source/disk offset identifiers in aline-source =====
+
+$ rg -n src_off|source_off|disk_off|storage_off crates/aline-source/src
+[exit=1; no src_off/disk_off identifiers (expected no hits)]
+
+===== 2. all offset/range identifiers in aline-source =====
+
+$ rg -n StorageRange|SourceRange|offset crates/aline-source/src
+crates/aline-source/src/storage.rs:18:        offset: usize,
+crates/aline-source/src/storage.rs:120:pub struct StorageRange {
+crates/aline-source/src/storage.rs:125:impl StorageRange {
+crates/aline-source/src/storage.rs:187:    pub fn range(&self, bytes: Range<usize>) -> Result<StorageRange, StorageError> {
+crates/aline-source/src/storage.rs:193:                offset: bytes.end,
+crates/aline-source/src/storage.rs:197:        Ok(StorageRange {
+crates/aline-source/src/storage.rs:204:    pub fn slice(&self, range: &StorageRange) -> Result<&[u8], StorageError> {
+crates/aline-source/src/storage.rs:211:                offset: range.bytes.end,
+crates/aline-source/src/atomic.rs:593:        let mut offset = 0usize;
+crates/aline-source/src/atomic.rs:594:        while offset < chunk.len() {
+crates/aline-source/src/atomic.rs:600:            let remaining = chunk.get(offset..).ok_or_else(|| StagingFailure::Io {
+crates/aline-source/src/atomic.rs:618:                    offset = offset
+crates/aline-source/src/lib.rs:17:    BaselineId, DiskVersion, StorageBudget, StorageError, StorageRange, StorageSnapshot,
+[exit=0; storage range and local write cursor only (expected informational)]
+
+===== 3. consumers outside aline-source =====
+
+$ rg -n aline_source|SourceBaseline|StorageSnapshot crates --glob !crates/aline-source/**
+[exit=1; no external consumer yet (expected no hits)]
+
+===== 4. StorageRange contract =====
+
+$ sed -n 118,135p crates/aline-source/src/storage.rs
+/// 绑定存储基线的原始字节半开范围，不等同源码 UTF-8 范围。
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StorageRange {
+    baseline: BaselineId,
+    bytes: Range<usize>,
+}
+
+impl StorageRange {
+    /// 返回原始字节区间，含 BOM/CRLF 等存储表示。
+    pub fn byte_range(&self) -> Range<usize> {
+        self.bytes.clone()
+    }
+
+    /// 返回所属基线身份。
+    pub fn baseline_id(&self) -> &BaselineId {
+        &self.baseline
+    }
+}
+
+$ sed -n 186,214p crates/aline-source/src/storage.rs
+    /// 构造绑定本基线的字节范围；不把存储字节误作 UTF-8 字符边界。
+    pub fn range(&self, bytes: Range<usize>) -> Result<StorageRange, StorageError> {
+        if bytes.start > bytes.end {
+            return Err(StorageError::ReversedRange);
+        }
+        if bytes.end > self.bytes.len() {
+            return Err(StorageError::OutOfBounds {
+                offset: bytes.end,
+                len: self.bytes.len(),
+            });
+        }
+        Ok(StorageRange {
+            baseline: self.id.clone(),
+            bytes,
+        })
+    }
+
+    /// 复验基线身份后读取原 bytes；错误基线即使文本相同也拒绝。
+    pub fn slice(&self, range: &StorageRange) -> Result<&[u8], StorageError> {
+        if range.baseline != self.id {
+            return Err(StorageError::BaselineMismatch);
+        }
+        self.bytes
+            .get(range.bytes.clone())
+            .ok_or(StorageError::OutOfBounds {
+                offset: range.bytes.end,
+                len: self.bytes.len(),
+            })
+    }
+
+===== 5. decode boundary =====
+
+$ sed -n 117,167p crates/aline-source/src/decode.rs
+/// 先验预算，再验证编码并解码存储视图。
+///
+/// 失败时不修改输入快照，也不返回部分源码。成功结果携带与输入相同的
+/// 存储基线身份，供后续编码绑定内容相等证据。
+pub fn decode(
+    storage: &StorageSnapshot,
+    budget: StorageBudget,
+) -> Result<DecodedSource, DecodeError> {
+    let bytes = storage.bytes();
+    let needed = bytes.len();
+    let limit = budget.max_bytes();
+    if needed > limit {
+        return Err(DecodeError::BudgetExceeded { needed, limit });
+    }
+    if bytes.starts_with(&[0xff, 0xfe]) {
+        return Err(DecodeError::Utf16Bom {
+            little_endian: true,
+        });
+    }
+    if bytes.starts_with(&[0xfe, 0xff]) {
+        return Err(DecodeError::Utf16Bom {
+            little_endian: false,
+        });
+    }
+    let text = std::str::from_utf8(bytes).map_err(|error| DecodeError::InvalidUtf8 {
+        valid_up_to: error.valid_up_to(),
+        error_len: error.error_len(),
+    })?;
+    let (has_bom, body) = match text.strip_prefix('\u{feff}') {
+        Some(body) => (true, body),
+        None => (false, text),
+    };
+    let (crlf_pairs, unpaired_lf) = scan_line_endings(body.as_bytes());
+    let line_ending = if crlf_pairs > unpaired_lf {
+        LineEnding::Crlf
+    } else {
+        LineEnding::Lf
+    };
+    Ok(DecodedSource {
+        baseline: SourceBaseline::new(
+            storage.clone(),
+            body.to_owned(),
+            StorageMetadata {
+                has_bom,
+                crlf_pairs,
+                unpaired_lf,
+                line_ending,
+            },
+        ),
+    })
+}
+
+===== 6. encode boundary =====
+
+$ sed -n 84,134p crates/aline-source/src/encode.rs
+/// 把冻结编辑源码编码为完整待写 bytes。
+///
+/// 相等时返回基线原 bytes（含 BOM、混合行尾、孤立 CR 与末尾状态）；不等时
+/// 重放 BOM 和 [`SourceBaseline`] 记录的行尾策略，平票为 LF。基线无 BOM 而
+/// 冻结源码以 U+FEFF 开头时，补写一个头部 BOM 保护该正文字符，预算计入。
+/// 编码不修改基线或输入文本，不隐式整理行尾，也不增删末尾换行。
+pub fn encode(
+    frozen_source: &str,
+    baseline: &SourceBaseline,
+    budget: StorageBudget,
+) -> Result<EncodedBytes, EncodeError> {
+    let limit = budget.max_bytes();
+    if frozen_source == baseline.source() {
+        let needed = baseline.storage().bytes().len();
+        check_budget(needed, limit)?;
+        return Ok(EncodedBytes {
+            bytes: baseline.storage().bytes().to_vec(),
+            baseline: baseline.id().clone(),
+            reused_original: true,
+        });
+    }
+
+    let policy = baseline.metadata().line_ending();
+    let emit_bom = emits_header_bom(frozen_source, baseline);
+    let mut body_len = 0usize;
+    walk_body(frozen_source, policy, |chunk| {
+        body_len = body_len
+            .checked_add(chunk.len())
+            .ok_or(EncodeError::LengthOverflow)?;
+        Ok(())
+    })?;
+    let bom_len = if emit_bom { BOM.len() } else { 0 };
+    let needed = body_len
+        .checked_add(bom_len)
+        .ok_or(EncodeError::LengthOverflow)?;
+    check_budget(needed, limit)?;
+
+    let mut bytes = Vec::with_capacity(needed);
+    if emit_bom {
+        bytes.extend_from_slice(BOM);
+    }
+    walk_body(frozen_source, policy, |chunk| {
+        bytes.extend_from_slice(chunk);
+        Ok(())
+    })?;
+    Ok(EncodedBytes {
+        bytes,
+        baseline: baseline.id().clone(),
+        reused_original: false,
+    })
+}
+
+===== 7. atomic write/publish path =====
+
+$ sed -n 426,501p crates/aline-source/src/atomic.rs
+/// 创建同目录专属 staging，完整写入并 sync；不修改目标。
+///
+/// 路径必须是绝对路径、同父目录且不相同；staging 使用 `create_new`，已存在的
+/// 路径不会被覆盖、截断、删除或复用。成功返回的准备结果仍持有 staging 的
+/// `File` 句柄；失败不会生成成功基线。
+pub fn prepare_atomic(
+    encoded: &EncodedBytes,
+    target: &Path,
+    staging: &Path,
+    budget: IoBudget,
+    cancellation: &Cancellation,
+) -> Result<PreparedAtomic, AtomicFailure> {
+    let file = prepare_atomic_with(encoded, target, staging, budget, cancellation, open_staging)?;
+    Ok(PreparedAtomic {
+        encoded: encoded.clone(),
+        target: target.to_path_buf(),
+        staging: staging.to_path_buf(),
+        file,
+    })
+}
+
+/// 生产 prepare 的注入缝：前置检查与失败映射固定，只有打开 staging 的句柄可由测试替换。
+///
+/// 单元测试用真实 staging `File` 的包装器走完整 prepare，验证写入/同步失败时目标
+/// 未被提前触碰、staging 路径随失败返回且 sync 未被误调用。
+fn prepare_atomic_with<W, F>(
+    encoded: &EncodedBytes,
+    target: &Path,
+    staging: &Path,
+    budget: IoBudget,
+    cancellation: &Cancellation,
+    open: F,
+) -> Result<W, AtomicFailure>
+where
+    W: StagingWriter,
+    F: FnOnce(&Path) -> io::Result<W>,
+{
+    let needed = encoded.bytes().len();
+    if needed > budget.max_bytes() {
+        return Err(AtomicFailure::new(
+            AtomicFailureKind::Budget {
+                needed,
+                limit: budget.max_bytes(),
+            },
+            None,
+        ));
+    }
+    if let Err(reason) = validate_paths(target, staging) {
+        return Err(AtomicFailure::new(
+            AtomicFailureKind::InvalidInput { reason },
+            None,
+        ));
+    }
+    if cancellation.is_cancelled() {
+        return Err(AtomicFailure::new(
+            AtomicFailureKind::Cancelled {
+                stage: AtomicStage::Prepare,
+            },
+            None,
+        ));
+    }
+    let mut writer = match open(staging) {
+        Ok(writer) => writer,
+        Err(source) => {
+            return Err(AtomicFailure::new(
+                AtomicFailureKind::Io {
+                    stage: AtomicStage::Create,
+                    source,
+                },
+                None,
+            ));
+        }
+    };
+    write_staging_owned(&mut writer, encoded.bytes(), staging, budget, cancellation)?;
+    Ok(writer)
+}
+
+$ sed -n 252,360p crates/aline-source/src/atomic.rs
+    /// 以 `hard_link` 发布到尚不存在的目标；消费准备结果。
+    ///
+    /// 目标已存在时拒绝并且不修改它；检查后竞争出现的目标同样不被覆盖。
+    /// 成功只表示目标已指向完整写入且已 sync 的文件内容；目录持久性、清理与
+    /// 跨平台行为未验证。
+    pub fn publish_new(self, cancellation: &Cancellation) -> Result<Written, AtomicFailure> {
+        self.publish_new_with_hook(cancellation, || {})
+    }
+
+    fn publish_new_with_hook<F: FnOnce()>(
+        self,
+        cancellation: &Cancellation,
+        after_target_check: F,
+    ) -> Result<Written, AtomicFailure> {
+        let PreparedAtomic {
+            encoded,
+            target,
+            staging,
+            file,
+        } = self;
+        if cancellation.is_cancelled() {
+            return Err(AtomicFailure::new(
+                AtomicFailureKind::Cancelled {
+                    stage: AtomicStage::Publish,
+                },
+                Some(staging),
+            ));
+        }
+        let staging_metadata = match std::fs::symlink_metadata(&staging) {
+            Ok(metadata) => metadata,
+            Err(source) => {
+                return Err(AtomicFailure::new(
+                    AtomicFailureKind::Io {
+                        stage: AtomicStage::Publish,
+                        source,
+                    },
+                    Some(staging),
+                ));
+            }
+        };
+        let owned_metadata = match file.metadata() {
+            Ok(metadata) => metadata,
+            Err(source) => {
+                return Err(AtomicFailure::new(
+                    AtomicFailureKind::Io {
+                        stage: AtomicStage::Publish,
+                        source,
+                    },
+                    Some(staging),
+                ));
+            }
+        };
+        if !same_file_identity(&staging_metadata, &owned_metadata) {
+            return Err(AtomicFailure::new(AtomicFailureKind::StagingReplaced, None));
+        }
+        match std::fs::symlink_metadata(&target) {
+            Ok(metadata) => {
+                let kind = if metadata.file_type().is_symlink() {
+                    ExistingTargetKind::Symlink
+                } else if metadata.is_dir() {
+                    ExistingTargetKind::Directory
+                } else if metadata.is_file() {
+                    return Err(AtomicFailure::new(
+                        AtomicFailureKind::MetadataPreservationUnverified,
+                        Some(staging),
+                    ));
+                } else {
+                    ExistingTargetKind::Other
+                };
+                return Err(AtomicFailure::new(
+                    AtomicFailureKind::ExistingTarget { kind },
+                    Some(staging),
+                ));
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(source) => {
+                return Err(AtomicFailure::new(
+                    AtomicFailureKind::Io {
+                        stage: AtomicStage::Publish,
+                        source,
+                    },
+                    Some(staging),
+                ));
+            }
+        }
+        after_target_check();
+        match std::fs::hard_link(&staging, &target) {
+            Ok(()) => Ok(Written {
+                encoded,
+                target,
+                staging,
+            }),
+            Err(source) if source.kind() == io::ErrorKind::AlreadyExists => {
+                Err(AtomicFailure::new(
+                    AtomicFailureKind::Conflict {
+                        target_exists: true,
+                    },
+                    Some(staging),
+                ))
+            }
+            Err(source) => Err(AtomicFailure::new(
+                AtomicFailureKind::Io {
+                    stage: AtomicStage::Publish,
+                    source,
+                },
+                Some(staging),
+            )),
+        }
+    }
+
+===== 8. worked offset example: BOM + 甲 CRLF 乙 =====
+
+$ python3 -I -c <offset computation>
+source_len 8
+source_offset_of_乙 5
+disk_len 11
+disk_offset_of_乙 8
+difference 3
+
+===== 9. docs backfill diff (additions only) =====
+
+$ git diff --stat -- docs/engine-design.md docs/v1-architecture.md docs/v1-validation-plan.md
+ docs/engine-design.md      | 11 +++++++++++
+ docs/v1-architecture.md    |  2 ++
+ docs/v1-validation-plan.md |  4 ++++
+ 3 files changed, 17 insertions(+)
+
+===== 10. no code or evidence mutation in this audit =====
+
+$ git status --porcelain -- crates/
+[exit=0]
+
+utc_end=2026-10-31T05:46:35Z

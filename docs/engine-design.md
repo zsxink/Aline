@@ -133,6 +133,17 @@ source 必须先验输入预算，再验证有效 UTF-8。按已确认WC-03，�
 
 原子替换、权限、磁盘满、另存为资源迁移、恢复清理与串行写队列遵守架构 §7.3～7.4、V-08。本文件不把一次 rename 称作跨进程 CAS，也不把这些事务放进 markdown。WC-04已确认有条件继续策略：权限复制错误明确属于不支持且临时文件/替换访问语义经平台证明安全时才可继续，并反馈实际保证；其他权限失败停止且保全原文/内存。source返回受检错误类别/可证明能力，UI协调决定是否满足条件；mode不等于ACL/xattr，不能忽略所有权限错误，V-01/V-08仍须证明。
 
+### 5.4 M0 编码与最小 I/O 实施状态（2026-10-31）
+
+4.1～4.4 已在 `aline-source` 落地并留证：`StorageSnapshot`/`StorageRange`、`decode`、`SourceBaseline`、`encode`、`prepare_atomic`/`Written`。实现保持以下边界：
+
+- 解码先验预算，再拒绝 UTF-16 BOM 与非法 UTF-8；只剥离一个头部 BOM，源码保留原始 CR/LF，孤立 CR 逐字节保留，不提供有损替换或额外只读转码入口。
+- 编码只由同一基线对象上的冻结源码相等决定原 bytes 通道；否则重放 BOM 与多数派行尾，CRLF 对和未配对 LF 各为一个行尾单元；基线无 BOM 而冻结源码以 U+FEFF 开头时补写一个头部 BOM 保护正文。
+- `StorageRange` 是当前唯一公开的存储字节范围类型，显式绑定 `BaselineId`，并注明不等同源码 UTF-8 范围；source 不提供以磁盘偏移索引编辑源码的接口。
+- 最小 I/O 只实现 create-only 发布：同目录 `create_new` staging → 分块完整写入 → `sync_all` → `hard_link` 到尚不存在的目标。目标已存在普通文件返回 `MetadataPreservationUnverified`，符号链接/目录/其他非普通文件返回 `ExistingTarget{kind}`，检查后的竞争返回 `Conflict`；不覆盖、不截断、不删除，也不回退为原地写。
+
+证据：4.1～4.4 的金样、测试与门禁见 `docs/validation/m0-engine-foundation/group-4/`；K-08 偏移人工复核见 `step-4.5/report.md`。未验证：ACL/xattr/权限复制、目录 fsync/断电、跨进程 CAS、现有文件覆盖保存、Windows/Linux、网络/外接卷与真实应用保存闭环。V-06/V-07/V-08 与 M0 出口均未据此判通过。
+
 ## 6. 解析管线及预处理映射
 
 ### 6.1 阶段契约
