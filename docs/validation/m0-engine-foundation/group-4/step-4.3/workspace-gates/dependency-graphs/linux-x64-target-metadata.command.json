@@ -1,0 +1,24 @@
+{
+  "argv": [
+    "cargo",
+    "metadata",
+    "--manifest-path",
+    "/Users/xian/Project/editor/Aline/Cargo.toml",
+    "--locked",
+    "--offline",
+    "--format-version",
+    "1",
+    "--filter-platform",
+    "x86_64-unknown-linux-gnu"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "started_utc": "2026-10-31T03:56:41.763079+00:00",
+  "finished_utc": "2026-10-31T03:56:41.871853+00:00",
+  "exit_code": 0,
+  "stdout_sha256": "877e7a54e265218487da365c294d612a06a996d1bec76630f7f9a73fb878fe24",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "env_overrides": {
+    "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  }
+}

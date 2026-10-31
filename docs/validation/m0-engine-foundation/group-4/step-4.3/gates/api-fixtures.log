@@ -1,0 +1,39 @@
+{"case": "api-valid", "command": ["cargo", "check", "--offline", "--message-format=json", "--manifest-path", "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-source-roundtrip-api-oq4o3mx6/Cargo.toml"], "exit_code": 0, "error_codes": [], "expected_error": null}
+error[E0061]: this function takes 3 arguments but 4 arguments were supplied
+  --> src/main.rs:4:19
+   |
+ 4 |     let _result = encode("changed", baseline, true, StorageBudget::new(1024));
+   |                   ^^^^^^                      ---- unexpected argument #3 of type `bool`
+   |
+note: function defined here
+  --> /Users/xian/Project/editor/Aline/crates/aline-source/src/encode.rs:80:8
+   |
+80 | pub fn encode(
+   |        ^^^^^^
+help: remove the extra argument
+   |
+ 4 -     let _result = encode("changed", baseline, true, StorageBudget::new(1024));
+ 4 +     let _result = encode("changed", baseline, StorageBudget::new(1024));
+   |
+
+
+{"case": "unchanged-bool", "command": ["cargo", "check", "--offline", "--message-format=json", "--manifest-path", "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-source-roundtrip-api-oq4o3mx6/Cargo.toml"], "exit_code": 101, "error_codes": ["E0061"], "expected_error": "E0061"}
+error[E0308]: mismatched types
+  --> src/main.rs:4:37
+   |
+ 4 |     let _result = encode("changed", old_equality, StorageBudget::new(1024));
+   |                   ------            ^^^^^^^^^^^^ expected `&SourceBaseline`, found `&EncodedBytes`
+   |                   |
+   |                   arguments to this function are incorrect
+   |
+   = note: expected reference `&SourceBaseline`
+              found reference `&EncodedBytes`
+note: function defined here
+  --> /Users/xian/Project/editor/Aline/crates/aline-source/src/encode.rs:80:8
+   |
+80 | pub fn encode(
+   |        ^^^^^^
+
+
+{"case": "old-equality", "command": ["cargo", "check", "--offline", "--message-format=json", "--manifest-path", "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-source-roundtrip-api-oq4o3mx6/Cargo.toml"], "exit_code": 101, "error_codes": ["E0308"], "expected_error": "E0308"}
+checked=3 public API fixtures (1 positive, 2 negative)

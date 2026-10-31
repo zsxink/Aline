@@ -1,0 +1,23 @@
+{
+  "argv": [
+    "cargo",
+    "clippy",
+    "--manifest-path",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-4/step-4.3/workspace-gates/lint-fixtures/fixtures/negative-panic/Cargo.toml",
+    "--offline",
+    "--all-targets",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-4/step-4.3/workspace-gates/lint-fixtures/fixtures/negative-panic",
+  "started_utc": "2026-10-31T03:56:49.172911+00:00",
+  "finished_utc": "2026-10-31T03:56:49.235368+00:00",
+  "exit_code": 101,
+  "env_overrides": {
+    "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+    "CARGO_TARGET_DIR": "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-4/step-4.3/workspace-gates/lint-fixtures/cargo-target",
+    "CARGO_NET_OFFLINE": "true",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  }
+}

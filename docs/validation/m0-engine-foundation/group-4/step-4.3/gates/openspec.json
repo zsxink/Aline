@@ -1,0 +1,18 @@
+{
+  "command": [
+    "openspec",
+    "validate",
+    "m0-engine-foundation",
+    "--strict",
+    "--no-interactive"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "start_utc": "2026-10-31T03:56:37.438448+00:00",
+  "end_utc": "2026-10-31T03:56:39.645079+00:00",
+  "exit_code": 0,
+  "environment": {
+    "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_NET_OFFLINE": "true"
+  }
+}

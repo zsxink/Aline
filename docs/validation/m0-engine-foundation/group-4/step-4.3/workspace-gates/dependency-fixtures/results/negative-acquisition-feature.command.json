@@ -1,0 +1,28 @@
+{
+  "argv": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "/Users/xian/Project/editor/Aline/scripts/check_engineering.py",
+    "--metadata",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/engineering-live-graphs/all-metadata.stdout.log",
+    "--tree",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/engineering-live-graphs/all-tree.stdout.log",
+    "--lock",
+    "/Users/xian/Project/editor/Aline/Cargo.lock",
+    "--scenario",
+    "all",
+    "--metadata-command",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-4/step-4.3/workspace-gates/dependency-fixtures/fixtures/negative-acquisition-feature/metadata.command.json",
+    "--tree-command",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-4/step-4.3/workspace-gates/dependency-fixtures/fixtures/negative-acquisition-feature/tree.command.json"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "started_utc": "2026-10-31T03:56:47.735119+00:00",
+  "finished_utc": "2026-10-31T03:56:47.763264+00:00",
+  "exit_code": 1,
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "542a4c2808613145a3180cc7ce8d586594a988ae96e7192357a875283cdfd4b8",
+  "env_overrides": {
+    "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  }
+}

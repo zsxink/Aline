@@ -1,0 +1,18 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "-p",
+    "aline-source",
+    "roundtrip"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "start_utc": "2026-10-31T03:56:35.172687+00:00",
+  "end_utc": "2026-10-31T03:56:35.232453+00:00",
+  "exit_code": 0,
+  "environment": {
+    "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_NET_OFFLINE": "true"
+  }
+}

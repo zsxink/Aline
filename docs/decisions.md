@@ -547,3 +547,9 @@ PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02
 文档版本标签：本批改动未引入新的产品或专项确认，故 `docs/` 各稿首部的 版本/日期 保留原确认语境，与[开发前终审维护记录](./maintenance/pre-development-review/report.md)“版本/日期保留原专项确认语境……不以改版本标签伪装新确认”一致；Splat 非规范回写与本次 OpenSpec 回写的差异分别由[调研 §10](./splat-study.md#10-文档回写与验证边界)和本节及[文档入口](./README.md)追踪，`AGENTS.md` 首段据此明确 OpenSpec 不改变权威分工（只说“同时必读”，不说“高于”）。
 
 本次检查：OpenSpec CLI 1.13.2 执行 `openspec validate --all --strict --no-interactive`，工程治理主规格 1/1 通过（12 项要求）；PyYAML 解析配置及字段类型通过；在临时项目验证 proposal/specs/design/tasks 的 context/rules 和 apply/archive 的 guidance 均被 CLI 实际加载，临时项目已移除；所涉八份 Markdown 的 395 处本地目标/锚点引用通过，`git diff --check` 通过。独立审查提出的热路径措辞和 S 规则索引问题已修正并复核关闭，无剩余审查阻塞项。上述为文档和配置证据，未运行 Cargo 或平台实验。
+
+## 14. 2026-10-31 孤立 CR 与多数派行尾的边界
+
+来源：4.3 前发现 PRD 多数派统一文字与 4.2 保留孤立 CR 的编码守卫未明确对齐；向用户列出最小处置方案后，用户指示“继续处理掉”。据此保留现有守卫，并明确 LF 策略下紧跟在孤立 CR 之后的 CRLF 单元保留，以免重新解码时吞掉孤立 CR；输出可以仍含混合行尾。普通 CRLF 和未配对 LF、精确源码身份、保护性 BOM 及保存成功/失败的既定规则不变。
+
+回写 PRD SAFE-03、引擎 §5.2、架构 §5.1 及 M0 change 的 design/source delta。既有 4.2 金样与实现证据见 [4.2 报告](./validation/m0-engine-foundation/group-4/step-4.2/report.md)；该澄清不表示完整 V-01～V-09 或 M0 出口已通过。
