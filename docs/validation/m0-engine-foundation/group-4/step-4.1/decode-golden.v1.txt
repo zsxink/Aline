@@ -1,0 +1,43 @@
+# 任务 4.1 独立金样：存储 bytes -> 编辑源码/存储元数据 -> 未改时原 bytes。
+# 预期来源：docs/engine-design.md §5.1–5.2 的 2026-10-31 已批准原始行尾表示，
+# 以及 openspec/changes/m0-engine-foundation/specs/engine/source/spec.md。
+# 本表由人工按上述规范手写，不从实现输出反推；实现与测试只消费本表。
+# 字段以 | 分隔：
+# name | input_hex | decode_budget | expected | source_hex | bom | crlf_pairs | unpaired_lf | line_ending | unchanged_encode_hex | error
+# expected: ok/err。error 为 - 或 budget:needed:limit / utf16-bom:little|big /
+# invalid-utf8:valid_up_to:error_len|none。空十六进制串表示空字节串。
+# unchanged_encode_hex 是“未修改时 encode 必须逐字节返回原 bytes”的独立预期，
+# 任务 4.1 先由测试检查该列等于 input_hex，任务 4.2 起改为实际 encode 结果对照。
+
+empty||0|ok||0|0|0|lf||-
+bom-only|EFBBBF|3|ok||1|0|0|lf|EFBBBF|-
+header-bom|EFBBBF41|4|ok|41|1|0|0|lf|EFBBBF41|-
+body-bom-without-header|41EFBBBF42|5|ok|41EFBBBF42|0|0|0|lf|41EFBBBF42|-
+body-bom-after-header|EFBBBFEFBBBF41|7|ok|EFBBBF41|1|0|0|lf|EFBBBFEFBBBF41|-
+lf-only|410A420A|4|ok|410A420A|0|0|2|lf|410A420A|-
+crlf-only|410D0A420D0A|6|ok|410D0A420D0A|0|2|0|crlf|410D0A420D0A|-
+bom-with-crlf|EFBBBF410D0A42|7|ok|410D0A42|1|1|0|crlf|EFBBBF410D0A42|-
+mixed-crlf-majority|410D0A420A430D0A44|9|ok|410D0A420A430D0A44|0|2|1|crlf|410D0A420A430D0A44|-
+mixed-lf-majority|410A420D0A430A44|8|ok|410A420D0A430A44|0|1|2|lf|410A420D0A430A44|-
+mixed-tie|410D0A420A43|6|ok|410D0A420A43|0|1|1|lf|410D0A420A43|-
+crlf-majority-with-isolated-cr|410D0A420D430D0A44|9|ok|410D0A420D430D0A44|0|2|0|crlf|410D0A420D430D0A44|-
+isolated-cr|410D420D43|5|ok|410D420D43|0|0|0|lf|410D420D43|-
+trailing-cr|410D|2|ok|410D|0|0|0|lf|410D|-
+isolated-cr-and-lf|410D420A43|5|ok|410D420A43|0|0|1|lf|410D420A43|-
+isolated-cr-before-crlf-lf-majority|410D0D0A420A430A44|9|ok|410D0D0A420A430A44|0|1|2|lf|410D0D0A420A430A44|-
+no-trailing-newline|410A42|3|ok|410A42|0|0|1|lf|410A42|-
+pdf-prefix|255044462D312E370A25E4B8AD|13|ok|255044462D312E370A25E4B8AD|0|0|1|lf|255044462D312E370A25E4B8AD|-
+pk-prefix|504B0304E4B8AD0A|8|ok|504B0304E4B8AD0A|0|0|1|lf|504B0304E4B8AD0A|-
+unicode-4byte-crlf|F09F92A90D0A|6|ok|F09F92A90D0A|0|1|0|crlf|F09F92A90D0A|-
+utf16le-no-bom-valid-utf8|41004200|4|ok|41004200|0|0|0|lf|41004200|-
+utf16le-bom|FFFE4100|4|err||0|0|0|lf||utf16-bom:little
+utf16be-bom|FEFF0041|4|err||0|0|0|lf||utf16-bom:big
+invalid-utf8|41FF42|3|err||0|0|0|lf||invalid-utf8:1:1
+lone-continuation|80|1|err||0|0|0|lf||invalid-utf8:0:1
+truncated-3byte|41E4B8|3|err||0|0|0|lf||invalid-utf8:1:none
+truncated-4byte|F09F92|3|err||0|0|0|lf||invalid-utf8:0:none
+bom-then-invalid|EFBBBFFF|4|err||0|0|0|lf||invalid-utf8:3:1
+over-budget|4142|1|err||0|0|0|lf||budget:2:1
+over-budget-invalid|FF|0|err||0|0|0|lf||budget:1:0
+over-budget-utf16|FFFE|1|err||0|0|0|lf||budget:2:1
+bom-over-budget|EFBBBF|2|err||0|0|0|lf||budget:3:2

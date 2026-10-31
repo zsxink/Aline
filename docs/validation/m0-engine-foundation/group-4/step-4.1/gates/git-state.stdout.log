@@ -1,0 +1,7 @@
+6731ff2d57e78916e659ea95e517ea598053501b
+ M crates/aline-source/src/lib.rs
+ M docs/engine-design.md
+ M openspec/changes/m0-engine-foundation/specs/engine/source/spec.md
+?? crates/aline-source/src/decode.rs
+?? crates/aline-source/tests/decode_golden.rs
+?? docs/validation/m0-engine-foundation/group-4/step-4.1/

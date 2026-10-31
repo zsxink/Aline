@@ -1,0 +1,7 @@
+2026-10-31T03:08:08Z	2026-10-31T03:08:08Z	zsh -c date -u; uname -a; rustc -Vv; cargo -V; printenv CARGO_HOME	exit=0
+2026-10-31T03:08:08Z	2026-10-31T03:08:09Z	zsh -c git -C /Users/xian/Project/editor/Aline rev-parse HEAD; git -C /Users/xian/Project/editor/Aline status --porcelain	exit=0
+2026-10-31T03:08:09Z	2026-10-31T03:08:09Z	cargo test -p aline-source --locked --offline	exit=0
+2026-10-31T03:08:09Z	2026-10-31T03:08:09Z	cargo test -p aline-source --locked --offline -- --list	exit=0
+2026-10-31T03:08:09Z	2026-10-31T03:08:09Z	cargo fmt --all --check	exit=0
+2026-10-31T03:08:09Z	2026-10-31T03:08:09Z	cargo clippy --workspace --all-targets -- -D warnings	exit=0
+2026-10-31T03:08:09Z	2026-10-31T03:08:11Z	cargo test --workspace --locked --offline	exit=0

@@ -1,0 +1,25 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test snapshot_and_decode_budgets_are_distinct_layers ... ok
+test decode_golden_cases_match_independent_expectations ... ok
+test decode_does_not_write_the_original_file ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test storage_snapshot_can_be_carried_by_future_host_tasks ... ok
+test storage_ranges_are_bound_to_their_own_baseline ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
