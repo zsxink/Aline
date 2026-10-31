@@ -4,4 +4,6 @@ mod coordinates;
 mod projection;
 
 pub use coordinates::{DrawnOffset, DrawnRange, ProjectionId, Utf16Offset, Utf16Range};
-pub use projection::{Mapped, MappingBudget, MappingError, MappingPrecision, Projection};
+pub use projection::{
+    Mapped, MappingBudget, MappingError, MappingPrecision, MappingSegment, Projection,
+};

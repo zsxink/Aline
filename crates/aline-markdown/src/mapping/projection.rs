@@ -74,6 +74,65 @@ pub enum MappingPrecision {
     Synthetic,
 }
 
+/// 一个绘制片段到源码片段的受检关系；片段可精确、对齐、隐藏或合成。
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MappingSegment {
+    drawn: Range<usize>,
+    source: SrcRange,
+    precision: MappingPrecision,
+}
+
+impl MappingSegment {
+    /// 构造片段关系；绘制范围反向或源码范围不属于同一快照时拒绝。
+    pub fn new(
+        drawn: Range<usize>,
+        source: SrcRange,
+        precision: MappingPrecision,
+    ) -> Result<Self, MappingError> {
+        if drawn.start > drawn.end {
+            return Err(MappingError::ReversedRange);
+        }
+        if source.byte_range().start > source.byte_range().end {
+            return Err(MappingError::ReversedRange);
+        }
+        match precision {
+            MappingPrecision::Exact if drawn.len() != source.len_bytes() => {
+                return Err(MappingError::InvalidMapping);
+            }
+            MappingPrecision::Aligned if drawn.is_empty() || source.is_empty() => {
+                return Err(MappingError::InvalidMapping);
+            }
+            MappingPrecision::Hidden if !drawn.is_empty() || source.is_empty() => {
+                return Err(MappingError::InvalidMapping);
+            }
+            MappingPrecision::Synthetic if drawn.is_empty() || !source.is_empty() => {
+                return Err(MappingError::InvalidMapping);
+            }
+            _ => {}
+        }
+        Ok(Self {
+            drawn,
+            source,
+            precision,
+        })
+    }
+
+    /// 返回绘制片段范围。
+    pub fn drawn_range(&self) -> Range<usize> {
+        self.drawn.clone()
+    }
+
+    /// 返回源码片段范围。
+    pub fn source_range(&self) -> &SrcRange {
+        &self.source
+    }
+
+    /// 返回片段精确性。
+    pub const fn precision(&self) -> MappingPrecision {
+        self.precision
+    }
+}
+
 /// 携带精确性、来源和方向偏好的受检转换结果。
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Mapped<T> {
@@ -106,7 +165,10 @@ impl<T> Mapped<T> {
     }
 }
 
-/// 投影构造的字节与索引点预算，不代表发布性能限额。
+/// 投影构造的绘制字节、片段数与索引点预算，不代表发布性能限额。
+///
+/// `max_points` 在 M0 中同时限制索引点数和片段数；片段数超限与索引点超限都返回
+/// [`MappingError::BudgetExceeded`]。
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MappingBudget {
     max_drawn_bytes: usize,
@@ -115,6 +177,9 @@ pub struct MappingBudget {
 
 impl MappingBudget {
     /// 注入绘制文本和索引点上限。
+    ///
+    /// 索引点上限同时作为片段数上限（保持 M0 既有语义），因此片段数超限同样返回
+    /// [`MappingError::BudgetExceeded`]。
     pub const fn new(max_drawn_bytes: usize, max_points: usize) -> Self {
         Self {
             max_drawn_bytes,
@@ -123,7 +188,7 @@ impl MappingBudget {
     }
 }
 
-/// 只读恒等投影；输入源范围和 UTF-16 索引由映射层统一拥有。
+/// 只读投影；输入源范围和 UTF-16 索引由映射层统一拥有。
 #[derive(Clone)]
 pub struct Projection {
     id: ProjectionId,
@@ -131,6 +196,7 @@ pub struct Projection {
     source: SrcRange,
     drawn: Arc<String>,
     points: Arc<Vec<(usize, usize)>>,
+    segments: Arc<Vec<MappingSegment>>,
 }
 
 impl fmt::Debug for Projection {
@@ -141,6 +207,7 @@ impl fmt::Debug for Projection {
             .field("source", &self.source)
             .field("drawn_bytes", &self.drawn.len())
             .field("points", &self.points.len())
+            .field("segments", &self.segments.len())
             .finish_non_exhaustive()
     }
 }
@@ -158,29 +225,94 @@ impl Projection {
         let slice = snapshot
             .slice(&source, TextBudget::new(budget.max_drawn_bytes))
             .map_err(MappingError::Source)?;
-        let mut drawn = String::new();
-        drawn
-            .try_reserve_exact(slice.len())
-            .map_err(MappingError::Allocation)?;
-        drawn.push_str(&slice);
-        let mut points = Vec::new();
-        let mut units = 0usize;
-        push_point(&mut points, (0, 0), budget)?;
-        for (drawn_off, character) in drawn.char_indices() {
-            let end = drawn_off
-                .checked_add(character.len_utf8())
-                .ok_or(MappingError::LengthOverflow)?;
-            units = units
-                .checked_add(character.len_utf16())
-                .ok_or(MappingError::LengthOverflow)?;
-            push_point(&mut points, (end, units), budget)?;
+        let drawn = slice.into_owned();
+        let segments = vec![MappingSegment::new(
+            0..drawn.len(),
+            source.clone(),
+            MappingPrecision::Exact,
+        )?];
+        Self::from_segments(snapshot, source, drawn, segments, budget)
+    }
+
+    /// 从绘制文本与显式片段关系构造投影；片段必须按绘制顺序覆盖可见文本。
+    pub fn from_segments(
+        snapshot: TextSnapshot,
+        source: SrcRange,
+        drawn: String,
+        mut segments: Vec<MappingSegment>,
+        budget: MappingBudget,
+    ) -> Result<Self, MappingError> {
+        snapshot
+            .validate_range(&source)
+            .map_err(MappingError::Source)?;
+        if drawn.len() > budget.max_drawn_bytes {
+            return Err(MappingError::BudgetExceeded);
         }
+        // `max_points` 兼作片段数上限；该维度超限与索引点超限共用 BudgetExceeded。
+        if segments.len() > budget.max_points {
+            return Err(MappingError::BudgetExceeded);
+        }
+        segments.sort_by(|left, right| {
+            left.drawn
+                .start
+                .cmp(&right.drawn.start)
+                .then_with(|| left.drawn.end.cmp(&right.drawn.end))
+                .then_with(|| {
+                    left.source
+                        .byte_range()
+                        .start
+                        .cmp(&right.source.byte_range().start)
+                })
+        });
+        let source_range = source.byte_range();
+        let mut visible_end = 0usize;
+        for segment in &segments {
+            let drawn_range = segment.drawn_range();
+            if drawn_range.end > drawn.len() {
+                return Err(MappingError::OutOfBounds {
+                    offset: drawn_range.end,
+                    len: drawn.len(),
+                });
+            }
+            if !drawn.is_char_boundary(drawn_range.start)
+                || !drawn.is_char_boundary(drawn_range.end)
+            {
+                return Err(MappingError::NotCharBoundary);
+            }
+            let segment_source = segment.source_range().byte_range();
+            if segment_source.start < source_range.start || segment_source.end > source_range.end {
+                return Err(MappingError::SourceOutsideProjection);
+            }
+            snapshot
+                .src_range(segment_source.clone())
+                .map_err(MappingError::Source)?;
+            match segment.precision() {
+                MappingPrecision::Hidden => {}
+                MappingPrecision::Synthetic => {
+                    if drawn_range.start != visible_end {
+                        return Err(MappingError::InvalidMapping);
+                    }
+                    visible_end = drawn_range.end;
+                }
+                _ => {
+                    if drawn_range.start != visible_end {
+                        return Err(MappingError::InvalidMapping);
+                    }
+                    visible_end = drawn_range.end;
+                }
+            }
+        }
+        if visible_end != drawn.len() {
+            return Err(MappingError::InvalidMapping);
+        }
+        let points = build_points(&drawn, budget)?;
         Ok(Self {
             id: ProjectionId(Arc::new(())),
             snapshot,
             source,
             drawn: Arc::new(drawn),
             points: Arc::new(points),
+            segments: Arc::new(segments),
         })
     }
 
@@ -192,13 +324,17 @@ impl Projection {
     pub fn snapshot_id(&self) -> &SnapshotId {
         self.snapshot.id()
     }
-    /// 返回恒等投影对应的全局源码范围。
+    /// 返回投影对应的全局源码范围。
     pub fn source_range(&self) -> &SrcRange {
         &self.source
     }
     /// 返回绘制文本；它是只读投影，不是文档真源。
     pub fn drawn_text(&self) -> &str {
         &self.drawn
+    }
+    /// 返回投影片段关系；调用方只能读取，不能据此假定双射。
+    pub fn segments(&self) -> &[MappingSegment] {
+        &self.segments
     }
 
     /// 构造绘制字节偏移；通过预建索引检查 UTF-8，不逐次物化源码。
@@ -262,24 +398,83 @@ impl Projection {
             return Err(MappingError::ProjectionMismatch);
         }
         self.drawn_offset(drawn.byte)?;
-        let src_off = self
-            .source
-            .byte_range()
-            .start
-            .checked_add(drawn.byte)
-            .ok_or(MappingError::LengthOverflow)?;
+        let segment = match self.segment_for_drawn(drawn.byte) {
+            Some(segment) => segment,
+            None if self.drawn.is_empty() => {
+                let offset = self.source.byte_range().start;
+                let value = self
+                    .snapshot
+                    .src_offset(offset)
+                    .map_err(MappingError::Source)?;
+                let source = self
+                    .snapshot
+                    .src_range(offset..offset)
+                    .map_err(MappingError::Source)?;
+                return Ok(Mapped {
+                    value,
+                    source,
+                    precision: MappingPrecision::Exact,
+                    affinity,
+                });
+            }
+            None => return Err(MappingError::InvalidMapping),
+        };
+        let source_range = segment.source_range().byte_range();
+        let (source_off, source) = match segment.precision() {
+            MappingPrecision::Exact => {
+                let delta = drawn
+                    .byte
+                    .checked_sub(segment.drawn_range().start)
+                    .ok_or(MappingError::LengthOverflow)?;
+                let offset = source_range
+                    .start
+                    .checked_add(delta)
+                    .ok_or(MappingError::LengthOverflow)?;
+                let source = self
+                    .snapshot
+                    .src_range(offset..offset)
+                    .map_err(MappingError::Source)?;
+                (offset, source)
+            }
+            MappingPrecision::Aligned => {
+                let offset = match affinity {
+                    Affinity::Before => source_range.start,
+                    Affinity::After => source_range.end,
+                };
+                let source = self
+                    .snapshot
+                    .src_range(source_range)
+                    .map_err(MappingError::Source)?;
+                (offset, source)
+            }
+            MappingPrecision::Hidden => {
+                let offset = match affinity {
+                    Affinity::Before => source_range.start,
+                    Affinity::After => source_range.end,
+                };
+                let source = self
+                    .snapshot
+                    .src_range(source_range)
+                    .map_err(MappingError::Source)?;
+                (offset, source)
+            }
+            MappingPrecision::Synthetic => {
+                let offset = source_range.start;
+                let source = self
+                    .snapshot
+                    .src_range(offset..offset)
+                    .map_err(MappingError::Source)?;
+                (offset, source)
+            }
+        };
         let value = self
             .snapshot
-            .src_offset(src_off)
-            .map_err(MappingError::Source)?;
-        let source = self
-            .snapshot
-            .src_range(src_off..src_off)
+            .src_offset(source_off)
             .map_err(MappingError::Source)?;
         Ok(Mapped {
             value,
             source,
-            precision: MappingPrecision::Exact,
+            precision: segment.precision(),
             affinity,
         })
     }
@@ -298,18 +493,59 @@ impl Projection {
         if src_off < range.start || src_off > range.end {
             return Err(MappingError::SourceOutsideProjection);
         }
-        let drawn_off = src_off
-            .checked_sub(range.start)
-            .ok_or(MappingError::LengthOverflow)?;
+        let segment = match self.segment_for_source(src_off) {
+            Some(segment) => segment,
+            None if self.drawn.is_empty() && src_off == range.start => {
+                let value = self.drawn_offset(0)?;
+                let source = self
+                    .snapshot
+                    .src_range(src_off..src_off)
+                    .map_err(MappingError::Source)?;
+                return Ok(Mapped {
+                    value,
+                    source,
+                    precision: MappingPrecision::Exact,
+                    affinity,
+                });
+            }
+            None => return Err(MappingError::InvalidMapping),
+        };
+        let segment_source = segment.source_range().byte_range();
+        let drawn_off = match segment.precision() {
+            MappingPrecision::Exact => {
+                let delta = src_off
+                    .checked_sub(segment_source.start)
+                    .ok_or(MappingError::LengthOverflow)?;
+                segment
+                    .drawn_range()
+                    .start
+                    .checked_add(delta)
+                    .ok_or(MappingError::LengthOverflow)?
+            }
+            MappingPrecision::Aligned | MappingPrecision::Hidden => match affinity {
+                Affinity::Before => segment.drawn_range().start,
+                Affinity::After => segment.drawn_range().end,
+            },
+            MappingPrecision::Synthetic => match affinity {
+                Affinity::Before => segment.drawn_range().start,
+                Affinity::After => segment.drawn_range().end,
+            },
+        };
         let value = self.drawn_offset(drawn_off)?;
-        let source = self
-            .snapshot
-            .src_range(src_off..src_off)
-            .map_err(MappingError::Source)?;
+        let source = match segment.precision() {
+            MappingPrecision::Exact | MappingPrecision::Synthetic => self
+                .snapshot
+                .src_range(src_off..src_off)
+                .map_err(MappingError::Source)?,
+            MappingPrecision::Aligned | MappingPrecision::Hidden => self
+                .snapshot
+                .src_range(segment_source)
+                .map_err(MappingError::Source)?,
+        };
         Ok(Mapped {
             value,
             source,
-            precision: MappingPrecision::Exact,
+            precision: segment.precision(),
             affinity,
         })
     }
@@ -379,6 +615,74 @@ impl Projection {
         )
         .map_err(MappingError::Source)
     }
+
+    fn segment_for_drawn(&self, drawn_off: usize) -> Option<&MappingSegment> {
+        if self.drawn.is_empty() {
+            return None;
+        }
+        for segment in self.segments.iter() {
+            if segment.precision() == MappingPrecision::Hidden {
+                continue;
+            }
+            let range = segment.drawn_range();
+            if range.start <= drawn_off && drawn_off < range.end {
+                return Some(segment);
+            }
+        }
+        if drawn_off == self.drawn.len() {
+            for segment in self.segments.iter().rev() {
+                if segment.precision() == MappingPrecision::Hidden {
+                    continue;
+                }
+                if segment.drawn_range().end == drawn_off {
+                    return Some(segment);
+                }
+            }
+        }
+        None
+    }
+
+    fn segment_for_source(&self, source_off: usize) -> Option<&MappingSegment> {
+        let mut best: Option<(u8, &MappingSegment)> = None;
+        for segment in self.segments.iter() {
+            let range = segment.source_range().byte_range();
+            let contains = match segment.precision() {
+                MappingPrecision::Synthetic => range.start == source_off && range.end == source_off,
+                MappingPrecision::Exact | MappingPrecision::Aligned | MappingPrecision::Hidden => {
+                    range.start <= source_off && source_off <= range.end
+                }
+            };
+            if !contains {
+                continue;
+            }
+            let rank = match segment.precision() {
+                MappingPrecision::Exact => 0,
+                MappingPrecision::Synthetic => 1,
+                MappingPrecision::Aligned => 2,
+                MappingPrecision::Hidden => 3,
+            };
+            if best.is_none_or(|(best_rank, _)| rank < best_rank) {
+                best = Some((rank, segment));
+            }
+        }
+        best.map(|(_, segment)| segment)
+    }
+}
+
+fn build_points(drawn: &str, budget: MappingBudget) -> Result<Vec<(usize, usize)>, MappingError> {
+    let mut points = Vec::new();
+    let mut units = 0usize;
+    push_point(&mut points, (0, 0), budget)?;
+    for (drawn_off, character) in drawn.char_indices() {
+        let end = drawn_off
+            .checked_add(character.len_utf8())
+            .ok_or(MappingError::LengthOverflow)?;
+        units = units
+            .checked_add(character.len_utf16())
+            .ok_or(MappingError::LengthOverflow)?;
+        push_point(&mut points, (end, units), budget)?;
+    }
+    Ok(points)
 }
 
 fn push_point(
