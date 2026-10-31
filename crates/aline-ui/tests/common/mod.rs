@@ -138,9 +138,7 @@ pub fn assert_committed(outcome: CommitOutcome, revision: u64) {
 
 /// 由当前快照与工作版本构造身份信封。
 pub fn current_identity(doc: &mut DocCore) -> Result<InputIdentity, DocError> {
-    let current = snapshot(doc)?;
-    InputIdentity::new(doc.document_id().clone(), doc.version(), current.text())
-        .map_err(DocError::Identity)
+    doc.current_input_identity()
 }
 
 /// 由指定文档身份、工作版本与当前文本快照构造身份信封。
@@ -198,6 +196,12 @@ pub fn assert_buffer_selection(doc: &DocCore, anchor: usize, head: usize) {
 pub struct State {
     pub buffer_text: String,
     pub snapshot_text: Option<String>,
+    pub snapshot_id: Option<aline_buffer::SnapshotId>,
+    pub resources: Vec<aline_ui::ResourceReference>,
+    pub mode: aline_ui::EditorMode,
+    pub next_wait_id: u64,
+    pub parse_config: aline_ui::ParseConfigGeneration,
+    pub request: aline_ui::DerivedRequestId,
     pub revision: u64,
     pub draft_generation: u64,
     pub undo: usize,
@@ -207,13 +211,15 @@ pub struct State {
     pub buffer_head: usize,
     pub open: Option<OpenState>,
     pub composition: Option<(Range<usize>, String)>,
-    pub wait: Option<(PublicationKind, WaitStatus)>,
+    pub wait: Option<(u64, PublicationKind, WaitStatus)>,
 }
 
 /// 打开块的可观察状态。
 #[derive(Debug, PartialEq)]
 pub struct OpenState {
     pub baseline: u64,
+    pub range: Option<Range<usize>>,
+    pub baseline_fragment: Option<String>,
     pub draft: Option<String>,
     pub anchor: usize,
     pub head: usize,
@@ -222,9 +228,12 @@ pub struct OpenState {
 /// 捕获当前完整可观察状态；快照被拒绝时记为 `None`。
 pub fn capture(doc: &mut DocCore) -> Result<State, DocError> {
     let buffer_text = doc.buffer_text()?;
-    let snapshot_text = match doc.current_snapshot(TEXT) {
-        Ok(current) => Some(current.full_text(TEXT).map_err(DocError::Buffer)?),
-        Err(_) => None,
+    let (snapshot_text, snapshot_id) = match doc.current_snapshot(TEXT) {
+        Ok(current) => (
+            Some(current.full_text(TEXT).map_err(DocError::Buffer)?),
+            Some(current.snapshot_id().clone()),
+        ),
+        Err(_) => (None, None),
     };
     let buffer_selection = doc.buffer_selection();
     let open = doc.open_block_selection().map(|selection| OpenState {
@@ -232,6 +241,8 @@ pub fn capture(doc: &mut DocCore) -> Result<State, DocError> {
             .open_block_baseline()
             .map(DocumentRevision::value)
             .unwrap_or_default(),
+        range: doc.open_block_range(),
+        baseline_fragment: doc.open_block_baseline_fragment().map(str::to_owned),
         draft: doc.open_block_draft().map(str::to_owned),
         anchor: selection.anchor(),
         head: selection.head(),
@@ -240,10 +251,18 @@ pub fn capture(doc: &mut DocCore) -> Result<State, DocError> {
         let range = view.range();
         (range, view.candidate().to_owned())
     });
-    let wait = doc.wait().map(|view| (view.kind(), view.status()));
+    let wait = doc
+        .wait()
+        .map(|view| (view.handle().value(), view.kind(), view.status()));
     Ok(State {
         buffer_text,
         snapshot_text,
+        snapshot_id,
+        resources: doc.resources().to_vec(),
+        mode: doc.mode(),
+        next_wait_id: doc.next_wait_id(),
+        parse_config: doc.parse_config_generation(),
+        request: doc.derived_request_id(),
         revision: doc.version().revision().value(),
         draft_generation: doc.version().draft_generation().value(),
         undo: doc.undo_depth(),

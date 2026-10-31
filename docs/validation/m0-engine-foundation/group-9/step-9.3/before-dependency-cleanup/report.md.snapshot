@@ -1,0 +1,55 @@
+# 9.3：E2 / E3 / E5 引擎证据包
+
+基准为 `16f8e30` 后当前未提交工作树。依据当前公开 API、独立源字节金样及正式 9.1 原始输出建包，待 9.6 独立复核；本步没有重复扩量运行已验证领域测试。
+
+出口标签按 [proposal 的 M0 出口表](../../../../../openspec/changes/m0-engine-foundation/proposal.md)对应：E2 为四核心无头机制及预算入口；E3 为展示树 dump 与原始范围；E5 为块/间隙覆盖和对齐映射。下文的预算、取消与非法输入证据归 E2，dump 与源字节核查归 E3，覆盖与映射不变量归 E5。
+
+## E2：四核心公共 API 的实际无头发现
+
+[正式 test stderr](../step-9.1/workspace-gates/test.stderr.log)逐个记录以下真实 target；[stdout](../step-9.1/workspace-gates/test.stdout.log)记录用例及结果，完整通过名称由 [9.2 只读摘录](../step-9.2/inspection.stdout.json)复算。整个 workspace 312 passed；不能把312全部算成四核心测试。
+
+| 核心与公开边界 | 实际发现 target | 代表覆盖/拒绝 |
+|---|---|---|
+| [source](../../../../../crates/aline-source/src/lib.rs)：decode/encode、存储快照/基线、create-only 原子原语 | `decode_golden`, `encode_golden`, `roundtrip`, `atomic`, `public_boundaries` | 空/BOM/CRLF多数派与边界新CRLF、原bytes、UTF-8/UTF-16拒绝、预算、受控写入失败与已存在目标拒绝 |
+| [buffer](../../../../../crates/aline-buffer/src/lib.rs)：TextSnapshot/受检坐标、CheckedBatch、StringBuffer、历史/锚点 | `anchors`, `checked_batch`, `history`, `patch_goldens`, `public_boundaries`, `rejections` | 独立正逆补丁、after坐标、方向选区、旧快照/半字符/重叠等拒绝、预算失败全状态不变、历史句柄保活 |
+| [markdown](../../../../../crates/aline-markdown/src/lib.rs)：parse/parse_with_cancel、映射/保护、RewriteMap、reuse | `diagnostics`, `hostile`, `html`, `identity_mapping`, `mapping`, `protection`, `public_boundaries`, `reuse`, `rewrite`, `spec` | 字节来源与精确性、隐藏/合成、Unicode/UTF-16/方向、有限HTML与MD-11保护、预算/取消和确实复用/拒绝复用 |
+| [edit](../../../../../crates/aline-edit/src/lib.rs)：plan_change/validate_change/受检计划 | `goldens`, `protection`, `refusals` | 替换、代表行内格式、候选复读、隐藏链接目标/空白保存、旧版本/投影/选区/预算/组合拒绝；无真实可写Buffer参数 |
+
+人工追踪：source 的 decode/encode 只读存储/基线输入，文件原语单独承担受检 I/O；buffer 不解析、不落盘；markdown 从不可变 TextSnapshot 派生 Parsed；edit 的 plan/validate 只读快照、解析结果、选区和上下文，返回计划凭据，实际发布由文档所有者承担。五引擎无 GPUI 的图证据见 [E1](../step-9.2/report.md)，不是仅凭 tests 文件夹命名判“无头”。
+
+公开坐标隔离另有[8项真实编译消费/失败证据](../step-9.1/workspace-gates/public-api/summary.json)：源码/绘制/UTF-16/存储错类型、私有身份/坐标字段、不可变 tuple 视图按具体 Rust 诊断拒绝，正例实际编译成功。没有运行非法夹具，也没有用任意非零码充当正确诊断。
+
+### E2 补充：预算、取消、非法输入
+
+| 机制 | 当前实际测试证据 | 保证与限制 |
+|---|---|---|
+| source 存储/编码预算与格式拒绝 | 正式 `decode_golden` / `encode_golden` / `public_boundaries` | 受检错误，未接受有损UTF-8；不证明系统资源发布阈值 |
+| buffer 原子批次与历史预算 | `apply_rejections_are_atomic_for_baseline_selection_and_capacities`、`history_undo_and_redo_budget_failures_leave_state_unchanged` | 文本/行索引/选区/revision/历史失败不变；逆补丁与容量溢出有独立用例 |
+| markdown 扫描/深度/节点/映射/改写预算 | `hostile` / `diagnostics` 实际通过名称见 stdout | 超限整源回退或受检错误，不返回截断树；`scan_steps_are_measured_by_the_budget_threshold` 以二分阈值交叉验证统计，不只信实现计数 |
+| 协作式取消 | `pre_cancelled_parse_returns_cancelled_without_tree`、`cooperative_cancel_stops_deep_nesting_without_hanging`、`cooperative_cancel_stops_huge_input_without_hanging` | 重写/扫描/构树间轮询；第三方 pulldown-cmark 内部单次调用不能被抢占，输入上限只限制成本边界 |
+| edit 预算/复读/保护拒绝 | `budget_exceeded_refusal_keeps_buffer_state`、`reread_failure_refusal_keeps_buffer_state`、`hidden_fragment_internal_whitespace_change_is_refused` | 计划/验证只读；候选重建/复读成功后才返回凭据，不表示已有完整DocCore命令执行UI |
+
+人工查看 `parse_with_cancel` 的错误出口：预取消直接 Cancelled，非法配置拒绝，受检源码预算先于读取；改写取消/预算分别传播；构树预算回退全源，取消不返回树。`CancelCheck` 文档明确不承诺第三方内部可中断。所有具体预算数值仍待 V-06，不是性能/内存或发布限额验收。
+
+## E3：dump 展示树与原始范围
+
+来源是当前 [basic.md](../../../../../crates/aline-markdown/tests/fixtures/m0/basic.md)、独立 [basic.blocks.tsv](../../../../../crates/aline-markdown/tests/fixtures/m0/basic.blocks.tsv) 与原始 [dump stdout](../../group-6/step-6.3/dump-tree.stdout.log)。当前正式 workspace 测试再次实际运行 `basic_blocks_and_gaps_match_handwritten_goldens` 与其它独立金样用例。
+
+本步实际运行 [inspect_dump.py](./inspect_dump.py) 做字节核查；[UTC/命令/exit](./commands.log)、[完整切片与SHA-256](./inspection.stdout.json)、[stderr](./inspection.stderr.log)保留。脚本没有调用解析器；原始 dump 仍标为先前实际执行，不伪称此刻重新 dump。首次摘录的 Python UTC 时钟文件保留为 `initial-python-clock-*`，正式重跑时间使用 date -u。
+
+人工逐项对照输出与源字节：319 字节从 `0..19 FrontMatter` 开始，到 `296..319 Paragraph` 结束，10 个块与9个间隙严格相接覆盖全部源；每个间隙是两个LF，块不含尾分隔。`21..29` 精确对应 `# 标题`，代码块 `143..200` 保留字面Markdown，表格 `202..237` 对应原表格，脚注定义 `260..278`、公式块 `280..294` 均与原字节一致。保护范围 `251..255` 仅为 `[^1]`，没有锁住相邻普通正文；FrontMatter 和 FootnoteDefinition 的保护也分别对齐源切片。无尾换行的末段保留到字节319。自动复算结果为 golden_matches_dump=true、partition_exactly_covers_source=true，人工检查并未仅比较可见字符串。
+
+## E5：块/间隙覆盖与对齐映射
+
+块/间隙覆盖复用上节同一组源字节与手写金样证据；映射来源、精确性、往返和对齐由下列独立输入/期望及正式测试输出交叉核对。与 E3 的 dump 核查共享来源文件，不将其重复计为新测试执行。
+
+| 映射/保护覆盖 | 当前独立输入/期望 | 正式实际执行结果 |
+|---|---|---|
+| 语法块/Gap | `spec.blocks.tsv`、`basic.blocks.tsv`；空/嵌套/未闭合/无尾换行夹具 | `spec` target 的手写金样与覆盖测试通过 |
+| 来源、精确性和对齐 | [映射用例](../../../../../crates/aline-markdown/tests/mapping.rs)、[HTML用例](../../../../../crates/aline-markdown/tests/html.rs)、[rewrite用例](../../../../../crates/aline-markdown/tests/rewrite.rs) | `mapping_goldens_tsv_matches_parser_output`、原样往返、局部投影、UTF-16、旧投影拒绝及Hidden/Synthetic来源用例通过 |
+| 有限HTML/脚注保护 | [protection](../../../../../crates/aline-markdown/tests/protection.rs)、[HTML](../../../../../crates/aline-markdown/tests/html.rs) | MD-11子范围、过滤/未闭合/引号/空白/实体与原文回退用例通过，不把展示段落身份替代HTML身份 |
+| 最小复用差分 | [reuse](../../../../../crates/aline-markdown/tests/reuse.rs) | 有实际命中及重定位比较，也有配置/定义/围栏/HTML/脚注等安全拒绝，非全部回退冒充复用 |
+
+## 未执行与后续出口
+
+本包仅整理和人工核查当前 macOS 原始证据；不证明 Windows/Linux/Intel Mac、真实 UI/IME、实际文件保存重开、完整结构命令、公式图表渲染或已完成的 V-05/V-06/V-07。尚无发布资源阈值/性能基准结论。E2/E3/E5 的阶段判定仍交 9.6 独立 reviewer；本文不宣称 M0 出口整项通过。

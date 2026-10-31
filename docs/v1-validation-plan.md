@@ -1,14 +1,16 @@
 # Aline V1 实现前验证清单
 
-更新日期：2026-10-30  
+更新日期：2026-10-31
 需求依据：[V1 PRD 0.9](./v1-prd.md)  
 评审记录：[产品问题批阅归档](./archive/2026-10-28-v1-open-questions.md) · [架构问题确认归档](./archive/2026-10-29-v1-architecture-decisions.md) · [Rust 与引擎问题确认归档](./archive/2026-10-29-rust-style-decisions.md) · [UI 问题确认归档](./archive/2026-10-29-ui-decisions.md) · [插件问题确认归档](./archive/2026-10-29-plugin-decisions.md) · [主题决定归档](./archive/2026-10-29-theme-decisions.md)
 
 本清单承接本轮已同意的验证方案，以及需要在技术设计中细化的行为契约。WC-01～WC-06 已确认并回写产品边界，完整依据见[迁移审计决定归档](./archive/2026-10-30-migration-decisions.md)；此确认不表示任何实验已通过。问题批阅、RS-01～RS-05、ED-01、UI-01～UI-06、PL-01～PL-03 及 TH-01～TH-10 的建议确认已回写归档，当前无待确认产品选择；下列实验、产物和用例尚未完成，不能标成已验证。主题字段与产品选择确认不代表 schema 数值、GPUI/字体/透明度能力或资源限额实验已冻结。无需为已决定的产品方向重复询问，但实验结果若迫使缩减范围，须记录影响并取得新的产品决定。
 
-以下条目均为**未执行**。涉及格式、默认数值或边界尚未固化的地方，先制作可检查的方案或样本，再回填 PRD 及专门规范。正式 V1 发布前，所有发布阻塞项必须完成。
+以下 V 项均**未整项完成**；M0 已执行的工程与无头基础分项在对应条目和结果表中单列，不能由局部结果推断整项通过。涉及格式、默认数值或边界尚未固化的地方，先制作可检查的方案或样本，再回填 PRD 及专门规范。正式 V1 发布前，所有发布阻塞项必须完成。
 
 ## V-01 · 三平台兼容与发布矩阵
+
+2026-10-31 M0 组 9 分项：当前 macOS arm64 的正式 workspace 统一门禁为 19/19 exit 0、312 passed，见[9.1 原始记录](./validation/m0-engine-foundation/group-9/step-9.1/report.md)。它只覆盖无窗口工程与纯状态基础；`--all-targets` 和目标依赖图解析不代表其他 OS/架构构建。M1 原生 macOS 冒烟、后续 Windows/Linux、Intel Mac/低系统版本与安装/真实输入仍未执行，V-01 未通过；完整交接见[E6](./validation/m0-engine-foundation/group-9/step-9.5/report.md)。
 
 顺序固定：先验证 macOS，完成后再验证 Windows/Linux；正式 V1 三平台一起发布。Windows 10、Intel Mac 必须保留。
 
@@ -74,6 +76,8 @@ Mermaid 护眼模式使用亮色映射；固定主题不跟随应用，主题是
 
 ## V-06 · 资源上限与可恢复降级
 
+组 9 证据归集（2026-10-31）：预算/取消/非法输入基础已在最终 312 项 workspace 测试中执行，并按四核心公共 API 及原始输出建立[E2 发现清单](./validation/m0-engine-foundation/group-9/step-9.3/report.md)。本次未扩量性能/资源实验，注入预算与合作取消不冻结发布限额，也不证明第三方长调用可中断；V-06 未通过。
+
 编码及行尾已确定：仅有效 UTF-8，保留 BOM；混合 LF/CRLF 编辑后多数派，平票 LF。>4 MiB 默认源码模式是视图降级，不等于无限制接受文件。
 
 产物：文件、单段/单表、图片像素/解码内存、公式/图表源码及生成资产的上限与时限；主题 ZIP 包体/解压/字体资源也在 V-04/V-06 联合测量。触发后的明确错误、源码回退或打开拒绝路径；增加有效 UTF-8 但以 `%PDF`/`PK` 开头的 Markdown 样本，确认不因签名本身拒绝。按类去重的会话级降级汇总须有身份/版本/容量/生命周期，验证 UI 呈现、不持久化正文/IME 候选/敏感路径且不使用引擎 thread-local；汇总容量与 UI 布局由本项和 V-09 实测确定。验证不会截断原文、卡死或覆盖输入；超限规则加入格式与性能夹具。产品选择确认不预设或暗示任何资源限额数字。
@@ -85,6 +89,8 @@ M0 编码基础证据（2026-10-31）：4.1～4.4 已固定解码/编码/往返�
 组 6 解析预算/敌意输入基础证据（2026-10-31）：`aline-markdown` 已把解析预算实现为八个可注入维度（源码字节、重写字节、映射片段、扫描步数、嵌套、节点、HTML 栈深、投影索引点），`ParseBudget::m0()` 的数值只是保护上限、**不是本项要冻结的发布限额**。`tests/hostile.rs` 覆盖深层嵌套、巨型输入、预算注入与预取消；`ParseStats` 记录实际扫描步数、投影索引点与预算触发次数，测试对 321 字节 HTML 密集源二分得到最小可通过扫描步数 80 并与统计值交叉一致（`validation/m0-engine-foundation/group-6/step-6.6/scan-budget-probe.stdout.log`）。**复核 N-F2-2 限定**：该交叉一致原先只覆盖未过滤 HTML 样本；过滤标签（`script/style/...`）下统计值曾与真实阈值不符（8 vs 5、6 vs 3），修复后补了过滤样本交叉验证，详见 `step-6.6/report.md`。协作式取消经 `CancelCheck`/`CancelToken` 注入，`parse_with_cancel` 在入口、重写编辑间、事件前与构树收尾循环轮询，取消返回 `ParseError::Cancelled` 且不产出树。未覆盖：真实端到端时延与峰值内存、1/4 MiB 与巨型单段/表格规模、图片/公式资产、会话级降级汇总与 UI 呈现、第三方 `pulldown-cmark` 内部长调用不可中断这一盲区、三平台。V-06 仍未通过。
 
 ## V-07 · 编辑、格式化与只读语法夹具
+
+组 9 证据归集（2026-10-31）：E3 的展示树 dump 与原始范围、E5 的块+Gap/来源/对齐映射见[9.3](./validation/m0-engine-foundation/group-9/step-9.3/report.md)，E4/E7 的 AC-01～04 基础与 TA-01/TA-02/ED-01 纯协议见[9.4](./validation/m0-engine-foundation/group-9/step-9.4/report.md)。最终门禁 312 passed 只证明当前发现并执行的基础；真实 UI 命中、灰色只读呈现、系统字素/IME、通用命令/跨块结构/格式化与尚未冻结的语法口径不因证据归集而通过。V-07 与 AC 整项仍未通过。
 
 已决定：基础跨块选择/复制/删除/粘贴；复杂结构命令可以拒绝并提供源码入口；表格复制优先 Markdown；缩进代码更改语言可转围栏并单步撤销。格式化仅菜单手动触发，全文差异确认后应用。
 
@@ -103,6 +109,8 @@ M0 编码基础证据（2026-10-31）：行尾边界金样已固定 CR-X-LF 删�
 **复核 N-F3-5 限定（映射金样来源）**：“组 6 解析/映射/保护基础夹具证据”段落中“手写映射金样 6 例”的**来源不可证**——08:48 已存在修复前解析器、TSV 时间 08:52:17Z，只能证明该 TSV 先于消费者（09:31:07Z）与 round-1 复核（09:15:27Z）且未被改写，内容另经独立 Python 重算（6 例、0 问题）。
 
 组 7 编辑计划/拒绝/最小命令证据（2026-10-31）：`aline-edit` 已落地纯 `plan_change`/`validate_change`，30 例手写金样（26 个 plan 用例 + 3 个 validate 拒绝 + 1 个 consume）先于实现建立，`tests/goldens.rs` 6 例直接解析该 TSV 断言，`tests/refusals.rs` 16 例（round-2 复核 N-F2-1 后由 15 例补至 16 例）在真实 `StringBuffer` 上比较文本/选区/revision/undo/redo/历史节点数，`tests/protection.rs` 4 例覆盖 front matter/`[toc]`/脚注引用的 Visual 拒绝与 Source 放行；命令面只有 `Replace` 与 `ToggleInlineFormat`（Strong/Strike）。证据见 `validation/m0-engine-foundation/group-7/step-7.1`～`step-7.4`。**已记录的勘误**：金样 `allow_source_footnote` 的目标选区写为 `7..7`，按统一字节规则应为 `8..8`（`4 + 4`），测试保留原值并引用 [step-7.1 报告](./validation/m0-engine-foundation/group-7/step-7.1/report.md) 第 3 节的书面解释，未回填金样。**已接受的语义限制**：隐藏语义比较跳过纯空白隐藏片段，且不比较片段边界与位置，不得据此声称“隐藏片段已完整保留”。**未覆盖**：块打开/提交分组与 900ms 真实计时、IME 确认/取消、离块与 Undo/Redo 交错、自动保存/恢复/导出交错、ED-01 的组合期等待/取消、列表/表格/任务框/代码语言/全文格式化命令、查找替换事务与不可见命中定位、MD-11 粘贴的独立用例（当前与跨区替换共用 `Replace` 路径）、HTML 右端越界与跨整个元素的格式命令、真实 UI/DocCore 消费者与灰色只读呈现、Windows/Linux 与其他 target。**V-07 仍未通过**，AC-04 也未通过。
+
+组 8 输入与组合协议基础证据（2026-10-31）：无窗口 DocCore 已覆盖唯一草稿/最新快照、同块多个 900ms 输入组、提交/关块分离、待定组优先 Undo 与 Redo 选区、组合更新/替换/确认/取消、ED-01 显式发布等待/取消、自动保存组合期延后、独立恢复读取、草稿基线冲突及配置/request/关闭/模式变化后的旧结果拒收。宿主完整登记是资源集合齐备的前提，DocCore 和快照保守强持有登记引用，不自动发现或清理资源。最终局部 UI 原始日志为 109 passed（[实现及失败保留](./validation/m0-engine-foundation/group-8/followup-2026-10-31/report.md)、[回填与未测清单](./validation/m0-engine-foundation/group-8/step-8.5/report.md)）；这不替代 workspace 全量门禁。**仍未测/未实现**：真实键盘/焦点/候选窗/marked 绘制/平台 callback、真实双模式视图与选区映射、自动保存计时/目标队列、真实保存/恢复/导出及资源迁移、通用命令消费者与跨块/结构命令、Windows/Linux/Intel Mac。上方各组的未覆盖描述保留其时点；本段只补上述纯状态基础，V-07 与 AC-03/04/05/14 仍未通过。
 
 产物：表格表头/整理的输入输出、跨结构选区命令边界、格式化风格和未知语法/HTML 保护样例；查找按源码、不可见命中定位、环回和退出焦点行为。
 
@@ -128,6 +136,8 @@ M0 编码基础证据（2026-10-31）：行尾边界金样已固定 CR-X-LF 删�
 **接口基础记录（2026-10-31，任务 3.3）：** 八接口（decode/encode/parse/映射/plan/validate/apply/snapshot）的输入输出、错误类别、唯一写入口与相等证据来源已按已确认架构/引擎规范冻结；实际落地的包括 `TextSnapshot`/`StorageSnapshot`、受检坐标/身份、`CheckedBatch` 构造/校验、恒等 `Projection` 与 `InputIdentity`，decode/encode、完整 parse、edit 层 plan/validate、apply 与 `snapshot_current` 内容快照仍仅契约未验证。公开面追踪未发现映射 API 的 UI 生产消费者，当前仓库扫描也未发现映射外手算局部差或自建 UTF-16 表，但公开坐标访问器仍可被绕过；这不证明真实命中、IME、保存或本节任何用例通过。完整记录见[任务 3.3 记录](./validation/m0-engine-foundation/group-3/step-3.3/report.md)。本节上方“补充可视化机制回归矩阵”仍全部未执行。
 
 ## V-08 · 文件操作、临时图片与恢复事务
+
+**M0 身份/快照设计准备（2026-10-31，组 8）：** 已有文档/工作版本/快照来源/配置/请求采纳身份、冻结当前输入与已登记资源、组合期显式等待/自动保存延后及独立恢复读取的无头基础。`SnapshotId` 不是版本或内容哈希；宿主须在引用生效前完整登记资源，M0 保守保留而不精确追踪/回收。source create-only 集成用例只证明宿主可保留实际 `Written` 及既有目标拒绝分类，即使派生输入过期/块关闭也不能丢弃已发生写盘事实；它未消费到 DocCore 保存点或真实文件协调器。**未执行**：现有文件安全替换及 metadata 保全、版本竞争/权限/断电、多资源事务、真实手动/自动保存、10 秒恢复与恢复图片可读、另存为迁移/清理、真实平台组合等待、Windows/Linux/Intel Mac。M2 前身份/事务方案及最小安全闭环仍为独立出口，V-08 未通过。证据见[8.5 回填记录](./validation/m0-engine-foundation/group-8/step-8.5/report.md)。
 
 产物：文件树拖拽源/目标、目录移动、跨卷/外部拖放、冲突/取消/权限失败、回收站不可用、打开文件移动时的保存与关联行为。文档路径、图片预览和资源引用的同步需有实际样例；不能静默覆盖重名目标或破坏源文件。
 
@@ -163,6 +173,9 @@ M0 编码基础证据（2026-10-31）：行尾边界金样已固定 CR-X-LF 删�
 
 | 编号 | 当前状态 | 规范/实验/产物证据 | 受影响需求 | 结论及回写日期 |
 |---|---|---|---|---|
-| V-01～V-09 | 未执行 | 待实际验证后逐项填写 | 见各条目 | 尚无验证结论 |
+| V-01 | M0 工程/目标登记已有分项；原生发布矩阵未完成 | [E1](./validation/m0-engine-foundation/group-9/step-9.2/report.md)、[E6/M1 交接](./validation/m0-engine-foundation/group-9/step-9.5/report.md) | FILE-02～03、第 7.1 节 | 未整项通过，2026-10-31 |
+| V-02～V-05、V-09 | 完整产物/平台/性能/视觉实验未执行；ED-01 等纯协议不代替产物 | [未测与交接清单](./validation/m0-engine-foundation/group-9/step-9.5/report.md) | 见各条目 | 未整项通过，2026-10-31 |
+| V-06～V-07 | 无头基础分项已执行；限额、真实输入/显示及完整语法命令未完成 | [E2/E3/E5](./validation/m0-engine-foundation/group-9/step-9.3/report.md)、[E4/E7](./validation/m0-engine-foundation/group-9/step-9.4/report.md) | SAFE-01～03、EDIT、MD、FORMAT 等，见各条目 | 未整项通过，2026-10-31 |
+| V-08 | 身份/快照与 create-only 原语是设计准备；真实保存/恢复/资源事务未完成 | [M2 前独立出口](./validation/m0-engine-foundation/group-9/step-9.5/report.md#m2-前独立安全出口)、[8.5](./validation/m0-engine-foundation/group-8/step-8.5/report.md) | FILE、SAFE、IMAGE 等，见本项 | 未整项通过，2026-10-31 |
 
 完成标准：证据可检查、支持和拒绝边界明确、PRD/专门规范已同步、相关验收通过。范围决定不再重复询问；尚未确定的规范细节由方案和样本收口，不能仅通过归档动作标记验证完成。

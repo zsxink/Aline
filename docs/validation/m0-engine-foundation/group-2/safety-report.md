@@ -33,3 +33,7 @@
 目录身份不只凭目录名：固定八成员路径必须匹配 Cargo `read-manifest --offline` 返回的真实 package name；命令失败或不匹配拒绝。新增把实际 aline-source 放进已知 aline-ui 目录的反例。身份由 Cargo 解析，不自制 TOML 正则；每个只读子命令的完整参数、退出码和原始输出记录于扫描结果 member_reads。新增合法 quoted name 与多行 description 假 name 的误导反例。不解析依赖图，不联网下载，不替代 metadata 守卫。
 
 改用真实 Cargo 清单读取时首次自测退出 1：五个合成 workspace 夹具缺少独立 [workspace]，Cargo 正确拒绝其属于外层 workspace 的错误身份上下文；正常 workspace 扫描退出 0。已为自有合成夹具声明独立 workspace 并重跑，不放宽身份规则。首次失败原始命令/输出/summary 保存于 safety-first-cargo-read*。
+
+## 后续自测计数说明（2026-10-31）
+
+本报告中的 **45 项**是本报告记录时实际执行的历史自测数量，不代表之后每次自测固定为 45 项。后续安全守卫修复追加用例后，2026-10-31 13:43:07Z 的 `--self-test` 实测为 **53 项且全部符合预期**；原始逐例结果见 [`security-followups/self-test.stdout.json`](../group-9/step-9.1/safety-guard-fix/security-followups/self-test.stdout.json)，逐条命令及退出码见 [`security-followups/commands.log`](../group-9/step-9.1/safety-guard-fix/security-followups/commands.log)。这是后续自测证据，不回溯替代本报告当时的 45 项记录。

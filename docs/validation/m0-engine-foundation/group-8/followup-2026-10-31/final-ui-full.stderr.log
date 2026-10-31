@@ -1,0 +1,10 @@
+   Compiling aline-ui v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-ui)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.39s
+     Running unittests src/lib.rs (target/debug/deps/aline_ui-d15ff7fdf60be8cc)
+     Running tests/document.rs (target/debug/deps/document-e9a779aebb28f16c)
+     Running tests/document_composition.rs (target/debug/deps/document_composition-4a046b4dedeeee10)
+     Running tests/document_followups.rs (target/debug/deps/document_followups-79eccc470025bd16)
+     Running tests/document_results.rs (target/debug/deps/document_results-d2795811ac67e7f6)
+     Running tests/document_typing.rs (target/debug/deps/document_typing-f6375555370f2b44)
+     Running tests/public_boundaries.rs (target/debug/deps/public_boundaries-ed004354c6eada81)
+   Doc-tests aline_ui

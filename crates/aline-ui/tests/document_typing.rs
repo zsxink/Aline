@@ -7,9 +7,9 @@ mod common;
 
 use aline_ui::{CommitOutcome, DocCore, DocError};
 use common::{
-    assert_buffer, assert_closed, assert_committed, assert_composition, assert_history,
-    assert_new_snapshot, assert_open, assert_rejected_without_change, assert_same_snapshot,
-    assert_snapshot, assert_version, assert_wait, collapsed, new_doc, snapshot_id,
+    assert_buffer, assert_closed, assert_committed, assert_history, assert_new_snapshot,
+    assert_open, assert_rejected_without_change, assert_same_snapshot, assert_snapshot,
+    assert_version, collapsed, new_doc, snapshot_id,
 };
 
 fn f1() -> Result<DocCore, DocError> {
@@ -101,7 +101,7 @@ fn after_8_2_20() -> Result<DocCore, DocError> {
 }
 
 #[test]
-fn case_8_2_01_899ms_merges() -> Result<(), Box<dyn std::error::Error>> {
+fn input_group_case_8_2_01_899ms_merges() -> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.2-01：899 <= 900，并入同一草稿组；历史仍 0/0/0。
     let mut doc = p_a()?;
     let before = snapshot_id(&mut doc)?;
@@ -118,7 +118,8 @@ fn case_8_2_01_899ms_merges() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn case_8_2_02_900ms_merges_on_closed_boundary() -> Result<(), Box<dyn std::error::Error>> {
+fn input_group_case_8_2_02_900ms_merges_on_closed_boundary()
+-> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.2-02：900 <= 900，闭区间边界仍并入同一组。
     let mut doc = p_a()?;
     let before = snapshot_id(&mut doc)?;
@@ -135,7 +136,8 @@ fn case_8_2_02_900ms_merges_on_closed_boundary() -> Result<(), Box<dyn std::erro
 }
 
 #[test]
-fn case_8_2_03_901ms_splits_and_commits_old_group() -> Result<(), Box<dyn std::error::Error>> {
+fn input_group_case_8_2_03_901ms_splits_and_commits_old_group()
+-> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.2-03：901 > 900，旧组提交并封口，dg 从 1→3（T-8-04）。
     let mut doc = p_a()?;
     let before = snapshot_id(&mut doc)?;
@@ -152,7 +154,8 @@ fn case_8_2_03_901ms_splits_and_commits_old_group() -> Result<(), Box<dyn std::e
 }
 
 #[test]
-fn case_8_2_04_commit_after_899_merge_makes_one_node() -> Result<(), Box<dyn std::error::Error>> {
+fn input_group_case_8_2_04_commit_after_899_merge_makes_one_node()
+-> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.2-04：899 侧提交为一个节点，提交后块仍打开。
     let mut doc = after_8_2_01()?;
     let before = snapshot_id(&mut doc)?;
@@ -170,7 +173,8 @@ fn case_8_2_04_commit_after_899_merge_makes_one_node() -> Result<(), Box<dyn std
 }
 
 #[test]
-fn case_8_2_05_commit_after_900_merge_makes_one_node() -> Result<(), Box<dyn std::error::Error>> {
+fn input_group_case_8_2_05_commit_after_900_merge_makes_one_node()
+-> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.2-05：900 侧只产生一个节点，闭区间边界不拆组。
     let mut doc = after_8_2_02()?;
     let outcome = doc.commit_open_block(902)?;
@@ -184,7 +188,8 @@ fn case_8_2_05_commit_after_900_merge_makes_one_node() -> Result<(), Box<dyn std
 }
 
 #[test]
-fn case_8_2_06_commit_after_split_makes_second_node() -> Result<(), Box<dyn std::error::Error>> {
+fn input_group_case_8_2_06_commit_after_split_makes_second_node()
+-> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.2-06：901 侧为第二个节点，node=2。
     let mut doc = after_8_2_03()?;
     let outcome = doc.commit_open_block(903)?;
@@ -198,7 +203,8 @@ fn case_8_2_06_commit_after_split_makes_second_node() -> Result<(), Box<dyn std:
 }
 
 #[test]
-fn case_8_2_07_explicit_commit_is_group_boundary() -> Result<(), Box<dyn std::error::Error>> {
+fn input_group_case_8_2_07_explicit_commit_is_group_boundary()
+-> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.2-07：即使 90ms 且相邻，显式提交后也开启新草稿。
     let mut doc = after_8_2_07()?;
     assert_buffer(&doc, "xa\n")?;
@@ -211,7 +217,8 @@ fn case_8_2_07_explicit_commit_is_group_boundary() -> Result<(), Box<dyn std::er
 }
 
 #[test]
-fn case_8_2_08_seal_prevents_merge_of_commits() -> Result<(), Box<dyn std::error::Error>> {
+fn input_group_case_8_2_08_seal_prevents_merge_of_commits() -> Result<(), Box<dyn std::error::Error>>
+{
     // TSV 8.2-08：node=2 证明封口，未把两次提交并成一个节点。
     let doc = after_8_2_08()?;
     assert_buffer(&doc, "xab\n")?;
@@ -223,7 +230,8 @@ fn case_8_2_08_seal_prevents_merge_of_commits() -> Result<(), Box<dyn std::error
 }
 
 #[test]
-fn case_8_2_09_non_adjacent_input_splits_group() -> Result<(), Box<dyn std::error::Error>> {
+fn input_group_case_8_2_09_non_adjacent_input_splits_group()
+-> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.2-09：非相邻输入拆组，旧组 X 提交，Y 成为新草稿。
     let mut doc = after_8_2_09()?;
     assert_buffer(&doc, "abcdX\n")?;
@@ -236,8 +244,8 @@ fn case_8_2_09_non_adjacent_input_splits_group() -> Result<(), Box<dyn std::erro
 }
 
 #[test]
-fn case_8_2_10_non_adjacent_group_commits_independently() -> Result<(), Box<dyn std::error::Error>>
-{
+fn input_group_case_8_2_10_non_adjacent_group_commits_independently()
+-> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.2-10：node=2，非相邻输入形成独立组。
     let mut doc = after_8_2_09()?;
     let outcome = doc.commit_open_block(110)?;
@@ -251,8 +259,8 @@ fn case_8_2_10_non_adjacent_group_commits_independently() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn case_8_2_11_commit_without_pending_group_is_unchanged() -> Result<(), Box<dyn std::error::Error>>
-{
+fn input_group_case_8_2_11_commit_without_pending_group_is_unchanged()
+-> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.2-11：无待定组时不产生空步；snapshot_id 保持 same。
     let mut doc = after_8_2_08()?;
     let before = snapshot_id(&mut doc)?;
@@ -269,8 +277,8 @@ fn case_8_2_11_commit_without_pending_group_is_unchanged() -> Result<(), Box<dyn
 }
 
 #[test]
-fn case_8_2_12_leave_commits_remaining_group_and_closes() -> Result<(), Box<dyn std::error::Error>>
-{
+fn input_group_case_8_2_12_leave_commits_remaining_group_and_closes()
+-> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.2-12：离块只处理剩余组 Y，node=2。
     let mut doc = after_8_2_12()?;
     let before = snapshot_id(&mut doc)?;
@@ -287,8 +295,8 @@ fn case_8_2_12_leave_commits_remaining_group_and_closes() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn case_8_2_13_escape_commits_remaining_group_and_closes() -> Result<(), Box<dyn std::error::Error>>
-{
+fn input_group_case_8_2_13_escape_commits_remaining_group_and_closes()
+-> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.2-13：非组合 Escape 提交剩余组而非丢弃。
     let mut doc = after_8_2_12()?;
     doc.escape(200)?;
@@ -302,7 +310,8 @@ fn case_8_2_13_escape_commits_remaining_group_and_closes() -> Result<(), Box<dyn
 }
 
 #[test]
-fn case_8_2_14_escape_after_close_is_rejected() -> Result<(), Box<dyn std::error::Error>> {
+fn input_group_case_8_2_14_escape_after_close_is_rejected() -> Result<(), Box<dyn std::error::Error>>
+{
     // TSV 8.2-14：关闭后无第二打开槽位，状态零变化。
     let mut doc = after_8_2_12()?;
     doc.escape(200)?;
@@ -318,7 +327,7 @@ fn case_8_2_14_escape_after_close_is_rejected() -> Result<(), Box<dyn std::error
 }
 
 #[test]
-fn case_8_2_15_undo_prefers_pending_draft() -> Result<(), Box<dyn std::error::Error>> {
+fn input_group_case_8_2_15_undo_prefers_pending_draft() -> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.2-15：撤销待定组不提交、不新增节点、revision 不变。
     let mut doc = p_a()?;
     doc.type_text(2, "b", 100)?;
@@ -336,7 +345,7 @@ fn case_8_2_15_undo_prefers_pending_draft() -> Result<(), Box<dyn std::error::Er
 }
 
 #[test]
-fn case_8_2_16_redo_restores_pending_group() -> Result<(), Box<dyn std::error::Error>> {
+fn input_group_case_8_2_16_redo_restores_pending_group() -> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.2-16：Redo 恢复同一待定组及 after-selection 3:3。
     let mut doc = after_8_2_15()?;
     let before = snapshot_id(&mut doc)?;
@@ -353,8 +362,8 @@ fn case_8_2_16_redo_restores_pending_group() -> Result<(), Box<dyn std::error::E
 }
 
 #[test]
-fn case_8_2_17_undo_pending_draft_before_committed_node() -> Result<(), Box<dyn std::error::Error>>
-{
+fn input_group_case_8_2_17_undo_pending_draft_before_committed_node()
+-> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.2-17：有已提交节点时仍先撤销待定草稿，节点 1 保持。
     let mut doc = after_8_2_17()?;
     assert_buffer(&doc, "xa\n")?;
@@ -367,7 +376,7 @@ fn case_8_2_17_undo_pending_draft_before_committed_node() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn case_8_2_18_second_undo_undoes_node_one() -> Result<(), Box<dyn std::error::Error>> {
+fn input_group_case_8_2_18_second_undo_undoes_node_one() -> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.2-18：第二次 Undo 才撤销节点 1，选区恢复 1:1。
     let mut doc = after_8_2_18()?;
     assert_buffer(&doc, "x\n")?;
@@ -380,7 +389,7 @@ fn case_8_2_18_second_undo_undoes_node_one() -> Result<(), Box<dyn std::error::E
 }
 
 #[test]
-fn case_8_2_19_redo_restores_node_one() -> Result<(), Box<dyn std::error::Error>> {
+fn input_group_case_8_2_19_redo_restores_node_one() -> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.2-19：Redo 恢复节点 1 after-selection 2:2。
     let mut doc = after_8_2_18()?;
     doc.redo()?;
@@ -394,7 +403,8 @@ fn case_8_2_19_redo_restores_node_one() -> Result<(), Box<dyn std::error::Error>
 }
 
 #[test]
-fn case_8_2_20_snapshot_does_not_seal_group() -> Result<(), Box<dyn std::error::Error>> {
+fn input_group_case_8_2_20_snapshot_does_not_seal_group() -> Result<(), Box<dyn std::error::Error>>
+{
     // TSV 8.2-20：快照不封口，草稿与历史状态不变。
     let mut doc = after_8_2_20()?;
     assert_buffer(&doc, "x\n")?;
@@ -407,7 +417,8 @@ fn case_8_2_20_snapshot_does_not_seal_group() -> Result<(), Box<dyn std::error::
 }
 
 #[test]
-fn case_8_2_21_typing_after_snapshot_still_merges() -> Result<(), Box<dyn std::error::Error>> {
+fn input_group_case_8_2_21_typing_after_snapshot_still_merges()
+-> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.2-21：快照后 100ms 相邻输入仍并入同一组，历史仍 0/0/0。
     let mut doc = after_8_2_20()?;
     let before = snapshot_id(&mut doc)?;
@@ -424,7 +435,8 @@ fn case_8_2_21_typing_after_snapshot_still_merges() -> Result<(), Box<dyn std::e
 }
 
 #[test]
-fn case_8_2_22_snapshot_and_typing_produce_one_node() -> Result<(), Box<dyn std::error::Error>> {
+fn input_group_case_8_2_22_snapshot_and_typing_produce_one_node()
+-> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.2-22：快照与继续输入交错后只产生 1 个节点。
     let mut doc = after_8_2_20()?;
     doc.type_text(2, "b", 100)?;
@@ -439,24 +451,34 @@ fn case_8_2_22_snapshot_and_typing_produce_one_node() -> Result<(), Box<dyn std:
 }
 
 #[test]
-fn case_8_2_23_mode_switch_has_no_doc_core_entry() -> Result<(), Box<dyn std::error::Error>> {
-    // TSV 8.2-23：宿主模式切换有协议性期望，但 DocCore 无入口（T-8-15）；
-    // outcome/error 列为“待定”，测试不调用任何模式切换，也不断言该列。
+fn case_8_2_23_input_group_mode_switch_waits_for_natural_composition_end()
+-> Result<(), Box<dyn std::error::Error>> {
     let mut doc = f1()?;
     doc.composition_update("中", 0)?;
-    assert_buffer(&doc, "x\n")?;
-    assert_snapshot(&mut doc, "x中\n")?;
-    assert_version(&doc, 0, 1);
-    assert_history(&doc, 0, 0, 0);
-    assert_open(&doc, 0, Some("中"), 4, 4);
-    assert_composition(&doc, Some((1..1, "中")));
-    assert_wait(&doc, None);
-    // 等待列为 none（已确定）；组合列本用例即前置状态，不额外断言。
+    let before = common::capture(&mut doc)?;
+    assert_eq!(
+        doc.switch_mode(aline_ui::EditorMode::Source, 10)?,
+        aline_ui::ModeSwitchOutcome::Deferred
+    );
+    assert_eq!(before, common::capture(&mut doc)?);
+    doc.composition_commit(20)?;
+    let before = common::capture(&mut doc)?;
+    assert_eq!(
+        doc.switch_mode(aline_ui::EditorMode::Source, 30)?,
+        aline_ui::ModeSwitchOutcome::Ready
+    );
+    let mut after = common::capture(&mut doc)?;
+    assert_eq!(after.request.value(), before.request.value() + 1);
+    after.request = before.request;
+    after.mode = before.mode;
+    assert_eq!(before, after);
+    assert_eq!(doc.mode(), aline_ui::EditorMode::Source);
     Ok(())
 }
 
 #[test]
-fn case_8_2_24_typing_after_ime_commit_is_ordinary() -> Result<(), Box<dyn std::error::Error>> {
+fn input_group_case_8_2_24_typing_after_ime_commit_is_ordinary()
+-> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.2-24：平台自然确认后，剩余输入走普通协议。
     let mut doc = f1()?;
     doc.composition_update("中", 0)?;
@@ -475,7 +497,8 @@ fn case_8_2_24_typing_after_ime_commit_is_ordinary() -> Result<(), Box<dyn std::
 }
 
 #[test]
-fn case_8_2_25_post_ime_input_commits_as_one_step() -> Result<(), Box<dyn std::error::Error>> {
+fn input_group_case_8_2_25_post_ime_input_commits_as_one_step()
+-> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.2-25：切换后剩余输入提交为 1 步；切换未追加历史步。
     let mut doc = f1()?;
     doc.composition_update("中", 0)?;

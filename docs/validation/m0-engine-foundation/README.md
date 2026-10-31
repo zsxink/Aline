@@ -2,9 +2,21 @@
 
 日期：2026-10-31
 
-范围：本次 apply 第 1～2 组（候选准入、正式骨架/工程门禁/catalog）
+范围：`m0-engine-foundation` 第 1～9 组的证据入口；具体结论以各原始日志和独立复核为准。
 
-状态：1.1～1.4 已完成；见[第 1 组完成与交接记录](./group-1-report.md)及[准入身份登记](./group-1-admission.json)。精确例外按用户继续指示已同步现行规范，主 Agent 与独立 reviewer 复核并修复问题后完成验收。第 2 组已建立正式八成员、依赖/lint/安全守卫及 catalog，详见[第 2 组报告](./group-2/report.md)；四个文档引擎仍是骨架，完整 M0 出口和 V 项未通过。
+当前入口：第 1～8 组已有分项证据，第 9 组证据包与回填已完成独立核对。任务勾选不代替出口验收，完整 M0 出口和 V-01～V-09 均不据此宣称通过。下方早期环境、依赖及“本组状态与限制”是第 1～2 组开工时的历史快照，其“尚未”表述不是当前状态。
+
+| 组 | 证据入口与范围 |
+|---|---|
+| 1–2 | [候选准入与交接](./group-1-report.md)、[准入身份](./group-1-admission.json)、[工程门禁与 catalog](./group-2/report.md) |
+| 3 | [公共接口与身份基础](./group-3/step-3.3/report.md) |
+| 4 | [source 编码与回填](./group-4/step-4.5/report.md) |
+| 5 | [buffer 与历史回填](./group-5/step-5.5/report.md) |
+| 6 | [解析回填](./group-6/step-6.8/report.md)、[独立复判](./group-6/review-round-4.md) |
+| 7 | [编辑协议回填](./group-7/step-7.4/report.md)、[独立复判](./group-7/review-round-4.md) |
+| 8 | [首次复核](./group-8/review-round-1.md)、[补充实现](./group-8/followup-2026-10-31/report.md)、[复判](./group-8/review-round-3.md)、[8.5 回填](./group-8/step-8.5/report.md) |
+| 9 | [workspace 门禁](./group-9/step-9.1/report.md)、[E1](./group-9/step-9.2/report.md)、[E2/E3/E5](./group-9/step-9.3/report.md)、[E4/E7](./group-9/step-9.4/report.md)、[E6 与 M1 交接](./group-9/step-9.5/report.md)、[独立审查及回填](./group-9/step-9.6/report.md) |
+
 
 第 2 组最新证据见[工程门禁及 catalog](./group-2/report.md)，源码行尾定义已获用户确认，见[同步记录](./source-representation-decision.md)；第 1 组证据见第 1 组完成记录、[GPUI 隔离候选审计](./admission-2026-10-30/report.md)、[纯引擎依赖候选](./pure-candidates-2026-10-30/report.md)及[候选守卫](./admission-2026-10-30/guard-summary.md)。[最小例外草案](./admission-2026-10-30/proposed-policy.md)保留审阅时快照，已由现行架构 §3.2 承接。下方工具链/依赖及“本组状态与限制”保留开工初次检查的历史快照，其中“尚未下载/未解析/未完成”不是当前状态；最新结论以前述完成记录和原始日志为准。
 

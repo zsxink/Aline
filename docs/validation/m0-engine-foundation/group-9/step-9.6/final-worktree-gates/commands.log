@@ -1,0 +1,6 @@
+2026-10-31T20:52:17Z start cmd=cargo fmt --all --check
+2026-10-31T20:52:17Z exit=0
+2026-10-31T20:52:17Z start cmd=cargo clippy --workspace --all-targets --locked --offline -- -D warnings
+2026-10-31T20:52:18Z exit=0
+2026-10-31T20:52:18Z start cmd=cargo test --workspace --locked --offline
+2026-10-31T20:52:21Z exit=0

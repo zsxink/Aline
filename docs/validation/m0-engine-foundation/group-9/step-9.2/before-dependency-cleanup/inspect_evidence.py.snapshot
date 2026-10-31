@@ -1,0 +1,58 @@
+"""只读整理既有原始证据；不运行 Cargo、不修改来源证据。"""
+
+import hashlib
+import json
+from pathlib import Path
+import re
+
+ROOT = Path(__file__).resolve().parents[5]
+GATES = ROOT / 'docs/validation/m0-engine-foundation/group-9/step-9.1/workspace-gates'
+
+
+def digest(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def load(name):
+    return json.loads((GATES / name).read_text())
+
+
+metadata = load('dependency-graphs/all-metadata.stdout.log')
+packages = {item['id']: item for item in metadata['packages']}
+nodes = {item['id']: item for item in metadata['resolve']['nodes']}
+members = [packages[value] for value in metadata['workspace_members']]
+closures = {}
+for member in members:
+    if member['name'] not in {'aline-source', 'aline-buffer', 'aline-markdown', 'aline-edit', 'aline-app-core'}:
+        continue
+    seen, pending = set(), [member['id']]
+    while pending:
+        package_id = pending.pop()
+        if package_id in seen:
+            continue
+        seen.add(package_id)
+        pending.extend(dep['pkg'] for dep in nodes[package_id]['deps'])
+    closures[member['name']] = sorted(packages[value]['name'] + '@' + packages[value]['version'] for value in seen)
+
+summary = load('summary.json')
+dependency_cases = load('dependency-fixtures/summary.json')
+safety = load('safety-fixtures/summary.json')
+api = load('public-api/summary.json')
+test_text = (GATES / 'test.stdout.log').read_text()
+test_names = re.findall(r'^test (.*?) \.\.\. ok$', test_text, re.MULTILINE)
+print(json.dumps({
+    'kind': '既有原始日志与当前源码的只读摘录，不是新测试执行',
+    'workspace': [{
+        'name': item['name'], 'version': item['version'],
+        'direct_dependencies': [dep['name'] for dep in item['dependencies']],
+    } for item in members],
+    'engine_full_metadata_closures': closures,
+    'locked_identities': [{key: item.get(key) for key in ('name', 'version', 'source')} for item in metadata['packages'] if item['name'] in {'gpui-pre', 'pulldown-cmark', 'rust-embed', 'toml'}],
+    'cargo_lock_sha256': digest(ROOT / 'Cargo.lock'),
+    'workspace_gates': {'count': len(summary['results']), 'exit_0': sum(item['exit_code'] == 0 for item in summary['results'])},
+    'dependency_fixtures': {'count': len(dependency_cases['records']), 'all_matched': all(item['passed'] for item in dependency_cases['records']), 'ids': [item['id'] for item in dependency_cases['records']]},
+    'safety_fixtures': {'count': len(safety['cases']), 'all_matched': all(item['passed'] for item in safety['cases']), 'names': [item['name'] for item in safety['cases']]},
+    'public_api_fixtures': api,
+    'test_results': {'passed': sum(map(int, re.findall(r'test result: ok\. (\d+) passed', test_text))), 'names': test_names},
+    'source_evidence_sha256': {name: digest(GATES / name) for name in ['summary.json', 'test.stdout.log', 'test.stderr.log', 'dependency.stdout.log', 'lint.stdout.log', 'lint-self-test.stdout.log', 'safety.stdout.log', 'dependency-fixtures/summary.json', 'safety-fixtures/summary.json', 'public-api/summary.json']},
+}, ensure_ascii=False, indent=2))

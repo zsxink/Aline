@@ -20,7 +20,8 @@ use aline_buffer::{
 
 use crate::document::composition::{CompositionState, CompositionView};
 use crate::document::identity::{
-    DocumentId, DraftGeneration, IdentityError, InputIdentity, WorkingVersion,
+    DerivedRequestId, DocumentId, DraftGeneration, IdentityError, InputIdentity,
+    ParseConfigGeneration, WorkingVersion,
 };
 use crate::document::open_block::{DraftSlot, OpenBlock, TypingGroup};
 use crate::document::publication::{
@@ -28,6 +29,7 @@ use crate::document::publication::{
     WaitView,
 };
 use crate::document::snapshot::{CurrentSnapshot, SnapshotCache};
+use crate::document::{EditorMode, ResourceReference};
 
 /// 文档核心的注入预算集合；不声明发布性能阈值。
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -104,6 +106,8 @@ pub enum DocError {
     StaleResult,
     /// 等待句柄编号耗尽。
     WaitIdExhausted,
+    /// 资源引用数量超过宿主注入预算。
+    ResourceBudgetExceeded,
     /// 底层 Buffer 拒绝。
     Buffer(BufferError),
     /// 工作版本推进被身份层拒绝。
@@ -138,13 +142,16 @@ pub struct DocCore {
     next_wait_id: u64,
     limits: DocLimits,
     snapshot_cache: Option<SnapshotCache>,
+    resources: Arc<[ResourceReference]>,
+    parse_config: ParseConfigGeneration,
+    derived_request: DerivedRequestId,
+    mode: EditorMode,
 }
 
 impl DocCore {
     /// 以完整源码、初始选区和注入预算创建文档，并在当前选区上打开唯一块。
     ///
-    /// 初始打开范围取选区排序后的范围；本组没有用例断言 `new` 的初始范围
-    /// 必须不同于该范围。构造失败不留下实例。
+    /// 初始打开范围按已确认契约取选区排序后的范围。构造失败不留下实例。
     pub fn new(
         text: impl Into<String>,
         selection: SelectionSpec,
@@ -177,6 +184,10 @@ impl DocCore {
             next_wait_id: INITIAL_WAIT_ID,
             limits,
             snapshot_cache: None,
+            resources: Arc::from([]),
+            parse_config: ParseConfigGeneration::initial(),
+            derived_request: DerivedRequestId::initial(),
+            mode: EditorMode::Visual,
         })
     }
 
@@ -609,14 +620,23 @@ impl DocCore {
             return Err(DocError::ClosedTarget);
         }
         let snapshot = self.current_snapshot(self.limits.text)?;
-        let current = InputIdentity::new(self.document.clone(), self.version, snapshot.text())
-            .map_err(DocError::Identity)?;
+        let current = InputIdentity::for_request(
+            self.document.clone(),
+            self.version,
+            snapshot.text(),
+            self.parse_config,
+            self.derived_request,
+        )
+        .map_err(DocError::Identity)?;
         match identity.validate(&current) {
             Ok(()) => Ok(()),
             Err(IdentityError::WrongDocument) => Err(DocError::WrongDocument),
-            Err(IdentityError::StaleWorkingVersion | IdentityError::StaleSnapshot) => {
-                Err(DocError::StaleResult)
-            }
+            Err(
+                IdentityError::StaleWorkingVersion
+                | IdentityError::StaleSnapshot
+                | IdentityError::StaleParseConfig
+                | IdentityError::StaleRequest,
+            ) => Err(DocError::StaleResult),
             Err(error) => Err(DocError::Identity(error)),
         }
     }
@@ -1004,7 +1024,10 @@ impl DocCore {
         if self.is_composition_active() {
             return Err(DocError::CompositionActive);
         }
+        // 关闭是结果采纳资格的边界；预检必须在任何待定组提交之前完成。
+        let next_request = self.derived_request.next().map_err(DocError::Identity)?;
         self.commit_typing_group(now_millis)?;
+        self.derived_request = next_request;
         self.open = None;
         self.wait = None;
         self.snapshot_cache = None;
@@ -1166,15 +1189,18 @@ impl DocCore {
                 self.version,
                 base.clone(),
                 self.buffer.selection().clone(),
+                self.resources.clone(),
             ));
         };
         let Some(draft) = block.current_draft() else {
+            check_len(base.len_bytes(), text_budget)?;
             let selection = bind_selection(base, block.selection)?;
             return Ok(CurrentSnapshot::new(
                 self.document.clone(),
                 self.version,
                 base.clone(),
                 selection,
+                self.resources.clone(),
             ));
         };
         let replaced = base
@@ -1189,6 +1215,7 @@ impl DocCore {
             self.version,
             text,
             selection,
+            self.resources.clone(),
         ))
     }
 
@@ -1263,3 +1290,5 @@ fn selection_of(selection: &aline_buffer::SrcSelection) -> SelectionSpec {
         selection.head().byte_offset(),
     )
 }
+
+mod protocols;

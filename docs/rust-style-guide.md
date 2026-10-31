@@ -372,6 +372,8 @@ RS-05 已确认有限真实 scope：纯文档用 `docs`，workspace 工程配置
 
 下列完整 V 实验仍未完成，实际结果按分项记录。2026-10-31 第 2 组正式 workspace 的依赖/lint/catalog/完整 Cargo 门禁及格式配置实验已执行，见[工具实验分项](./validation/m0-engine-foundation/group-2/report.md)；不将该结果等同 V-01～V-09 通过。技术验证不代替用户政策裁决，版本/后端/工具由实际实验收口。
 
+**2026-10-31 组 9 工程与接口分项：** 最终依赖清理后的本机 macOS arm64 统一门禁为 19/19 exit 0、workspace 测试 312 passed，Clippy/test 实际带 `--locked --offline`；原始命令、环境和输出见[9.1](./validation/m0-engine-foundation/group-9/step-9.1/report.md)。八成员 lint 继承、五引擎闭包、53 例安全自测、8 个 API 编译例与 catalog 证据见[E1](./validation/m0-engine-foundation/group-9/step-9.2/report.md)，无头 API/受检坐标/预算/映射边界见[E2/E3/E5](./validation/m0-engine-foundation/group-9/step-9.3/report.md)。独立审查后清理了 ui→plugin、plugin→edit、plugin→app-core 无消费者边，plugin 成员骨架保留；未放宽 unsafe、lint 或依赖准入规则。隔离夹具中部分辅助 Cargo 命令只带 offline，不能将 workspace 参数泛化；依赖清理中遗漏 locked/原始输出的操作偏差也单列于 9.1 引用，不冒充门禁证据。宏展开、第三方长调用/运行时语义、原生平台、性能与实际保存恢复仍有盲区，完整 V-01～V-09 均未通过。独立复核与 M1/M2 前交接见[9.6](./validation/m0-engine-foundation/group-9/step-9.6/report.md)及[9.5](./validation/m0-engine-foundation/group-9/step-9.5/report.md)。
+
 第 1 组工具组合与 GPUI 核心库的实际分项见 §2.1 及候选审计；它们不代表下表完整实验通过。GPUI 精确例外已按 §13/15 及架构 §3.2 同步，正式五引擎闭包、成员 lint 与 catalog 已获第 2 组实际证据；真实平台能力仍待后续阶段验证。
 
 第 1 组纯依赖消费者的 metadata/tree、五目标解析和 macOS aarch64 check/release build 见[纯候选证据](./validation/m0-engine-foundation/pure-candidates-2026-10-30/report.md)。拟用解析/catalog 版本及 TOML build metadata 的 lock 身份边界已登记；不因此认定 V-06/V-07 语法、catalog 键/插值、拒绝或正式引擎接口已验证。

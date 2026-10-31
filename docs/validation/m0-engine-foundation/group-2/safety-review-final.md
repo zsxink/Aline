@@ -20,6 +20,8 @@
 - 六项分别为 path 同源、嵌套兄弟同名、双 cfg 生产消费、未知目录、quoted 真名与 description 假名、引擎放已知 UI 目录。复核脚本同时记录当时两份实现的 SHA-256，不虚构 Rust 编译或平台运行结果。
 - `safety-results/summary.json` 显示最新 45 项全部符合预期，测试后正常源码无违规；主 Agent 的 root-safety-checks 另保留独立重跑。与这些结果并列的 debug/release lint 诊断及成员继承属于另一套 Cargo 证据。
 
+**计数时间边界：** 上述 45 项是本次独立复核当时的完整自测结果。之后安全守卫继续修复并扩展用例；2026-10-31 13:43:07Z 的后续 `--self-test` 共 53 项且全部符合预期，原始逐例结果见 [`security-followups/self-test.stdout.json`](../group-9/step-9.1/safety-guard-fix/security-followups/self-test.stdout.json)，命令与退出码见 [`security-followups/commands.log`](../group-9/step-9.1/safety-guard-fix/security-followups/commands.log)。后续 53 项不表示本复核执行了 53 项，也不改写 45 项历史结果。
+
 ## 边界
 
 词法检查不是 Rust 解析、名字解析或宏展开器；不证明索引、容量、间接函数、未知内部可变类型、过程宏和第三方调用无 panic。复杂 cfg 与无法证明的模块路径采用保守拒绝。新增公开实现仍须按入口→辅助函数/宏→受检运算→状态所有者实际追踪，并补相应非法输入和预算测试。

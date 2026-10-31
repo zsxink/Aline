@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "rustc",
+    "-Vv"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "started_utc": "2026-10-31T15:02:51.957321+00:00",
+  "finished_utc": "2026-10-31T15:02:51.983503+00:00",
+  "exit_code": 0,
+  "env_overrides": {
+    "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+    "CARGO_TARGET_DIR": "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-9/step-9.1/workspace-gates-after-cleanup/lint-fixtures/cargo-target",
+    "CARGO_NET_OFFLINE": "true",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  }
+}

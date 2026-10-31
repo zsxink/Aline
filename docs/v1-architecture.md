@@ -450,6 +450,8 @@ Aline/
 | 窗口/标签/滚动/焦点 | Workspace、TabViewState | 标签引用 DocumentId；不各自持有可编辑副本或独立 dirty |
 | 主题/语言/设置 | app-core 数据，UI 的应用级服务发布快照 | `settings_generation`、字体/主题代次用于失效派生结果 |
 
+**2026-10-31 M0 所有权记录（组 8）：** 无窗口 `DocCore` 已实际持有唯一 `StringBuffer`/History、至多一个打开块/草稿槽及组合/发布等待状态，没有子编辑器第二历史。当前快照冻结最新输入、文档/工作版本、源码选区与资源强引用。M0 由宿主在引用生效前完整登记同文档资源，DocCore 保守持有已登记集合至自身生命周期结束，快照独立持有冻结集合；尚无文本资源自动发现、精确历史可达追踪、迁移/清理或恢复记录写入，空集合不证明资源齐备。证据见[组 8 回填记录](./validation/m0-engine-foundation/group-8/step-8.5/report.md)。
+
 `Source` 不用一个 `crlf: bool` 代替行尾统计；也不把“是否修改过”“当前是否等于已保存内容”“是否正在写盘”合成一个标志。2026-10-31 用户批准导入文本仅剥离头部 BOM、保留原始 CR/LF，原 bytes 与原始行尾统计仅作存储基线；编码按 CRLF/LF 行尾单元多数派输出，包含编辑新拼接 CRLF，未配对 CR 保留，不增删末尾换行。LF 策略下紧跟在孤立 CR 之后的 CRLF 单元保留 CRLF，以免重开时吞掉孤立 CR。存储往返只允许行尾表示等价，不用于吞掉真实补丁或改变历史/版本；源码补丁、选区和逆操作保持精确字节语义。src_off 始终指编辑器源码快照的 UTF-8 字节，不混用磁盘 bytes（含 BOM/CRLF）的偏移；如需原文件定位，由 source 的存储转换接口承担。编码时对未修改快照直接返回原 bytes，对已修改文本按读取基线的 BOM/多数派规则输出；成功写盘后更新对应基线，失败不得更新。`DocumentId` 不由文件名或路径哈希充当；恢复后的未命名文档也有独立身份。
 
 2026-10-31 回填：4.1～4.4 已实现 source 侧 `StorageSnapshot`/`StorageRange`、`decode`/`encode`、`SourceBaseline` 与 create-only `prepare_atomic`。`StorageRange` 显式绑定基线身份并注明是存储字节范围，source 不提供以磁盘偏移索引编辑源码的接口；当前 crate 外尚无 `aline_source` 代码级消费者（`aline-ui` 仅在 manifest 声明未使用的依赖），因此未出现跨层偏移混用。现有普通文件覆盖、ACL/xattr/权限复制、目录同步/断电、跨进程 CAS、Windows/Linux 与真实保存闭环均未验证；目标已存在时原语拒绝：普通文件返回 `MetadataPreservationUnverified`，符号链接/目录/其他非普通文件返回 `ExistingTarget{kind}`，不构成现有文件保存能力。证据与 K-08 人工复核见 [group-4/step-4.5/report.md](./validation/m0-engine-foundation/group-4/step-4.5/report.md)。
@@ -473,6 +475,8 @@ Aline/
 提交预检范围、字符边界、基线版本和保护规则；若草稿未改变，不产生补丁和空历史步。真正提交只调用一次单区间编辑，块尾分隔字节不包含在内。TA-01 已确认提交与关块分离：块可保持打开，连续相邻输入按 900ms 窗口分组，IME 确认独立成组，各组形成单区间提交与单步历史；提交后更新打开块的基线和范围。离块只提交最后未封口组，不重复记步，也不把此前输入组压成整块一步。
 
 模式切换先把当前输入安全交给同一历史/补丁通道，再换视图，按源码选区恢复位置；切换自身零新增字节、零历史步。Source 单选区，逐行虚拟化并复用 IME 适配；无 minimap、折叠或多光标。两模式共用内容列和主滚动入口，不机械复用像素滚动位置。
+
+**组 8 无头协议范围：** 初始打开范围为排序后的初始源码选区；提交与关块分离、900ms 分组、离块/Escape 与快照不封口已由事件测试覆盖。模式切换在组合期间延后，结束后由宿主重试并通过同一历史处理剩余输入；实际模式变化和关块受检推进派生采纳代次，切回原模式或重新开块不能复活旧请求，代次耗尽或提交失败不提前改变输入/资格。真实点击开块、视图及源选区映射、平台焦点与模式切换接线尚未验证。
 
 ### 5.3 映射、解析与复用
 
@@ -498,6 +502,8 @@ History 使用正/逆补丁及 before/after 源码选区，不保存每次全文
 **2026-10-31 M0 接口基础记录（任务 3.3）：** `SourceBaseline`、`OpenBlock`、DocCore、`Parsed`、`Change`、`HistoryStep` 与 `snapshot_current` 的内容快照仍仅契约未验证；已落地的包括 `TextSnapshot`/`CheckedBatch`/`SrcSelection`、`StorageSnapshot`、恒等 `Projection` 和 `InputIdentity` 身份信封，以及它们使用的 `DocumentRevision`/`WorkingVersion` 身份。`InputIdentity` 只携带文档、工作版本与快照身份，不含草稿内容；不能把它当作当前文本快照。完整冻结与消费者追踪见[任务 3.3 记录](./validation/m0-engine-foundation/group-3/step-3.3/report.md)。
 
 **2026-10-31 M0 原语记录（组 5）：** `aline-buffer` 已落地 `StringBuffer` 的原子批次、before/after 正逆补丁、锚点 affinity/方向性选区变换、单调 revision，以及历史节点/待定组/保存点身份/裁剪/独立重载边界。历史保存正逆补丁、before/after 选区、来源和快照身份；900ms 只合并相邻普通输入，保存点不使用 `undo.len() == saved_at`，重载只改内存、不移动磁盘基线。内容等价回到保存点目前按新快照身份保守判脏；全文比较/指纹与后台版本采纳尚未实现，未做每键全文哈希。DocCore/OpenBlock 提交、IME 组合、自动保存/外改提示、命令规划与真实文件保存重开仍未实现；TA-02 的真实自动保存暂停/外改提示尚属 M2。证据与未覆盖边界见[组 5 记录](./validation/m0-engine-foundation/group-5/step-5.5/report.md)。
+
+**2026-10-31 组 8 后状态补充：** 上述任务 3.3/组 5 记录保留其时点。DocCore 已编排同块多组、待定组优先 Undo、Redo 选区恢复、组合确认独立一步/取消恢复与模拟重载的独立边界；重载来源仅以节点和 Undo/Redo 间接观察。自动保存只有组合期延后/结束后读取判定，恢复只有独立快照读取；真实保存点结算、外改提示、自动保存调度与恢复落盘仍未实现。M2 可复用这一状态/历史协议，仍须完成真实输入与文件安全闭环。
 
 ## 6. 功能分配与需求追踪
 
@@ -543,7 +549,7 @@ History 使用正/逆补丁及 before/after 源码选区，不保存每次全文
 | `map_position`（映射 API 统称） | 源码/绘制/UTF-16 坐标与方向偏好 → 对齐坐标/失败 | 非法边界不应用编辑；markdown 映射层 | 恒等路径已实现并有 3.2 外部/编译证据；复杂来源关系仅契约（第 6 组） |
 | `plan_change` / `validate_change` | 当前源码/Parsed/选区/Command → Change 或 EditRefusal | 基线版本、补丁排序、保护区间、预期内容/语义；edit | 仅契约未验证；`plan_change` 与 edit 层 `validate_change` 均未实现，edit 无公开接口（第 7 组）；buffer/markdown/UI 的 validate 三层已实现 |
 | `apply_change` | 通过校验的补丁、选区、历史分组原因 → 新 revision / 事件 | 单一 DocCore 写入口；拒绝零副作用；buffer 原子应用 | 仅契约未验证；`CheckedBatch` 只校验不 apply（第 5/8 组） |
-| `snapshot_current` | 当前 Buffer、唯一草稿、工作版本 → 不可变当前文本与资源引用快照 | 包括打开块最新内容；不隐式生成撤销步；UI 编排，遵守 TA-01；ED-01 的显式保存/另存为/导出请求先等待平台自然结束组合再取快照 | 仅 `InputIdentity` 身份信封；内容快照仅契约（第 8 组） |
+| `snapshot_current` | 当前 Buffer、唯一草稿、工作版本 → 不可变当前文本与资源引用快照 | 包括打开块最新内容；不隐式生成撤销步；UI 编排，遵守 TA-01；ED-01 的显式保存/另存为/导出请求先等待平台自然结束组合再取快照 | 组 8 已落地 `DocCore::current_snapshot` / `CurrentSnapshot`，含最新输入、文档/工作版本、源码选区与宿主已登记资源的冻结强引用；真实发布/保存仍未接线 |
 | `save` | DocumentId、路径代次、快照、存储策略、预期磁盘版本、资源计划 → SaveResult | Conflict/Io/Resource/Cancelled 分开；UI 编排，source 提供受检写原语 | 仅契约未验证（后续任务） |
 | `recover` | 恢复记录 + 资源清单 → 内存会话或损坏诊断 | 不直写原文件、不按旧路径覆盖其他文件；UI | 仅契约未验证（后续任务） |
 | `render_asset` / `export` | 纯快照、有效主题/插件配置、预算 → 资产/产物计划/诊断 | 不持有可变 Buffer；结果带 request_id；plugin 计算、UI 接纳/落盘 | 仅契约未验证（后续任务） |
@@ -553,6 +559,8 @@ History 使用正/逆补丁及 before/after 源码选区，不保存每次全文
 **2026-10-31 组 6 后状态补充（任务 6.8）：** 上表 `parse` 与 `map_position` 两行的“仅契约未验证”是任务 3.3 时点的记录。组 6 已在 `aline-markdown` 落地：`parse(&TextSnapshot, ParseConfig, ParseBudget)` 返回带输入版本、块/Gap、映射、保护、样式与诊断的 `Parsed`；超限的构树类维度（扫描步数、嵌套、节点、HTML 栈深、映射片段数 `max_segments`）整源回退、不截断也不发布部分结果；源码字节或重写字节超限返回 `Err`（`Source` / `BudgetExceeded`），投影索引点与投影片段数（M0 共用 `max_mapping_points`）超限返回 `Err(Mapping(BudgetExceeded))`——**更正（复核 N-F3-6、R3-F2-1）**：原“超限整源回退而不截断”过宽，且曾把“映射片段”误列在 `Err` 一侧；`max_segments` 属构树阶段，超限走整源回退，`max_mapping_points` 才兼作投影片段数上限；`ParseConfig` 带代次，代次 0 被拒绝；`ParseBudget` 八维可注入，协作式 `CancelCheck`/`CancelToken` 可取消，`ParseStats` 记录扫描步数/投影索引点/预算触发次数。映射 API 的恒等路径之外已有片段级 `source_at`/`drawn_at`、局部与全文投影、UTF-16 换算与规范锚点，非法端点/旧投影/代理对中间受检拒绝，不做 clamp 或 backscan。仍未实现：`plan_change`/`validate_change` 的 edit 层（第 7 组）、`apply_change` 的单一写入口（第 5/8 组）、`snapshot_current` 内容快照（第 8 组）、`save`/`recover`/`render_asset`；真实 UI 命中、IME 与灰色只读区呈现未验证。证据见[组 6 记录](./validation/m0-engine-foundation/group-6/step-6.8/report.md)。
 
 **2026-10-31 组 7 后状态补充（任务 7.4）：** 上表 `plan_change` / `validate_change` 行的“仅契约未验证”同样是任务 3.3 时点的记录。组 7 已在 `aline-edit` 落地：`plan_change(&TextSnapshot, &Parsed, &SrcSelection, &EditContext, &EditCommand, EditBudget) -> Result<PlanOutcome, EditRefusal>`，成功返回 `ChangePlan`（绑定 `before_revision`、快照/投影身份、`before_selection`、逐条期望片段、`CheckedBatch`、after 目标选区、复读契约、解析配置与预算），无变化返回 `Unchanged(NoChangeReason)`，拒绝返回 `EditRefusal`；`validate_change` 在执行前重验同一套绑定并在候选快照上重跑复读。两入口都不持有可变 Buffer，`apply_change` 仍无 edit 层实现——`ChangePlan::batch()` 交给文档所有者原子发布，本组不发布。命令面只有 `Replace` 与 `ToggleInlineFormat`（`Strong`/`Strike`）。仍未实现：`apply_change` 单一写入口（第 5/8 组）、`snapshot_current` 内容快照（第 8 组）、`save`/`recover`/`render_asset`、列表/表格/任务框/代码语言/全文格式化命令；真实 UI/DocCore 消费者、IME、灰色只读区呈现与跨平台未验证。证据见[组 7 记录](./validation/m0-engine-foundation/group-7/step-7.4/report.md)。
+
+**2026-10-31 组 8 后状态补充（任务 8.5）：** 当前文本快照已由 DocCore 实现，`InputIdentity` 同时绑定文档、工作版本、快照来源、解析配置和请求/采纳代次；`SnapshotId` 仅是来源身份，可跨工作版本复用，不能单独作为版本或内容相等证据。新请求、配置变化、输入变化、关块和实际模式改变使相关旧结果失效。资源集合依赖宿主完整登记并保守持有，不等于已实现资源协调器。显式发布等待、自动保存延后、恢复读取及 source create-only 写盘回执分类已有基础测试；尚无 `ChangePlan` 到 DocCore 的通用命令消费入口、真实文件协调器、现有文件 metadata 保全替换、恢复落盘或资源迁移，`save`/`recover`/`render_asset` 的完整契约仍待后续。证据与逐项未测清单见[8.5 回填记录](./validation/m0-engine-foundation/group-8/step-8.5/report.md)，不构成 V-07/V-08 或 M0 出口通过。
 
 `Change` 至少包含同一快照下的补丁、目标源码选区、预期版本和分组原因；不能只返回裸区间而不说明来源。菜单、快捷键、右键共用命令表的 id/文案 key/前置条件。前置条件还须在执行时重验，不能信任菜单打开时的状态。
 
@@ -802,6 +810,10 @@ cargo test --workspace
 ## 13. M0–M6 实施顺序与阶段出口
 
 依赖主线 `M0 → M1 → M2 → M3 → M4 → M5 → M6`。验证从最早可测阶段开始，不等最后阶段才发现平台/字体/保存阻塞；后阶段可准备样本，但不能跳过前阶段安全出口。保留 AGENTS.md 的里程碑名称与本章编号。
+
+**2026-10-31 M0 分项取证记录（组 9）：** 依赖清理后的正式统一门禁在当前 macOS arm64 主机记录 19/19 exit 0、workspace 测试 312 passed，见[9.1 原始证据入口](./validation/m0-engine-foundation/group-9/step-9.1/report.md)。八成员保留，`aline-plugin` 仍为空骨架；没有消费者的 ui→plugin、plugin→edit、plugin→app-core 边已删除，先前 ui→edit 直接边也已清理。E1 工程、E2 无头 API/预算、E3 展示树 dump、E4 AC-01～04 基础、E5 覆盖/映射、E6 未测清单及 E7 输入协议的证据分别见[9.2](./validation/m0-engine-foundation/group-9/step-9.2/report.md)、[9.3](./validation/m0-engine-foundation/group-9/step-9.3/report.md)、[9.4](./validation/m0-engine-foundation/group-9/step-9.4/report.md)、[9.5](./validation/m0-engine-foundation/group-9/step-9.5/report.md)；独立复核与记录限制见[9.6](./validation/m0-engine-foundation/group-9/step-9.6/report.md)。这些是可检查的 M0 分项，不是 M0 出口、AC 或 V 项整项通过声明。
+
+M1 交接仍先取得锁定 GPUI 的原生 macOS 单窗冒烟、V-04 中文字体回退、V-05 Release 基准与真实语法/点击/灰区样本，再按 V-01 顺序补 Windows/Linux；Windows 10、Intel Mac 和最低系统版本目标继续保留。当前没有原生窗口、真实 IME/焦点/候选窗或其他平台成绩；M2 前 V-08 身份/事务方案及保存、自动保存、外改重载、10 秒恢复和恢复图片可读的最小安全闭环仍是独立出口，不能由无头快照/资源引用或 create-only 写盘原语代替。交接清单见[9.5](./validation/m0-engine-foundation/group-9/step-9.5/report.md)。
 
 | 阶段 | 实施任务与先决依赖 | 可检查的出口（逐目标平台记录） |
 |---|---|---|

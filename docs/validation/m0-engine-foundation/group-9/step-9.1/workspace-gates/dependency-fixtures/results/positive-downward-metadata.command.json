@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "cargo",
+    "metadata",
+    "--manifest-path",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-9/step-9.1/workspace-gates/dependency-fixtures/fixtures/positive-downward/Cargo.toml",
+    "--offline",
+    "--format-version",
+    "1"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "started_utc": "2026-10-31T14:52:35.068237+00:00",
+  "finished_utc": "2026-10-31T14:52:35.193794+00:00",
+  "exit_code": 0,
+  "stdout_sha256": "ffff57a03b6b91633b3f5bdfd8ade17cdbcab20eab5b715783395bbe7b0d4041",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "env_overrides": {
+    "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  }
+}

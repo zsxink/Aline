@@ -205,31 +205,35 @@ fn case_8_4_06_rejects_identity_after_pending_undo() -> Result<(), Box<dyn std::
 }
 
 #[test]
-fn case_8_4_07_missing_parse_config_identity_field() -> Result<(), Box<dyn std::error::Error>> {
-    // TSV 8.4-07：规范要求结果身份含解析配置代次，identity.rs 未暴露。
-    // outcome/error 列为“待定”（T-8-10），测试不调用采纳，也不断言该列；
-    // 只断言已确定的状态列。
+fn case_8_4_07_document_rejects_stale_parse_config() -> Result<(), Box<dyn std::error::Error>> {
     let mut doc = p_a()?;
-    assert_buffer(&doc, "x\n")?;
-    assert_snapshot(&mut doc, "xa\n")?;
-    assert_version(&doc, 0, 1);
-    assert_history(&doc, 0, 0, 0);
-    assert_open(&doc, 0, Some("a"), 2, 2);
-    assert_idle(&doc);
+    let old = doc.begin_derived_request()?;
+    doc.advance_parse_config()?;
+    assert_rejected_without_change(
+        &mut doc,
+        |doc| doc.accept_derived_result(&old),
+        |error| matches!(error, DocError::StaleResult),
+    )?;
+    let current = doc.begin_derived_request()?;
+    doc.accept_derived_result(&current)?;
     Ok(())
 }
 
 #[test]
-fn case_8_4_08_missing_request_identity_field() -> Result<(), Box<dyn std::error::Error>> {
-    // TSV 8.4-08：旧请求身份字段缺口；状态本身不变。
-    // outcome/error 列为“待定”（T-8-10），测试不调用采纳，也不断言该列。
+fn case_8_4_08_document_rejects_old_request_at_same_version()
+-> Result<(), Box<dyn std::error::Error>> {
     let mut doc = p_a()?;
-    assert_buffer(&doc, "x\n")?;
-    assert_snapshot(&mut doc, "xa\n")?;
-    assert_version(&doc, 0, 1);
-    assert_history(&doc, 0, 0, 0);
-    assert_open(&doc, 0, Some("a"), 2, 2);
-    assert_idle(&doc);
+    let old = doc.begin_derived_request()?;
+    let latest = doc.begin_derived_request()?;
+    assert_eq!(old.working_version(), latest.working_version());
+    assert_eq!(old.snapshot_id(), latest.snapshot_id());
+    assert_ne!(old.request_id(), latest.request_id());
+    assert_rejected_without_change(
+        &mut doc,
+        |doc| doc.accept_derived_result(&old),
+        |error| matches!(error, DocError::StaleResult),
+    )?;
+    doc.accept_derived_result(&latest)?;
     Ok(())
 }
 

@@ -1,0 +1,340 @@
+{
+  "inspection_utc": "2026-10-31T15:05:14Z",
+  "kind": "只读链接/输入核对，未执行平台或产品实验",
+  "inputs": [
+    {
+      "path": "docs/v1-prd.md",
+      "sha256": "e6cadea4263ea08eaaaf1c3e4f0a5195ca785a9901aa8fcec1a683860fbfb8f4"
+    },
+    {
+      "path": "docs/v1-validation-plan.md",
+      "sha256": "180fad4013e687c6ee98f81bad14993b0ba0f79ecde7788d4ca4acd9a31ceff6"
+    },
+    {
+      "path": "docs/v1-architecture.md",
+      "sha256": "53f5fe4089d2025edb1219a29dc568497b88e17e1e9a7ea450b40133613b5adf"
+    },
+    {
+      "path": "openspec/changes/m0-engine-foundation/proposal.md",
+      "sha256": "f03d4e41ad4f8a59597d01d77c361e723be06108211f80c9c5bfa9a4c299bda4"
+    },
+    {
+      "path": "app/src/main.rs",
+      "sha256": "5a1801f4ba2c57ceb700e92e392d7d5a707b9e89649838d3ea896de56917768a"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "998b8b9178c129cb3d7b915054b9d007dee72eb4f4dd7d99671876fdd3dabe69"
+    },
+    {
+      "path": "crates/aline-ui/Cargo.toml",
+      "sha256": "98228005c853d5b1e8e032ba3e5dcf4fbc7ab66b635e23d3aa66e0fe723fcf01"
+    },
+    {
+      "path": "crates/aline-plugin/Cargo.toml",
+      "sha256": "f71a39dd7595c251f2d09513d823c27a52c088d289f00bd25f2fec5d897d4bd8"
+    }
+  ],
+  "links": [
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.5/report.md",
+      "target": "../../../../../openspec/changes/m0-engine-foundation/proposal.md",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.5/report.md",
+      "target": "../step-9.1/formal-run/commands.log",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.5/report.md",
+      "target": "../step-9.1/workspace-gates/summary.json",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.5/report.md",
+      "target": "../step-9.1/workspace-gates/test.stdout.log",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.5/report.md",
+      "target": "../step-9.4/source-fingerprints.tsv",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.5/report.md",
+      "target": "../step-9.4/observed-tests.json",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.5/report.md",
+      "target": "../step-9.1/formal-run-after-cleanup/commands.log",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.5/report.md",
+      "target": "../step-9.1/workspace-gates-after-cleanup/summary.json",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.5/report.md",
+      "target": "../step-9.1/workspace-gates-after-cleanup/test.stdout.log",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.5/report.md",
+      "target": "../step-9.4/source-fingerprints-after-cleanup.tsv",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.5/report.md",
+      "target": "../step-9.4/observed-tests-after-cleanup.json",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.5/report.md",
+      "target": "./handoff-inputs-and-links-after-cleanup.json",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.5/report.md",
+      "target": "./inspection-after-cleanup/",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.5/report.md",
+      "target": "../../../../v1-validation-plan.md",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.5/report.md",
+      "target": "../step-9.4/report.md",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.5/report.md",
+      "target": "../../../../v1-validation-plan.md#结果记录",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.5/report.md",
+      "target": "./commands.log",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../../../../../openspec/changes/m0-engine-foundation/proposal.md",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "./inspection/",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "./commands.log",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "./source-fingerprints.tsv",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../step-9.1/formal-run/commands.log",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../step-9.1/workspace-gates/summary.json",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../step-9.1/workspace-gates/test.stdout.log",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../step-9.1/workspace-gates/test.stderr.log",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../step-9.1/formal-run-after-cleanup/commands.log",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../step-9.1/workspace-gates-after-cleanup/summary.json",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../step-9.1/workspace-gates-after-cleanup/test.stdout.log",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../step-9.1/workspace-gates-after-cleanup/test.stderr.log",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "./observed-tests-after-cleanup.json",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "./inspect_evidence.py",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "./source-fingerprints-after-cleanup.tsv",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "./inspection-after-cleanup/",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "./observed-tests.json",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../../../../../crates/aline-source/tests/roundtrip.rs",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../../group-4/step-4.3/roundtrip-golden.v1.txt",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../../../../../crates/aline-source/tests/decode_golden.rs",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../../../../../crates/aline-source/tests/encode_golden.rs",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../../../../../crates/aline-buffer/tests/patch_goldens.rs",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../../group-5/step-5.1/goldens/forward-inverse.tsv",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../../../../../crates/aline-ui/tests/document_followups.rs",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../../../../../crates/aline-markdown/tests/mapping.rs",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../../../../../crates/aline-ui/tests/document_composition.rs",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../../../../../crates/aline-buffer/tests/anchors.rs",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../../../../../crates/aline-ui/tests/document_typing.rs",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../../../../../crates/aline-edit/tests/goldens.rs",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../../../../../crates/aline-edit/tests/refusals.rs",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../../group-7/step-7.1/report.md",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../../group-7/step-7.4/report.md",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../../../../../crates/aline-buffer/tests/rejections.rs",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../../../../../crates/aline-ui/tests/common/mod.rs",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../../group-8/step-8.1/expectations.md",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../../group-8/step-8.2/expectations.md",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../../group-8/followup-2026-10-31/expectations.md",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../../../../../crates/aline-buffer/tests/history.rs",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../../../../../crates/aline-ui/tests/document_composition.rs",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../../../../../crates/aline-ui/tests/document_followups.rs",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../../group-8/followup-2026-10-31/commands.log",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../../group-8/review-round-3.md",
+      "exists": true
+    },
+    {
+      "report": "docs/validation/m0-engine-foundation/group-9/step-9.4/report.md",
+      "target": "../step-9.5/report.md",
+      "exists": true
+    }
+  ]
+}

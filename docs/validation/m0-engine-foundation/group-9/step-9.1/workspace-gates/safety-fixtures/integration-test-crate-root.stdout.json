@@ -1,0 +1,34 @@
+{
+  "failures": [],
+  "scanned": [
+    {
+      "file": "crates/aline-buffer/src/lib.rs",
+      "kind": "engine-production"
+    },
+    {
+      "file": "crates/aline-buffer/tests/check.rs",
+      "kind": "engine-test"
+    },
+    {
+      "file": "crates/aline-buffer/tests/common/mod.rs",
+      "kind": "engine-test"
+    }
+  ],
+  "member_reads": [
+    {
+      "argv": [
+        "cargo",
+        "read-manifest",
+        "--manifest-path",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/integration-test-crate-root/crates/aline-buffer/Cargo.toml",
+        "--offline"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/integration-test-crate-root",
+      "started_utc": "2026-10-31T14:53:03.256424+00:00",
+      "finished_utc": "2026-10-31T14:53:03.269922+00:00",
+      "exit_code": 0,
+      "stdout": "{\"name\":\"aline-buffer\",\"version\":\"0.0.0\",\"id\":\"path+file:///Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/integration-test-crate-root/crates/aline-buffer#0.0.0\",\"license\":null,\"license_file\":null,\"description\":null,\"source\":null,\"dependencies\":[],\"targets\":[{\"kind\":[\"lib\"],\"crate_types\":[\"lib\"],\"name\":\"aline_buffer\",\"src_path\":\"/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/integration-test-crate-root/crates/aline-buffer/src/lib.rs\",\"edition\":\"2015\",\"doc\":true,\"doctest\":true,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"check\",\"src_path\":\"/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/integration-test-crate-root/crates/aline-buffer/tests/check.rs\",\"edition\":\"2015\",\"doc\":false,\"doctest\":false,\"test\":true}],\"features\":{},\"manifest_path\":\"/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/integration-test-crate-root/crates/aline-buffer/Cargo.toml\",\"metadata\":null,\"publish\":null,\"authors\":[],\"categories\":[],\"keywords\":[],\"readme\":null,\"repository\":null,\"homepage\":null,\"documentation\":null,\"edition\":\"2015\",\"links\":null,\"default_run\":null,\"rust_version\":null}\n",
+      "stderr": ""
+    }
+  ]
+}

@@ -119,7 +119,7 @@ fn fixture_x() -> Result<DocCore, DocError> {
 }
 
 #[test]
-fn case_8_1_01_typing_enters_unique_draft() -> Result<(), Box<dyn std::error::Error>> {
+fn document_case_8_1_01_typing_enters_unique_draft() -> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.1-01：普通输入只进入唯一草稿，Buffer/History 不变。
     let mut doc = f1()?;
     let base = snapshot_id(&mut doc)?;
@@ -138,7 +138,7 @@ fn case_8_1_01_typing_enters_unique_draft() -> Result<(), Box<dyn std::error::Er
 }
 
 #[test]
-fn case_8_1_02_snapshot_keeps_identity_and_does_not_commit()
+fn document_case_8_1_02_snapshot_keeps_identity_and_does_not_commit()
 -> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.1-02：同一工作版本重复读取保留同一 SnapshotId。
     let mut doc = after_8_1_01()?;
@@ -155,7 +155,8 @@ fn case_8_1_02_snapshot_keeps_identity_and_does_not_commit()
 }
 
 #[test]
-fn case_8_1_03_adjacent_input_merges_within_900ms() -> Result<(), Box<dyn std::error::Error>> {
+fn document_case_8_1_03_adjacent_input_merges_within_900ms()
+-> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.1-03：100 <= 900 并入同一草稿组，dg 前进，历史仍为 0。
     let mut doc = after_8_1_01()?;
     let before = snapshot_id(&mut doc)?;
@@ -172,7 +173,8 @@ fn case_8_1_03_adjacent_input_merges_within_900ms() -> Result<(), Box<dyn std::e
 }
 
 #[test]
-fn case_8_1_04_snapshot_text_equals_latest_draft() -> Result<(), Box<dyn std::error::Error>> {
+fn document_case_8_1_04_snapshot_text_equals_latest_draft() -> Result<(), Box<dyn std::error::Error>>
+{
     // TSV 8.1-04：快照文本逐字节等于最新草稿，且未弹历史节点。
     let mut doc = after_8_1_03()?;
     let first = snapshot_id(&mut doc)?;
@@ -187,7 +189,7 @@ fn case_8_1_04_snapshot_text_equals_latest_draft() -> Result<(), Box<dyn std::er
 }
 
 #[test]
-fn case_8_1_05_commit_group_keeps_block_open() -> Result<(), Box<dyn std::error::Error>> {
+fn document_case_8_1_05_commit_group_keeps_block_open() -> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.1-05：组提交为单个节点，块保持打开并封口。
     let mut doc = after_8_1_04()?;
     let before = snapshot_id(&mut doc)?;
@@ -205,8 +207,8 @@ fn case_8_1_05_commit_group_keeps_block_open() -> Result<(), Box<dyn std::error:
 }
 
 #[test]
-fn case_8_1_06_snapshot_after_commit_has_no_side_effects() -> Result<(), Box<dyn std::error::Error>>
-{
+fn document_case_8_1_06_snapshot_after_commit_has_no_side_effects()
+-> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.1-06：快照不压缩历史、不封口、不清 redo。
     let mut doc = after_8_1_05()?;
     let first = snapshot_id(&mut doc)?;
@@ -221,7 +223,8 @@ fn case_8_1_06_snapshot_after_commit_has_no_side_effects() -> Result<(), Box<dyn
 }
 
 #[test]
-fn case_8_1_07_typing_after_commit_opens_new_draft() -> Result<(), Box<dyn std::error::Error>> {
+fn document_case_8_1_07_typing_after_commit_opens_new_draft()
+-> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.1-07：提交后的新输入开启新草稿，Buffer 仍落后快照。
     let mut doc = after_8_1_06()?;
     let before = snapshot_id(&mut doc)?;
@@ -238,7 +241,7 @@ fn case_8_1_07_typing_after_commit_opens_new_draft() -> Result<(), Box<dyn std::
 }
 
 #[test]
-fn case_8_1_08_snapshot_after_new_draft() -> Result<(), Box<dyn std::error::Error>> {
+fn document_case_8_1_08_snapshot_after_new_draft() -> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.1-08：快照文本等于最新草稿，历史未压缩。
     let mut doc = after_8_1_07()?;
     let first = snapshot_id(&mut doc)?;
@@ -253,7 +256,8 @@ fn case_8_1_08_snapshot_after_new_draft() -> Result<(), Box<dyn std::error::Erro
 }
 
 #[test]
-fn case_8_1_09_repeated_snapshot_keeps_same_id() -> Result<(), Box<dyn std::error::Error>> {
+fn document_case_8_1_09_repeated_snapshot_keeps_same_id() -> Result<(), Box<dyn std::error::Error>>
+{
     // TSV 8.1-09：同版本连续读取 SnapshotId 相同，零副作用。
     let mut doc = after_8_1_08()?;
     let first = snapshot_id(&mut doc)?;
@@ -269,7 +273,8 @@ fn case_8_1_09_repeated_snapshot_keeps_same_id() -> Result<(), Box<dyn std::erro
 }
 
 #[test]
-fn case_8_1_10_redo_sequence_starts_from_fresh_draft() -> Result<(), Box<dyn std::error::Error>> {
+fn document_case_8_1_10_redo_sequence_starts_from_fresh_draft()
+-> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.1-10：开始 redo 保持序列的首次输入。
     let mut doc = after_8_1_10()?;
     assert_buffer(&doc, "x\n")?;
@@ -282,7 +287,7 @@ fn case_8_1_10_redo_sequence_starts_from_fresh_draft() -> Result<(), Box<dyn std
 }
 
 #[test]
-fn case_8_1_11_first_commit_makes_node_one() -> Result<(), Box<dyn std::error::Error>> {
+fn document_case_8_1_11_first_commit_makes_node_one() -> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.1-11：提交 1 组，Buffer 追平草稿。
     let mut doc = after_8_1_11()?;
     assert_buffer(&doc, "xa\n")?;
@@ -295,7 +300,8 @@ fn case_8_1_11_first_commit_makes_node_one() -> Result<(), Box<dyn std::error::E
 }
 
 #[test]
-fn case_8_1_12_sealed_group_is_not_merged_again() -> Result<(), Box<dyn std::error::Error>> {
+fn document_case_8_1_12_sealed_group_is_not_merged_again() -> Result<(), Box<dyn std::error::Error>>
+{
     // TSV 8.1-12：旧组已封口，本次输入是新草稿。
     let mut doc = after_8_1_12()?;
     assert_buffer(&doc, "xa\n")?;
@@ -308,7 +314,7 @@ fn case_8_1_12_sealed_group_is_not_merged_again() -> Result<(), Box<dyn std::err
 }
 
 #[test]
-fn case_8_1_13_second_commit_makes_node_two() -> Result<(), Box<dyn std::error::Error>> {
+fn document_case_8_1_13_second_commit_makes_node_two() -> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.1-13：第二个节点，node=2。
     let mut doc = after_8_1_13()?;
     assert_buffer(&doc, "xab\n")?;
@@ -321,7 +327,7 @@ fn case_8_1_13_second_commit_makes_node_two() -> Result<(), Box<dyn std::error::
 }
 
 #[test]
-fn case_8_1_14_undo_restores_before_selection() -> Result<(), Box<dyn std::error::Error>> {
+fn document_case_8_1_14_undo_restores_before_selection() -> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.1-14：无待定草稿时撤销节点 2，revision 前进并恢复选区。
     let mut doc = after_8_1_14()?;
     assert_buffer(&doc, "xa\n")?;
@@ -334,7 +340,7 @@ fn case_8_1_14_undo_restores_before_selection() -> Result<(), Box<dyn std::error
 }
 
 #[test]
-fn case_8_1_15_snapshot_preserves_redo() -> Result<(), Box<dyn std::error::Error>> {
+fn document_case_8_1_15_snapshot_preserves_redo() -> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.1-15：快照不清 redo、不压缩历史。
     let mut doc = after_8_1_14()?;
     let first = snapshot_id(&mut doc)?;
@@ -349,7 +355,7 @@ fn case_8_1_15_snapshot_preserves_redo() -> Result<(), Box<dyn std::error::Error
 }
 
 #[test]
-fn case_8_1_16_redo_restores_after_selection() -> Result<(), Box<dyn std::error::Error>> {
+fn document_case_8_1_16_redo_restores_after_selection() -> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.1-16：Redo 恢复节点 2 after-selection 3:3。
     let mut doc = after_8_1_15()?;
     doc.redo()?;
@@ -363,7 +369,8 @@ fn case_8_1_16_redo_restores_after_selection() -> Result<(), Box<dyn std::error:
 }
 
 #[test]
-fn case_8_1_17_snapshot_rejects_stale_baseline() -> Result<(), Box<dyn std::error::Error>> {
+fn document_case_8_1_17_snapshot_rejects_stale_baseline() -> Result<(), Box<dyn std::error::Error>>
+{
     // TSV 8.1-17：基线 rev0 != 当前 rev1，拒绝且不产生快照。
     // TSV 的 dg 为“待定”（T-8-13），因此这里不断言 dg 的绝对值。
     let mut doc = fixture_x()?;
@@ -382,7 +389,7 @@ fn case_8_1_17_snapshot_rejects_stale_baseline() -> Result<(), Box<dyn std::erro
 }
 
 #[test]
-fn case_8_1_18_typing_rejects_stale_baseline() -> Result<(), Box<dyn std::error::Error>> {
+fn document_case_8_1_18_typing_rejects_stale_baseline() -> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.1-18：拒绝输入且完整状态零变化；dg 为“待定”。
     let mut doc = fixture_x()?;
     assert_rejected_without_change(
@@ -397,7 +404,7 @@ fn case_8_1_18_typing_rejects_stale_baseline() -> Result<(), Box<dyn std::error:
 }
 
 #[test]
-fn case_8_1_19_commit_rejects_stale_baseline() -> Result<(), Box<dyn std::error::Error>> {
+fn document_case_8_1_19_commit_rejects_stale_baseline() -> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.1-19：不把旧基线组写入新源；dg 为“待定”。
     let mut doc = fixture_x()?;
     assert_rejected_without_change(
@@ -412,7 +419,7 @@ fn case_8_1_19_commit_rejects_stale_baseline() -> Result<(), Box<dyn std::error:
 }
 
 #[test]
-fn case_8_1_20_leave_rejects_stale_baseline_without_dropping_block()
+fn document_case_8_1_20_leave_rejects_stale_baseline_without_dropping_block()
 -> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.1-20：拒绝关闭，块仍打开，草稿/选区保留；dg 为“待定”。
     let mut doc = fixture_x()?;
@@ -429,8 +436,8 @@ fn case_8_1_20_leave_rejects_stale_baseline_without_dropping_block()
 }
 
 #[test]
-fn case_8_1_21_commit_after_close_returns_no_open_block() -> Result<(), Box<dyn std::error::Error>>
-{
+fn document_case_8_1_21_commit_after_close_returns_no_open_block()
+-> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.1-21：唯一打开槽位已关闭，拒绝且状态零变化。
     let mut doc = after_8_1_21()?;
     assert_buffer(&doc, "xa\n")?;
@@ -452,7 +459,8 @@ fn case_8_1_21_commit_after_close_returns_no_open_block() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn case_8_1_22_non_boundary_typing_is_rejected() -> Result<(), Box<dyn std::error::Error>> {
+fn document_case_8_1_22_non_boundary_typing_is_rejected() -> Result<(), Box<dyn std::error::Error>>
+{
     // TSV 8.1-22：偏移 1 位于三字节 UTF-8 字符内部，文本/版本/历史/选区零副作用。
     let mut doc = f4()?;
     let before = capture(&mut doc)?;

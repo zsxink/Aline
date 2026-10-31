@@ -1,0 +1,37 @@
+# 9.2：E1 工程证据包
+
+基准为 `16f8e30` 后删除无消费者依赖边的未提交工作树。本文按任务 9.2 整理真实 metadata、命令输出及当前公开消费代码，尚待 9.6 独立出口复核；不以任务勾选或旧报告的结论作验收。最新依据为 `workspace-gates-after-cleanup` 在 2026-10-31T15:02:22Z–15:03:05Z 的正式运行；清理前报告、脚本及输出完整保留于 `before-dependency-cleanup/`，它们只代表当时状态，不是最新证据。
+
+## 实际证据与复算
+
+[正式统一门禁 summary](../step-9.1/workspace-gates-after-cleanup/summary.json)记录 19 条实际命令均 exit 0；[Cargo 原始 stdout](../step-9.1/workspace-gates-after-cleanup/test.stdout.log)合计 312 passed、0 failed，[stderr](../step-9.1/workspace-gates-after-cleanup/test.stderr.log)记录实际发现的测试 target。环境是 Rust 1.98.1、`aarch64-apple-darwin`、指定离线 Cargo home；实际参数与起止 UTC 见逐条 `*.command.json`。这是当前主机结果，target 图解析不等于其他平台构建。
+
+本步实际执行的是[只读摘录脚本](./inspect_evidence.py)，从最新正式原始日志和当前锁文件复算；[命令/UTC/exit](./commands.log)、[stdout](./inspection.stdout.json)、[stderr](./inspection.stderr.log)均已刷新。脚本没有运行 Cargo 或领域测试，stdout 中含明确的来源路径、来源 SHA-256、当前成员清单指纹、完整五引擎保守闭包、成员直依赖、312 个实际通过测试名及正反例清单。清理前首轮使用 Python UTC 时钟的摘录保存在 `initial-python-clock-*` 和历史目录；最新摘录按 `date -u +%Y-%m-%dT%H:%M:%SZ` 记录。未把复算标为重新执行 Cargo。
+
+其后仅移除了 plugin 清单文件尾多余空行，未改变依赖语义；本步再次运行只读摘录，更新当前清单字节指纹，未新跑 Cargo。移除空行前的指纹、命令/输出及报告快照保留于 `before-plugin-whitespace-fix/`；正式门禁来源仍是上述清理后运行。
+
+## E1 逐项映射
+
+| 要求 | 直接证据 | 当前观察 |
+|---|---|---|
+| 八成员、实际包名及版本 | [all metadata](../step-9.1/workspace-gates-after-cleanup/dependency-graphs/all-metadata.stdout.log)、当前 [Cargo.lock](../../../../../Cargo.lock) | aline、aline-ui、aline-plugin、aline-edit、aline-markdown、aline-buffer、aline-source、aline-app-core，均 0.1.0；无第九 crate |
+| 精确版本与准入身份 | [依赖原始结果](../step-9.1/workspace-gates-after-cleanup/dependency.stdout.log)、[原准入身份账本](../../group-1-admission.json)、[all tree](../step-9.1/workspace-gates-after-cleanup/dependency-graphs/all-tree.stdout.log) | gpui-pre 0.3.9、pulldown-cmark 0.13.6、rust-embed 8.13.0、toml 1.1.8+spec-1.1.0；解析器仅 pulldown-cmark；锁文件整体 SHA 在摘录中 |
+| 依赖方向、GPUI 隔离及精确例外 | [七组图结果](../step-9.1/workspace-gates-after-cleanup/dependency.stdout.log)、[图采集参数](../step-9.1/workspace-gates-after-cleanup/dependency-graphs/all-metadata.command.json) | 五引擎保守闭包中无 GPUI、notify、regex、tokio、Wasmtime/WASI；GPUI 获准路径仍由精确身份/边/校验和守卫检查，未全包放行 |
+| 依赖违规反例 | [77 条原始记录](../step-9.1/workspace-gates-after-cleanup/dependency-fixtures/summary.json)及其 `results/*.command.json` | 所有记录符合各自预先期望；包含真实 Cargo 采集、合成图变异、alias/kind/target/feature/身份和采集失败拒绝；77 不是77次平台构建 |
+| 成员 lint 继承 | [正常扫描](../step-9.1/workspace-gates-after-cleanup/lint.stdout.log)、[隔离诊断全文](../step-9.1/workspace-gates-after-cleanup/lint-self-test.stdout.log)、`lint-fixtures/results/` | 八成员声明继承；各成员 unsafe 触发、禁止降低 forbid、漏继承反例均给预期诊断；debug/release 分列 |
+| 引擎 panic/unwrap 与线程/全局扫描 | [安全扫描](../step-9.1/workspace-gates-after-cleanup/safety.stdout.log)、[53 例及恢复后正常扫描](../step-9.1/workspace-gates-after-cleanup/safety-fixtures/summary.json) | 实际作用域包括生产/测试/示例/基准、成员身份与模块解析反例；词法扫描不是 Rust 宏展开或第三方行为证明 |
+| catalog 键、插值及实际消费 | [workspace 测试 stdout](../step-9.1/workspace-gates-after-cleanup/test.stdout.log)、[i18n 实现](../../../../../crates/aline-app-core/src/i18n.rs)、[UI 消费](../../../../../crates/aline-ui/src/lib.rs) | 真实发现嵌入双语、键集合/插值不一致、缺键/多缺参数/重复参数/损坏 TOML、实例 locale 隔离与 UI 名称消费测试 |
+| 全量 Cargo 结果 | [fmt](../step-9.1/workspace-gates-after-cleanup/fmt.command.json)、[Clippy](../step-9.1/workspace-gates-after-cleanup/clippy.command.json)、[test](../step-9.1/workspace-gates-after-cleanup/test.command.json) | 当前主机三项 exit 0；Clippy/test 实际带 `--locked --offline`，fmt 不解析依赖 |
+
+## 本步人工核查
+
+1. 对全 metadata 的每个五引擎根做完整 resolve 闭包遍历，再逐项查看摘录出的真实包名。source/buffer 仅含自身；markdown 为自身、buffer 和唯一解析器依赖；edit 继续向 markdown/buffer；app-core 仅 catalog 相关闭包。没有发现向 UI/plugin/app 的反向边。完整闭包是 all-target metadata 的保守集合，不假称它等于某个 target 的最终编译选包。正式守卫另将目标/feature 的 tree 与 metadata 交叉检查。
+2. 最新 metadata 与当前 [UI 清单](../../../../../crates/aline-ui/Cargo.toml)、[plugin 清单](../../../../../crates/aline-plugin/Cargo.toml)一致：UI 不再含未使用的 `aline-edit` 或 `aline-plugin` 直接边；plugin 仍作为 workspace 成员保留，但已删除未使用的 `aline-edit` 与 `aline-app-core` 直接边，当前无依赖。[plugin 源码](../../../../../crates/aline-plugin/src/lib.rs)仍只有模块说明，不能声称已有消费者。清理前曾存在上述三条骨架边的事实保存在历史报告和原始 metadata；不将主链允许向下依赖解释为已存在消费。早先 UI 依赖清理过程的命令纪律偏差另见[如实记录](../../group-8/followup-2026-10-31/dependency-cleanup-note.md)，不作为本包通过证据。
+3. 人工查看双语 TOML，两者当前均有 `app.name = "Aline"`。UI 的 `application_name` 经 `Translator::embedded(locale)?.t("app.name")` 返回 GPUI 字符串；引擎错误公开面仍是枚举/受检错误，未引入翻译器。catalog 目前覆盖骨架实际消费，不能证明未来尚未存在的界面文案。
+
+## 边界与待独立复核
+
+- E1 所需本机原始证据已集中索引；是否满足阶段出口由 9.6 独立 reviewer 逐项判断，本文不宣称 M0 或任何 V 整项通过。
+- target 集合含 macOS arm/Intel、Windows x64、Linux x64/arm 及 all-features 图解析；未在这些其他平台构建或运行。CI 是否实际运行未在本包取得远端证据。
+- 隔离 lint/API 夹具创建自身锁文件，部分辅助 Cargo 命令按原始记录只有 offline，不把正式 workspace 的 locked 参数泛化到每条夹具命令；不补写不存在的参数。
+- 守卫不证明第三方内部无 panic、无宏展开盲区、无运行时语义错误；安全/架构独立路径审查仍是 9.6 必需项。

@@ -1,0 +1,1091 @@
+{
+  "kind": "读取已有日志，未重新运行测试",
+  "inspection_utc": "2026-10-31T15:04:46Z",
+  "gate_path": "docs/validation/m0-engine-foundation/group-9/step-9.1/workspace-gates-after-cleanup",
+  "gate_checks": 19,
+  "gate_exit_zero": 19,
+  "workspace_passed": 312,
+  "workspace_failed": 0,
+  "test_functions": [
+    {
+      "source": "crates/aline-source/tests/atomic.rs",
+      "line": 116,
+      "test": "atomic_golden_publish_new_and_existing_target_match_independent_expectation",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-source/tests/atomic.rs",
+      "line": 213,
+      "test": "atomic_staging_creation_failure_preserves_target_and_existing_staging",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-source/tests/atomic.rs",
+      "line": 244,
+      "test": "atomic_invalid_paths_budget_and_prepare_cancellation_create_nothing",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-source/tests/atomic.rs",
+      "line": 330,
+      "test": "atomic_pre_publish_cancellation_preserves_target_and_staging",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-source/tests/atomic.rs",
+      "line": 361,
+      "test": "atomic_replaced_staging_path_is_rejected_without_touching_target",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-source/tests/atomic.rs",
+      "line": 389,
+      "test": "atomic_existing_symlink_and_directory_are_rejected_without_touching_target",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-source/tests/atomic.rs",
+      "line": 445,
+      "test": "atomic_large_source_crosses_write_chunks_and_publishes_exact_bytes",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-source/tests/decode_golden.rs",
+      "line": 229,
+      "test": "decode_golden_cases_match_independent_expectations",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-source/tests/decode_golden.rs",
+      "line": 325,
+      "test": "snapshot_and_decode_budgets_are_distinct_layers",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-source/tests/decode_golden.rs",
+      "line": 353,
+      "test": "decode_does_not_write_the_original_file",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-source/tests/encode_golden.rs",
+      "line": 184,
+      "test": "encode_golden_cases_match_independent_expectations",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-source/tests/encode_golden.rs",
+      "line": 300,
+      "test": "budget_boundary_and_categories_are_distinct",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-source/tests/encode_golden.rs",
+      "line": 331,
+      "test": "encoded_bytes_carry_their_own_baseline_identity",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-source/tests/encode_golden.rs",
+      "line": 378,
+      "test": "inverse_patches_restore_exact_source_and_original_bytes",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-source/tests/encode_golden.rs",
+      "line": 536,
+      "test": "guard_rule_roundtrips_all_small_cr_lf_sources",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-source/tests/encode_golden.rs",
+      "line": 589,
+      "test": "public_encoding_types_are_send_and_sync",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-source/tests/public_boundaries.rs",
+      "line": 5,
+      "test": "storage_snapshot_can_be_carried_by_future_host_tasks",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-source/tests/public_boundaries.rs",
+      "line": 11,
+      "test": "storage_ranges_are_bound_to_their_own_baseline",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-source/tests/roundtrip.rs",
+      "line": 53,
+      "test": "roundtrip_golden_preserves_bytes_and_local_patch_with_exact_inverse",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-source/tests/roundtrip.rs",
+      "line": 201,
+      "test": "roundtrip_failed_save_preserves_host_baseline_and_input_facts",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-source/tests/roundtrip.rs",
+      "line": 220,
+      "test": "roundtrip_success_uses_written_bytes_and_keeps_newer_input_unsaved",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-source/tests/roundtrip.rs",
+      "line": 254,
+      "test": "roundtrip_undo_after_success_never_restores_expired_original_bytes",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-source/tests/roundtrip.rs",
+      "line": 279,
+      "test": "roundtrip_protective_bom_becomes_new_baseline_storage_fact",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-source/tests/roundtrip.rs",
+      "line": 302,
+      "test": "roundtrip_success_cannot_substitute_requested_text_for_actual_bytes",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-source/tests/roundtrip.rs",
+      "line": 316,
+      "test": "roundtrip_reload_replaces_identity_policy_and_rejects_old_ranges",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-buffer/tests/anchors.rs",
+      "line": 13,
+      "test": "anchors_transform_replacement_with_before_and_after_affinity",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-buffer/tests/anchors.rs",
+      "line": 39,
+      "test": "anchors_transform_insertions_and_adjacent_replacement_start",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-buffer/tests/anchors.rs",
+      "line": 65,
+      "test": "anchors_transform_multiple_patches_by_cumulative_delta",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-buffer/tests/anchors.rs",
+      "line": 94,
+      "test": "anchors_transform_selection_preserves_direction_and_rejects_partial_validity",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-buffer/tests/anchors.rs",
+      "line": 121,
+      "test": "anchors_reject_foreign_snapshot_and_stale_batch",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-buffer/tests/checked_batch.rs",
+      "line": 8,
+      "test": "checked_tuple_batch_keeps_original_shape_and_context",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-buffer/tests/checked_batch.rs",
+      "line": 39,
+      "test": "checked_tuple_batch_rejects_invalid_endpoints_order_and_budgets",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-buffer/tests/history.rs",
+      "line": 26,
+      "test": "history_records_source_selections_and_monotonic_revisions",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-buffer/tests/history.rs",
+      "line": 91,
+      "test": "history_typing_merge_window_and_seal_boundaries",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-buffer/tests/history.rs",
+      "line": 182,
+      "test": "history_same_stack_depth_after_save_undo_new_edit_is_not_save_point",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-buffer/tests/history.rs",
+      "line": 224,
+      "test": "history_content_equal_redo_keeps_new_identity_dirty",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-buffer/tests/history.rs",
+      "line": 248,
+      "test": "history_redo_branch_is_discarded_by_new_edit",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-buffer/tests/history.rs",
+      "line": 297,
+      "test": "history_trimming_protects_save_point_and_current_node",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-buffer/tests/history.rs",
+      "line": 378,
+      "test": "history_undo_and_redo_budget_failures_leave_state_unchanged",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-buffer/tests/history.rs",
+      "line": 409,
+      "test": "history_reload_is_independent_memory_boundary",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-buffer/tests/history.rs",
+      "line": 482,
+      "test": "history_handles_keep_trimmed_patch_resources_alive",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-buffer/tests/patch_goldens.rs",
+      "line": 48,
+      "test": "forward_inverse_patch_goldens_round_trip_after_coordinates",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-buffer/tests/patch_goldens.rs",
+      "line": 186,
+      "test": "line_index_goldens_match_handwritten_boundaries",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-buffer/tests/public_boundaries.rs",
+      "line": 7,
+      "test": "source_coordinates_keep_snapshot_identity_and_selection_direction",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-buffer/tests/public_boundaries.rs",
+      "line": 34,
+      "test": "single_overlay_shares_base_and_only_materializes_when_requested",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-buffer/tests/rejections.rs",
+      "line": 26,
+      "test": "rejection_cases_leave_text_index_selection_revision_and_history_unchanged",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-buffer/tests/rejections.rs",
+      "line": 63,
+      "test": "apply_rejections_are_atomic_for_baseline_selection_and_capacities",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-buffer/tests/rejections.rs",
+      "line": 202,
+      "test": "legal_empty_insertion_and_no_change_replacement_are_distinct",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-buffer/tests/rejections.rs",
+      "line": 266,
+      "test": "no_change_after_undo_does_not_clear_redo_branch",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-edit/tests/goldens.rs",
+      "line": 441,
+      "test": "golden_plan_cases",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-edit/tests/goldens.rs",
+      "line": 463,
+      "test": "golden_validate_after_change",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-edit/tests/goldens.rs",
+      "line": 515,
+      "test": "golden_validate_reparsed",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-edit/tests/goldens.rs",
+      "line": 542,
+      "test": "golden_validate_changed_selection",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-edit/tests/goldens.rs",
+      "line": 568,
+      "test": "golden_consume_single_history_step",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-edit/tests/goldens.rs",
+      "line": 627,
+      "test": "golden_contains_all_required_refusal_classes",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-edit/tests/protection.rs",
+      "line": 116,
+      "test": "front_matter_visual_refused_source_allowed",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-edit/tests/protection.rs",
+      "line": 137,
+      "test": "toc_visual_refused_source_allowed",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-edit/tests/protection.rs",
+      "line": 157,
+      "test": "visual_body_beside_front_matter_allowed",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-edit/tests/protection.rs",
+      "line": 170,
+      "test": "visual_cross_region_replacement_refused_source_allowed",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-edit/tests/refusals.rs",
+      "line": 163,
+      "test": "refusal_keeps_pending_typing_group_open",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-edit/tests/refusals.rs",
+      "line": 214,
+      "test": "refusal_keeps_redo_branch_and_history_intact",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-edit/tests/refusals.rs",
+      "line": 257,
+      "test": "refusal_keeps_composition_state_untouched",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-edit/tests/refusals.rs",
+      "line": 284,
+      "test": "stale_plan_wrong_version_does_not_touch_buffer",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-edit/tests/refusals.rs",
+      "line": 323,
+      "test": "identity_replace_creates_no_history_step",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-edit/tests/refusals.rs",
+      "line": 348,
+      "test": "visual_multi_edit_batch_refused_without_state_change",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-edit/tests/refusals.rs",
+      "line": 372,
+      "test": "successful_plan_and_validation_leave_buffer_untouched",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-edit/tests/refusals.rs",
+      "line": 406,
+      "test": "hidden_fragment_internal_whitespace_change_is_refused",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-edit/tests/refusals.rs",
+      "line": 428,
+      "test": "visual_replace_range_is_command_authority",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-edit/tests/refusals.rs",
+      "line": 462,
+      "test": "visual_replace_validates_bound_selection_only",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-edit/tests/refusals.rs",
+      "line": 499,
+      "test": "budget_exceeded_refusal_keeps_buffer_state",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-edit/tests/refusals.rs",
+      "line": 540,
+      "test": "reread_failure_refusal_keeps_buffer_state",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-edit/tests/refusals.rs",
+      "line": 565,
+      "test": "protected_range_refusal_keeps_buffer_state",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-edit/tests/refusals.rs",
+      "line": 605,
+      "test": "html_boundary_refusal_keeps_buffer_state",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-edit/tests/refusals.rs",
+      "line": 639,
+      "test": "already_formatted_creates_no_history_step",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-edit/tests/refusals.rs",
+      "line": 673,
+      "test": "pure_whitespace_hidden_separator_is_accepted_limitation",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document.rs",
+      "line": 121,
+      "test": "document_case_8_1_01_typing_enters_unique_draft",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document.rs",
+      "line": 140,
+      "test": "document_case_8_1_02_snapshot_keeps_identity_and_does_not_commit",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document.rs",
+      "line": 157,
+      "test": "document_case_8_1_03_adjacent_input_merges_within_900ms",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document.rs",
+      "line": 175,
+      "test": "document_case_8_1_04_snapshot_text_equals_latest_draft",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document.rs",
+      "line": 191,
+      "test": "document_case_8_1_05_commit_group_keeps_block_open",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document.rs",
+      "line": 209,
+      "test": "document_case_8_1_06_snapshot_after_commit_has_no_side_effects",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document.rs",
+      "line": 225,
+      "test": "document_case_8_1_07_typing_after_commit_opens_new_draft",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document.rs",
+      "line": 243,
+      "test": "document_case_8_1_08_snapshot_after_new_draft",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document.rs",
+      "line": 258,
+      "test": "document_case_8_1_09_repeated_snapshot_keeps_same_id",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document.rs",
+      "line": 275,
+      "test": "document_case_8_1_10_redo_sequence_starts_from_fresh_draft",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document.rs",
+      "line": 289,
+      "test": "document_case_8_1_11_first_commit_makes_node_one",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document.rs",
+      "line": 302,
+      "test": "document_case_8_1_12_sealed_group_is_not_merged_again",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document.rs",
+      "line": 316,
+      "test": "document_case_8_1_13_second_commit_makes_node_two",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document.rs",
+      "line": 329,
+      "test": "document_case_8_1_14_undo_restores_before_selection",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document.rs",
+      "line": 342,
+      "test": "document_case_8_1_15_snapshot_preserves_redo",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document.rs",
+      "line": 357,
+      "test": "document_case_8_1_16_redo_restores_after_selection",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document.rs",
+      "line": 371,
+      "test": "document_case_8_1_17_snapshot_rejects_stale_baseline",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document.rs",
+      "line": 391,
+      "test": "document_case_8_1_18_typing_rejects_stale_baseline",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document.rs",
+      "line": 406,
+      "test": "document_case_8_1_19_commit_rejects_stale_baseline",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document.rs",
+      "line": 421,
+      "test": "document_case_8_1_20_leave_rejects_stale_baseline_without_dropping_block",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document.rs",
+      "line": 438,
+      "test": "document_case_8_1_21_commit_after_close_returns_no_open_block",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document.rs",
+      "line": 461,
+      "test": "document_case_8_1_22_non_boundary_typing_is_rejected",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_composition.rs",
+      "line": 74,
+      "test": "case_8_3_01_first_update_opens_composition_implicitly",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_composition.rs",
+      "line": 93,
+      "test": "composition_case_8_3_02_update_replaces_candidate",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_composition.rs",
+      "line": 111,
+      "test": "composition_case_8_3_03_identical_update_advances_draft_generation",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_composition.rs",
+      "line": 131,
+      "test": "composition_case_8_3_04_commit_makes_single_ime_node",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_composition.rs",
+      "line": 153,
+      "test": "case_8_3_05_update_after_commit_opens_new_composition",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_composition.rs",
+      "line": 172,
+      "test": "case_8_3_06_cancel_restores_pre_composition_state",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_composition.rs",
+      "line": 190,
+      "test": "case_8_3_07_cancelled_composition_identity_is_stale",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_composition.rs",
+      "line": 209,
+      "test": "composition_case_8_3_08_ime_commit_does_not_merge_adjacent_typing_node",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_composition.rs",
+      "line": 229,
+      "test": "composition_case_8_3_09_cancel_keeps_existing_committed_input",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_composition.rs",
+      "line": 248,
+      "test": "composition_case_8_3_10_empty_candidate_commit_is_unchanged",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_composition.rs",
+      "line": 275,
+      "test": "publication_wait_composition_case_8_3_11_begin_wait_has_no_snapshot_side_effect",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_composition.rs",
+      "line": 289,
+      "test": "publication_wait_composition_case_8_3_12_second_wait_is_rejected",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_composition.rs",
+      "line": 307,
+      "test": "publication_wait_composition_case_8_3_13_wait_does_not_freeze_candidate_updates",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_composition.rs",
+      "line": 326,
+      "test": "publication_wait_case_8_3_14_finish_during_composition_is_rejected",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_composition.rs",
+      "line": 344,
+      "test": "publication_wait_composition_case_8_3_15_commit_keeps_wait_pending",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_composition.rs",
+      "line": 364,
+      "test": "publication_wait_case_8_3_16_finish_returns_post_composition_snapshot",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_composition.rs",
+      "line": 388,
+      "test": "publication_wait_composition_case_8_3_17_save_as_wait_is_established",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_composition.rs",
+      "line": 402,
+      "test": "publication_wait_composition_case_8_3_18_export_wait_is_established",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_composition.rs",
+      "line": 416,
+      "test": "publication_wait_composition_case_8_3_19_cancel_request_only_changes_wait",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_composition.rs",
+      "line": 429,
+      "test": "publication_wait_composition_case_8_3_20_finish_cancelled_wait_is_unknown",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_composition.rs",
+      "line": 447,
+      "test": "publication_wait_composition_case_8_3_21_update_clears_cancelled_wait",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_composition.rs",
+      "line": 467,
+      "test": "publication_wait_case_8_3_22_cancel_after_wait_restores_pre_composition",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_composition.rs",
+      "line": 488,
+      "test": "case_8_3_23_publication_wait_autosave_defers_during_composition",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_composition.rs",
+      "line": 506,
+      "test": "composition_case_8_3_24_restore_read_keeps_snapshot_identity",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_composition.rs",
+      "line": 525,
+      "test": "case_8_3_25_composition_does_not_merge_pending_typing_draft",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_followups.rs",
+      "line": 10,
+      "test": "document_initial_open_range_is_sorted_selection",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_followups.rs",
+      "line": 20,
+      "test": "document_snapshot_id_is_source_identity_not_content_or_version",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_followups.rs",
+      "line": 41,
+      "test": "document_resource_snapshot_freezes_nonempty_owned_references",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_followups.rs",
+      "line": 67,
+      "test": "document_resource_registration_rejects_wrong_document_and_budget",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_followups.rs",
+      "line": 93,
+      "test": "document_resource_lives_through_history_and_outlives_document",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_followups.rs",
+      "line": 116,
+      "test": "input_group_mode_switch_commits_only_pending_group",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_followups.rs",
+      "line": 138,
+      "test": "input_group_mode_switch_after_cancel_and_rejection_preserves_state",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_followups.rs",
+      "line": 164,
+      "test": "publication_wait_autosave_and_recovery_are_independent_reads",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_followups.rs",
+      "line": 185,
+      "test": "document_written_receipt_survives_stale_result_and_closed_target",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_followups.rs",
+      "line": 248,
+      "test": "document_snapshot_budget_rejection_without_draft_preserves_state",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_followups.rs",
+      "line": 268,
+      "test": "document_close_reopen_rejects_old_result_even_when_text_and_version_match",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_followups.rs",
+      "line": 287,
+      "test": "document_mode_roundtrip_rejects_old_result_without_text_or_history_change",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_followups.rs",
+      "line": 306,
+      "test": "document_lifecycle_noop_deferred_and_rejections_keep_identity",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_followups.rs",
+      "line": 345,
+      "test": "input_group_lifecycle_history_budget_rejection_does_not_invalidate_requests",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_results.rs",
+      "line": 64,
+      "test": "case_8_4_01_accepts_current_result_without_side_effects",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_results.rs",
+      "line": 83,
+      "test": "case_8_4_02_rejects_stale_initial_identity",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_results.rs",
+      "line": 107,
+      "test": "case_8_4_03_rejects_other_document_identity",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_results.rs",
+      "line": 130,
+      "test": "case_8_4_04_rejects_bad_draft_generation",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_results.rs",
+      "line": 152,
+      "test": "case_8_4_05_rejects_request_captured_before_commit",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_results.rs",
+      "line": 176,
+      "test": "case_8_4_06_rejects_identity_after_pending_undo",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_results.rs",
+      "line": 207,
+      "test": "case_8_4_07_document_rejects_stale_parse_config",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_results.rs",
+      "line": 222,
+      "test": "case_8_4_08_document_rejects_old_request_at_same_version",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_results.rs",
+      "line": 240,
+      "test": "case_8_4_09_rejects_result_for_closed_target",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_results.rs",
+      "line": 268,
+      "test": "case_8_4_10_snapshot_rejects_stale_baseline",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_results.rs",
+      "line": 287,
+      "test": "case_8_4_11_commit_rejects_stale_baseline_without_dropping_block",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_results.rs",
+      "line": 305,
+      "test": "case_8_4_12_rejects_old_projection_and_keeps_input",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_results.rs",
+      "line": 325,
+      "test": "case_8_4_13_reload_forms_independent_history_boundary",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_results.rs",
+      "line": 349,
+      "test": "case_8_4_14_undo_reload_restores_previous_text",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_results.rs",
+      "line": 367,
+      "test": "case_8_4_15_redo_reload_restores_reloaded_text",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_results.rs",
+      "line": 385,
+      "test": "case_8_4_16_unchanged_reload_preserves_redo",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_results.rs",
+      "line": 407,
+      "test": "case_8_4_17_file_coordination_has_no_doc_core_entry",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_typing.rs",
+      "line": 103,
+      "test": "input_group_case_8_2_01_899ms_merges",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_typing.rs",
+      "line": 120,
+      "test": "input_group_case_8_2_02_900ms_merges_on_closed_boundary",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_typing.rs",
+      "line": 138,
+      "test": "input_group_case_8_2_03_901ms_splits_and_commits_old_group",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_typing.rs",
+      "line": 156,
+      "test": "input_group_case_8_2_04_commit_after_899_merge_makes_one_node",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_typing.rs",
+      "line": 175,
+      "test": "input_group_case_8_2_05_commit_after_900_merge_makes_one_node",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_typing.rs",
+      "line": 190,
+      "test": "input_group_case_8_2_06_commit_after_split_makes_second_node",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_typing.rs",
+      "line": 205,
+      "test": "input_group_case_8_2_07_explicit_commit_is_group_boundary",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_typing.rs",
+      "line": 219,
+      "test": "input_group_case_8_2_08_seal_prevents_merge_of_commits",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_typing.rs",
+      "line": 232,
+      "test": "input_group_case_8_2_09_non_adjacent_input_splits_group",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_typing.rs",
+      "line": 246,
+      "test": "input_group_case_8_2_10_non_adjacent_group_commits_independently",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_typing.rs",
+      "line": 261,
+      "test": "input_group_case_8_2_11_commit_without_pending_group_is_unchanged",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_typing.rs",
+      "line": 279,
+      "test": "input_group_case_8_2_12_leave_commits_remaining_group_and_closes",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_typing.rs",
+      "line": 297,
+      "test": "input_group_case_8_2_13_escape_commits_remaining_group_and_closes",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_typing.rs",
+      "line": 312,
+      "test": "input_group_case_8_2_14_escape_after_close_is_rejected",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_typing.rs",
+      "line": 329,
+      "test": "input_group_case_8_2_15_undo_prefers_pending_draft",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_typing.rs",
+      "line": 347,
+      "test": "input_group_case_8_2_16_redo_restores_pending_group",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_typing.rs",
+      "line": 364,
+      "test": "input_group_case_8_2_17_undo_pending_draft_before_committed_node",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_typing.rs",
+      "line": 378,
+      "test": "input_group_case_8_2_18_second_undo_undoes_node_one",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_typing.rs",
+      "line": 391,
+      "test": "input_group_case_8_2_19_redo_restores_node_one",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_typing.rs",
+      "line": 405,
+      "test": "input_group_case_8_2_20_snapshot_does_not_seal_group",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_typing.rs",
+      "line": 419,
+      "test": "input_group_case_8_2_21_typing_after_snapshot_still_merges",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_typing.rs",
+      "line": 437,
+      "test": "input_group_case_8_2_22_snapshot_and_typing_produce_one_node",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_typing.rs",
+      "line": 453,
+      "test": "case_8_2_23_input_group_mode_switch_waits_for_natural_composition_end",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_typing.rs",
+      "line": 479,
+      "test": "input_group_case_8_2_24_typing_after_ime_commit_is_ordinary",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/document_typing.rs",
+      "line": 499,
+      "test": "input_group_case_8_2_25_post_ime_input_commits_as_one_step",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/public_boundaries.rs",
+      "line": 6,
+      "test": "input_identity_can_be_carried_by_future_host_tasks",
+      "observed_ok_in_existing_log": true
+    },
+    {
+      "source": "crates/aline-ui/tests/public_boundaries.rs",
+      "line": 13,
+      "test": "input_identity_rejects_wrong_document_or_working_version",
+      "observed_ok_in_existing_log": true
+    }
+  ]
+}

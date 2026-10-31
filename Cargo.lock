@@ -93,10 +93,6 @@ dependencies = [
 [[package]]
 name = "aline-plugin"
 version = "0.1.0"
-dependencies = [
- "aline-app-core",
- "aline-edit",
-]
 
 [[package]]
 name = "aline-source"
@@ -108,9 +104,7 @@ version = "0.1.0"
 dependencies = [
  "aline-app-core",
  "aline-buffer",
- "aline-edit",
  "aline-markdown",
- "aline-plugin",
  "aline-source",
  "gpui-pre",
 ]

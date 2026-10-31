@@ -14,6 +14,10 @@ pub enum IdentityError {
     StaleWorkingVersion,
     /// 当前源码视图已变化。
     StaleSnapshot,
+    /// 解析配置已经变化。
+    StaleParseConfig,
+    /// 已有较新的派生请求。
+    StaleRequest,
     /// 草稿代次已耗尽。
     GenerationExhausted,
     /// 提交未推进已提交 revision。
@@ -131,20 +135,85 @@ impl WorkingVersion {
     }
 }
 
+/// 解析配置的单调代次；具体配置由宿主所有者维护。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ParseConfigGeneration(u64);
+impl ParseConfigGeneration {
+    /// 创建初始配置身份。
+    pub const fn initial() -> Self {
+        Self(0)
+    }
+    /// 返回代次，供宿主与证据记录。
+    pub const fn value(self) -> u64 {
+        self.0
+    }
+    pub(crate) fn next(self) -> Result<Self, IdentityError> {
+        self.0
+            .checked_add(1)
+            .map(Self)
+            .ok_or(IdentityError::GenerationExhausted)
+    }
+}
+
+/// 单文档派生采纳的单调身份；新请求、目标关闭或模式切换均推进，不与文本版本混用。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct DerivedRequestId(u64);
+impl DerivedRequestId {
+    #[cfg(test)]
+    pub(super) const fn exhausted_for_test() -> Self {
+        Self(u64::MAX)
+    }
+
+    /// 创建尚未发起请求的初始身份。
+    pub const fn initial() -> Self {
+        Self(0)
+    }
+    /// 返回请求编号。
+    pub const fn value(self) -> u64 {
+        self.0
+    }
+    pub(crate) fn next(self) -> Result<Self, IdentityError> {
+        self.0
+            .checked_add(1)
+            .map(Self)
+            .ok_or(IdentityError::GenerationExhausted)
+    }
+}
+
 /// 具体的文档输入身份信封；不提供泛型消息总线或引擎反向依赖。
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct InputIdentity {
     document: DocumentId,
     version: WorkingVersion,
     snapshot: SnapshotId,
+    config: ParseConfigGeneration,
+    request: DerivedRequestId,
 }
 
 impl InputIdentity {
-    /// 绑定当前不可变视图；revision 不一致时拒绝，不复制全文。
+    /// 绑定初始配置/尚未请求的视图；revision 不一致时拒绝，不复制全文。
+    /// 活跃 DocCore 任务应使用 current_input_identity/begin_derived_request，避免漏配身份。
     pub fn new(
         document: DocumentId,
         version: WorkingVersion,
         snapshot: &TextSnapshot,
+    ) -> Result<Self, IdentityError> {
+        Self::for_request(
+            document,
+            version,
+            snapshot,
+            ParseConfigGeneration::initial(),
+            DerivedRequestId::initial(),
+        )
+    }
+
+    /// 绑定宿主实际配置与请求身份，供派生任务传递冻结输入键。
+    pub fn for_request(
+        document: DocumentId,
+        version: WorkingVersion,
+        snapshot: &TextSnapshot,
+        config: ParseConfigGeneration,
+        request: DerivedRequestId,
     ) -> Result<Self, IdentityError> {
         if version.revision != snapshot.revision() {
             return Err(IdentityError::SnapshotRevisionMismatch);
@@ -153,6 +222,8 @@ impl InputIdentity {
             document,
             version,
             snapshot: snapshot.id().clone(),
+            config,
+            request,
         })
     }
 
@@ -171,6 +242,15 @@ impl InputIdentity {
         &self.snapshot
     }
 
+    /// 返回冻结的解析配置代次。
+    pub const fn parse_config_generation(&self) -> ParseConfigGeneration {
+        self.config
+    }
+    /// 返回冻结的派生请求身份。
+    pub const fn request_id(&self) -> DerivedRequestId {
+        self.request
+    }
+
     /// 采纳请求/结果前逐项比对；不同文档、旧工作版本或旧视图明确拒绝。
     pub fn validate(&self, current: &Self) -> Result<(), IdentityError> {
         if self.document != current.document {
@@ -182,6 +262,29 @@ impl InputIdentity {
         if self.snapshot != current.snapshot {
             return Err(IdentityError::StaleSnapshot);
         }
+        if self.config != current.config {
+            return Err(IdentityError::StaleParseConfig);
+        }
+        if self.request != current.request {
+            return Err(IdentityError::StaleRequest);
+        }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{DerivedRequestId, IdentityError, ParseConfigGeneration};
+
+    #[test]
+    fn derived_counters_reject_exhaustion_without_wrapping() {
+        assert_eq!(
+            DerivedRequestId(u64::MAX).next(),
+            Err(IdentityError::GenerationExhausted)
+        );
+        assert_eq!(
+            ParseConfigGeneration(u64::MAX).next(),
+            Err(IdentityError::GenerationExhausted)
+        );
     }
 }

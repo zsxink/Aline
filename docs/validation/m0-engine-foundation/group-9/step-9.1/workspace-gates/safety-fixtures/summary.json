@@ -1,0 +1,1631 @@
+{
+  "cases": [
+    {
+      "name": "constant-table",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/constant-table.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:00.331267+00:00",
+      "finished_utc": "2026-10-31T14:53:00.392309+00:00",
+      "exit_code": 0,
+      "expected_rules": [],
+      "actual_rules": [],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "test-assertions",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/test-assertions.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:00.408428+00:00",
+      "finished_utc": "2026-10-31T14:53:00.457954+00:00",
+      "exit_code": 0,
+      "expected_rules": [],
+      "actual_rules": [],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "test-function",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/test-function.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:00.462209+00:00",
+      "finished_utc": "2026-10-31T14:53:00.506603+00:00",
+      "exit_code": 0,
+      "expected_rules": [],
+      "actual_rules": [],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "integration-assert",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/integration-assert.rs",
+        "--kind",
+        "engine-test"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:00.518164+00:00",
+      "finished_utc": "2026-10-31T14:53:00.582511+00:00",
+      "exit_code": 0,
+      "expected_rules": [],
+      "actual_rules": [],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "strings-comments",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/strings-comments.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:00.586157+00:00",
+      "finished_utc": "2026-10-31T14:53:00.666312+00:00",
+      "exit_code": 0,
+      "expected_rules": [],
+      "actual_rules": [],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "unwrap-production",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/unwrap-production.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:00.674907+00:00",
+      "finished_utc": "2026-10-31T14:53:00.783220+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-unwrap"
+      ],
+      "actual_rules": [
+        "engine-unwrap"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "unwrap-test",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/unwrap-test.rs",
+        "--kind",
+        "engine-test"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:00.795403+00:00",
+      "finished_utc": "2026-10-31T14:53:00.867272+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-unwrap"
+      ],
+      "actual_rules": [
+        "engine-unwrap"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "unwrap-cfg-test",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/unwrap-cfg-test.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:00.879327+00:00",
+      "finished_utc": "2026-10-31T14:53:00.919505+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-unwrap"
+      ],
+      "actual_rules": [
+        "engine-unwrap"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "unwrap-example",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/unwrap-example.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:00.923401+00:00",
+      "finished_utc": "2026-10-31T14:53:00.969397+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-unwrap"
+      ],
+      "actual_rules": [
+        "engine-unwrap"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "unwrap-bench",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/unwrap-bench.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:00.973509+00:00",
+      "finished_utc": "2026-10-31T14:53:01.016442+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-unwrap"
+      ],
+      "actual_rules": [
+        "engine-unwrap"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "production-expect",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/production-expect.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:01.020309+00:00",
+      "finished_utc": "2026-10-31T14:53:01.062889+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-expect"
+      ],
+      "actual_rules": [
+        "engine-production-expect"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "production-panic",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/production-panic.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:01.071136+00:00",
+      "finished_utc": "2026-10-31T14:53:01.127306+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-panic"
+      ],
+      "actual_rules": [
+        "engine-production-panic"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "production-unreachable",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/production-unreachable.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:01.135414+00:00",
+      "finished_utc": "2026-10-31T14:53:01.179452+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-unreachable"
+      ],
+      "actual_rules": [
+        "engine-production-unreachable"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "production-assert",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/production-assert.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:01.187471+00:00",
+      "finished_utc": "2026-10-31T14:53:01.227763+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-assert"
+      ],
+      "actual_rules": [
+        "engine-production-assert"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "production-assert-eq",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/production-assert-eq.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:01.236483+00:00",
+      "finished_utc": "2026-10-31T14:53:01.284705+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-assert_eq"
+      ],
+      "actual_rules": [
+        "engine-production-assert_eq"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "production-assert-ne",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/production-assert-ne.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:01.288318+00:00",
+      "finished_utc": "2026-10-31T14:53:01.336300+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-assert_ne"
+      ],
+      "actual_rules": [
+        "engine-production-assert_ne"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "release-only-production-assert",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/release-only-production-assert.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:01.344590+00:00",
+      "finished_utc": "2026-10-31T14:53:01.399478+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-assert"
+      ],
+      "actual_rules": [
+        "engine-production-assert"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "test-scope-does-not-leak",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/test-scope-does-not-leak.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:01.410967+00:00",
+      "finished_utc": "2026-10-31T14:53:01.451102+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-assert"
+      ],
+      "actual_rules": [
+        "engine-production-assert"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "complex-cfg-conservative",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/complex-cfg-conservative.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:01.454034+00:00",
+      "finished_utc": "2026-10-31T14:53:01.497352+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-assert"
+      ],
+      "actual_rules": [
+        "engine-production-assert"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "macro-body-panic",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/macro-body-panic.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:01.501278+00:00",
+      "finished_utc": "2026-10-31T14:53:01.565935+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-panic"
+      ],
+      "actual_rules": [
+        "engine-production-panic"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "debug-assert-positive",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/debug-assert-positive.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:01.572922+00:00",
+      "finished_utc": "2026-10-31T14:53:01.665188+00:00",
+      "exit_code": 0,
+      "expected_rules": [],
+      "actual_rules": [],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "once-lock",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/once-lock.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:01.672277+00:00",
+      "finished_utc": "2026-10-31T14:53:01.722921+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-runtime-state"
+      ],
+      "actual_rules": [
+        "engine-runtime-state"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "lazy-lock",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/lazy-lock.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:01.727332+00:00",
+      "finished_utc": "2026-10-31T14:53:01.777276+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-runtime-state"
+      ],
+      "actual_rules": [
+        "engine-runtime-state"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "thread-spawn",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/thread-spawn.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:01.797270+00:00",
+      "finished_utc": "2026-10-31T14:53:01.848307+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-thread"
+      ],
+      "actual_rules": [
+        "engine-thread"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "thread-import-alias",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/thread-import-alias.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:01.859856+00:00",
+      "finished_utc": "2026-10-31T14:53:01.906238+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-thread"
+      ],
+      "actual_rules": [
+        "engine-thread"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "thread-group-import",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/thread-group-import.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:01.919426+00:00",
+      "finished_utc": "2026-10-31T14:53:01.977854+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-thread"
+      ],
+      "actual_rules": [
+        "engine-thread"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "global-atomic-u32",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/global-atomic-u32.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:01.987323+00:00",
+      "finished_utc": "2026-10-31T14:53:02.039511+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-mutable-static"
+      ],
+      "actual_rules": [
+        "engine-mutable-static"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "thread-local",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/thread-local.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:02.051519+00:00",
+      "finished_utc": "2026-10-31T14:53:02.119379+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-thread-local"
+      ],
+      "actual_rules": [
+        "engine-thread-local"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "global-locale",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/global-locale.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:02.151074+00:00",
+      "finished_utc": "2026-10-31T14:53:02.198466+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-runtime-state",
+        "engine-mutable-static"
+      ],
+      "actual_rules": [
+        "engine-mutable-static",
+        "engine-runtime-state"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "static-mut",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/static-mut.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:02.206416+00:00",
+      "finished_utc": "2026-10-31T14:53:02.256410+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "mutable-static"
+      ],
+      "actual_rules": [
+        "mutable-static"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "unsafe-owned",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/unsafe-owned.rs",
+        "--kind",
+        "ui"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:02.276343+00:00",
+      "finished_utc": "2026-10-31T14:53:02.329277+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "unsafe-owned"
+      ],
+      "actual_rules": [
+        "unsafe-owned"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "ui-production-assert",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/ui-production-assert.rs",
+        "--kind",
+        "ui-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:02.333147+00:00",
+      "finished_utc": "2026-10-31T14:53:02.375162+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "owned-production-assert"
+      ],
+      "actual_rules": [
+        "owned-production-assert"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "ui-test-assert",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/ui-test-assert.rs",
+        "--kind",
+        "ui-test"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:02.393418+00:00",
+      "finished_utc": "2026-10-31T14:53:02.432992+00:00",
+      "exit_code": 0,
+      "expected_rules": [],
+      "actual_rules": [],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "ui-unproven-path",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/ui-unproven-path.rs",
+        "--kind",
+        "ui-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:02.441271+00:00",
+      "finished_utc": "2026-10-31T14:53:02.480312+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "unproven-module-path"
+      ],
+      "actual_rules": [
+        "unproven-module-path"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "unproven-path",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/unproven-path.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:02.483965+00:00",
+      "finished_utc": "2026-10-31T14:53:02.524754+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "unproven-module-path"
+      ],
+      "actual_rules": [
+        "unproven-module-path"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "unproven-cfg-attr-path",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/unproven-cfg-attr-path.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:02.532389+00:00",
+      "finished_utc": "2026-10-31T14:53:02.587350+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "unproven-module-path"
+      ],
+      "actual_rules": [
+        "unproven-module-path"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "unterminated-comment",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--file",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/unterminated-comment.rs",
+        "--kind",
+        "engine-production"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:02.587744+00:00",
+      "finished_utc": "2026-10-31T14:53:02.664715+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "lexical-failure"
+      ],
+      "actual_rules": [
+        "lexical-failure"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust S-7/10/13、tasks 2.3；预先手写 cases.json"
+    },
+    {
+      "name": "external-test-module",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--root",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/external-test-module"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:02.676789+00:00",
+      "finished_utc": "2026-10-31T14:53:02.739050+00:00",
+      "exit_code": 0,
+      "expected_rules": [],
+      "actual_rules": [],
+      "passed": true,
+      "independent_expectation": "精确 cfg(test) 声明才授予测试断言范围；文件名不构成证据"
+    },
+    {
+      "name": "filename-is-not-test-scope",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--root",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/filename-is-not-test-scope"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:02.747847+00:00",
+      "finished_utc": "2026-10-31T14:53:02.803873+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-assert"
+      ],
+      "actual_rules": [
+        "engine-production-assert"
+      ],
+      "passed": true,
+      "independent_expectation": "精确 cfg(test) 声明才授予测试断言范围；文件名不构成证据"
+    },
+    {
+      "name": "nested-module-does-not-authorize-sibling",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--root",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/nested-module-does-not-authorize-sibling"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:02.811771+00:00",
+      "finished_utc": "2026-10-31T14:53:02.859106+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-assert",
+        "test-module-resolution"
+      ],
+      "actual_rules": [
+        "engine-production-assert",
+        "test-module-resolution"
+      ],
+      "passed": true,
+      "independent_expectation": "精确 cfg(test) 声明才授予测试断言范围；文件名不构成证据"
+    },
+    {
+      "name": "production-consumer-wins",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--root",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/production-consumer-wins"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:02.865940+00:00",
+      "finished_utc": "2026-10-31T14:53:02.918287+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-assert"
+      ],
+      "actual_rules": [
+        "engine-production-assert"
+      ],
+      "passed": true,
+      "independent_expectation": "精确 cfg(test) 声明才授予测试断言范围；文件名不构成证据"
+    },
+    {
+      "name": "binary-and-lib-shared",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--root",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/binary-and-lib-shared"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:02.930128+00:00",
+      "finished_utc": "2026-10-31T14:53:02.979986+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "engine-production-assert"
+      ],
+      "actual_rules": [
+        "engine-production-assert"
+      ],
+      "passed": true,
+      "independent_expectation": "精确 cfg(test) 声明才授予测试断言范围；文件名不构成证据"
+    },
+    {
+      "name": "unrecognized-member-path",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--root",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/unrecognized-member-path"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:02.980287+00:00",
+      "finished_utc": "2026-10-31T14:53:03.043320+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "unrecognized-member-path"
+      ],
+      "actual_rules": [
+        "unrecognized-member-path"
+      ],
+      "passed": true,
+      "independent_expectation": "精确 cfg(test) 声明才授予测试断言范围；文件名不构成证据"
+    },
+    {
+      "name": "wrong-package-in-known-ui-path",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--root",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/wrong-package-in-known-ui-path"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:03.044074+00:00",
+      "finished_utc": "2026-10-31T14:53:03.128163+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "member-package-identity"
+      ],
+      "actual_rules": [
+        "member-package-identity"
+      ],
+      "passed": true,
+      "independent_expectation": "精确 cfg(test) 声明才授予测试断言范围；文件名不构成证据"
+    },
+    {
+      "name": "quoted-package-and-description-decoy",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--root",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/quoted-package-and-description-decoy"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:03.143289+00:00",
+      "finished_utc": "2026-10-31T14:53:03.211374+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "member-package-identity"
+      ],
+      "actual_rules": [
+        "member-package-identity"
+      ],
+      "passed": true,
+      "independent_expectation": "精确 cfg(test) 声明才授予测试断言范围；文件名不构成证据"
+    },
+    {
+      "name": "integration-test-crate-root",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--root",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/integration-test-crate-root"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:03.216073+00:00",
+      "finished_utc": "2026-10-31T14:53:03.283360+00:00",
+      "exit_code": 0,
+      "expected_rules": [],
+      "actual_rules": [],
+      "passed": true,
+      "independent_expectation": "Cargo 集成测试根：tests/<name>.rs 的 mod 相对 tests/ 解析；缺失模块必须拒绝"
+    },
+    {
+      "name": "integration-test-missing-module",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--root",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/integration-test-missing-module"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:03.287815+00:00",
+      "finished_utc": "2026-10-31T14:53:03.343956+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "test-module-resolution"
+      ],
+      "actual_rules": [
+        "test-module-resolution"
+      ],
+      "passed": true,
+      "independent_expectation": "Cargo 集成测试根：tests/<name>.rs 的 mod 相对 tests/ 解析；缺失模块必须拒绝"
+    },
+    {
+      "name": "integration-nested-module-resolution",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--root",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/integration-nested-module-resolution"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:03.345582+00:00",
+      "finished_utc": "2026-10-31T14:53:03.409471+00:00",
+      "exit_code": 0,
+      "expected_rules": [],
+      "actual_rules": [],
+      "passed": true,
+      "independent_expectation": "Cargo 集成测试根：tests/<name>.rs 的 mod 相对 tests/ 解析；缺失模块必须拒绝"
+    },
+    {
+      "name": "integration-sibling-file-is-own-root",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--root",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/integration-sibling-file-is-own-root"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:03.443501+00:00",
+      "finished_utc": "2026-10-31T14:53:03.494708+00:00",
+      "exit_code": 0,
+      "expected_rules": [],
+      "actual_rules": [],
+      "passed": true,
+      "independent_expectation": "Cargo 集成测试根：tests/<name>.rs 的 mod 相对 tests/ 解析；缺失模块必须拒绝"
+    },
+    {
+      "name": "integration-root-does-not-see-src-module",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--root",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/integration-root-does-not-see-src-module"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:03.499966+00:00",
+      "finished_utc": "2026-10-31T14:53:03.576317+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "test-module-resolution"
+      ],
+      "actual_rules": [
+        "test-module-resolution"
+      ],
+      "passed": true,
+      "independent_expectation": "Cargo 集成测试根：tests/<name>.rs 的 mod 相对 tests/ 解析；缺失模块必须拒绝"
+    },
+    {
+      "name": "integration-self-reference-is-rejected",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--root",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/integration-self-reference-is-rejected"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:03.584023+00:00",
+      "finished_utc": "2026-10-31T14:53:03.643123+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "test-module-resolution"
+      ],
+      "actual_rules": [
+        "test-module-resolution"
+      ],
+      "passed": true,
+      "independent_expectation": "Cargo 集成测试根：tests/<name>.rs 的 mod 相对 tests/ 解析；缺失模块必须拒绝"
+    },
+    {
+      "name": "integration-nested-file-is-not-crate-root",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--root",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/integration-nested-file-is-not-crate-root"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:03.658690+00:00",
+      "finished_utc": "2026-10-31T14:53:03.736472+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "test-module-resolution"
+      ],
+      "actual_rules": [
+        "test-module-resolution"
+      ],
+      "passed": true,
+      "independent_expectation": "Cargo 集成测试根：tests/<name>.rs 的 mod 相对 tests/ 解析；缺失模块必须拒绝"
+    },
+    {
+      "name": "integration-old-wrong-location-is-rejected",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/xian/Project/editor/Aline/scripts/check_safety.py",
+        "--root",
+        "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/integration-old-wrong-location-is-rejected"
+      ],
+      "cwd": "/Users/xian/Project/editor/Aline",
+      "started_utc": "2026-10-31T14:53:03.755102+00:00",
+      "finished_utc": "2026-10-31T14:53:03.807837+00:00",
+      "exit_code": 1,
+      "expected_rules": [
+        "test-module-resolution"
+      ],
+      "actual_rules": [
+        "test-module-resolution"
+      ],
+      "passed": true,
+      "independent_expectation": "Cargo 集成测试根：tests/<name>.rs 的 mod 相对 tests/ 解析；缺失模块必须拒绝"
+    }
+  ],
+  "workspace_after_fixtures": {
+    "failures": [],
+    "scanned": [
+      {
+        "file": "app/src/main.rs",
+        "kind": "ui-production"
+      },
+      {
+        "file": "crates/aline-app-core/src/i18n.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-app-core/src/lib.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-buffer/src/anchors.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-buffer/src/batch.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-buffer/src/coordinates.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-buffer/src/history.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-buffer/src/lib.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-buffer/src/line_index.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-buffer/src/string_buffer.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-buffer/src/text.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-buffer/tests/anchors.rs",
+        "kind": "engine-test"
+      },
+      {
+        "file": "crates/aline-buffer/tests/checked_batch.rs",
+        "kind": "engine-test"
+      },
+      {
+        "file": "crates/aline-buffer/tests/history.rs",
+        "kind": "engine-test"
+      },
+      {
+        "file": "crates/aline-buffer/tests/patch_goldens.rs",
+        "kind": "engine-test"
+      },
+      {
+        "file": "crates/aline-buffer/tests/public_boundaries.rs",
+        "kind": "engine-test"
+      },
+      {
+        "file": "crates/aline-buffer/tests/rejections.rs",
+        "kind": "engine-test"
+      },
+      {
+        "file": "crates/aline-edit/src/budget.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-edit/src/command.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-edit/src/errors.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-edit/src/lib.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-edit/src/permissions.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-edit/src/plan.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-edit/src/refusal.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-edit/src/reread.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-edit/src/validate.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-edit/tests/goldens.rs",
+        "kind": "engine-test"
+      },
+      {
+        "file": "crates/aline-edit/tests/protection.rs",
+        "kind": "engine-test"
+      },
+      {
+        "file": "crates/aline-edit/tests/refusals.rs",
+        "kind": "engine-test"
+      },
+      {
+        "file": "crates/aline-markdown/examples/dump_tree.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-markdown/src/budget.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-markdown/src/build.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-markdown/src/config.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-markdown/src/diagnostic.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-markdown/src/lib.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-markdown/src/mapping/coordinates.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-markdown/src/mapping/mod.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-markdown/src/mapping/projection.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-markdown/src/mdast.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-markdown/src/parse.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-markdown/src/pre/front.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-markdown/src/pre/mod.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-markdown/src/pre/rewrite.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-markdown/src/protection.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-markdown/src/reuse.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-markdown/src/style.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-markdown/src/tree/html.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-markdown/src/tree/mod.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-markdown/tests/diagnostics.rs",
+        "kind": "engine-test"
+      },
+      {
+        "file": "crates/aline-markdown/tests/hostile.rs",
+        "kind": "engine-test"
+      },
+      {
+        "file": "crates/aline-markdown/tests/html.rs",
+        "kind": "engine-test"
+      },
+      {
+        "file": "crates/aline-markdown/tests/identity_mapping.rs",
+        "kind": "engine-test"
+      },
+      {
+        "file": "crates/aline-markdown/tests/mapping.rs",
+        "kind": "engine-test"
+      },
+      {
+        "file": "crates/aline-markdown/tests/protection.rs",
+        "kind": "engine-test"
+      },
+      {
+        "file": "crates/aline-markdown/tests/public_boundaries.rs",
+        "kind": "engine-test"
+      },
+      {
+        "file": "crates/aline-markdown/tests/reuse.rs",
+        "kind": "engine-test"
+      },
+      {
+        "file": "crates/aline-markdown/tests/rewrite.rs",
+        "kind": "engine-test"
+      },
+      {
+        "file": "crates/aline-markdown/tests/spec.rs",
+        "kind": "engine-test"
+      },
+      {
+        "file": "crates/aline-plugin/src/lib.rs",
+        "kind": "ui-production"
+      },
+      {
+        "file": "crates/aline-source/src/atomic.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-source/src/baseline.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-source/src/decode.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-source/src/encode.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-source/src/lib.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-source/src/storage.rs",
+        "kind": "engine-production"
+      },
+      {
+        "file": "crates/aline-source/tests/atomic.rs",
+        "kind": "engine-test"
+      },
+      {
+        "file": "crates/aline-source/tests/decode_golden.rs",
+        "kind": "engine-test"
+      },
+      {
+        "file": "crates/aline-source/tests/encode_golden.rs",
+        "kind": "engine-test"
+      },
+      {
+        "file": "crates/aline-source/tests/public_boundaries.rs",
+        "kind": "engine-test"
+      },
+      {
+        "file": "crates/aline-source/tests/roundtrip.rs",
+        "kind": "engine-test"
+      },
+      {
+        "file": "crates/aline-ui/src/document/composition.rs",
+        "kind": "ui-production"
+      },
+      {
+        "file": "crates/aline-ui/src/document/doc_core/protocols.rs",
+        "kind": "ui-production"
+      },
+      {
+        "file": "crates/aline-ui/src/document/doc_core.rs",
+        "kind": "ui-production"
+      },
+      {
+        "file": "crates/aline-ui/src/document/identity.rs",
+        "kind": "ui-production"
+      },
+      {
+        "file": "crates/aline-ui/src/document/mod.rs",
+        "kind": "ui-production"
+      },
+      {
+        "file": "crates/aline-ui/src/document/mode.rs",
+        "kind": "ui-production"
+      },
+      {
+        "file": "crates/aline-ui/src/document/open_block.rs",
+        "kind": "ui-production"
+      },
+      {
+        "file": "crates/aline-ui/src/document/publication.rs",
+        "kind": "ui-production"
+      },
+      {
+        "file": "crates/aline-ui/src/document/resource.rs",
+        "kind": "ui-production"
+      },
+      {
+        "file": "crates/aline-ui/src/document/snapshot.rs",
+        "kind": "ui-production"
+      },
+      {
+        "file": "crates/aline-ui/src/lib.rs",
+        "kind": "ui-production"
+      },
+      {
+        "file": "crates/aline-ui/tests/common/mod.rs",
+        "kind": "ui-test"
+      },
+      {
+        "file": "crates/aline-ui/tests/document.rs",
+        "kind": "ui-test"
+      },
+      {
+        "file": "crates/aline-ui/tests/document_composition.rs",
+        "kind": "ui-test"
+      },
+      {
+        "file": "crates/aline-ui/tests/document_followups.rs",
+        "kind": "ui-test"
+      },
+      {
+        "file": "crates/aline-ui/tests/document_results.rs",
+        "kind": "ui-test"
+      },
+      {
+        "file": "crates/aline-ui/tests/document_typing.rs",
+        "kind": "ui-test"
+      },
+      {
+        "file": "crates/aline-ui/tests/public_boundaries.rs",
+        "kind": "ui-test"
+      }
+    ],
+    "member_reads": [
+      {
+        "argv": [
+          "cargo",
+          "read-manifest",
+          "--manifest-path",
+          "/Users/xian/Project/editor/Aline/app/Cargo.toml",
+          "--offline"
+        ],
+        "cwd": "/Users/xian/Project/editor/Aline",
+        "started_utc": "2026-10-31T14:53:03.808080+00:00",
+        "finished_utc": "2026-10-31T14:53:03.820578+00:00",
+        "exit_code": 0,
+        "stdout": "{\"name\":\"aline\",\"version\":\"0.1.0\",\"id\":\"path+file:///Users/xian/Project/editor/Aline/app#aline@0.1.0\",\"license\":null,\"license_file\":null,\"description\":null,\"source\":null,\"dependencies\":[{\"name\":\"aline-app-core\",\"source\":null,\"req\":\"*\",\"kind\":null,\"rename\":null,\"optional\":false,\"uses_default_features\":true,\"features\":[],\"target\":null,\"registry\":null,\"path\":\"/Users/xian/Project/editor/Aline/crates/aline-app-core\"},{\"name\":\"aline-ui\",\"source\":null,\"req\":\"*\",\"kind\":null,\"rename\":null,\"optional\":false,\"uses_default_features\":true,\"features\":[],\"target\":null,\"registry\":null,\"path\":\"/Users/xian/Project/editor/Aline/crates/aline-ui\"}],\"targets\":[{\"kind\":[\"bin\"],\"crate_types\":[\"bin\"],\"name\":\"aline\",\"src_path\":\"/Users/xian/Project/editor/Aline/app/src/main.rs\",\"edition\":\"2024\",\"doc\":true,\"doctest\":false,\"test\":true}],\"features\":{},\"manifest_path\":\"/Users/xian/Project/editor/Aline/app/Cargo.toml\",\"metadata\":null,\"publish\":[],\"authors\":[],\"categories\":[],\"keywords\":[],\"readme\":null,\"repository\":null,\"homepage\":null,\"documentation\":null,\"edition\":\"2024\",\"links\":null,\"default_run\":null,\"rust_version\":null}\n",
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "cargo",
+          "read-manifest",
+          "--manifest-path",
+          "/Users/xian/Project/editor/Aline/crates/aline-app-core/Cargo.toml",
+          "--offline"
+        ],
+        "cwd": "/Users/xian/Project/editor/Aline",
+        "started_utc": "2026-10-31T14:53:03.821535+00:00",
+        "finished_utc": "2026-10-31T14:53:03.834069+00:00",
+        "exit_code": 0,
+        "stdout": "{\"name\":\"aline-app-core\",\"version\":\"0.1.0\",\"id\":\"path+file:///Users/xian/Project/editor/Aline/crates/aline-app-core#0.1.0\",\"license\":null,\"license_file\":null,\"description\":null,\"source\":null,\"dependencies\":[{\"name\":\"rust-embed\",\"source\":\"registry+https://github.com/rust-lang/crates.io-index\",\"req\":\"=8.13.0\",\"kind\":null,\"rename\":null,\"optional\":false,\"uses_default_features\":false,\"features\":[\"debug-embed\"],\"target\":null,\"registry\":null},{\"name\":\"toml\",\"source\":\"registry+https://github.com/rust-lang/crates.io-index\",\"req\":\"=1.1.8\",\"kind\":null,\"rename\":null,\"optional\":false,\"uses_default_features\":false,\"features\":[\"std\",\"parse\",\"serde\"],\"target\":null,\"registry\":null}],\"targets\":[{\"kind\":[\"lib\"],\"crate_types\":[\"lib\"],\"name\":\"aline_app_core\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-app-core/src/lib.rs\",\"edition\":\"2024\",\"doc\":true,\"doctest\":true,\"test\":true}],\"features\":{},\"manifest_path\":\"/Users/xian/Project/editor/Aline/crates/aline-app-core/Cargo.toml\",\"metadata\":null,\"publish\":[],\"authors\":[],\"categories\":[],\"keywords\":[],\"readme\":null,\"repository\":null,\"homepage\":null,\"documentation\":null,\"edition\":\"2024\",\"links\":null,\"default_run\":null,\"rust_version\":null}\n",
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "cargo",
+          "read-manifest",
+          "--manifest-path",
+          "/Users/xian/Project/editor/Aline/crates/aline-buffer/Cargo.toml",
+          "--offline"
+        ],
+        "cwd": "/Users/xian/Project/editor/Aline",
+        "started_utc": "2026-10-31T14:53:03.876781+00:00",
+        "finished_utc": "2026-10-31T14:53:03.888582+00:00",
+        "exit_code": 0,
+        "stdout": "{\"name\":\"aline-buffer\",\"version\":\"0.1.0\",\"id\":\"path+file:///Users/xian/Project/editor/Aline/crates/aline-buffer#0.1.0\",\"license\":null,\"license_file\":null,\"description\":null,\"source\":null,\"dependencies\":[],\"targets\":[{\"kind\":[\"lib\"],\"crate_types\":[\"lib\"],\"name\":\"aline_buffer\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-buffer/src/lib.rs\",\"edition\":\"2024\",\"doc\":true,\"doctest\":true,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"anchors\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/anchors.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"checked_batch\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/checked_batch.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"history\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/history.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"patch_goldens\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/patch_goldens.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"public_boundaries\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/public_boundaries.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"rejections\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-buffer/tests/rejections.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true}],\"features\":{},\"manifest_path\":\"/Users/xian/Project/editor/Aline/crates/aline-buffer/Cargo.toml\",\"metadata\":null,\"publish\":[],\"authors\":[],\"categories\":[],\"keywords\":[],\"readme\":null,\"repository\":null,\"homepage\":null,\"documentation\":null,\"edition\":\"2024\",\"links\":null,\"default_run\":null,\"rust_version\":null}\n",
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "cargo",
+          "read-manifest",
+          "--manifest-path",
+          "/Users/xian/Project/editor/Aline/crates/aline-edit/Cargo.toml",
+          "--offline"
+        ],
+        "cwd": "/Users/xian/Project/editor/Aline",
+        "started_utc": "2026-10-31T14:53:04.197054+00:00",
+        "finished_utc": "2026-10-31T14:53:04.209286+00:00",
+        "exit_code": 0,
+        "stdout": "{\"name\":\"aline-edit\",\"version\":\"0.1.0\",\"id\":\"path+file:///Users/xian/Project/editor/Aline/crates/aline-edit#0.1.0\",\"license\":null,\"license_file\":null,\"description\":null,\"source\":null,\"dependencies\":[{\"name\":\"aline-buffer\",\"source\":null,\"req\":\"*\",\"kind\":null,\"rename\":null,\"optional\":false,\"uses_default_features\":true,\"features\":[],\"target\":null,\"registry\":null,\"path\":\"/Users/xian/Project/editor/Aline/crates/aline-buffer\"},{\"name\":\"aline-markdown\",\"source\":null,\"req\":\"*\",\"kind\":null,\"rename\":null,\"optional\":false,\"uses_default_features\":true,\"features\":[],\"target\":null,\"registry\":null,\"path\":\"/Users/xian/Project/editor/Aline/crates/aline-markdown\"}],\"targets\":[{\"kind\":[\"lib\"],\"crate_types\":[\"lib\"],\"name\":\"aline_edit\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-edit/src/lib.rs\",\"edition\":\"2024\",\"doc\":true,\"doctest\":true,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"goldens\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-edit/tests/goldens.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"protection\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-edit/tests/protection.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"refusals\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-edit/tests/refusals.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true}],\"features\":{},\"manifest_path\":\"/Users/xian/Project/editor/Aline/crates/aline-edit/Cargo.toml\",\"metadata\":null,\"publish\":[],\"authors\":[],\"categories\":[],\"keywords\":[],\"readme\":null,\"repository\":null,\"homepage\":null,\"documentation\":null,\"edition\":\"2024\",\"links\":null,\"default_run\":null,\"rust_version\":null}\n",
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "cargo",
+          "read-manifest",
+          "--manifest-path",
+          "/Users/xian/Project/editor/Aline/crates/aline-markdown/Cargo.toml",
+          "--offline"
+        ],
+        "cwd": "/Users/xian/Project/editor/Aline",
+        "started_utc": "2026-10-31T14:53:04.461859+00:00",
+        "finished_utc": "2026-10-31T14:53:04.474277+00:00",
+        "exit_code": 0,
+        "stdout": "{\"name\":\"aline-markdown\",\"version\":\"0.1.0\",\"id\":\"path+file:///Users/xian/Project/editor/Aline/crates/aline-markdown#0.1.0\",\"license\":null,\"license_file\":null,\"description\":null,\"source\":null,\"dependencies\":[{\"name\":\"aline-buffer\",\"source\":null,\"req\":\"*\",\"kind\":null,\"rename\":null,\"optional\":false,\"uses_default_features\":true,\"features\":[],\"target\":null,\"registry\":null,\"path\":\"/Users/xian/Project/editor/Aline/crates/aline-buffer\"},{\"name\":\"pulldown-cmark\",\"source\":\"registry+https://github.com/rust-lang/crates.io-index\",\"req\":\"=0.13.6\",\"kind\":null,\"rename\":null,\"optional\":false,\"uses_default_features\":false,\"features\":[],\"target\":null,\"registry\":null}],\"targets\":[{\"kind\":[\"lib\"],\"crate_types\":[\"lib\"],\"name\":\"aline_markdown\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-markdown/src/lib.rs\",\"edition\":\"2024\",\"doc\":true,\"doctest\":true,\"test\":true},{\"kind\":[\"example\"],\"crate_types\":[\"bin\"],\"name\":\"dump_tree\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-markdown/examples/dump_tree.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":false},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"diagnostics\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-markdown/tests/diagnostics.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"hostile\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-markdown/tests/hostile.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"html\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-markdown/tests/html.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"identity_mapping\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-markdown/tests/identity_mapping.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"mapping\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-markdown/tests/mapping.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"protection\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-markdown/tests/protection.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"public_boundaries\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-markdown/tests/public_boundaries.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"reuse\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-markdown/tests/reuse.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"rewrite\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-markdown/tests/rewrite.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"spec\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-markdown/tests/spec.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true}],\"features\":{},\"manifest_path\":\"/Users/xian/Project/editor/Aline/crates/aline-markdown/Cargo.toml\",\"metadata\":null,\"publish\":[],\"authors\":[],\"categories\":[],\"keywords\":[],\"readme\":null,\"repository\":null,\"homepage\":null,\"documentation\":null,\"edition\":\"2024\",\"links\":null,\"default_run\":null,\"rust_version\":null}\n",
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "cargo",
+          "read-manifest",
+          "--manifest-path",
+          "/Users/xian/Project/editor/Aline/crates/aline-plugin/Cargo.toml",
+          "--offline"
+        ],
+        "cwd": "/Users/xian/Project/editor/Aline",
+        "started_utc": "2026-10-31T14:53:05.350884+00:00",
+        "finished_utc": "2026-10-31T14:53:05.364621+00:00",
+        "exit_code": 0,
+        "stdout": "{\"name\":\"aline-plugin\",\"version\":\"0.1.0\",\"id\":\"path+file:///Users/xian/Project/editor/Aline/crates/aline-plugin#0.1.0\",\"license\":null,\"license_file\":null,\"description\":null,\"source\":null,\"dependencies\":[{\"name\":\"aline-app-core\",\"source\":null,\"req\":\"*\",\"kind\":null,\"rename\":null,\"optional\":false,\"uses_default_features\":true,\"features\":[],\"target\":null,\"registry\":null,\"path\":\"/Users/xian/Project/editor/Aline/crates/aline-app-core\"},{\"name\":\"aline-edit\",\"source\":null,\"req\":\"*\",\"kind\":null,\"rename\":null,\"optional\":false,\"uses_default_features\":true,\"features\":[],\"target\":null,\"registry\":null,\"path\":\"/Users/xian/Project/editor/Aline/crates/aline-edit\"}],\"targets\":[{\"kind\":[\"lib\"],\"crate_types\":[\"lib\"],\"name\":\"aline_plugin\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-plugin/src/lib.rs\",\"edition\":\"2024\",\"doc\":true,\"doctest\":true,\"test\":true}],\"features\":{},\"manifest_path\":\"/Users/xian/Project/editor/Aline/crates/aline-plugin/Cargo.toml\",\"metadata\":null,\"publish\":[],\"authors\":[],\"categories\":[],\"keywords\":[],\"readme\":null,\"repository\":null,\"homepage\":null,\"documentation\":null,\"edition\":\"2024\",\"links\":null,\"default_run\":null,\"rust_version\":null}\n",
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "cargo",
+          "read-manifest",
+          "--manifest-path",
+          "/Users/xian/Project/editor/Aline/crates/aline-source/Cargo.toml",
+          "--offline"
+        ],
+        "cwd": "/Users/xian/Project/editor/Aline",
+        "started_utc": "2026-10-31T14:53:05.365164+00:00",
+        "finished_utc": "2026-10-31T14:53:05.377717+00:00",
+        "exit_code": 0,
+        "stdout": "{\"name\":\"aline-source\",\"version\":\"0.1.0\",\"id\":\"path+file:///Users/xian/Project/editor/Aline/crates/aline-source#0.1.0\",\"license\":null,\"license_file\":null,\"description\":null,\"source\":null,\"dependencies\":[],\"targets\":[{\"kind\":[\"lib\"],\"crate_types\":[\"lib\"],\"name\":\"aline_source\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-source/src/lib.rs\",\"edition\":\"2024\",\"doc\":true,\"doctest\":true,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"atomic\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-source/tests/atomic.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"decode_golden\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-source/tests/decode_golden.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"encode_golden\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-source/tests/encode_golden.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"public_boundaries\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-source/tests/public_boundaries.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"roundtrip\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-source/tests/roundtrip.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true}],\"features\":{},\"manifest_path\":\"/Users/xian/Project/editor/Aline/crates/aline-source/Cargo.toml\",\"metadata\":null,\"publish\":[],\"authors\":[],\"categories\":[],\"keywords\":[],\"readme\":null,\"repository\":null,\"homepage\":null,\"documentation\":null,\"edition\":\"2024\",\"links\":null,\"default_run\":null,\"rust_version\":null}\n",
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "cargo",
+          "read-manifest",
+          "--manifest-path",
+          "/Users/xian/Project/editor/Aline/crates/aline-ui/Cargo.toml",
+          "--offline"
+        ],
+        "cwd": "/Users/xian/Project/editor/Aline",
+        "started_utc": "2026-10-31T14:53:05.682008+00:00",
+        "finished_utc": "2026-10-31T14:53:05.695068+00:00",
+        "exit_code": 0,
+        "stdout": "{\"name\":\"aline-ui\",\"version\":\"0.1.0\",\"id\":\"path+file:///Users/xian/Project/editor/Aline/crates/aline-ui#0.1.0\",\"license\":null,\"license_file\":null,\"description\":null,\"source\":null,\"dependencies\":[{\"name\":\"aline-app-core\",\"source\":null,\"req\":\"*\",\"kind\":null,\"rename\":null,\"optional\":false,\"uses_default_features\":true,\"features\":[],\"target\":null,\"registry\":null,\"path\":\"/Users/xian/Project/editor/Aline/crates/aline-app-core\"},{\"name\":\"aline-buffer\",\"source\":null,\"req\":\"*\",\"kind\":null,\"rename\":null,\"optional\":false,\"uses_default_features\":true,\"features\":[],\"target\":null,\"registry\":null,\"path\":\"/Users/xian/Project/editor/Aline/crates/aline-buffer\"},{\"name\":\"aline-markdown\",\"source\":null,\"req\":\"*\",\"kind\":null,\"rename\":null,\"optional\":false,\"uses_default_features\":true,\"features\":[],\"target\":null,\"registry\":null,\"path\":\"/Users/xian/Project/editor/Aline/crates/aline-markdown\"},{\"name\":\"aline-plugin\",\"source\":null,\"req\":\"*\",\"kind\":null,\"rename\":null,\"optional\":false,\"uses_default_features\":true,\"features\":[],\"target\":null,\"registry\":null,\"path\":\"/Users/xian/Project/editor/Aline/crates/aline-plugin\"},{\"name\":\"aline-source\",\"source\":null,\"req\":\"*\",\"kind\":null,\"rename\":null,\"optional\":false,\"uses_default_features\":true,\"features\":[],\"target\":null,\"registry\":null,\"path\":\"/Users/xian/Project/editor/Aline/crates/aline-source\"},{\"name\":\"gpui-pre\",\"source\":\"registry+https://github.com/rust-lang/crates.io-index\",\"req\":\"=0.3.9\",\"kind\":null,\"rename\":\"gpui\",\"optional\":false,\"uses_default_features\":false,\"features\":[],\"target\":null,\"registry\":null}],\"targets\":[{\"kind\":[\"lib\"],\"crate_types\":[\"lib\"],\"name\":\"aline_ui\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-ui/src/lib.rs\",\"edition\":\"2024\",\"doc\":true,\"doctest\":true,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"document\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-ui/tests/document.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"document_composition\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_composition.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"document_followups\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_followups.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"document_results\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_results.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"document_typing\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-ui/tests/document_typing.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true},{\"kind\":[\"test\"],\"crate_types\":[\"bin\"],\"name\":\"public_boundaries\",\"src_path\":\"/Users/xian/Project/editor/Aline/crates/aline-ui/tests/public_boundaries.rs\",\"edition\":\"2024\",\"doc\":false,\"doctest\":false,\"test\":true}],\"features\":{},\"manifest_path\":\"/Users/xian/Project/editor/Aline/crates/aline-ui/Cargo.toml\",\"metadata\":null,\"publish\":[],\"authors\":[],\"categories\":[],\"keywords\":[],\"readme\":null,\"repository\":null,\"homepage\":null,\"documentation\":null,\"edition\":\"2024\",\"links\":null,\"default_run\":null,\"rust_version\":null}\n",
+        "stderr": ""
+      }
+    ]
+  },
+  "passed": true
+}

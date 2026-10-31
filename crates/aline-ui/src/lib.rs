@@ -3,9 +3,11 @@
 mod document;
 
 pub use document::{
-    CommitOutcome, CompositionView, CurrentSnapshot, DocCore, DocError, DocLimits, DocumentId,
-    DraftGeneration, IdentityError, InputIdentity, PublicationKind, PublicationOutcome,
-    PublicationResult, WaitHandle, WaitStatus, WaitView, WorkingVersion,
+    CommitOutcome, CompositionView, CurrentSnapshot, DerivedRequestId, DocCore, DocError,
+    DocLimits, DocumentId, DraftGeneration, EditorMode, IdentityError, InputIdentity,
+    ModeSwitchOutcome, ParseConfigGeneration, PublicationKind, PublicationOutcome,
+    PublicationResult, ResourceReference, WaitHandle, WaitStatus, WaitView, WeakResourceReference,
+    WorkingVersion,
 };
 
 use aline_app_core::{CatalogError, Locale, Translator};

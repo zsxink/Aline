@@ -1,0 +1,2 @@
+2026-10-31T14:52:24Z start cmd=python3 scripts/check_workspace.py --cargo-home /Users/xian/Library/Caches/aline-m0/cargo-home --output-dir docs/validation/m0-engine-foundation/group-9/step-9.1/workspace-gates
+2026-10-31T14:53:10Z exit=0

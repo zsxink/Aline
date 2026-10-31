@@ -6,7 +6,3 @@ publish.workspace = true
 
 [lints]
 workspace = true
-
-[dependencies]
-aline-edit.workspace = true
-aline-app-core.workspace = true

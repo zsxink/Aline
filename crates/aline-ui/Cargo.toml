@@ -10,8 +10,6 @@ workspace = true
 [dependencies]
 aline-buffer.workspace = true
 aline-markdown.workspace = true
-aline-edit.workspace = true
-aline-plugin.workspace = true
 aline-source.workspace = true
 aline-app-core.workspace = true
 gpui.workspace = true

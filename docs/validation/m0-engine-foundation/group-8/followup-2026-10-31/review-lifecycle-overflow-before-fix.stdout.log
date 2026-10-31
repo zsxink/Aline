@@ -1,0 +1,27 @@
+
+running 2 tests
+test document::doc_core::protocols::lifecycle_tests::input_group_mode_request_exhaustion_is_atomic_before_pending_commit ... FAILED
+test document::doc_core::protocols::lifecycle_tests::document_close_request_exhaustion_is_atomic_before_pending_commit ... FAILED
+
+failures:
+
+---- document::doc_core::protocols::lifecycle_tests::input_group_mode_request_exhaustion_is_atomic_before_pending_commit stdout ----
+
+thread 'document::doc_core::protocols::lifecycle_tests::input_group_mode_request_exhaustion_is_atomic_before_pending_commit' (531661) panicked at crates/aline-ui/src/document/doc_core/protocols.rs:206:13:
+assertion failed: matches!(result,
+    Err(DocError::Identity(super::super::IdentityError::GenerationExhausted)))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- document::doc_core::protocols::lifecycle_tests::document_close_request_exhaustion_is_atomic_before_pending_commit stdout ----
+
+thread 'document::doc_core::protocols::lifecycle_tests::document_close_request_exhaustion_is_atomic_before_pending_commit' (531660) panicked at crates/aline-ui/src/document/doc_core/protocols.rs:194:13:
+assertion failed: matches!(result,
+    Err(DocError::Identity(super::super::IdentityError::GenerationExhausted)))
+
+
+failures:
+    document::doc_core::protocols::lifecycle_tests::document_close_request_exhaustion_is_atomic_before_pending_commit
+    document::doc_core::protocols::lifecycle_tests::input_group_mode_request_exhaustion_is_atomic_before_pending_commit
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+

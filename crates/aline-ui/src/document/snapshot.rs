@@ -7,6 +7,9 @@
 
 use aline_buffer::{BufferError, SnapshotId, SrcSelection, TextBudget, TextSnapshot};
 
+use crate::document::ResourceReference;
+use std::sync::Arc;
+
 use crate::document::identity::{DocumentId, WorkingVersion};
 
 /// 一致的只读全文快照与它的工作版本。
@@ -16,6 +19,7 @@ pub struct CurrentSnapshot {
     version: WorkingVersion,
     text: TextSnapshot,
     selection: SrcSelection,
+    resources: Arc<[ResourceReference]>,
 }
 
 impl CurrentSnapshot {
@@ -25,12 +29,14 @@ impl CurrentSnapshot {
         version: WorkingVersion,
         text: TextSnapshot,
         selection: SrcSelection,
+        resources: Arc<[ResourceReference]>,
     ) -> Self {
         Self {
             document,
             version,
             text,
             selection,
+            resources,
         }
     }
 
@@ -54,7 +60,12 @@ impl CurrentSnapshot {
         &self.selection
     }
 
-    /// 返回快照身份。
+    /// 返回宿主已登记资源的保守可达集合；快照独立强持有，不因文档关闭失效。
+    pub fn resources(&self) -> &[ResourceReference] {
+        &self.resources
+    }
+
+    /// 返回快照来源身份；它不是工作版本或内容哈希，相同文本可有不同身份。
     pub fn snapshot_id(&self) -> &SnapshotId {
         self.text.id()
     }

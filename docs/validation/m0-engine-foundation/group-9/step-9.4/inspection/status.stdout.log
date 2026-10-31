@@ -1,0 +1,39 @@
+ M Cargo.lock
+ M crates/aline-ui/Cargo.toml
+ M crates/aline-ui/src/document/doc_core.rs
+ M crates/aline-ui/src/document/identity.rs
+ M crates/aline-ui/src/document/mod.rs
+ M crates/aline-ui/src/document/snapshot.rs
+ M crates/aline-ui/src/lib.rs
+ M crates/aline-ui/tests/common/mod.rs
+ M crates/aline-ui/tests/document.rs
+ M crates/aline-ui/tests/document_composition.rs
+ M crates/aline-ui/tests/document_results.rs
+ M crates/aline-ui/tests/document_typing.rs
+ M docs/engine-design.md
+ M docs/v1-architecture.md
+ M docs/v1-validation-plan.md
+ M docs/validation/m0-engine-foundation/README.md
+ M docs/validation/m0-engine-foundation/group-2/safety-report.md
+ M docs/validation/m0-engine-foundation/group-2/safety-review-final.md
+ M docs/validation/m0-engine-foundation/group-8/README.md
+ M docs/validation/m0-engine-foundation/group-8/step-8.1/expectations.md
+ M openspec/changes/m0-engine-foundation/design.md
+ M openspec/changes/m0-engine-foundation/specs/engine/document-core/spec.md
+ M openspec/changes/m0-engine-foundation/tasks.md
+ M scripts/check_workspace.py
+?? crates/aline-ui/src/document/doc_core/
+?? crates/aline-ui/src/document/mode.rs
+?? crates/aline-ui/src/document/resource.rs
+?? crates/aline-ui/tests/document_followups.rs
+?? docs/validation/m0-engine-foundation/group-8/followup-2026-10-31/
+?? docs/validation/m0-engine-foundation/group-8/review-round-2.md
+?? docs/validation/m0-engine-foundation/group-8/review-round-3.md
+?? docs/validation/m0-engine-foundation/group-8/step-8.5/
+?? docs/validation/m0-engine-foundation/group-9/step-9.1/formal-run/
+?? docs/validation/m0-engine-foundation/group-9/step-9.1/report.md
+?? docs/validation/m0-engine-foundation/group-9/step-9.1/workspace-gates/
+?? docs/validation/m0-engine-foundation/group-9/step-9.2/
+?? docs/validation/m0-engine-foundation/group-9/step-9.3/
+?? docs/validation/m0-engine-foundation/group-9/step-9.4/
+?? docs/validation/m0-engine-foundation/group-9/step-9.5/
