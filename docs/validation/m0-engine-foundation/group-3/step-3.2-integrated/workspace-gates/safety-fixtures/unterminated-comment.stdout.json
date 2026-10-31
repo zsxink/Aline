@@ -1,0 +1,10 @@
+{
+  "failures": [
+    {
+      "file": "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/safety-fixtures/unterminated-comment.rs",
+      "line": 1,
+      "rule": "lexical-failure",
+      "detail": "未闭合块注释，行 1"
+    }
+  ]
+}

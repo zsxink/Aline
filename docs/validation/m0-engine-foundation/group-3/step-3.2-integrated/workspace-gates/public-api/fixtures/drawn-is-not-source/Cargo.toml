@@ -1,0 +1,12 @@
+[package]
+name="aline-m0-api-drawn-is-not-source"
+version="0.0.0"
+edition="2024"
+publish=false
+[workspace]
+[dependencies]
+aline-buffer = { path = "/Users/xian/Project/editor/Aline/crates/aline-buffer" }
+aline-markdown = { path = "/Users/xian/Project/editor/Aline/crates/aline-markdown" }
+aline-source = { path = "/Users/xian/Project/editor/Aline/crates/aline-source" }
+[lints.rust]
+unsafe_code="forbid"

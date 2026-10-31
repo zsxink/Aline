@@ -83,6 +83,7 @@ def run(args):
         ('lint-self-test', [sys.executable, str(ROOT / 'scripts/check_lints.py'), '--self-test', '--output-dir', str(output / 'lint-fixtures')]),
         ('safety', [sys.executable, str(ROOT / 'scripts/check_safety.py')]),
         ('safety-self-test', [sys.executable, str(ROOT / 'scripts/check_safety.py'), '--self-test', '--output-dir', str(output / 'safety-fixtures')]),
+        ('public-api', [sys.executable, str(ROOT / 'scripts/check_public_api.py'), '--self-test', '--output-dir', str(output / 'public-api')]),
     ]
     for label, argv in checks:
         row, _ = invoke(argv, output, label, env)

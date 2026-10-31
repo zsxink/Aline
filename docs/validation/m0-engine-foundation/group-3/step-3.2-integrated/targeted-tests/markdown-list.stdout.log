@@ -1,0 +1,10 @@
+0 tests, 0 benchmarks
+identity_mapping_converts_local_global_and_utf16_through_one_service: test
+identity_mapping_refuses_foreign_projection_snapshot_and_invalid_units: test
+
+2 tests, 0 benchmarks
+immutable_projection_can_be_carried_by_future_host_tasks: test
+projection_coordinates_are_typed_and_bound_to_one_instance: test
+
+2 tests, 0 benchmarks
+0 tests, 0 benchmarks

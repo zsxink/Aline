@@ -1,0 +1,22 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.17s
+     Running unittests src/main.rs (target/debug/deps/aline-a5079934e059ee02)
+     Running unittests src/lib.rs (target/debug/deps/aline_app_core-e20631449fa807a6)
+     Running unittests src/lib.rs (target/debug/deps/aline_buffer-0c7c8ae644d1fe57)
+     Running tests/checked_batch.rs (target/debug/deps/checked_batch-ec4a25aa83270eb9)
+     Running tests/public_boundaries.rs (target/debug/deps/public_boundaries-350481ea1a718dae)
+     Running unittests src/lib.rs (target/debug/deps/aline_edit-2cbcb1989148ac2a)
+     Running unittests src/lib.rs (target/debug/deps/aline_markdown-3e017807a3dadb1e)
+     Running tests/identity_mapping.rs (target/debug/deps/identity_mapping-6a5ce29d44264268)
+     Running tests/public_boundaries.rs (target/debug/deps/public_boundaries-1abb79fe12c1bea9)
+     Running unittests src/lib.rs (target/debug/deps/aline_plugin-9a905e7dabc38564)
+     Running unittests src/lib.rs (target/debug/deps/aline_source-d6930c23ad8537fd)
+     Running tests/public_boundaries.rs (target/debug/deps/public_boundaries-b22ccc6ab1dd8f88)
+     Running unittests src/lib.rs (target/debug/deps/aline_ui-6a4ea95e58d353f7)
+     Running tests/public_boundaries.rs (target/debug/deps/public_boundaries-d9c1fd9f41282e06)
+   Doc-tests aline_app_core
+   Doc-tests aline_buffer
+   Doc-tests aline_edit
+   Doc-tests aline_markdown
+   Doc-tests aline_plugin
+   Doc-tests aline_source
+   Doc-tests aline_ui

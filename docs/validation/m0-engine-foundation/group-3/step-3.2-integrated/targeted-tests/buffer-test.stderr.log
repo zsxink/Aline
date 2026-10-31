@@ -1,0 +1,5 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.26s
+     Running unittests src/lib.rs (target/debug/deps/aline_buffer-0c7c8ae644d1fe57)
+     Running tests/checked_batch.rs (target/debug/deps/checked_batch-ec4a25aa83270eb9)
+     Running tests/public_boundaries.rs (target/debug/deps/public_boundaries-350481ea1a718dae)
+   Doc-tests aline_buffer

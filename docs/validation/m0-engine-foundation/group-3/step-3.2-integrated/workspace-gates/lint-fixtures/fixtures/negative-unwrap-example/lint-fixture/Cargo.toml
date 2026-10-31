@@ -1,0 +1,11 @@
+[package]
+name = "lint-fixture"
+version = "0.0.0"
+edition = "2024"
+
+[lints]
+workspace = true
+
+[[example]]
+name = "fixture"
+path = "examples/fixture.rs"

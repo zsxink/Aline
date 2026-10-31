@@ -1,0 +1,8 @@
+catalog_tests::application_name_consumes_embedded_catalog: test
+
+1 test, 0 benchmarks
+input_identity_can_be_carried_by_future_host_tasks: test
+input_identity_rejects_wrong_document_or_working_version: test
+
+2 tests, 0 benchmarks
+0 tests, 0 benchmarks
