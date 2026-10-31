@@ -1,0 +1,9 @@
+24e5d6825965b2c4ffe62b71ea0c7e18723f3025
+ M crates/aline-source/src/decode.rs
+ M crates/aline-source/src/lib.rs
+ M docs/engine-design.md
+ M openspec/changes/m0-engine-foundation/specs/engine/source/spec.md
+?? crates/aline-source/src/baseline.rs
+?? crates/aline-source/src/encode.rs
+?? crates/aline-source/tests/encode_golden.rs
+?? docs/validation/m0-engine-foundation/group-4/step-4.2/

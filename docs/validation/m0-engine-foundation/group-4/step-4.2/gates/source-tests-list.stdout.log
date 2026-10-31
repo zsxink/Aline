@@ -1,0 +1,19 @@
+0 tests, 0 benchmarks
+decode_does_not_write_the_original_file: test
+decode_golden_cases_match_independent_expectations: test
+snapshot_and_decode_budgets_are_distinct_layers: test
+
+3 tests, 0 benchmarks
+budget_boundary_and_categories_are_distinct: test
+encode_golden_cases_match_independent_expectations: test
+encoded_bytes_carry_their_own_baseline_identity: test
+guard_rule_roundtrips_all_small_cr_lf_sources: test
+inverse_patches_restore_exact_source_and_original_bytes: test
+public_encoding_types_are_send_and_sync: test
+
+6 tests, 0 benchmarks
+storage_ranges_are_bound_to_their_own_baseline: test
+storage_snapshot_can_be_carried_by_future_host_tasks: test
+
+2 tests, 0 benchmarks
+0 tests, 0 benchmarks
