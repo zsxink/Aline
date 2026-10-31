@@ -1,0 +1,94 @@
+{
+  "passed": true,
+  "cases": [
+    {
+      "name": "positive",
+      "expected_exit_code": 0,
+      "actual_exit_code": 0,
+      "required_diagnostics": [],
+      "passed": true,
+      "independent_expectation": "Rust newtype/私有字段的语言边界与任务 3.2，非任意非零即通过"
+    },
+    {
+      "name": "drawn-is-not-source",
+      "expected_exit_code": 101,
+      "actual_exit_code": 101,
+      "required_diagnostics": [
+        "E0308",
+        "SrcOffset",
+        "DrawnOffset"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust newtype/私有字段的语言边界与任务 3.2，非任意非零即通过"
+    },
+    {
+      "name": "drawn-is-not-utf16",
+      "expected_exit_code": 101,
+      "actual_exit_code": 101,
+      "required_diagnostics": [
+        "E0308",
+        "Utf16Offset",
+        "DrawnOffset"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust newtype/私有字段的语言边界与任务 3.2，非任意非零即通过"
+    },
+    {
+      "name": "source-is-not-storage",
+      "expected_exit_code": 101,
+      "actual_exit_code": 101,
+      "required_diagnostics": [
+        "E0308",
+        "StorageRange",
+        "SrcRange"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust newtype/私有字段的语言边界与任务 3.2，非任意非零即通过"
+    },
+    {
+      "name": "private-source-fields",
+      "expected_exit_code": 101,
+      "actual_exit_code": 101,
+      "required_diagnostics": [
+        "E0451",
+        "private"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust newtype/私有字段的语言边界与任务 3.2，非任意非零即通过"
+    },
+    {
+      "name": "private-snapshot-id",
+      "expected_exit_code": 101,
+      "actual_exit_code": 101,
+      "required_diagnostics": [
+        "E0423",
+        "private"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust newtype/私有字段的语言边界与任务 3.2，非任意非零即通过"
+    },
+    {
+      "name": "private-projection-id",
+      "expected_exit_code": 101,
+      "actual_exit_code": 101,
+      "required_diagnostics": [
+        "E0423",
+        "private"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust newtype/私有字段的语言边界与任务 3.2，非任意非零即通过"
+    },
+    {
+      "name": "tuple-view-is-immutable",
+      "expected_exit_code": 101,
+      "actual_exit_code": 101,
+      "required_diagnostics": [
+        "E0596",
+        "cannot borrow"
+      ],
+      "passed": true,
+      "independent_expectation": "Rust newtype/私有字段的语言边界与任务 3.2，非任意非零即通过"
+    }
+  ],
+  "scope": "当前 macOS 工具链真实编译，未运行非法夹具，不声明其他平台或完整引擎业务"
+}

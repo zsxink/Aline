@@ -270,6 +270,8 @@ WC-01已确认宿主维护有会话/文档/版本归属、去重/容量/生命�
 
 **建议：**属性测试保存最小失败样例/可重现 seed；proptest 是历史候选，不要求每个 crate 为形式引入它。快照适合复杂结构回归，更新须人工审查语义差异；insta 尚未准入，`cargo insta review` 不是当前命令。基准可在 `benches/`，criterion 只是候选。GPUI `TestAppContext` 须先核锁定版本/feature，纯状态机模拟、GPUI 交互与真实系统输入法验证分别报告。
 
+**2026-10-31 M0 组 5 测试记录：** 补丁/锚点/历史原语先有独立金样和反例，再接 `StringBuffer` 实现。`crates/aline-buffer/tests/` 使用公共 API 集成测试，单元预算/行索引边界放在实现旁 `#[cfg(test)] mod tests`；测试名采用“行为_场景”，未使用 `test1` 式名称。时间通过 `now_millis` 显式注入，没有真实 sleep；坏数据走 `Result`/拒绝断言，未用 `unsafe` 构造无效 `str`，也未用 `should_panic` 把用户输入崩溃当作预期。正逆补丁金样共 134 例（14 例手工 + 120 例固定 seed 独立生成），另 11 例行索引金样；`cargo test -p aline-buffer patch` 的名称过滤同时命中名字含 `patch` 的锚点/历史用例，不能只按过滤后的总数判断覆盖。全 crate 29 个测试通过，未新增依赖或测试库。证据见 [group-5/step-5.5/report.md](./validation/m0-engine-foundation/group-5/step-5.5/report.md)；这些无头原语测试不替代 V-07 的 IME、命令、格式化和 UI 样例。
+
 ## 13. 并发、GPUI、锁与运行时
 
 | 编号 | 强制要求及边界 | 检查 |

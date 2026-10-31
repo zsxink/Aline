@@ -1,0 +1,8 @@
+[package]
+name = "aline-edit"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+hidden_alias = { package = "aline-markdown", path = "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-5/step-5.5/workspace-gates-after-review/dependency-fixtures/fixtures/positive-downward/aline-markdown" }

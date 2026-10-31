@@ -1,0 +1,13 @@
+2026-10-31T06:24:19Z	2026-10-31T06:24:19Z	zsh -c date -u; uname -a; rustc -Vv; cargo -V; printenv CARGO_HOME RUSTUP_TOOLCHAIN CARGO_NET_OFFLINE	exit=0
+2026-10-31T06:24:19Z	2026-10-31T06:24:20Z	zsh -c git -C /Users/xian/Project/editor/Aline rev-parse HEAD; git -C /Users/xian/Project/editor/Aline status --porcelain	exit=0
+2026-10-31T06:24:20Z	2026-10-31T06:24:21Z	cargo test -p aline-buffer --locked --offline -- --list	exit=0
+2026-10-31T06:24:21Z	2026-10-31T06:24:21Z	cargo test -p aline-buffer --locked --offline patch	exit=0
+2026-10-31T06:24:21Z	2026-10-31T06:24:21Z	cargo test -p aline-buffer --locked --offline --test rejections	exit=0
+2026-10-31T06:24:21Z	2026-10-31T06:24:21Z	cargo test -p aline-buffer --locked --offline anchors	exit=0
+2026-10-31T06:24:21Z	2026-10-31T06:24:21Z	cargo test -p aline-buffer --locked --offline --test history	exit=0
+2026-10-31T06:24:21Z	2026-10-31T06:24:22Z	cargo test -p aline-buffer --locked --offline	exit=0
+2026-10-31T06:24:22Z	2026-10-31T06:24:22Z	sh /Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-5/step-5.3/run-audit.sh /Users/xian/Project/editor/Aline	exit=0
+2026-10-31T07:09:07Z	2026-10-31T07:09:07Z	sh /Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-5/step-5.3/run-audit.sh /Users/xian/Project/editor/Aline	exit=0
+2026-10-31T07:09:40Z	2026-10-31T07:10:07Z	python3 scripts/check_workspace.py --cargo-home /Users/xian/Library/Caches/aline-m0/cargo-home --output-dir docs/validation/m0-engine-foundation/group-5/step-5.5/workspace-gates-after-review	exit=0
+2026-10-31T07:11:31Z	2026-10-31T07:11:32Z	openspec validate m0-engine-foundation --strict --no-interactive	exit=0
+2026-10-31T07:11:33Z	2026-10-31T07:11:33Z	git diff --cached --check -- crates docs/engine-design.md docs/rust-style-guide.md docs/v1-architecture.md docs/v1-prd.md docs/v1-validation-plan.md openspec	exit=0

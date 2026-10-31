@@ -46,11 +46,11 @@
 
 范围：string_buffer/patch/anchors/history/revision；前置：3/4 表示和身份通过审查。关联 engine/buffer 两 requirement，E2/E4/E7；R-3～5、S-5/7/12，K-02/K-03，TA-01/02。
 
-- [ ] 5.1 先写手工正逆补丁金样，再建 StringBuffer/行索引与原子批次；以 abcXYZ→aQQc! 金样验证 after 逆坐标，随机合法批次/固定 seed 往返 bytes/选区，`cargo test -p aline-buffer patch` 记录最小失败样本（随机库先准入）。
-- [ ] 5.2 检查末项非法、重叠、逆序、同点歧义插入、半字符、旧基线、after 选区非法与容量溢出；反例均比较文本/行索引/选区/revision/undo/redo 零变化，合法空插入和无变化替换分别验证；预检完成前不得发布局部修改。
-- [ ] 5.3 建锚点 affinity 变换、正逆选区、操作来源和单调 revision，用 `cargo test -p aline-buffer anchors` 与 history 用例验证替换内锚点/前文变长、Undo/Redo 不退 revision；低层不解析或写盘，人工审查唯一持有关系。
-- [ ] 5.4 建历史节点/待定组/独立重载边界及预算入口，测保存 A→Undo→B 同栈深、历史裁剪、回基线相等证据待定、redo 分叉、逆补丁预算耗尽；重载 Undo/Redo 只改内存不退磁盘基线，资源可达接口不提前释放历史引用，不每键做全文哈希。用 history 过滤测试及全 crate 测试留证。
-- [ ] 5.5 回填引擎 §9、架构 §5.4、Rust §12、AC-01～04 基础贡献及 V-07 分项，注明 TA-02 真实自动保存暂停/外改提示尚属 M2，不能把历史原语测试当闭环完成。
+- [x] 5.1 先写手工正逆补丁金样，再建 StringBuffer/行索引与原子批次；以 abcXYZ→aQQc! 金样验证 after 逆坐标，随机合法批次/固定 seed 往返 bytes/选区，`cargo test -p aline-buffer patch` 记录最小失败样本（随机库先准入）。
+- [x] 5.2 检查末项非法、重叠、逆序、同点歧义插入、半字符、旧基线、after 选区非法与容量溢出；反例均比较文本/行索引/选区/revision/undo/redo 零变化，合法空插入和无变化替换分别验证；预检完成前不得发布局部修改。
+- [x] 5.3 建锚点 affinity 变换、正逆选区、操作来源和单调 revision，用 `cargo test -p aline-buffer anchors` 与 history 用例验证替换内锚点/前文变长、Undo/Redo 不退 revision；低层不解析或写盘，人工审查唯一持有关系。
+- [x] 5.4 建历史节点/待定组/独立重载边界及预算入口，测保存 A→Undo→B 同栈深、历史裁剪、回基线相等证据待定、redo 分叉、逆补丁预算耗尽；重载 Undo/Redo 只改内存不退磁盘基线，资源可达接口不提前释放历史引用，不每键做全文哈希。用 history 过滤测试及全 crate 测试留证。
+- [x] 5.5 回填引擎 §9、架构 §5.4、Rust §12、AC-01～04 基础贡献及 V-07 分项，注明 TA-02 真实自动保存暂停/外改提示尚属 M2，不能把历史原语测试当闭环完成。
 
 ## 6. aline-markdown 解析、块/Gap、映射与保护
 

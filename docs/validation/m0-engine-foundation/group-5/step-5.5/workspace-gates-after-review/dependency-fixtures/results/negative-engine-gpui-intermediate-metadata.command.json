@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "cargo",
+    "metadata",
+    "--manifest-path",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-5/step-5.5/workspace-gates-after-review/dependency-fixtures/fixtures/negative-engine-gpui-intermediate/Cargo.toml",
+    "--offline",
+    "--format-version",
+    "1"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "started_utc": "2026-10-31T07:09:51.378447+00:00",
+  "finished_utc": "2026-10-31T07:09:51.520981+00:00",
+  "exit_code": 0,
+  "stdout_sha256": "f17589b9e7747b2e1ec5de9eabb0e4f4802613182d94b332c594ca64a4c782b2",
+  "stderr_sha256": "4565d22ff9b09fe70ee4b62c55e0db18f6652ba9c47112d0f43c18f59b195ffb",
+  "env_overrides": {
+    "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  }
+}

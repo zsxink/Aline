@@ -497,6 +497,8 @@ History 使用正/逆补丁及 before/after 源码选区，不保存每次全文
 
 **2026-10-31 M0 接口基础记录（任务 3.3）：** `SourceBaseline`、`OpenBlock`、DocCore、`Parsed`、`Change`、`HistoryStep` 与 `snapshot_current` 的内容快照仍仅契约未验证；已落地的包括 `TextSnapshot`/`CheckedBatch`/`SrcSelection`、`StorageSnapshot`、恒等 `Projection` 和 `InputIdentity` 身份信封，以及它们使用的 `DocumentRevision`/`WorkingVersion` 身份。`InputIdentity` 只携带文档、工作版本与快照身份，不含草稿内容；不能把它当作当前文本快照。完整冻结与消费者追踪见[任务 3.3 记录](./validation/m0-engine-foundation/group-3/step-3.3/report.md)。
 
+**2026-10-31 M0 原语记录（组 5）：** `aline-buffer` 已落地 `StringBuffer` 的原子批次、before/after 正逆补丁、锚点 affinity/方向性选区变换、单调 revision，以及历史节点/待定组/保存点身份/裁剪/独立重载边界。历史保存正逆补丁、before/after 选区、来源和快照身份；900ms 只合并相邻普通输入，保存点不使用 `undo.len() == saved_at`，重载只改内存、不移动磁盘基线。内容等价回到保存点目前按新快照身份保守判脏；全文比较/指纹与后台版本采纳尚未实现，未做每键全文哈希。DocCore/OpenBlock 提交、IME 组合、自动保存/外改提示、命令规划与真实文件保存重开仍未实现；TA-02 的真实自动保存暂停/外改提示尚属 M2。证据与未覆盖边界见[组 5 记录](./validation/m0-engine-foundation/group-5/step-5.5/report.md)。
+
 ## 6. 功能分配与需求追踪
 
 表中阶段是首次具备相关链路及完整交付阶段；更细边界由 V 产物冻结。每个需求的测试记录应保存需求号、输入、操作、预期、实际证据和平台，不能只写“同上/全绿”。

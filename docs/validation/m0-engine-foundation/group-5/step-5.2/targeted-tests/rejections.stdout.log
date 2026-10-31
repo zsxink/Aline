@@ -1,0 +1,9 @@
+
+running 4 tests
+test legal_empty_insertion_and_no_change_replacement_are_distinct ... ok
+test no_change_after_undo_does_not_clear_redo_branch ... ok
+test apply_rejections_are_atomic_for_baseline_selection_and_capacities ... ok
+test rejection_cases_leave_text_index_selection_revision_and_history_unchanged ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
