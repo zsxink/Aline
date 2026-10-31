@@ -1,0 +1,3 @@
+   Compiling aline-edit v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-edit)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.25s
+     Running tests/refusals.rs (target/debug/deps/refusals-18229e48c2bba282)

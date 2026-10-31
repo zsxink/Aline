@@ -1,0 +1,28 @@
+{
+  "argv": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "/Users/xian/Project/editor/Aline/scripts/check_engineering.py",
+    "--metadata",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-7/step-7.4/leader-verify-post-fix/workspace-gates/dependency-fixtures/results/negative-buffer-source-metadata.stdout.log",
+    "--tree",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-7/step-7.4/leader-verify-post-fix/workspace-gates/dependency-fixtures/results/negative-buffer-source-tree.stdout.log",
+    "--lock",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-7/step-7.4/leader-verify-post-fix/workspace-gates/dependency-fixtures/fixtures/negative-buffer-source/Cargo.lock",
+    "--scenario",
+    "all",
+    "--metadata-command",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-7/step-7.4/leader-verify-post-fix/workspace-gates/dependency-fixtures/results/negative-buffer-source-metadata.command.json",
+    "--tree-command",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-7/step-7.4/leader-verify-post-fix/workspace-gates/dependency-fixtures/results/negative-buffer-source-tree.command.json"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "started_utc": "2026-10-31T10:04:40.367721+00:00",
+  "finished_utc": "2026-10-31T10:04:40.400121+00:00",
+  "exit_code": 1,
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "7bc43510dd46cfc5264de1d1d69a22a3020afc719e0e1b428a39a01c7ba5b6d6",
+  "env_overrides": {
+    "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  }
+}

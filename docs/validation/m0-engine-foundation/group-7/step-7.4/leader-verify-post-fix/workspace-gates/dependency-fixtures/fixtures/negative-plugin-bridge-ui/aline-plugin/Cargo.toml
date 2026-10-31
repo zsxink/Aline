@@ -1,0 +1,8 @@
+[package]
+name = "aline-plugin"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+hidden_alias = { package = "fixture-helper", path = "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-7/step-7.4/leader-verify-post-fix/workspace-gates/dependency-fixtures/fixtures/packages/negative-plugin-bridge-ui-helper" }

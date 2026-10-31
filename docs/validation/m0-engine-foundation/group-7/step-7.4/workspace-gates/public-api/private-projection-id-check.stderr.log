@@ -1,0 +1,15 @@
+    Checking aline-m0-api-private-projection-id v0.0.0 (/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-7/step-7.4/workspace-gates/public-api/fixtures/private-projection-id)
+error[E0423]: cannot initialize a tuple struct which contains private fields
+  --> src/main.rs:8:15
+   |
+ 8 | let _forged = aline_markdown::ProjectionId(std::sync::Arc::new(()));
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: constructor is not visible here due to private fields
+  --> /Users/xian/Project/editor/Aline/crates/aline-markdown/src/mapping/coordinates.rs:11:25
+   |
+11 | pub struct ProjectionId(pub(super) Arc<()>);
+   |                         ^^^^^^^^^^^^^^^^^^ private field
+
+For more information about this error, try `rustc --explain E0423`.
+error: could not compile `aline-m0-api-private-projection-id` (bin "aline-m0-api-private-projection-id") due to 1 previous error

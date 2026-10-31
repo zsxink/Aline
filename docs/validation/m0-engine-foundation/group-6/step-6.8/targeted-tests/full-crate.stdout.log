@@ -1,0 +1,117 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 10 tests
+test rewritten_budget_failure_returns_budget_error_not_partial_text ... ok
+test source_budget_is_checked_before_reading ... ok
+test injected_node_budget_terminates_before_publishing_partial_tree ... ok
+test deep_nesting_terminates_with_raw_fallback ... ok
+test deep_nesting_within_budget_keeps_full_text ... ok
+test repeated_unclosed_tags_fall_back_to_whole_source_without_truncation ... ok
+test repeated_unclosed_quotes_stay_linear_and_keep_source ... ok
+test scan_steps_are_measured_by_the_budget_threshold ... ok
+test huge_table_is_not_truncated_within_budget ... ok
+test huge_paragraph_is_not_truncated ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 11 tests
+test comments_and_processing_instructions_are_hidden ... ok
+test cross_nesting_pops_through_outer_tag ... ok
+test filtered_tags_remain_visible_literal_text ... ok
+test nested_supported_tags_merge_styles ... ok
+test supported_tags_map_to_styles_and_hide_markup ... ok
+test quoted_greater_than_does_not_end_tag_early ... ok
+test entities_inside_html_keep_aligned_mapping ... ok
+test html_budget_failure_falls_back_to_whole_source ... ok
+test unclosed_supported_tag_keeps_style_without_panicking ... ok
+test links_require_allowed_href_schemes ... ok
+test html_block_fixture_stays_protected_and_styled ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test identity_mapping_refuses_foreign_projection_snapshot_and_invalid_units ... ok
+test identity_mapping_converts_local_global_and_utf16_through_one_service ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 10 tests
+test local_projection_rejects_sources_outside_its_range ... ok
+test hidden_and_synthetic_segments_anchor_without_pretending_bijection ... ok
+test identity_roundtrip_covers_all_char_boundaries ... ok
+test entities_and_escapes_map_as_aligned_segments ... ok
+test br_tag_produces_synthetic_newline ... ok
+test multichar_and_numeric_entities_keep_drawn_width ... ok
+test selections_preserve_direction_and_entity_alignment ... ok
+test soft_and_hard_breaks_are_exact_or_aligned ... ok
+test stale_projection_and_snapshot_are_rejected ... ok
+test utf16_offsets_reject_surrogate_middles ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+test raw_fallback_protects_the_whole_source ... ok
+test front_matter_and_toc_are_protected_independently ... ok
+test literal_code_does_not_trigger_protection_or_front_matter ... ok
+test adjacent_footnote_references_stay_separate_subranges ... ok
+test html_block_is_protected_as_one_range ... ok
+test inline_html_tags_are_protected_per_tag ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test immutable_projection_can_be_carried_by_future_host_tasks ... ok
+test projection_coordinates_are_typed_and_bound_to_one_instance ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 7 tests
+test edit_inside_one_paragraph_keeps_only_outer_blocks ... ok
+test reused_text_matches_full_reparse_block_by_block ... ok
+test old_absolute_ranges_fail_against_new_snapshot ... ok
+test unrelated_documents_reuse_nothing ... ok
+test config_change_and_raw_fallback_refuse_reuse ... ok
+test insertion_before_rebases_matching_suffix_blocks ... ok
+test global_dependencies_refuse_reuse ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+test control_bytes_do_not_collide_with_synthetic_markers ... ok
+test front_matter_is_hidden_in_parse_copy_and_maps_back_to_source ... ok
+test reversed_overlapping_and_non_boundary_edits_are_rejected ... ok
+test maps_compose_through_two_rewrite_levels ... ok
+test multi_edit_map_preserves_each_source_segment ... ok
+test parse_budget_failure_falls_back_to_original_text ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 8 tests
+test empty_document_has_no_blocks_or_gaps ... ok
+test dump_contains_config_blocks_gaps_source_protection_and_diagnostics ... ok
+test literal_code_block_avoids_front_matter_toc_footnote_and_html ... ok
+test unclosed_front_matter_is_not_swallowed ... ok
+test basic_blocks_and_gaps_match_handwritten_goldens ... ok
+test gfm_features_are_enabled_explicitly ... ok
+test front_matter_plus_and_yaml_are_paired ... ok
+test fixture_blocks_and_gaps_match_handwritten_goldens ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,8 @@
+[package]
+name = "aline-ui"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+hidden_alias = { package = "notify", path = "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-6/leader-verify-round-2/workspace-gates/dependency-fixtures/fixtures/packages/notify" }

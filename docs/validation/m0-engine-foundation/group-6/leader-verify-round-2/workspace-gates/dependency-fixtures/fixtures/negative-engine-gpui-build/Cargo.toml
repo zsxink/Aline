@@ -1,0 +1,3 @@
+[workspace]
+resolver = "3"
+members = ["aline","aline-app-core","aline-buffer","aline-edit","aline-markdown","aline-plugin","aline-source","aline-ui"]

@@ -1,0 +1,18 @@
+# 组 7 修复后（F2-1/F2-2/F3-1）定向测试与门禁命令记录
+# 格式：UTC 起始<TAB>UTC 结束<TAB>退出码<TAB>命令
+# 环境：CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home RUSTUP_TOOLCHAIN=1.98.1 CARGO_NET_OFFLINE=true
+# 原始 stdout/stderr：docs/validation/m0-engine-foundation/group-7/step-7.2/targeted-tests-post-fix/
+2026-10-31T10:00:21Z	2026-10-31T10:00:21Z	0	cargo test -p aline-edit --locked --offline --test refusals
+2026-10-31T10:00:21Z	2026-10-31T10:00:21Z	0	cargo test -p aline-edit --locked --offline --test goldens
+2026-10-31T10:00:21Z	2026-10-31T10:00:21Z	0	cargo test -p aline-edit --locked --offline --test protection
+2026-10-31T10:00:21Z	2026-10-31T10:00:22Z	0	cargo test -p aline-edit --locked --offline
+2026-10-31T10:00:22Z	2026-10-31T10:00:22Z	0	cargo clippy -p aline-edit --all-targets --locked --offline -- -D warnings
+2026-10-31T10:00:22Z	2026-10-31T10:00:22Z	0	cargo fmt --all --check
+#
+# 关键输出摘要（均摘自同名 stdout/stderr 原始日志）
+# refusals: running 15 tests; test result: ok. 15 passed; 0 failed; 0 ignored
+# goldens: running 6 tests; test result: ok. 6 passed; 0 failed; 0 ignored
+# protection: running 4 tests; test result: ok. 4 passed; 0 failed; 0 ignored
+# full-crate: unittests 0 + goldens 6 + protection 4 + refusals 15 + doc-tests 0；合计 25 passed, 0 failed
+# clippy: Finished dev profile; 无 warning（-D warnings 退出 0）
+# fmt-check: 无输出；退出 0

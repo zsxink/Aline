@@ -1,0 +1,11 @@
+
+running 6 tests
+test control_bytes_do_not_collide_with_synthetic_markers ... ok
+test maps_compose_through_two_rewrite_levels ... ok
+test reversed_overlapping_and_non_boundary_edits_are_rejected ... ok
+test multi_edit_map_preserves_each_source_segment ... ok
+test front_matter_is_hidden_in_parse_copy_and_maps_back_to_source ... ok
+test parse_budget_failure_falls_back_to_original_text ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

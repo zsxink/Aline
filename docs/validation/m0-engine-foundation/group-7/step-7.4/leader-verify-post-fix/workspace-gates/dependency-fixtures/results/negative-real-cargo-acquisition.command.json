@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "cargo",
+    "metadata",
+    "--offline",
+    "--format-version",
+    "1",
+    "--manifest-path",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-7/step-7.4/leader-verify-post-fix/workspace-gates/dependency-fixtures/fixtures/missing/Cargo.toml"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "started_utc": "2026-10-31T10:04:45.468149+00:00",
+  "finished_utc": "2026-10-31T10:04:45.477690+00:00",
+  "exit_code": 101,
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "4f94644be3ac2d6f6fdd04c763e953ce25fc648f152b106bc7afe358532c27b3",
+  "env_overrides": {
+    "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  }
+}

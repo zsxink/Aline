@@ -1,0 +1,12 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.05s
+     Running unittests src/lib.rs (target/debug/deps/aline_markdown-90346524485eca21)
+     Running tests/hostile.rs (target/debug/deps/hostile-a192e5710e5dc231)
+     Running tests/html.rs (target/debug/deps/html-44ebd4c6c4dc27a8)
+     Running tests/identity_mapping.rs (target/debug/deps/identity_mapping-ecc77ee2bd14d6dc)
+     Running tests/mapping.rs (target/debug/deps/mapping-4760fc313f746858)
+     Running tests/protection.rs (target/debug/deps/protection-ef96cd5f2f09bc9e)
+     Running tests/public_boundaries.rs (target/debug/deps/public_boundaries-88b79ebe551053c5)
+     Running tests/reuse.rs (target/debug/deps/reuse-3c12cac10955b4ac)
+     Running tests/rewrite.rs (target/debug/deps/rewrite-05cf926af7a4ce05)
+     Running tests/spec.rs (target/debug/deps/spec-77b5ed904722e83a)
+   Doc-tests aline_markdown

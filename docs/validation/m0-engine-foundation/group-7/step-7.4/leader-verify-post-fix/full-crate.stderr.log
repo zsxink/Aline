@@ -1,0 +1,6 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.03s
+     Running unittests src/lib.rs (target/debug/deps/aline_edit-1d5e7602ebfd60f5)
+     Running tests/goldens.rs (target/debug/deps/goldens-407198a8a43383fa)
+     Running tests/protection.rs (target/debug/deps/protection-030b80ea54443346)
+     Running tests/refusals.rs (target/debug/deps/refusals-18229e48c2bba282)
+   Doc-tests aline_edit

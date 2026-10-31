@@ -1,0 +1,14 @@
+2026-10-31T08:48:11Z	2026-10-31T08:48:11Z	zsh -c date -u; uname -a; rustc -Vv; cargo -V; printenv CARGO_HOME RUSTUP_TOOLCHAIN CARGO_NET_OFFLINE	exit=0
+2026-10-31T08:48:11Z	2026-10-31T08:48:11Z	zsh -c git -C /Users/xian/Project/editor/Aline rev-parse HEAD; git -C /Users/xian/Project/editor/Aline status --porcelain	exit=0
+2026-10-31T08:48:11Z	2026-10-31T08:48:11Z	cargo test -p aline-markdown --locked --offline -- --list	exit=0
+2026-10-31T08:48:11Z	2026-10-31T08:48:11Z	cargo test -p aline-markdown --locked --offline --test spec	exit=0
+2026-10-31T08:48:11Z	2026-10-31T08:48:11Z	cargo test -p aline-markdown --locked --offline --test rewrite	exit=0
+2026-10-31T08:48:11Z	2026-10-31T08:48:13Z	cargo run -q -p aline-markdown --locked --offline --example dump_tree -- crates/aline-markdown/tests/fixtures/m0/basic.md	exit=0
+2026-10-31T08:48:13Z	2026-10-31T08:48:13Z	cargo test -p aline-markdown --locked --offline --test mapping	exit=0
+2026-10-31T08:48:13Z	2026-10-31T08:48:13Z	cargo test -p aline-markdown --locked --offline --test html	exit=0
+2026-10-31T08:48:13Z	2026-10-31T08:48:13Z	cargo test -p aline-markdown --locked --offline --test protection	exit=0
+2026-10-31T08:48:13Z	2026-10-31T08:48:13Z	cargo test -p aline-markdown --locked --offline --test hostile	exit=0
+2026-10-31T08:48:13Z	2026-10-31T08:48:13Z	cargo test -p aline-markdown --locked --offline --test reuse	exit=0
+2026-10-31T08:48:13Z	2026-10-31T08:48:13Z	cargo test -p aline-markdown --locked --offline	exit=0
+2026-10-31T08:48:13Z	2026-10-31T08:48:13Z	python3 -I /Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-6/verify_goldens.py /Users/xian/Project/editor/Aline	exit=0
+2026-10-31T09:13:09Z	2026-10-31T09:13:10Z	cargo run -q (扫描步数阈值探针)	exit=0

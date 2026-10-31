@@ -1,0 +1,15 @@
+
+running 10 tests
+test local_projection_rejects_sources_outside_its_range ... ok
+test hidden_and_synthetic_segments_anchor_without_pretending_bijection ... ok
+test identity_roundtrip_covers_all_char_boundaries ... ok
+test entities_and_escapes_map_as_aligned_segments ... ok
+test multichar_and_numeric_entities_keep_drawn_width ... ok
+test br_tag_produces_synthetic_newline ... ok
+test selections_preserve_direction_and_entity_alignment ... ok
+test utf16_offsets_reject_surrogate_middles ... ok
+test soft_and_hard_breaks_are_exact_or_aligned ... ok
+test stale_projection_and_snapshot_are_rejected ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

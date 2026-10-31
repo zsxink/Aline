@@ -1,0 +1,2 @@
+2026-10-31T09:10:14Z	2026-10-31T09:10:14Z	cargo run -q (外部探针 /tmp/g6-mapcheck, path 依赖仓库 crates)	exit=0
+2026-10-31T09:12:23Z	2026-10-31T09:12:24Z	cargo run -q (缺口探针: ZWJ/重复/转义/tab/组合字符)	exit=0

@@ -1,0 +1,58 @@
+zwj	source_bytes	19
+zwj	drawn	"👨\u{200d}👩\u{200d}👧"
+zwj	segment	0..18	0..18	Exact
+zwj	segment	18..18	18..19	Hidden
+zwj	anchor	0	Ok((0, Exact))	Ok((0, Exact))
+zwj	anchor	4	Ok((4, Exact))	Ok((4, Exact))
+zwj	anchor	7	Ok((7, Exact))	Ok((7, Exact))
+zwj	anchor	11	Ok((11, Exact))	Ok((11, Exact))
+zwj	anchor	14	Ok((14, Exact))	Ok((14, Exact))
+zwj	anchor	18	Ok((18, Exact))	Ok((18, Exact))
+repeated_text	source_bytes	12
+repeated_text	drawn	"a a"
+repeated_text	segment	0..0	0..2	Hidden
+repeated_text	segment	0..1	2..3	Exact
+repeated_text	segment	1..1	3..5	Hidden
+repeated_text	segment	1..2	5..6	Exact
+repeated_text	segment	2..2	6..8	Hidden
+repeated_text	segment	2..3	8..9	Exact
+repeated_text	segment	3..3	9..12	Hidden
+repeated_text	anchor	0	Ok((2, Exact))	Ok((2, Exact))
+repeated_text	anchor	1	Ok((5, Exact))	Ok((5, Exact))
+repeated_text	anchor	2	Ok((8, Exact))	Ok((8, Exact))
+repeated_text	anchor	3	Ok((9, Exact))	Ok((9, Exact))
+double_space	source_bytes	5
+double_space	drawn	"a  b"
+double_space	segment	0..4	0..4	Exact
+double_space	segment	4..4	4..5	Hidden
+double_space	anchor	0	Ok((0, Exact))	Ok((0, Exact))
+double_space	anchor	1	Ok((1, Exact))	Ok((1, Exact))
+double_space	anchor	2	Ok((2, Exact))	Ok((2, Exact))
+double_space	anchor	3	Ok((3, Exact))	Ok((3, Exact))
+double_space	anchor	4	Ok((4, Exact))	Ok((4, Exact))
+escaped	source_bytes	6
+escaped	drawn	"*x*"
+escaped	segment	0..0	0..1	Hidden
+escaped	segment	0..2	1..3	Exact
+escaped	segment	2..2	3..4	Hidden
+escaped	segment	2..3	4..5	Exact
+escaped	segment	3..3	5..6	Hidden
+escaped	anchor	0	Ok((1, Exact))	Ok((1, Exact))
+escaped	anchor	1	Ok((2, Exact))	Ok((2, Exact))
+escaped	anchor	2	Ok((4, Exact))	Ok((4, Exact))
+escaped	anchor	3	Ok((5, Exact))	Ok((5, Exact))
+tab_indent	source_bytes	4
+tab_indent	drawn	"a\tb"
+tab_indent	segment	0..3	0..3	Exact
+tab_indent	segment	3..3	3..4	Hidden
+tab_indent	anchor	0	Ok((0, Exact))	Ok((0, Exact))
+tab_indent	anchor	1	Ok((1, Exact))	Ok((1, Exact))
+tab_indent	anchor	2	Ok((2, Exact))	Ok((2, Exact))
+tab_indent	anchor	3	Ok((3, Exact))	Ok((3, Exact))
+combining	source_bytes	4
+combining	drawn	"e\u{301}"
+combining	segment	0..3	0..3	Exact
+combining	segment	3..3	3..4	Hidden
+combining	anchor	0	Ok((0, Exact))	Ok((0, Exact))
+combining	anchor	1	Ok((1, Exact))	Ok((1, Exact))
+combining	anchor	3	Ok((3, Exact))	Ok((3, Exact))

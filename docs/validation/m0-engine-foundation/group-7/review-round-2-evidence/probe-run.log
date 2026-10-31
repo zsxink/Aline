@@ -1,0 +1,197 @@
+# probe run start: 2026-10-31T10:33:47Z
+# command: cd /tmp/aline-g7-r2/probe && cargo run --offline --quiet
+warning: unreachable pattern
+  --> src/main.rs:60:13
+   |
+60 |             _ => "Other",
+   |             ^ no value can reach this
+   |
+note: multiple earlier patterns match some of the same values
+  --> src/main.rs:60:13
+   |
+56 |             MappingPrecision::Exact => "Exact",
+   |             ----------------------- matches some of the same values
+57 |             MappingPrecision::Aligned => "Aligned",
+   |             ------------------------- matches some of the same values
+58 |             MappingPrecision::Hidden => "Hidden",
+   |             ------------------------ matches some of the same values
+59 |             MappingPrecision::Synthetic => "Synthetic",
+   |             --------------------------- matches some of the same values
+60 |             _ => "Other",
+   |             ^ collectively making this unreachable
+   = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+
+=== case link_title_internal_ws mode=Visual ===
+source "[x](https://e \"a  b\")\\n"
+before drawn "x"
+before blocks: [Paragraph]
+    seg Hidden    src 0..1 drawn 0..0 text "["
+    seg Exact     src 1..2 drawn 0..1 text "x"
+    seg Hidden    src 2..22 drawn 1..1 text "](https://e \"a  b\")\\n"
+plan: Err RereadFailed { reason: HiddenSourceChanged, cause: None }
+buffer state unchanged: true (text="[x](https://e \"a  b\")\n", anchor=0, head=0, rev=DocumentRevision(0), undo=0, redo=0, nodes=0)
+
+=== case hardbreak_spaces mode=Visual ===
+source "a  \\nb\\n"
+before drawn "a\\nb"
+before blocks: [Paragraph]
+    seg Exact     src 0..1 drawn 0..1 text "a"
+    seg Aligned   src 1..4 drawn 1..2 text "  \\n"
+    seg Exact     src 4..5 drawn 2..3 text "b"
+    seg Hidden    src 5..6 drawn 3..3 text "\\n"
+plan: Err RereadFailed { reason: VisibleTextChanged, cause: None }
+buffer state unchanged: true (text="a  \nb\n", anchor=0, head=0, rev=DocumentRevision(0), undo=0, redo=0, nodes=0)
+
+=== case heading_marker_space mode=Visual ===
+source "# Title\\n"
+before drawn "Title"
+before blocks: [Heading]
+    seg Hidden    src 0..2 drawn 0..0 text "# "
+    seg Exact     src 2..7 drawn 0..5 text "Title"
+    seg Hidden    src 7..8 drawn 5..5 text "\\n"
+plan: Err RereadFailed { reason: HiddenSourceChanged, cause: None }
+buffer state unchanged: true (text="# Title\n", anchor=0, head=0, rev=DocumentRevision(0), undo=0, redo=0, nodes=0)
+
+=== case footnote_body_ws mode=Visual ===
+source "text[^1]\\n\\n[^1]: a  b\\n"
+before drawn "text[^1]a  b"
+before blocks: [Paragraph, FootnoteDefinition]
+    seg Exact     src 0..4 drawn 0..4 text "text"
+    seg Exact     src 4..8 drawn 4..8 text "[^1]"
+    seg Hidden    src 8..16 drawn 8..8 text "\\n\\n[^1]: "
+    seg Exact     src 16..20 drawn 8..12 text "a  b"
+    seg Hidden    src 20..21 drawn 12..12 text "\\n"
+plan: Err ProtectedRange { kind: FootnoteDefinition, range: 10..20 }
+buffer state unchanged: true (text="text[^1]\n\n[^1]: a  b\n", anchor=0, head=0, rev=DocumentRevision(0), undo=0, redo=0, nodes=0)
+
+=== case html_attr_ws mode=Visual ===
+source "a <b  x=\"1\">z</b>\\n"
+before drawn "a z"
+before blocks: [Paragraph]
+    seg Exact     src 0..2 drawn 0..2 text "a "
+    seg Hidden    src 2..12 drawn 2..2 text "<b  x=\"1\">"
+    seg Exact     src 12..13 drawn 2..3 text "z"
+    seg Hidden    src 13..18 drawn 3..3 text "</b>\\n"
+plan: Err HtmlBoundary { range: 2..12 }
+buffer state unchanged: true (text="a <b  x=\"1\">z</b>\n", anchor=0, head=0, rev=DocumentRevision(0), undo=0, redo=0, nodes=0)
+
+=== case list_marker_space mode=Visual ===
+source "- a\\n"
+before drawn "a"
+before blocks: [List]
+    seg Hidden    src 0..2 drawn 0..0 text "- "
+    seg Exact     src 2..3 drawn 0..1 text "a"
+    seg Hidden    src 3..4 drawn 1..1 text "\\n"
+plan: Err RereadFailed { reason: HiddenSourceChanged, cause: None }
+buffer state unchanged: true (text="- a\n", anchor=0, head=0, rev=DocumentRevision(0), undo=0, redo=0, nodes=0)
+
+=== case quote_marker_space mode=Visual ===
+source "> a\\n"
+before drawn "a"
+before blocks: [BlockQuote]
+    seg Hidden    src 0..2 drawn 0..0 text "> "
+    seg Exact     src 2..3 drawn 0..1 text "a"
+    seg Hidden    src 3..4 drawn 1..1 text "\\n"
+plan: Err RereadFailed { reason: HiddenSourceChanged, cause: None }
+buffer state unchanged: true (text="> a\n", anchor=0, head=0, rev=DocumentRevision(0), undo=0, redo=0, nodes=0)
+
+=== case fence_info_space mode=Visual ===
+source "``` rust\\nx\\n```\\n"
+before drawn "x\\n"
+before blocks: [CodeBlock]
+    seg Hidden    src 0..9 drawn 0..0 text "``` rust\\n"
+    seg Exact     src 9..11 drawn 0..2 text "x\\n"
+    seg Hidden    src 11..15 drawn 2..2 text "```\\n"
+plan: Err RereadFailed { reason: HiddenSourceChanged, cause: None }
+buffer state unchanged: true (text="``` rust\nx\n```\n", anchor=0, head=0, rev=DocumentRevision(0), undo=0, redo=0, nodes=0)
+
+=== case paragraph_separator mode=Visual ===
+source "a\\n\\nb\\n"
+before drawn "ab"
+before blocks: [Paragraph, Paragraph]
+    seg Exact     src 0..1 drawn 0..1 text "a"
+    seg Hidden    src 1..3 drawn 1..1 text "\\n\\n"
+    seg Exact     src 3..4 drawn 1..2 text "b"
+    seg Hidden    src 4..5 drawn 2..2 text "\\n"
+plan: Changed
+validate: Ok(ValidatedChange)
+candidate "ab\\n"
+candidate drawn "ab"
+candidate blocks: [Paragraph]
+    seg Exact     src 0..2 drawn 0..2 text "ab"
+    seg Hidden    src 2..3 drawn 2..2 text "\\n"
+buffer state unchanged: true (text="a\n\nb\n", anchor=0, head=0, rev=DocumentRevision(0), undo=0, redo=0, nodes=0)
+
+=== case paragraph_half_separator mode=Visual ===
+source "a\\n\\nb\\n"
+before drawn "ab"
+before blocks: [Paragraph, Paragraph]
+    seg Exact     src 0..1 drawn 0..1 text "a"
+    seg Hidden    src 1..3 drawn 1..1 text "\\n\\n"
+    seg Exact     src 3..4 drawn 1..2 text "b"
+    seg Hidden    src 4..5 drawn 2..2 text "\\n"
+plan: Err RereadFailed { reason: VisibleTextChanged, cause: None }
+buffer state unchanged: true (text="a\n\nb\n", anchor=0, head=0, rev=DocumentRevision(0), undo=0, redo=0, nodes=0)
+
+=== case softbreak mode=Visual ===
+source "a\\nb\\n"
+before drawn "a\\nb"
+before blocks: [Paragraph]
+    seg Exact     src 0..1 drawn 0..1 text "a"
+    seg Exact     src 1..2 drawn 1..2 text "\\n"
+    seg Exact     src 2..3 drawn 2..3 text "b"
+    seg Hidden    src 3..4 drawn 3..3 text "\\n"
+plan: Changed
+validate: Ok(ValidatedChange)
+candidate "ab\\n"
+candidate drawn "ab"
+candidate blocks: [Paragraph]
+    seg Exact     src 0..2 drawn 0..2 text "ab"
+    seg Hidden    src 2..3 drawn 2..2 text "\\n"
+buffer state unchanged: true (text="a\nb\n", anchor=0, head=0, rev=DocumentRevision(0), undo=0, redo=0, nodes=0)
+
+=== case trailing_newline mode=Visual ===
+source "a\\n"
+before drawn "a"
+before blocks: [Paragraph]
+    seg Exact     src 0..1 drawn 0..1 text "a"
+    seg Hidden    src 1..2 drawn 1..1 text "\\n"
+plan: Changed
+validate: Ok(ValidatedChange)
+candidate "a"
+candidate drawn "a"
+candidate blocks: [Paragraph]
+    seg Exact     src 0..1 drawn 0..1 text "a"
+buffer state unchanged: true (text="a\n", anchor=0, head=0, rev=DocumentRevision(0), undo=0, redo=0, nodes=0)
+
+=== case list_paragraph_separator mode=Visual ===
+source "- a\\n\\nb\\n"
+before drawn "ab"
+before blocks: [List, Paragraph]
+    seg Hidden    src 0..2 drawn 0..0 text "- "
+    seg Exact     src 2..3 drawn 0..1 text "a"
+    seg Hidden    src 3..5 drawn 1..1 text "\\n\\n"
+    seg Exact     src 5..6 drawn 1..2 text "b"
+    seg Hidden    src 6..7 drawn 2..2 text "\\n"
+plan: Changed
+validate: Ok(ValidatedChange)
+candidate "- ab\\n"
+candidate drawn "ab"
+candidate blocks: [List]
+    seg Hidden    src 0..2 drawn 0..0 text "- "
+    seg Exact     src 2..4 drawn 0..2 text "ab"
+    seg Hidden    src 4..5 drawn 2..2 text "\\n"
+buffer state unchanged: true (text="- a\n\nb\n", anchor=0, head=0, rev=DocumentRevision(0), undo=0, redo=0, nodes=0)
+
+=== case extra_blank_line mode=Visual ===
+source "a\\n\\n\\nb\\n"
+before drawn "ab"
+before blocks: [Paragraph, Paragraph]
+    seg Exact     src 0..1 drawn 0..1 text "a"
+    seg Hidden    src 1..4 drawn 1..1 text "\\n\\n\\n"
+    seg Exact     src 4..5 drawn 1..2 text "b"
+    seg Hidden    src 5..6 drawn 2..2 text "\\n"
+plan: Err RereadFailed { reason: VisibleTextChanged, cause: None }
+buffer state unchanged: true (text="a\n\n\nb\n", anchor=0, head=0, rev=DocumentRevision(0), undo=0, redo=0, nodes=0)
+# probe run end: 2026-10-31T10:33:49Z exit=0

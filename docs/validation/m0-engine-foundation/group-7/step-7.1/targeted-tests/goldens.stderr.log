@@ -1,0 +1,2 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.03s
+     Running tests/goldens.rs (target/debug/deps/goldens-407198a8a43383fa)

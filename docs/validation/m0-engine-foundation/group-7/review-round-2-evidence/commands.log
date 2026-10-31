@@ -1,0 +1,40 @@
+# 组 7 第二轮独立复核命令记录（review-round-2）
+# 复核者：独立复核（非实现者）。日期：2026-10-31（UTC）。
+# HEAD：99867bf2c5775aae4e8ed910713496d4ff84323c（复核开始与结束时均未变）。
+# 工作目录：/Users/xian/Project/editor/Aline
+# 环境（每条 cargo 命令均设置）：
+#   CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home
+#   RUSTUP_TOOLCHAIN=1.98.1
+#   CARGO_NET_OFFLINE=true
+# 格式：UTC start<TAB>UTC end<TAB>exit<TAB>command<TAB>log
+# “—”表示当时未单独记录该端点；end 取自日志文件 mtime 或日志内嵌结束标记。
+
+2026-10-31T10:21:05Z	2026-10-31T10:21:09Z	0	cargo test -p aline-edit --locked --offline	cargo-test-aline-edit.log
+2026-10-31T10:21:16Z	2026-10-31T10:21:18Z	0	cargo clippy -p aline-edit --all-targets --locked --offline -- -D warnings	cargo-clippy-aline-edit.log
+2026-10-31T10:21:20Z	2026-10-31T10:21:22Z	1	cargo fmt --all --check	cargo-fmt-check.log
+2026-10-31T10:31:39Z	2026-10-31T10:31:41Z	0	cargo fmt -p aline-edit -- --check	fmt-aline-edit-package.log
+2026-10-31T10:31:59Z	2026-10-31T10:32:03Z	0	cargo test -p aline-edit --locked --offline	cargo-test-aline-edit-2.log
+2026-10-31T10:32:03Z	2026-10-31T10:32:04Z	0	cargo clippy -p aline-edit --all-targets --locked --offline -- -D warnings	cargo-clippy-aline-edit-2.log
+2026-10-31T10:32:04Z	2026-10-31T10:32:04Z	0	cargo fmt --all --check	cargo-fmt-check-2.log
+2026-10-31T10:33:47Z	2026-10-31T10:33:49Z	0	cd /tmp/aline-g7-r2/probe && CARGO_TARGET_DIR=/tmp/aline-g7-r2/probe-target cargo run --offline --quiet	probe-run.log
+2026-10-31T10:33:49Z	2026-10-31T10:33:49Z	0	date -u; uname -a; rustc -Vv; cargo -V; sw_vers	environment.log
+2026-10-31T10:34:01Z	2026-10-31T10:34:01Z	0	git status --porcelain; shasum -a 256 docs/*.md; git diff --stat docs/; git diff docs/ | grep -cE '^-[^-]'; python3 -I (TSV/added-line classification); git hash-object; git ls-files --stage; stat; rg -n (write-channel scan); grep tasks.md; grep test-result logs	static-checks.log
+2026-10-31T10:38:13Z	2026-10-31T10:38:13Z	0	shasum -a 256 docs/*.md; stat mtimes; git diff --stat docs/; git diff docs/ | grep -cE '^-[^-]'; python3 -I (group-7 vs other added-line classification)	docs-snapshot-final.log
+2026-10-31T10:40:18Z	2026-10-31T10:40:19Z	0	git rev-parse HEAD; stat -f %m + date -u -r (source/test/golden mtimes); shasum -a 256 golden; git ls-files --stage (golden); git status --porcelain (golden); git diff --cached --stat (golden)	final-head-mtimes.log
+2026-10-31T10:42:33Z	2026-10-31T10:42:33Z	0	git rev-parse HEAD; git status --porcelain -- (review-round-2.md, review-round-2-evidence/, golden)	final-status.log
+
+# 说明
+# 1) 第 3 条 `cargo fmt --all --check`（10:21:22Z）退出 1，差异只在并发写入的
+#    crates/aline-markdown/examples/probe_events.rs 与 crates/aline-markdown/src/budget.rs，
+#    不涉及 aline-edit；第 7 条在同一工作树的后续状态（并发写入被其作者修好/移除后）退出 0。
+# 2) 第 4 条只检查 aline-edit 的包级格式，退出 0，输出为空（0 字节）。
+# 3) 第 8 条探针 crate 在 /tmp/aline-g7-r2/probe，独立 workspace，依赖以绝对路径指向
+#    本仓库 crates/aline-buffer、crates/aline-markdown、crates/aline-edit；14 个用例，
+#    "buffer state unchanged: true" 14 次、"false" 0 次。
+# 4) 本轮没有运行 workspace 级 `cargo test --workspace`/`cargo clippy --workspace`/
+#    scripts/check_workspace.py；只核对了实现者与调度方的 summary.json、日志与时间戳。
+# 5) 全部命令均只读仓库；未执行 git add/commit/push，未修改代码、测试、金样或其它文档。
+# 6) 10:40:18Z 复核时金样已不在索引（git ls-files --stage 为空，porcelain 为 ??），
+#    而 10:34:01Z 的 static-checks.log 仍记录为 A 且索引 blob 与工作区一致。
+#    金样内容 sha256 与 mtime 未变；该索引变化发生在复核窗口内，非本复核所为。
+#    详见 review-round-2.md 的 N-F3-4。

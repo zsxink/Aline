@@ -1,0 +1,33 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s
+     Running unittests src/lib.rs (target/debug/deps/aline_edit-1d5e7602ebfd60f5)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/goldens.rs (target/debug/deps/goldens-407198a8a43383fa)
+
+running 1 test
+test golden_contains_all_required_refusal_classes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/protection.rs (target/debug/deps/protection-030b80ea54443346)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/refusals.rs (target/debug/deps/refusals-18229e48c2bba282)
+
+running 7 tests
+test refusal_keeps_composition_state_untouched ... ok
+test budget_exceeded_refusal_keeps_buffer_state ... ok
+test protected_range_refusal_keeps_buffer_state ... ok
+test refusal_keeps_redo_branch_and_history_intact ... ok
+test html_boundary_refusal_keeps_buffer_state ... ok
+test reread_failure_refusal_keeps_buffer_state ... ok
+test refusal_keeps_pending_typing_group_open ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+

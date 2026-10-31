@@ -1,0 +1,1 @@
+2026-10-31T09:23:35Z	2026-10-31T09:23:35Z	zsh -c '逐变量 printenv CARGO_HOME/RUSTUP_TOOLCHAIN/CARGO_NET_OFFLINE；uname -a；rustc -Vv；cargo -V（含显式导出后复查）'	exit=0

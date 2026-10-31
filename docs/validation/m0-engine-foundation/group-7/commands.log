@@ -1,0 +1,15 @@
+# 组 7 命令证据（UTC）
+# 格式：start<TAB>end<TAB>exit<TAB>command
+# 说明：每条命令的原始 stdout/stderr 另存于对应 step 目录；本文件只记录时间、命令与退出码。
+2026-10-31T09:08:50Z	2026-10-31T09:08:50Z	0	stat + shasum -a 256 + git add docs/validation/m0-engine-foundation/group-7/step-7.1/goldens/edit-goldens.tsv
+2026-10-31T09:21:05Z	2026-10-31T09:21:05Z	0	zsh -c date -u; uname -a; rustc -Vv; cargo -V; printenv CARGO_HOME RUSTUP_TOOLCHAIN CARGO_NET_OFFLINE CARGO_TARGET_DIR
+2026-10-31T09:21:05Z	2026-10-31T09:21:05Z	0	zsh -c git -C /Users/xian/Project/editor/Aline rev-parse HEAD; git -C /Users/xian/Project/editor/Aline status --porcelain
+2026-10-31T09:21:05Z	2026-10-31T09:21:09Z	0	cargo test -p aline-edit --locked --offline -- --list
+2026-10-31T09:21:09Z	2026-10-31T09:21:09Z	0	cargo test -p aline-edit --locked --offline --test goldens
+2026-10-31T09:21:09Z	2026-10-31T09:21:09Z	0	cargo test -p aline-edit --locked --offline --test goldens golden_validate
+2026-10-31T09:21:09Z	2026-10-31T09:21:09Z	0	cargo test -p aline-edit --locked --offline --test goldens golden_consume
+2026-10-31T09:21:09Z	2026-10-31T09:21:09Z	0	cargo test -p aline-edit --locked --offline --test refusals
+2026-10-31T09:21:09Z	2026-10-31T09:21:09Z	0	cargo test -p aline-edit --locked --offline --test protection
+2026-10-31T09:21:09Z	2026-10-31T09:21:09Z	0	cargo test -p aline-edit --locked --offline
+2026-10-31T09:21:09Z	2026-10-31T09:21:48Z	0	python3 -I /Users/xian/Project/editor/Aline/scripts/check_workspace.py --cargo-home /Users/xian/Library/Caches/aline-m0/cargo-home --output-dir /Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-7/step-7.4/workspace-gates
+2026-10-31T09:23:06Z	2026-10-31T09:23:06Z	0	manual write-channel review (rg/sed) > docs/validation/m0-engine-foundation/group-7/step-7.4/manual-write-channel-review.log

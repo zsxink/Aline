@@ -1,0 +1,28 @@
+{
+  "argv": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "/Users/xian/Project/editor/Aline/scripts/check_engineering.py",
+    "--metadata",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-6/step-6.8/workspace-gates/dependency-fixtures/fixtures/positive-synthetic-baseline/metadata.json",
+    "--tree",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-6/step-6.8/workspace-gates/dependency-fixtures/fixtures/positive-synthetic-baseline/tree.log",
+    "--lock",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-6/step-6.8/workspace-gates/dependency-fixtures/fixtures/positive-synthetic-baseline/Cargo.lock",
+    "--scenario",
+    "all",
+    "--metadata-command",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-6/step-6.8/workspace-gates/dependency-fixtures/fixtures/positive-synthetic-baseline/metadata.synthetic-command.json",
+    "--tree-command",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-6/step-6.8/workspace-gates/dependency-fixtures/fixtures/positive-synthetic-baseline/tree.synthetic-command.json"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline",
+  "started_utc": "2026-10-31T08:43:55.166724+00:00",
+  "finished_utc": "2026-10-31T08:43:55.276231+00:00",
+  "exit_code": 0,
+  "stdout_sha256": "29c825c179dcba244951f86d72e1c1fed2520f797a7bf067d03de66afc24ce5a",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "env_overrides": {
+    "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  }
+}

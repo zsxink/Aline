@@ -1,0 +1,12 @@
+2026-10-31T10:18:40Z | CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home RUSTUP_TOOLCHAIN=1.98.1 CARGO_NET_OFFLINE=true cargo fmt -p aline-markdown -- --check | exit=1 | fmt-check.stdout.log (first attempt; same unrelated failure in crates/aline-markdown/examples/probe_events.rs)
+2026-10-31T10:19:53Z | CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home RUSTUP_TOOLCHAIN=1.98.1 CARGO_NET_OFFLINE=true cargo test -p aline-markdown --locked --offline --test reuse | exit=0 | targeted-reuse.stdout.log
+2026-10-31T10:20:00Z | CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home RUSTUP_TOOLCHAIN=1.98.1 CARGO_NET_OFFLINE=true cargo fmt -p aline-markdown -- --check | exit=1 | fmt-check.stdout.log (retry after 40s wait; failure is in crates/aline-markdown/examples/probe_events.rs, not a file this task changes)
+2026-10-31T10:20:04Z | CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home RUSTUP_TOOLCHAIN=1.98.1 CARGO_NET_OFFLINE=true cargo test -p aline-markdown --locked --offline | exit=0 | full-crate-tests.stdout.log
+2026-10-31T10:20:08Z | CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home RUSTUP_TOOLCHAIN=1.98.1 CARGO_NET_OFFLINE=true cargo clippy -p aline-markdown --all-targets --locked --offline -- -D warnings | exit=0 | clippy.stdout.log
+2026-10-31T10:20:13Z | RUSTUP_TOOLCHAIN=1.98.1 rustfmt --check --edition 2024 crates/aline-markdown/src/reuse.rs crates/aline-markdown/tests/reuse.rs | exit=0 | fmt-check-changed-files.stdout.log (scoped substitute for crate-wide fmt; only files changed by this task)
+
+Notes:
+- An initial invocation of the targeted reuse test used a shell wrapper that assigned to zsh's read-only `status` variable, so the wrapper aborted after cargo ran; that run's exit code was not captured and its log was overwritten by the timestamped run above (same code, same passing result).
+- The first crate-wide `cargo fmt` attempt at 10:18:40Z failed with the same `probe_events.rs` diff; its log was overwritten by the 10:20:00Z retry (identical output).
+- The crate-wide `cargo fmt` failure is confined to `crates/aline-markdown/examples/probe_events.rs`, an untracked probe file modified by another agent during this task (mtime 2026-10-31T10:17:24Z). It was not touched by this task. A 40s wait and retry produced the same failure. The two files changed by this task pass `rustfmt --check --edition 2024`.
+- Earlier timestamp-less runs of the targeted suite, full crate suite, and clippy (all exit=0) were rerun at the timestamps above; logs contain the rerun output.

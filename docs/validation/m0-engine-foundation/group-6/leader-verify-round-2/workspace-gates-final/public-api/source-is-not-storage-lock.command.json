@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "cargo",
+    "generate-lockfile",
+    "--manifest-path",
+    "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-6/leader-verify-round-2/workspace-gates-final/public-api/fixtures/source-is-not-storage/Cargo.toml",
+    "--offline"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-6/leader-verify-round-2/workspace-gates-final/public-api/fixtures/source-is-not-storage",
+  "started_utc": "2026-10-31T10:40:48.787952+00:00",
+  "finished_utc": "2026-10-31T10:40:48.802391+00:00",
+  "exit_code": 0,
+  "env_overrides": {
+    "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_TARGET_DIR": "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-6/leader-verify-round-2/workspace-gates-final/public-api/cargo-target"
+  }
+}

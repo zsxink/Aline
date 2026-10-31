@@ -1,0 +1,12 @@
+
+running 7 tests
+test refusal_keeps_composition_state_untouched ... ok
+test identity_replace_creates_no_history_step ... ok
+test visual_multi_edit_batch_refused_without_state_change ... ok
+test refusal_keeps_redo_branch_and_history_intact ... ok
+test refusal_keeps_pending_typing_group_open ... ok
+test successful_plan_and_validation_leave_buffer_untouched ... ok
+test stale_plan_wrong_version_does_not_touch_buffer ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

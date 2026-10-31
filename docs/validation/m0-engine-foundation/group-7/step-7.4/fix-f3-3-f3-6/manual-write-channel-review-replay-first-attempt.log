@@ -1,0 +1,31 @@
+# 人工写入通道审查（可复现重跑）
+# UTC: 2026-10-31T10:55:00Z
+# HEAD: 99867bf2c5775aae4e8ed910713496d4ff84323c
+
+### $ rg -n "&mut StringBuffer|StringBuffer::apply|\.apply\(|\.reload\(|\.undo\(|\.redo\(" crates/aline-edit/src
+    rg: crates/aline-edit/src: IO error for operation on crates/aline-edit/src: No such file or directory (os error 2)
+    [exit=2]
+
+### $ rg -n "CheckedBatch::new" crates/aline-edit/src
+    rg: crates/aline-edit/src: IO error for operation on crates/aline-edit/src: No such file or directory (os error 2)
+    [exit=2]
+
+### $ rg -n "std::fs|OpenOptions|fs::write|File::create" crates/aline-edit/src crates/aline-buffer/src crates/aline-markdown/src crates/aline-ui/src
+    rg: crates/aline-edit/src: No such file or directory (os error 2)
+    rg: crates/aline-buffer/src: No such file or directory (os error 2)
+    rg: crates/aline-markdown/src: No such file or directory (os error 2)
+    rg: crates/aline-ui/src: No such file or directory (os error 2)
+    [exit=2]
+
+### $ rg -n "^pub fn |^pub struct |^pub enum |^pub trait " crates/aline-edit/src/lib.rs
+    rg: crates/aline-edit/src/lib.rs: IO error for operation on crates/aline-edit/src/lib.rs: No such file or directory (os error 2)
+    [exit=2]
+
+### $ rg -n "aline-buffer|aline-markdown|aline-source|aline-plugin|gpui" crates/aline-edit/Cargo.toml
+    rg: crates/aline-edit/Cargo.toml: IO error for operation on crates/aline-edit/Cargo.toml: No such file or directory (os error 2)
+    [exit=2]
+
+### $ rg -n "fn .*&mut self" crates/aline-edit/src
+    rg: crates/aline-edit/src: IO error for operation on crates/aline-edit/src: No such file or directory (os error 2)
+    [exit=2]
+

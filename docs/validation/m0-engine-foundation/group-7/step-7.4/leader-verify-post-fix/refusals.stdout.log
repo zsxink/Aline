@@ -1,0 +1,20 @@
+
+running 15 tests
+test identity_replace_creates_no_history_step ... ok
+test html_boundary_refusal_keeps_buffer_state ... ok
+test refusal_keeps_redo_branch_and_history_intact ... ok
+test already_formatted_creates_no_history_step ... ok
+test refusal_keeps_composition_state_untouched ... ok
+test protected_range_refusal_keeps_buffer_state ... ok
+test budget_exceeded_refusal_keeps_buffer_state ... ok
+test hidden_fragment_internal_whitespace_change_is_refused ... ok
+test refusal_keeps_pending_typing_group_open ... ok
+test reread_failure_refusal_keeps_buffer_state ... ok
+test stale_plan_wrong_version_does_not_touch_buffer ... ok
+test visual_multi_edit_batch_refused_without_state_change ... ok
+test successful_plan_and_validation_leave_buffer_untouched ... ok
+test visual_replace_range_is_command_authority ... ok
+test visual_replace_validates_bound_selection_only ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,13 @@
+2026-10-31T09:42:10Z	2026-10-31T09:42:10Z	zsh -c git -C /Users/xian/Project/editor/Aline rev-parse HEAD; git -C /Users/xian/Project/editor/Aline status --porcelain	exit=0
+2026-10-31T09:42:10Z	2026-10-31T09:42:10Z	cargo test -p aline-markdown --locked --offline -- --list	exit=0
+2026-10-31T09:42:10Z	2026-10-31T09:42:10Z	cargo test -p aline-markdown --locked --offline --test spec	exit=0
+2026-10-31T09:42:10Z	2026-10-31T09:42:10Z	cargo test -p aline-markdown --locked --offline --test rewrite	exit=0
+2026-10-31T09:42:10Z	2026-10-31T09:42:10Z	cargo test -p aline-markdown --locked --offline --test mapping	exit=0
+2026-10-31T09:42:10Z	2026-10-31T09:42:10Z	cargo test -p aline-markdown --locked --offline --test html	exit=0
+2026-10-31T09:42:10Z	2026-10-31T09:42:11Z	cargo test -p aline-markdown --locked --offline --test protection	exit=0
+2026-10-31T09:42:11Z	2026-10-31T09:42:11Z	cargo test -p aline-markdown --locked --offline --test hostile	exit=0
+2026-10-31T09:42:11Z	2026-10-31T09:42:11Z	cargo test -p aline-markdown --locked --offline --test reuse	exit=0
+2026-10-31T09:42:11Z	2026-10-31T09:42:11Z	cargo test -p aline-markdown --locked --offline --test diagnostics	exit=0
+2026-10-31T09:42:11Z	2026-10-31T09:42:11Z	cargo run -q -p aline-markdown --locked --offline --example dump_tree -- crates/aline-markdown/tests/fixtures/m0/basic.md	exit=0
+2026-10-31T09:42:11Z	2026-10-31T09:42:11Z	cargo test -p aline-markdown --locked --offline	exit=0
+2026-10-31T09:42:11Z	2026-10-31T09:42:11Z	python3 -I /Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-6/verify_goldens.py /Users/xian/Project/editor/Aline	exit=0
