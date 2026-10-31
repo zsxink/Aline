@@ -1,0 +1,28 @@
+{
+  "status": "依赖门禁通过",
+  "results": {
+    "scenario": "all",
+    "workspace_members": [
+      "aline",
+      "aline-app-core",
+      "aline-buffer",
+      "aline-edit",
+      "aline-markdown",
+      "aline-plugin",
+      "aline-source",
+      "aline-ui"
+    ],
+    "selected_packages": 8,
+    "metadata_packages": 8,
+    "metadata_unselected": [],
+    "engines": {
+      "aline-app-core": 1,
+      "aline-buffer": 1,
+      "aline-edit": 1,
+      "aline-markdown": 1,
+      "aline-source": 1
+    },
+    "gpui_subtree_sha256": null,
+    "graph_model": "完整 all-target metadata 约束身份/边/保守闭包；实际 tree 包含目标及本机 host 宏/构建选包；filtered metadata 仅作交叉证据"
+  }
+}

@@ -1,0 +1,28 @@
+# 用户已授权的隔离机制探针；预期先于探针实现手写，不从运行输出回录。
+# 只在探针独占创建、mode=0700 的系统临时根内操作；不实施真实应用保存。
+metadata:
+  source bytes=SOURCE\n; target bytes=TARGET\n; source mode=0640
+  source ACL=everyone deny write; everyone allow read
+  source xattr com.aline.probe=aline-preserve
+  预期 fcopyfile(null,COPYFILE_METADATA) 成功；target mode/ACL/xattr 与 source 对应值相同
+  预期 source bytes=SOURCE\n、target bytes=TARGET\n；不含 DATA，不复制正文
+acl-only:
+  source/target 均 mode=0600；source/target bytes 不同；source 仅比 target 增加 ACL
+  预期成功且目标 ACL 匹配 source；源、目标各自正文不变
+same-inode:
+  source 与 target 为同一文件的不同持有句柄（另有不同路径硬链接）
+  预期包装层在 unsafe 调用前拒绝；调用计数保持不变；正文不变
+non-regular:
+  target 为探针根内目录的合法持有句柄
+  预期包装层在 unsafe 调用前拒绝；调用计数保持不变
+readonly-target:
+  source 普通文件可读；target 普通文件仅以只读方式持有，fd不关闭、不悬空、不复用
+  此样本只观察系统对只读fd的能力，不预设必须失败；失败保留errno且无成功回执，成功则核对mode/ACL/xattr
+  两种结果均要求target正文不变；若成功，本样本不算系统失败覆盖
+immutable-target:
+  仅在私有根内目标自有文件设置uchg不可变标志，source与target均仍由合法普通File持有
+  预期系统调用受检失败并保留errno；失败不得发布成功回执，目标正文仍为IMMUTABLE-TARGET\n
+  若系统不支持或不能形成失败，报告覆盖不足，不归因系统行为错误
+cleanup:
+  探针所有退出分支均先尝试nouchg恢复自有目标，再清ACL并清理独占临时根；清理错误单独输出并导致非零退出
+  不把任一机制样本成功扩大为平台替换、跨进程 CAS、目录同步或断电保证

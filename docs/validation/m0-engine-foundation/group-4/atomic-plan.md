@@ -1,6 +1,6 @@
 # M0 最小受检 I/O 原语方案
 
-日期：2026-10-31。状态：任务 4.4 的实施建议，尚无本方案 Rust 实现或文件系统测试通过记录；不修改规范、tasks 或产品合同。只读源码和文档分析不是实际权限/替换实验。
+日期：2026-10-31。状态：任务 4.4 的实施建议。2026-10-31 已按用户裁决的 A 方案在 `aline-source` 实现最小 create-only 原语，并取得 macOS 本机真实文件系统与故障注入记录；执行-3 的源文件哈希、命令、UTC、退出码、测试矩阵与限制见 [`step-4.4/report.md`](step-4.4/report.md)。4.4 仍待独立复核接受 F1/F2 后才由任务所有者决定是否勾选，不等同 V-08、现有文件保存或跨平台能力。本文件不修改规范、tasks 或产品合同；只读源码和文档分析不是实际权限/替换实验。
 
 ## 1. 推荐结论
 
@@ -23,7 +23,7 @@ M0 使用具体的 prepare + create-only publish 两阶段：同目录 `create_n
 
 ## 3. 推荐具体 API 与步骤
 
-下述是建议签名，不代表方法已经存在；类型名可随 source 实际 API 调整。
+下述是建议签名，不代表最终公开 API；实现已按 A 方案落地，类型名与签名以 `crates/aline-source/src/atomic.rs` 及 `step-4.4/report.md` 为准。
 
 ```text
 prepare_atomic(encoded: &Encoded, target: &Path, staging: &Path,
@@ -109,7 +109,7 @@ sed -n '2300,2383p' /Users/xian/.rustup/toolchains/1.98.1-aarch64-apple-darwin/l
 
 在线 Rust 页面本次显示 1.99.1，仅用作稳定 API 文档参照；版本化 1.98.1 页面读取失败，已改用上列本机 1.98.1 源码核对具体分支。不把在线最新版实现当锁定工具链事实。
 
-当前真实 FS 写入、故障注入、ACL/xattr、取消与发布回执测试均**未执行/未验证**。V-01～V-09 不据本分析判通过。
+当前已实际执行（2026-10-31，macOS 本机）：create-only 真实 FS 写入与发布、部分写入/同步失败注入、`create_new` 冲突、prepare/publish 取消、staging 替换检测、已存在普通文件/符号链接/目录拒绝、检查后目标竞争、70,000 字符跨 64 KiB 块写入。未执行/未验证：ACL/xattr、权限复制、目录 fsync/断电、跨进程 CAS、Windows/Linux、网络/外接卷、真实应用保存闭环。V-01～V-09 不据本分析或该最小原语判通过。
 
 ## 7. 不推荐方案
 

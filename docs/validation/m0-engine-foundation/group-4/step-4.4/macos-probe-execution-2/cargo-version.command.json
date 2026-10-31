@@ -1,0 +1,15 @@
+{
+  "command": [
+    "cargo",
+    "-V"
+  ],
+  "cwd": "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-4/step-4.4",
+  "started_utc": "2026-10-31T04:29:07.259849+00:00",
+  "ended_utc": "2026-10-31T04:29:07.274512+00:00",
+  "exit_code": 0,
+  "environment": {
+    "CARGO_HOME": "/Users/xian/Library/Caches/aline-m0/cargo-home",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_NET_OFFLINE": "true"
+  }
+}
