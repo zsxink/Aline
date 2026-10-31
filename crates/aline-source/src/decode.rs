@@ -6,6 +6,7 @@
 
 use std::fmt;
 
+use crate::baseline::SourceBaseline;
 use crate::storage::{StorageBudget, StorageSnapshot};
 
 /// 由原始字节多数派决定的重编码行尾策略；平票（含均为零）为 LF。
@@ -83,25 +84,33 @@ impl std::error::Error for DecodeError {}
 /// 解码成功的编辑源码、存储元数据与原始存储基线身份。
 #[derive(Clone, Debug)]
 pub struct DecodedSource {
-    storage: StorageSnapshot,
-    source: String,
-    metadata: StorageMetadata,
+    baseline: SourceBaseline,
 }
 
 impl DecodedSource {
     /// 返回解码所依据的只读存储视图；其身份与传入快照相同。
     pub fn storage(&self) -> &StorageSnapshot {
-        &self.storage
+        self.baseline.storage()
     }
 
     /// 返回编辑源码：已分离一个头部 UTF-8 BOM，其余 CR/LF 原样保留。
     pub fn source(&self) -> &str {
-        &self.source
+        self.baseline.source()
     }
 
     /// 返回原始字节的 BOM 与行尾统计。
     pub const fn metadata(&self) -> StorageMetadata {
-        self.metadata
+        self.baseline.metadata()
+    }
+
+    /// 返回本次解码建立的只读存储基线。
+    pub fn baseline(&self) -> &SourceBaseline {
+        &self.baseline
+    }
+
+    /// 取出本次解码建立的只读存储基线。
+    pub fn into_baseline(self) -> SourceBaseline {
+        self.baseline
     }
 }
 
@@ -144,14 +153,16 @@ pub fn decode(
         LineEnding::Lf
     };
     Ok(DecodedSource {
-        storage: storage.clone(),
-        source: body.to_owned(),
-        metadata: StorageMetadata {
-            has_bom,
-            crlf_pairs,
-            unpaired_lf,
-            line_ending,
-        },
+        baseline: SourceBaseline::new(
+            storage.clone(),
+            body.to_owned(),
+            StorageMetadata {
+                has_bom,
+                crlf_pairs,
+                unpaired_lf,
+                line_ending,
+            },
+        ),
     })
 }
 
