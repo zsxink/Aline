@@ -1,0 +1,135 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running unittests src/lib.rs (target/debug/deps/aline_ui-6a4ea95e58d353f7)
+
+running 1 test
+test catalog_tests::application_name_consumes_embedded_catalog ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/document.rs (target/debug/deps/document-dd7c035db3535f29)
+
+running 22 tests
+test case_8_1_02_snapshot_keeps_identity_and_does_not_commit ... ok
+test case_8_1_01_typing_enters_unique_draft ... ok
+test case_8_1_03_adjacent_input_merges_within_900ms ... ok
+test case_8_1_04_snapshot_text_equals_latest_draft ... ok
+test case_8_1_06_snapshot_after_commit_has_no_side_effects ... ok
+test case_8_1_08_snapshot_after_new_draft ... ok
+test case_8_1_09_repeated_snapshot_keeps_same_id ... ok
+test case_8_1_05_commit_group_keeps_block_open ... ok
+test case_8_1_10_redo_sequence_starts_from_fresh_draft ... ok
+test case_8_1_07_typing_after_commit_opens_new_draft ... ok
+test case_8_1_11_first_commit_makes_node_one ... ok
+test case_8_1_12_sealed_group_is_not_merged_again ... ok
+test case_8_1_13_second_commit_makes_node_two ... ok
+test case_8_1_14_undo_restores_before_selection ... ok
+test case_8_1_15_snapshot_preserves_redo ... ok
+test case_8_1_17_snapshot_rejects_stale_baseline ... ok
+test case_8_1_16_redo_restores_after_selection ... ok
+test case_8_1_18_typing_rejects_stale_baseline ... ok
+test case_8_1_19_commit_rejects_stale_baseline ... ok
+test case_8_1_20_leave_rejects_stale_baseline_without_dropping_block ... ok
+test case_8_1_21_commit_after_close_returns_no_open_block ... ok
+test case_8_1_22_non_boundary_typing_is_rejected ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/document_composition.rs (target/debug/deps/document_composition-24f4a10cee310b6d)
+
+running 25 tests
+test case_8_3_01_first_update_opens_composition_implicitly ... ok
+test case_8_3_06_cancel_restores_pre_composition_state ... ok
+test case_8_3_02_update_replaces_candidate ... ok
+test case_8_3_03_identical_update_advances_draft_generation ... ok
+test case_8_3_04_commit_makes_single_ime_node ... ok
+test case_8_3_05_update_after_commit_opens_new_composition ... ok
+test case_8_3_07_cancelled_composition_identity_is_stale ... ok
+test case_8_3_08_ime_commit_does_not_merge_adjacent_typing_node ... ok
+test case_8_3_10_empty_candidate_commit_is_unchanged ... ok
+test case_8_3_11_begin_wait_has_no_snapshot_side_effect ... ok
+test case_8_3_09_cancel_keeps_existing_committed_input ... ok
+test case_8_3_13_wait_does_not_freeze_candidate_updates ... ok
+test case_8_3_12_second_wait_is_rejected ... ok
+test case_8_3_14_finish_during_composition_is_rejected ... ok
+test case_8_3_15_commit_keeps_wait_pending ... ok
+test case_8_3_17_save_as_wait_is_established ... ok
+test case_8_3_16_finish_returns_post_composition_snapshot ... ok
+test case_8_3_18_export_wait_is_established ... ok
+test case_8_3_19_cancel_request_only_changes_wait ... ok
+test case_8_3_20_finish_cancelled_wait_is_unknown ... ok
+test case_8_3_22_cancel_after_wait_restores_pre_composition ... ok
+test case_8_3_21_update_clears_cancelled_wait ... ok
+test case_8_3_23_autosave_has_no_doc_core_entry ... ok
+test case_8_3_24_restore_read_keeps_snapshot_identity ... ok
+test case_8_3_25_composition_does_not_merge_pending_typing_draft ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/document_results.rs (target/debug/deps/document_results-ae0b34c1ef537abf)
+
+running 17 tests
+test case_8_4_01_accepts_current_result_without_side_effects ... ok
+test case_8_4_06_rejects_identity_after_pending_undo ... ok
+test case_8_4_03_rejects_other_document_identity ... ok
+test case_8_4_04_rejects_bad_draft_generation ... ok
+test case_8_4_07_missing_parse_config_identity_field ... ok
+test case_8_4_05_rejects_request_captured_before_commit ... ok
+test case_8_4_02_rejects_stale_initial_identity ... ok
+test case_8_4_08_missing_request_identity_field ... ok
+test case_8_4_09_rejects_result_for_closed_target ... ok
+test case_8_4_10_snapshot_rejects_stale_baseline ... ok
+test case_8_4_11_commit_rejects_stale_baseline_without_dropping_block ... ok
+test case_8_4_12_rejects_old_projection_and_keeps_input ... ok
+test case_8_4_13_reload_forms_independent_history_boundary ... ok
+test case_8_4_14_undo_reload_restores_previous_text ... ok
+test case_8_4_16_unchanged_reload_preserves_redo ... ok
+test case_8_4_17_file_coordination_has_no_doc_core_entry ... ok
+test case_8_4_15_redo_reload_restores_reloaded_text ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/document_typing.rs (target/debug/deps/document_typing-39c4e98f102cf177)
+
+running 25 tests
+test case_8_2_01_899ms_merges ... ok
+test case_8_2_02_900ms_merges_on_closed_boundary ... ok
+test case_8_2_04_commit_after_899_merge_makes_one_node ... ok
+test case_8_2_05_commit_after_900_merge_makes_one_node ... ok
+test case_8_2_03_901ms_splits_and_commits_old_group ... ok
+test case_8_2_07_explicit_commit_is_group_boundary ... ok
+test case_8_2_06_commit_after_split_makes_second_node ... ok
+test case_8_2_08_seal_prevents_merge_of_commits ... ok
+test case_8_2_10_non_adjacent_group_commits_independently ... ok
+test case_8_2_09_non_adjacent_input_splits_group ... ok
+test case_8_2_11_commit_without_pending_group_is_unchanged ... ok
+test case_8_2_13_escape_commits_remaining_group_and_closes ... ok
+test case_8_2_12_leave_commits_remaining_group_and_closes ... ok
+test case_8_2_15_undo_prefers_pending_draft ... ok
+test case_8_2_14_escape_after_close_is_rejected ... ok
+test case_8_2_16_redo_restores_pending_group ... ok
+test case_8_2_17_undo_pending_draft_before_committed_node ... ok
+test case_8_2_18_second_undo_undoes_node_one ... ok
+test case_8_2_20_snapshot_does_not_seal_group ... ok
+test case_8_2_21_typing_after_snapshot_still_merges ... ok
+test case_8_2_19_redo_restores_node_one ... ok
+test case_8_2_23_mode_switch_has_no_doc_core_entry ... ok
+test case_8_2_22_snapshot_and_typing_produce_one_node ... ok
+test case_8_2_24_typing_after_ime_commit_is_ordinary ... ok
+test case_8_2_25_post_ime_input_commits_as_one_step ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/public_boundaries.rs (target/debug/deps/public_boundaries-d9c1fd9f41282e06)
+
+running 2 tests
+test input_identity_can_be_carried_by_future_host_tasks ... ok
+test input_identity_rejects_wrong_document_or_working_version ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests aline_ui
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

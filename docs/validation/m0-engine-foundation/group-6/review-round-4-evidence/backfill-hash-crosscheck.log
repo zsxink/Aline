@@ -1,0 +1,46 @@
+# UTC: 2026-10-31T13:12:41Z
+# read-only backfill hash cross-check
+$ git log --oneline -5 --all | head
+1dd0174 docs(workspace): 补齐组 6/7 第三轮独立复核报告与证据
+96c6573 feat(aline-ui): 实现组 8 无窗口 DocCore 状态机
+7916cea docs(workspace): 按独立复核逐任务结论更新组 6/7 勾选
+419ac0e docs(workspace): 组 6/7 报告回填提交 SHA 以闭合 F3-8
+45d4324 docs(workspace): 回填组 6/7 记录到引擎、架构、PRD 与验证计划
+
+$ git rev-parse 45d4324^ 99867bf 2>/dev/null
+55bd376ef2e43f70b79bb6bee60e03ab55dcce0b
+99867bf2c5775aae4e8ed910713496d4ff84323c
+
+== docs/engine-design.md
+  report pre  : 279780bb6f0ef5ff1ef2cd6fff1ea1775846096efc8fc1a4c72f4b59ff1c1c4d
+  45d4324     : 2c9d2eab933467ae5ba707c309a932349ffa117364fba0a14280389ba13ae2ab
+  99867bf     : 279780bb6f0ef5ff1ef2cd6fff1ea1775846096efc8fc1a4c72f4b59ff1c1c4d
+  worktree    : 2c9d2eab933467ae5ba707c309a932349ffa117364fba0a14280389ba13ae2ab
+== docs/v1-validation-plan.md
+  report pre  : 239d6ca4b4f7677d1206a9a63ef06c1646c5697b5a4ee3442c2bc3a1f4e6370b
+  45d4324     : b6210cf70372c3681c0b1ab0e1e8d51d7f903135953c363dfaa80fd3a285625d
+  99867bf     : 239d6ca4b4f7677d1206a9a63ef06c1646c5697b5a4ee3442c2bc3a1f4e6370b
+  worktree    : b6210cf70372c3681c0b1ab0e1e8d51d7f903135953c363dfaa80fd3a285625d
+== docs/v1-prd.md
+  report pre  : ef660179e1eb75d9dc7b6436bd26f26a2fff4a50383f41ae941598db61bffefa
+  45d4324     : e6cadea4263ea08eaaaf1c3e4f0a5195ca785a9901aa8fcec1a683860fbfb8f4
+  99867bf     : ef660179e1eb75d9dc7b6436bd26f26a2fff4a50383f41ae941598db61bffefa
+  worktree    : e6cadea4263ea08eaaaf1c3e4f0a5195ca785a9901aa8fcec1a683860fbfb8f4
+== docs/v1-architecture.md
+  report pre  : 16eae13eba22cb2ae90d703422f381470c03381a301203a9d8379423d4562f74
+  45d4324     : 5b6aa421609c3a9b02784bcdcb92e26f74f09f39b757c6daaaa440dff16e78f8
+  99867bf     : 16eae13eba22cb2ae90d703422f381470c03381a301203a9d8379423d4562f74
+  worktree    : 965e7826b95079d6174939c9fc8d6c37d0eb23bfe51fd6339d1cbb1d86df22ab
+== docs/rust-style-guide.md
+  report pre  : 6d94f86c948b7b310519d7c30e650f4fa1a8095cae42dc19d6967707f0e46b56
+  45d4324     : 6d94f86c948b7b310519d7c30e650f4fa1a8095cae42dc19d6967707f0e46b56
+  99867bf     : 6d94f86c948b7b310519d7c30e650f4fa1a8095cae42dc19d6967707f0e46b56
+  worktree    : 6d94f86c948b7b310519d7c30e650f4fa1a8095cae42dc19d6967707f0e46b56
+
+$ git show --numstat --format=%H 45d4324 -- docs/
+45d43240383e0a21bae23168727676890a7ae621
+
+22	0	docs/engine-design.md
+6	0	docs/v1-architecture.md
+4	0	docs/v1-prd.md
+12	0	docs/v1-validation-plan.md

@@ -1,0 +1,21 @@
+# UTC start: 2026-10-31T12:56:52Z
+# HEAD: 1dd0174ca8fc4aa975209ee5d6c3169c36695fad
+# command: cargo test -p aline-markdown --locked --offline --test rewrite
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.03s
+     Running tests/rewrite.rs (target/debug/deps/rewrite-05cf926af7a4ce05)
+
+running 9 tests
+test cancellable_rewrite_stops_between_edits ... ok
+test control_bytes_do_not_collide_with_synthetic_markers ... ok
+test front_matter_is_hidden_in_parse_copy_and_maps_back_to_source ... ok
+test pre_cancelled_front_matter_rewrite_returns_cancelled ... ok
+test pre_cancelled_rewrite_returns_cancelled_without_text ... ok
+test maps_compose_through_two_rewrite_levels ... ok
+test multi_edit_map_preserves_each_source_segment ... ok
+test reversed_overlapping_and_non_boundary_edits_are_rejected ... ok
+test parse_budget_failure_falls_back_to_original_text ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+# exit_code: 0
+# UTC end: 2026-10-31T12:56:52Z

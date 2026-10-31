@@ -1,0 +1,11 @@
+
+running 6 tests
+test golden_validate_after_change ... ok
+test golden_validate_reparsed ... ok
+test golden_consume_single_history_step ... ok
+test golden_contains_all_required_refusal_classes ... ok
+test golden_validate_changed_selection ... ok
+test golden_plan_cases ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

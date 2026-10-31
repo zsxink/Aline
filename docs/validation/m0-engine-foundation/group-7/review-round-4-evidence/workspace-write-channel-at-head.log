@@ -1,0 +1,24 @@
+# workspace 生产代码写入通道扫描（HEAD 1dd0174，2026-10-31T13:05:30Z）
+
+## buffer 变更原语（crates/*/src、app/src，含 tests 与否未过滤）
+crates/aline-ui/src/document/doc_core.rs:153:        let buffer = StringBuffer::new(
+crates/aline-ui/src/document/doc_core.rs:474:            .apply(
+crates/aline-ui/src/document/doc_core.rs:658:            .undo(self.limits.text)
+crates/aline-ui/src/document/doc_core.rs:702:            .redo(self.limits.text)
+crates/aline-ui/src/document/doc_core.rs:728:            .reload(
+crates/aline-ui/src/document/doc_core.rs:904:                .apply(
+crates/aline-ui/src/document/doc_core.rs:973:            .apply(
+[exit=0]
+
+## 文件系统写入
+crates/aline-source/src/atomic.rs
+[exit=0]
+
+## doc_core 是否调用 plan_change/validate_change
+[exit=1] (1=无匹配)
+
+## 提交时间
+96c6573 2026-10-31T20:45:40+08:00 feat(aline-ui): 实现组 8 无窗口 DocCore 状态机
+
+## step-7.4 扫描时点 09:23:06Z 与组 8 提交 12:45:40Z 的先后
+96c6573 2026-10-31T20:45:40+08:00 feat(aline-ui): 实现组 8 无窗口 DocCore 状态机

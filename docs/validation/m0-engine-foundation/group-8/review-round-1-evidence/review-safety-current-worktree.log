@@ -1,0 +1,6 @@
+=== worktree guard (current scripts/check_safety.py) against current repo ===
+started 2026-10-31T13:07:42Z
+exit=0
+failures: 0
+--- stderr ---
+finished 2026-10-31T13:07:44Z

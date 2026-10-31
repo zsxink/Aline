@@ -1,0 +1,5 @@
+2026-10-31T12:54:19Z	2026-10-31T12:54:19Z	0	cargo test -p aline-ui --test document --locked --offline
+2026-10-31T12:54:19Z	2026-10-31T12:54:20Z	0	cargo test -p aline-ui --test document_typing --locked --offline
+2026-10-31T12:54:20Z	2026-10-31T12:54:20Z	0	cargo test -p aline-ui --test document_composition --locked --offline
+2026-10-31T12:54:20Z	2026-10-31T12:54:20Z	0	cargo test -p aline-ui --test document_results --locked --offline
+2026-10-31T12:54:26Z	2026-10-31T12:54:26Z	0	cargo test -p aline-ui --locked --offline

@@ -14,7 +14,7 @@
 | `docs/v1-architecture.md` | `16eae13eba22cb2ae90d703422f381470c03381a301203a9d8379423d4562f74` | §7.1 表后 | `parse`/`map_position` 两行的实际落地补充 |
 | `docs/rust-style-guide.md` | `6d94f86c948b7b310519d7c30e650f4fa1a8095cae42dc19d6967707f0e46b56` | 未回填 | 本组无新增测试组织规范需要记录 |
 
-回填后 SHA-256（工作区实际文件，证据记录见 `step-6.8/backfill-hashes.log`）：
+回填后 SHA-256（**09:45:51Z 工作区快照，当时 `HEAD=99867bf`**；证据记录见 `step-6.8/backfill-hashes.log`。该快照之后、提交前又追加了 round-2 处置段落，故提交 `45d4324` 的 `--numstat` 为 22/0、6/0、4/0、12/0 共 44 行新增，blob 哈希与下表不同；下表数值只对应 09:45:51Z 时点，不代表提交对象。复核 R4-F1）：
 
 | 文档 | 回填后 SHA-256 |
 |---|---|
@@ -71,7 +71,7 @@ python3 scripts/check_workspace.py \
 
 修复前（2026-10-31T08:48:11Z–08:48:13Z，`commands.log`，全部 exit 0）的对应数字为 spec 8、rewrite 6、mapping 10、html 11、protection 6、hostile 10、reuse 7、全 crate 62。两组证据都保留，用于说明修复前后的差异。
 
-上表是 09:42 时点的快照。round-2 复核处置后（10:19Z–10:34Z）的最终计数为 html 21（N-F3-2 现状用例）、hostile 19（N-F2-2/N-F2-3）、reuse 18（N-F2-1）、全 crate 108，工作区 `cargo test --workspace` 为 204 passed；证据在 `step-6.5`、`step-6.6/fix-n-f2-2-n-f2-3/`、`step-6.7/fix-n-f2-1/` 与 `group-6/leader-verify-round-2/`，本表数字不改写。
+上表是 09:42 时点的快照。round-2 复核处置后（10:19Z–10:34Z）的计数为 html 21（N-F3-2 现状用例）、hostile 19（N-F2-2/N-F2-3）、reuse 18（N-F2-1）、全 crate 108，工作区 `cargo test --workspace` 为 **204 passed（10:27:39Z–10:28:17Z 窗口运行，`leader-verify-round-2/workspace-gates/test.stdout.log`）**；10:40:20Z–10:40:49Z 的 `workspace-gates-final` 运行是 205（html 21 对 20，即 N-F3-2 用例补入后的差异），在本窗口之外。证据在 `step-6.5`、`step-6.6/fix-n-f2-2-n-f2-3/`、`step-6.7/fix-n-f2-1/` 与 `group-6/leader-verify-round-2/`，本表数字不改写。（时点标注见复核 R4-F4）
 
 金样独立校验：`python3 -I verify_goldens.py` 输出“6 个夹具、38 个区间、0 个问题；所有区间升序、无缝覆盖、端点合法、块尾无分隔换行、间隙只含换行”（`goldens-independent.stdout.log`）。
 

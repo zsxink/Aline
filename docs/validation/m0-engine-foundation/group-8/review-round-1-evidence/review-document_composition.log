@@ -1,0 +1,32 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s
+     Running tests/document_composition.rs (target/debug/deps/document_composition-24f4a10cee310b6d)
+
+running 25 tests
+test case_8_3_01_first_update_opens_composition_implicitly ... ok
+test case_8_3_02_update_replaces_candidate ... ok
+test case_8_3_07_cancelled_composition_identity_is_stale ... ok
+test case_8_3_06_cancel_restores_pre_composition_state ... ok
+test case_8_3_03_identical_update_advances_draft_generation ... ok
+test case_8_3_08_ime_commit_does_not_merge_adjacent_typing_node ... ok
+test case_8_3_04_commit_makes_single_ime_node ... ok
+test case_8_3_05_update_after_commit_opens_new_composition ... ok
+test case_8_3_09_cancel_keeps_existing_committed_input ... ok
+test case_8_3_10_empty_candidate_commit_is_unchanged ... ok
+test case_8_3_11_begin_wait_has_no_snapshot_side_effect ... ok
+test case_8_3_12_second_wait_is_rejected ... ok
+test case_8_3_13_wait_does_not_freeze_candidate_updates ... ok
+test case_8_3_14_finish_during_composition_is_rejected ... ok
+test case_8_3_15_commit_keeps_wait_pending ... ok
+test case_8_3_16_finish_returns_post_composition_snapshot ... ok
+test case_8_3_17_save_as_wait_is_established ... ok
+test case_8_3_18_export_wait_is_established ... ok
+test case_8_3_19_cancel_request_only_changes_wait ... ok
+test case_8_3_20_finish_cancelled_wait_is_unknown ... ok
+test case_8_3_21_update_clears_cancelled_wait ... ok
+test case_8_3_22_cancel_after_wait_restores_pre_composition ... ok
+test case_8_3_23_autosave_has_no_doc_core_entry ... ok
+test case_8_3_24_restore_read_keeps_snapshot_identity ... ok
+test case_8_3_25_composition_does_not_merge_pending_typing_draft ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

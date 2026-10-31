@@ -13,7 +13,7 @@
 | 暂存时 `crates/aline-edit` 内容 | 只有 `Cargo.toml` 与 `src/lib.rs` | `goldens-pre-implementation.log` |
 | 实现源码 mtime（**修复前**，09:23:06Z 扫描时点） | 2026-10-31T09:18:49Z（`lib.rs`/`plan.rs`/`validate.rs`/`reread.rs`/`budget.rs`） | 独立复核 `review.md` 第 3.1 节记录 |
 | 测试文件 mtime（**修复前**） | 09:19:00Z（`goldens.rs`）、09:19:01Z（`refusals.rs`）、09:20:51Z（`protection.rs`） | 同上 |
-| `git log --all -- <golden>` | 空（金样从未进入提交） | 同上 |
+| `git log --all -- <golden>` | 复核时点为空（当时金样尚未进入提交）；证据提交 `55bd376` 后已跟踪，blob `2d3703f…`、内容 sha256 未变 | `review-round-3.md` R3-F3-2；当前 `git ls-files --stage` |
 
 金样早于实现约 10 分钟，且暂存时实现目录只有骨架，因此“金样先写、实现后写”在 Git 索引、mtime 与日志三处可观察。
 
@@ -21,7 +21,7 @@
 
 **mtime 作用域更正（复核 N-F1-4）**：上表两行 mtime 是 09:23:06Z 扫描时点的**修复前**值。round-1 复核后的修复使源码与测试 mtime 前进（当前 `plan.rs` 09:58:27Z、`reread.rs` 09:59:45Z、`refusals.rs` 09:58:54Z；`goldens.rs` 仍为 09:19:00Z）；修复后时间见 §7。原表保留为修复前快照，不改写。
 
-**索引状态更正（复核 N-F3-4）**：上表“索引暂存 blob”是 09:08:50Z 时点的事实。该暂存后来被移出索引（10:34:01Z `git ls-files --stage` 仍可查到 blob `2d3703f…`，10:40:18Z 为空、porcelain 为 `??`）。金样内容 sha256 与 mtime 未变，因此不是回填；但“索引暂存”这一证据当前不可复现，只能作为当时点的记录。该变化非本组或本复核所为，责任方无法由现有证据确定。
+**索引状态更正（复核 N-F3-4、R3-F3-2）**：上表“索引暂存 blob”是 09:08:50Z 时点的事实。该暂存后来被移出索引（10:34:01Z `git ls-files --stage` 仍可查到 blob `2d3703f…`，10:40:18Z 为空、porcelain 为 `??`），当时“当前不可复现”的描述成立。证据提交 `55bd376` 之后，该文件已重新进入跟踪（blob 仍为 `2d3703f42f89f64b667321b4ced93ac216111e5b`，porcelain 干净）；金样内容 sha256 仍为 `cf2504f2…`、mtime 未变，因此不是回填，也不改变“金样先行”的结论。10:40:18Z 至 `55bd376` 之间的索引变化由调度者提交证据造成；此前变化的责任方无法由现有证据确定。
 
 ## 2. 金样内容与字节规则
 
@@ -115,7 +115,7 @@
 | 2026-10-31T10:04:22Z | `cargo test -p aline-edit --locked --offline` | 0 | 25 passed（0+6+4+15，doc-tests 0） |
 | 2026-10-31T10:04:22Z | `cargo clippy -p aline-edit --all-targets --locked --offline -- -D warnings` | 0 | 无 warning |
 | 2026-10-31T10:04:23Z | `cargo fmt --all --check` | 0 | 无输出 |
-| 2026-10-31T10:04:27Z–10:04:56Z | `python3 scripts/check_workspace.py --cargo-home … --output-dir …/leader-verify-post-fix/workspace-gates` | 0 | 19/19 exit 0；`cargo test --workspace` 40 个 `test result` 行合计 **195 passed** |
+| 2026-10-31T10:04:27Z–10:04:53.722Z | `python3 scripts/check_workspace.py --cargo-home … --output-dir …/leader-verify-post-fix/workspace-gates` | 0 | 19/19 exit 0；`cargo test --workspace` 40 个 `test result` 行合计 **195 passed**（结束时间按 `summary.json` 最晚 `finished_utc` 10:04:53.722236Z，复核 R3-F3-1） |
 
 两次运行（实现者 10:00:21Z、调度方 10:04:14Z）数字一致。**注意**：组 7 原 `step-7.4/workspace-gates`（09:21:09Z）合计 151 passed，那是组 6 测试尚未最终扩充时的快照；10:04 的 195 passed 才是当前工作区全量。两组都保留，不互相覆盖。
 

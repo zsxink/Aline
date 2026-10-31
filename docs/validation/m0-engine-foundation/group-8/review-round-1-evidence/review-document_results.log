@@ -1,0 +1,24 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s
+     Running tests/document_results.rs (target/debug/deps/document_results-ae0b34c1ef537abf)
+
+running 17 tests
+test case_8_4_02_rejects_stale_initial_identity ... ok
+test case_8_4_01_accepts_current_result_without_side_effects ... ok
+test case_8_4_04_rejects_bad_draft_generation ... ok
+test case_8_4_07_missing_parse_config_identity_field ... ok
+test case_8_4_03_rejects_other_document_identity ... ok
+test case_8_4_06_rejects_identity_after_pending_undo ... ok
+test case_8_4_08_missing_request_identity_field ... ok
+test case_8_4_05_rejects_request_captured_before_commit ... ok
+test case_8_4_09_rejects_result_for_closed_target ... ok
+test case_8_4_10_snapshot_rejects_stale_baseline ... ok
+test case_8_4_11_commit_rejects_stale_baseline_without_dropping_block ... ok
+test case_8_4_12_rejects_old_projection_and_keeps_input ... ok
+test case_8_4_13_reload_forms_independent_history_boundary ... ok
+test case_8_4_14_undo_reload_restores_previous_text ... ok
+test case_8_4_15_redo_reload_restores_reloaded_text ... ok
+test case_8_4_16_unchanged_reload_preserves_redo ... ok
+test case_8_4_17_file_coordination_has_no_doc_core_entry ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

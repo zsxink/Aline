@@ -1,0 +1,33 @@
+# independent write-channel scan 2026-10-31T12:56:32Z
+$ rg -n "&mut StringBuffer|StringBuffer::apply|\.apply\(|\.reload\(|\.undo\(|\.redo\(" crates/aline-edit/src
+exit=1
+$ rg -n "CheckedBatch::new" crates/aline-edit/src
+crates/aline-edit/src/plan.rs:242:    let batch = CheckedBatch::new(snapshot, patches, budget.patch()).map_err(map_batch_error)?;
+crates/aline-edit/src/plan.rs:330:    let batch = CheckedBatch::new(snapshot, patches, budget.patch()).map_err(map_batch_error)?;
+exit=0
+$ rg -n "std::fs|OpenOptions|fs::write|File::create" crates/aline-edit/src crates/aline-buffer/src crates/aline-markdown/src crates/aline-source/src
+crates/aline-source/src/atomic.rs:17:use std::fs::{File, OpenOptions};
+crates/aline-source/src/atomic.rs:280:        let staging_metadata = match std::fs::symlink_metadata(&staging) {
+crates/aline-source/src/atomic.rs:307:        match std::fs::symlink_metadata(&target) {
+crates/aline-source/src/atomic.rs:338:        match std::fs::hard_link(&staging, &target) {
+crates/aline-source/src/atomic.rs:544:    let mut options = OpenOptions::new();
+crates/aline-source/src/atomic.rs:548:        use std::os::unix::fs::OpenOptionsExt;
+crates/aline-source/src/atomic.rs:647:fn same_file_identity(left: &std::fs::Metadata, right: &std::fs::Metadata) -> bool {
+crates/aline-source/src/atomic.rs:653:fn same_file_identity(_: &std::fs::Metadata, _: &std::fs::Metadata) -> bool {
+crates/aline-source/src/atomic.rs:663:    use std::fs;
+crates/aline-source/src/atomic.rs:971:        fs::write(&target, sentinel)?;
+crates/aline-source/src/atomic.rs:1019:        fs::write(&target, sentinel)?;
+crates/aline-source/src/atomic.rs:1190:            assert!(fs::write(&target, b"RACER\n").is_ok());
+exit=0
+$ rg -n "pub fn (plan_change|validate_change)|pub struct ChangePlan|pub enum PlanOutcome" crates/aline-edit/src
+crates/aline-edit/src/validate.rs:56:pub fn validate_change<'a>(
+crates/aline-edit/src/plan.rs:57:pub enum PlanOutcome {
+crates/aline-edit/src/plan.rs:66:pub struct ChangePlan {
+crates/aline-edit/src/plan.rs:142:pub fn plan_change(
+exit=0
+$ rg -n "^\[dependencies\]" -A6 crates/aline-edit/Cargo.toml
+10:[dependencies]
+11-aline-buffer.workspace = true
+12-aline-markdown.workspace = true
+$ stat epoch mtime goldens
+1793437725 docs/validation/m0-engine-foundation/group-7/step-7.1/goldens/edit-goldens.tsv

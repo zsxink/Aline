@@ -1,0 +1,24 @@
+started 2026-10-31T13:13:40Z
+=== aline-buffer ===
+exit=0
+gpui_lines=0
+=== aline-edit ===
+exit=0
+gpui_lines=0
+=== aline-markdown ===
+exit=0
+gpui_lines=0
+=== aline-plugin ===
+exit=0
+gpui_lines=0
+=== aline-source ===
+exit=0
+gpui_lines=0
+=== aline-app-core ===
+exit=0
+gpui_lines=0
+=== aline-ui (expected to depend on gpui) ===
+gpui_lines=13
+=== crate count in workspace ===
+8
+finished 2026-10-31T13:13:41Z

@@ -1,0 +1,34 @@
+# residual search 2026-10-31T13:03:21Z HEAD 1dd0174
+
+## 10:04:56
+docs/validation/m0-engine-foundation/group-7/step-7.4/report.md:114:**更正（复核 N-F3-2）**：上表第二行原写结束时间 10:04:56Z，与 `summary.json` 的最晚 `finished_utc`（10:04:53.722Z，文件 mtime 10:04:53Z）不符，现按 `summary.json` 更正为 10:04:53.722Z。另：调度方 `group-7/commands.log` 未登记这条 workspace 门禁命令（该文件只登记组 7 实现者运行的命令），因此时间与结果的权威来源是 `leader-verify-post-fix/workspace-gates/summary.json` 与其中 19 项的 stdout/stderr，不是 `commands.log`。门禁命令本身与下方代码块一致。
+docs/validation/m0-engine-foundation/group-7/review-round-3.md:30:| N-F3-2 门禁结束时间 | **部分关闭** | 只读核对 | `summary.json`：19 项、全部 exit 0、最早 `10:04:27.889574Z`、最晚 `10:04:53.722236Z`；`step-7.4/report.md:112` 已更正为 `10:04:27Z–10:04:53.722Z` 并在 §6 说明 `commands.log` 未登记该命令。但 `step-7.1/report.md:118` 仍写 `10:04:27Z–10:04:56Z`，见 R3-F3-1 |
+docs/validation/m0-engine-foundation/group-7/review-round-3.md:41:该行仍写 `2026-10-31T10:04:27Z–10:04:56Z`。`summary.json` 最晚 `finished_utc` 为 `10:04:53.722236Z`，且 `step-7.4/report.md:114` 已按同一文件更正为 `10:04:53.722Z`。`step-7.2/report.md` §6 又指向 `step-7.1/report.md` 第 7.2 节，因此错误时间仍在被引用的位置。最小更正：把该行改为 `10:04:27Z–10:04:53.722Z`（或整行引用 `summary.json`）。
+docs/validation/m0-engine-foundation/group-7/review-round-2.md:135:| N-F3-2 | 低 | 工作区门禁报告写成 10:04:27Z–10:04:56Z，但 `summary.json` 的最晚 `finished_utc` 为 10:04:53.722Z（文件 mtime 10:04:53Z）；调度方 `commands.log` 也没有 workspace 门禁命令条目。195 passed 与 19/19 exit 0 本身可核对 | `step-7.4/report.md:112`；`step-7.1/report.md:114`；`leader-verify-post-fix/workspace-gates/summary.json` |
+[exit=0]
+
+## 从未进入提交
+docs/validation/m0-engine-foundation/group-7/review-round-3.md:32:| N-F3-4 金样索引状态 | **关闭（更正与当时事实一致）** | 只读核对 | 金样内容 SHA-256 仍为 `cf2504f2…`；`55bd376` 已将其以 blob `2d3703f…` 提交，当前 `git ls-files --stage` 可查到且 porcelain 干净。这使 `step-7.1/report.md:16` “从未进入提交”与 `:24` “当前不可复现”两句在提交后失真，见 R3-F3-2 |
+docs/validation/m0-engine-foundation/group-7/review-round-3.md:43:### R3-F3-2（轻微）`step-7.1/report.md:16`/`:24` 的“从未进入提交 / 当前不可复现”在证据提交后失真
+docs/validation/m0-engine-foundation/group-7/review-round-3.md:45:`55bd376` 已将 `edit-goldens.tsv` 以 blob `2d3703f42f89f64b667321b4ced93ac216111e5b` 提交；本轮 `git log --all -- <golden>` 返回 `55bd376`，`git ls-files --stage` 也重新可见该 blob。金样内容 SHA-256 仍为 `cf2504f2…`、mtime 未变，因此“非回填”的结论仍成立；但第 16 行“空（金样从未进入提交）”与第 24 行“当前不可复现”已不再是当前事实。最小更正：注明“证据提交前为空/不可复现；`55bd376` 之后的当前状态为已跟踪，blob 与暂存时相同”。该变化由调度者提交证据造成，不影响 7.1 的金样先行论证。
+[exit=0]
+
+## 当前不可复现
+docs/validation/m0-engine-foundation/group-7/review-round-3.md:32:| N-F3-4 金样索引状态 | **关闭（更正与当时事实一致）** | 只读核对 | 金样内容 SHA-256 仍为 `cf2504f2…`；`55bd376` 已将其以 blob `2d3703f…` 提交，当前 `git ls-files --stage` 可查到且 porcelain 干净。这使 `step-7.1/report.md:16` “从未进入提交”与 `:24` “当前不可复现”两句在提交后失真，见 R3-F3-2 |
+docs/validation/m0-engine-foundation/group-7/review-round-3.md:43:### R3-F3-2（轻微）`step-7.1/report.md:16`/`:24` 的“从未进入提交 / 当前不可复现”在证据提交后失真
+docs/validation/m0-engine-foundation/group-7/review-round-3.md:45:`55bd376` 已将 `edit-goldens.tsv` 以 blob `2d3703f42f89f64b667321b4ced93ac216111e5b` 提交；本轮 `git log --all -- <golden>` 返回 `55bd376`，`git ls-files --stage` 也重新可见该 blob。金样内容 SHA-256 仍为 `cf2504f2…`、mtime 未变，因此“非回填”的结论仍成立；但第 16 行“空（金样从未进入提交）”与第 24 行“当前不可复现”已不再是当前事实。最小更正：注明“证据提交前为空/不可复现；`55bd376` 之后的当前状态为已跟踪，blob 与暂存时相同”。该变化由调度者提交证据造成，不影响 7.1 的金样先行论证。
+docs/validation/m0-engine-foundation/group-7/review-round-2.md:137:| N-F3-4 | 中 | 金样的索引状态在复核窗口内从 `A ` 变为 `??`：10:34:01Z `git ls-files --stage` 仍有 blob `2d3703f…`，10:40:18Z 索引为空且 porcelain 为 `??`。内容 sha256（`cf2504f2…`）与 mtime（09:08:45Z）未变，不是回填；但“索引暂存”证据当前不可复现；该变化非本复核所为，责任方无法由现有证据确定 | `static-checks.log` 第 10/52–55 行；`final-head-mtimes.log` |
+docs/validation/m0-engine-foundation/group-7/step-7.1/report.md:24:**索引状态更正（复核 N-F3-4、R3-F3-2）**：上表“索引暂存 blob”是 09:08:50Z 时点的事实。该暂存后来被移出索引（10:34:01Z `git ls-files --stage` 仍可查到 blob `2d3703f…`，10:40:18Z 为空、porcelain 为 `??`），当时“当前不可复现”的描述成立。证据提交 `55bd376` 之后，该文件已重新进入跟踪（blob 仍为 `2d3703f42f89f64b667321b4ced93ac216111e5b`，porcelain 干净）；金样内容 sha256 仍为 `cf2504f2…`、mtime 未变，因此不是回填，也不改变“金样先行”的结论。10:40:18Z 至 `55bd376` 之间的索引变化由调度者提交证据造成；此前变化的责任方无法由现有证据确定。
+[exit=0]
+
+## workspace production .apply sites at HEAD
+crates/aline-ui/src/document/doc_core.rs:474:            .apply(
+crates/aline-ui/src/document/doc_core.rs:904:                .apply(
+crates/aline-ui/src/document/doc_core.rs:973:            .apply(
+[exit=0]
+
+## aline-ui fs writes at HEAD
+[exit=1]
+
+## doc_core commit
+96c6573 2026-10-31 20:45:40 +0800 feat(aline-ui): 实现组 8 无窗口 DocCore 状态机

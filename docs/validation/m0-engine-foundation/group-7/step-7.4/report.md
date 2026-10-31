@@ -47,7 +47,7 @@
 |---|---|
 | `aline-edit` 公开面可变写入 API | 无匹配 |
 | `aline-edit` 源码中 buffer 变更调用（tests 除外） | 仅 `plan.rs:242`、`plan.rs:330` 的 `CheckedBatch::new`——构造受检批次，不改 Buffer（**更正（复核 N-F1-2）**：09:23:06Z 扫描时行号为 `235`/`323`，后续修复使行号漂移到 `242`/`330`；结论不变） |
-| workspace 生产代码实际写入入口（排除测试/示例/文档） | 无匹配 |
+| workspace 生产代码实际写入入口（排除测试/示例/文档） | 无匹配——**作用域：仅 09:23:06Z 扫描时点**。组 8 的 `crates/aline-ui/src/document/doc_core.rs` 于 `96c6573`（12:45:40Z）落地后，HEAD 上该文件内有 `.apply(`（`:474`/`:904`/`:973`）、`.undo`（`:658`）、`.redo`（`:702`）、`.reload`（`:728`）（**更正（复核 R4-F1）**）。实质结论不变：这些写入全部在 `doc_core.rs` 内，`crates/*/src` 与 `app/src` 其余位置无写入原语，故“DocCore 以外无实际写入通道”仍成立 |
 | 文件系统写入原语（引擎生产代码） | 只在 `aline-source/src/atomic.rs`（第 4.5 组 create-only 原语） |
 | `aline-edit` 依赖 | 只有 `aline-buffer`、`aline-markdown` |
 
@@ -57,7 +57,7 @@
 
 **round-2 处置（F3-3）**：新增 `step-7.4/fix-f3-3-f3-6/run-write-channel-review.sh`，逐条记录命令、输出与退出码，输出保存在同目录 `manual-write-channel-review-replay.log`（2026-10-31T10:55:07Z，HEAD `99867bf2…`）。首次运行因脚本里的相对路径少一层（`../../../..` → `../../../../../../`）导致 `rg` 全部报 “No such file or directory” 退出 2；该失败输出原样保留为 `manual-write-channel-review-replay-first-attempt.log`，修正后的脚本与日志不覆盖它。重跑结果与上表一致：`CheckedBatch::new` 仅在 `plan.rs:242`/`330`，`&mut`/`apply`/`reload`/`undo`/`redo` 在 `aline-edit/src` 无匹配（rg 退出 1 表示未找到），`std::fs`/`OpenOptions`/`fs::write`/`File::create` 在四个 crate 的 `src` 均无匹配，依赖仅 `aline-buffer`、`aline-markdown`。
 
-**复核 F3-7 的缺口**：没有真实 UI/DocCore 消费者，因此“所有已开放写入口都经过 `plan_change`”在 M0 只能由“edit 层没有任何写入通道”这一结构性事实支撑，不能由运行时检查证明。
+**复核 F3-7 的缺口**：没有真实 UI/DocCore 消费者，因此“所有已开放写入口都经过 `plan_change`”在 M0 只能由“edit 层没有任何写入通道”这一结构性事实支撑，不能由运行时检查证明。（第 8 组 `DocCore` 作为写入通道已存在，但它不调用 `plan_change`/`validate_change`，`rg` 在 `crates/aline-ui/src` 无匹配；本句的“消费者”指 plan 层消费者。）
 
 **复核 F3-8 的缺口**：组 6/7 的证据目录在本轮写报告时仍全部未跟踪（`git status` 显示 `??`）。这与组 6 第二轮复核的同一观察一致；证据只有提交后才有版本身份。
 
@@ -136,6 +136,21 @@ python3 scripts/check_workspace.py \
 - 未覆盖：MD-11 粘贴独立用例、HTML 右端越界与跨整个元素的格式命令、真实 UI/DocCore 消费者、灰色只读区呈现、Windows/Linux。
 - 不宣称 V-07、AC-04 或 M0 出口通过；`tasks.md` 勾选不等于出口通过；本报告不代写独立复核结论。
 
+## 8. round-3 复核更正（R3-F3-1～R3-F3-3）与 round-4 复判
+
+本节只记录更正的落点与实测依据；**是否关闭由独立复核判定**。
+
+| ID | 更正 | 依据 |
+|---|---|---|
+| R3-F3-1 | `step-7.1/report.md:118` 的门禁结束时间改为 `10:04:27Z–10:04:53.722Z`，注明来源是 `summary.json` 最晚 `finished_utc`；§6 的同项更正已在 round-2（N-F3-2）落地，本轮未改 §6 | `leader-verify-post-fix/workspace-gates/summary.json`（19 项全 exit 0） |
+| R3-F3-2 | `step-7.1/report.md:16`/`:24` 的索引状态改为“证据提交 `55bd376` 后已重新跟踪，blob `2d3703f…`、内容 sha256 未变” | `git ls-files --stage`、`git hash-object`、`git log --all` |
+| R3-F3-3 | 本文件 N-F2-1 行（现 §9 表格）的断言强度改为“两例绘制文本均为 `"ab"`；`blocks().len()` 从 2 变 1（`tests/refusals.rs:716-717`）；块种类 `[Paragraph, Paragraph]`→`[Paragraph]`、`[List, Paragraph]`→`[List]` 只在用例注释中记录，未被断言” | `tests/refusals.rs:716-717`；`step-7.4/fix-n-f2-1-n-f1/refusals.stdout.log`（16 passed） |
+
+独立复核 `review-round-4.md` 判定：round-4 的四项更正（`step-7.1:118`、`:16`、`:24` 与本文件 N-F2-1 行）全部准确，7.4 在 M0 范围内**通过**、无阻断项。该复核另提两处非阻断文档问题，已处置：
+
+- **R4-F1**：§3 表“workspace 生产代码实际写入入口 = 无匹配”加时间作用域 `09:23:06Z`，并补记组 8 `doc_core.rs`（`96c6573`）落地后 HEAD 上的 `.apply`/`.undo`/`.redo`/`.reload` 位置；实质结论“DocCore 以外无实际写入通道”不变。
+- **R4-F2**：原章节号从 §7 跳到 §9、缺 §8；本节即补上的 §8，内容为本次 round-3 更正与 round-4 复判记录，不改变任何既有结论。
+
 ## 9. round-2 复核新发现（N-F1-1～N-F1-4、N-F2-1、N-F3-1～N-F3-4）处置
 
 本节只记录调度者对 `review-round-2.md` 新发现的处置位置；**是否关闭由独立复核判定，本节不写复核结论**。
@@ -146,7 +161,7 @@ python3 scripts/check_workspace.py \
 | N-F1-2 | 写入通道表的行号更正为当前 `plan.rs:242`/`330`，并标注 09:23 扫描时为 `235`/`323` | 本文件 §3 表格行 |
 | N-F1-3 | 38 行归因更正：组 7 自身 8 条记录 / 16 行（含分隔空行），其余 22 行为组 6；最终 44 行中组 7 仍 16 行 | 本文件首段与 §1 |
 | N-F1-4 | `step-7.1/report.md` 的实现/测试 mtime 标注“修复前”，并给出当前修复后值 | `step-7.1/report.md` §1 |
-| N-F2-1 | 新增 `pure_whitespace_hidden_separator_is_accepted_limitation`（`tests/refusals.rs`），把“纯空白隐藏片段与片段边界不比较”钉成测试，并断言其块结构后果：`a\n\nb\n` 删 1..3 → `[Paragraph, Paragraph]` 变 `[Paragraph]`；`- a\n\nb\n` 删 3..5 → `[List, Paragraph]` 变 `[List]`，两例前后绘制文本均为 `"ab"` | `step-7.4/fix-n-f2-1-n-f1/`（refusals 16 passed、fmt 0）；10:52Z |
+| N-F2-1 | 新增 `pure_whitespace_hidden_separator_is_accepted_limitation`（`tests/refusals.rs:674-720`），把“纯空白隐藏片段与片段边界不比较”钉成测试：两例前后绘制文本均为 `"ab"`，并断言 `blocks().len()` 从 2 变 1（`tests/refusals.rs:716-717`）；块种类 `[Paragraph, Paragraph]`→`[Paragraph]`、`[List, Paragraph]`→`[List]` 只在用例注释中记录，未被断言 | `step-7.4/fix-n-f2-1-n-f1/`（refusals 16 passed、fmt 0）；10:52Z |
 | N-F3-1 | 回填后哈希表加作用域“截至 10:11:09Z”，并记录 10:38:13Z 的三处漂移与“不影响 16 行/0 删除”结论 | 本文件 §1 |
 | N-F3-2 | 门禁结束时间按 `summary.json` 更正为 10:04:53.722Z，并说明 `commands.log` 未登记该命令 | 本文件 §6 |
 | N-F3-3 | 工作区未冻结属环境限制，已在各报告与组级报告如实记录，无代码处置 | `review-round-2.md` §4.5；本文件 §7 |
