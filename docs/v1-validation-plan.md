@@ -82,6 +82,8 @@ Mermaid 护眼模式使用亮色映射；固定主题不跟随应用，主题是
 
 M0 编码基础证据（2026-10-31）：4.1～4.4 已固定解码/编码/往返与 create-only I/O 用例，证据见 `validation/m0-engine-foundation/group-4/step-4.1`～`step-4.5`。已覆盖头部 BOM 分离、正文 U+FEFF、LF/CRLF/混合多数与平票、孤立 CR、无尾换行、有效 UTF-8 的 `%PDF`/`PK`、非法 UTF-8/UTF-16 BOM/截断/预算拒绝、原 bytes 通道、改后 BOM/多数派编码、逆补丁精确恢复、新基线替代、create-only 发布及写入/同步/竞争失败。未覆盖本项要求的文件/单段/单表/图片/公式资产上限与时限、会话级降级汇总及 UI 呈现、磁盘满/权限/断电/跨平台；这些不能由 M0 局部用例外推。V-06 仍未通过。
 
+组 6 解析预算/敌意输入基础证据（2026-10-31）：`aline-markdown` 已把解析预算实现为八个可注入维度（源码字节、重写字节、映射片段、扫描步数、嵌套、节点、HTML 栈深、投影索引点），`ParseBudget::m0()` 的数值只是保护上限、**不是本项要冻结的发布限额**。`tests/hostile.rs` 覆盖深层嵌套、巨型输入、预算注入与预取消；`ParseStats` 记录实际扫描步数、投影索引点与预算触发次数，测试对 321 字节 HTML 密集源二分得到最小可通过扫描步数 80 并与统计值交叉一致（`validation/m0-engine-foundation/group-6/step-6.6/scan-budget-probe.stdout.log`）。**复核 N-F2-2 限定**：该交叉一致原先只覆盖未过滤 HTML 样本；过滤标签（`script/style/...`）下统计值曾与真实阈值不符（8 vs 5、6 vs 3），修复后补了过滤样本交叉验证，详见 `step-6.6/report.md`。协作式取消经 `CancelCheck`/`CancelToken` 注入，`parse_with_cancel` 在入口、重写编辑间、事件前与构树收尾循环轮询，取消返回 `ParseError::Cancelled` 且不产出树。未覆盖：真实端到端时延与峰值内存、1/4 MiB 与巨型单段/表格规模、图片/公式资产、会话级降级汇总与 UI 呈现、第三方 `pulldown-cmark` 内部长调用不可中断这一盲区、三平台。V-06 仍未通过。
+
 ## V-07 · 编辑、格式化与只读语法夹具
 
 已决定：基础跨块选择/复制/删除/粘贴；复杂结构命令可以拒绝并提供源码入口；表格复制优先 Markdown；缩进代码更改语言可转围栏并单步撤销。格式化仅菜单手动触发，全文差异确认后应用。
@@ -91,6 +93,16 @@ M0 编码基础证据（2026-10-31）：4.1～4.4 已固定解码/编码/往返�
 M0 编码基础证据（2026-10-31）：行尾边界金样已固定 CR-X-LF 删除 X、边界插入/删除/粘贴、LF/CRLF 多数派与孤立 CR、再解码限定行尾等价及逆补丁精确恢复（`validation/m0-engine-foundation/group-4/step-4.2`、`step-4.3`）。这些只服务编辑/格式化的编码基础，不含本项的块打开/提交分组、IME、跨块命令、格式化差异确认、只读保护与下方可视化机制矩阵。V-07 仍未通过；权限与替换竞争不在本项，归 V-08。
 
 组 5 补丁/锚点/历史原语证据（2026-10-31）：`aline-buffer` 已用 134 例正逆补丁金样（含 `abcXYZ → aQQc!`）、11 例行索引金样和反例验证 after 逆坐标、合法空插入/无变化替换、锚点 affinity、900ms 输入组、保存点身份、重做分叉、裁剪与可撤销重载；证据见 `validation/m0-engine-foundation/group-5/step-5.1`～`step-5.5`。这些仍是无头 buffer 原语，不含块打开/提交分组、IME 确认/取消、跨块命令、格式化差异确认、只读保护及下方可视化机制矩阵，不能据此判定 V-07 通过。
+
+组 6 解析/映射/保护基础夹具证据（2026-10-31）：`aline-markdown` 已落地块/Gap 无缝覆盖金样（7 个夹具、57 个区间，含多空行、前导/尾随空行）、手写映射金样 6 例（实体、多字符实体、SoftBreak、硬换行、`<br>`、隐藏与合成片段混合；`tests/mapping.rs` 直接解析该 TSV 断言，不再是孤立证据文件），以及 ZWJ 家族 emoji、重复文字、连续空白、tab 与组合字符、UTF-16 局部投影的补充用例；证据见 `validation/m0-engine-foundation/group-6/step-6.3`～`step-6.4`。保护范围覆盖 Front matter、脚注引用/定义、HTML 注释与处理指令、代码/围栏与有限 HTML 的隐藏子区间。复用拒绝已扩到块引用/列表容器内的引用定义与围栏行、配置代次变化与整源回退，差分比较加入映射来源/精确性、保护与样式范围（`step-6.7`）。**未覆盖/待 V-07 冻结**：SoftBreak 当前投影为带来源的换行，该口径尚未冻结；有限 HTML 的空白折叠、块级标签合成换行、过滤集对 `title/textarea/xmp/noembed/noframes/plaintext` 的补全、非过滤集 void 标签（`input/link/meta/base`）展示口径、十进制/十六进制/多字符实体与“仅标签零可见文字”金样；真实 UI 命中、像素/候选窗/焦点、IME、系统字素与跨块命令；只读灰色展示仅引擎侧成立，未在 UI 验证。不能据此判定 AC-09 或 V-07 通过。
+
+组 6 有限 HTML 修复证据（2026-10-31，F2-1）：上段列出的过滤集补全、空白折叠、块级合成换行与实体/零可见金样已落地并由 `tests/html.rs` 20 例覆盖（修复前 11 例），`tests/protection.rs` 6 例不变；证据见 `validation/m0-engine-foundation/group-6/step-6.5`、`step-6.8/targeted-tests-post-fix`。**仍待冻结**：非过滤集 void 标签（`input/link/meta/base`）展示口径、空白折叠与块级换行口径本身、SoftBreak 口径；真实 UI 渲染与灰色只读呈现未验证。AC-09 与 V-07 仍未通过。
+
+组 6 round-2 复核处置证据（2026-10-31）：有限 HTML 的**未支持非 void 标签**（如 `<foo>`）当前开标签字面可见、闭标签隐藏、内部空白不折叠（`<span>` 对照为两侧隐藏 + 折叠），已由 `tests/html.rs` 的 `unsupported_non_void_tags_record_the_v07_pending_asymmetry` 固定为现状记录（html 21 例），**该口径仍待 V-07 冻结、不表示已统一处理**。过滤 HTML 的扫描步数统计已与真实扫描器一致（过滤样本 5/5、3/3、3/3，未过滤 8/8、80/80），`max_mapping_points` 兼作投影片段数上限的语义已在 `budget.rs`/`parse.rs`/`projection.rs` 注明，预算出口表按实际出口更正（源码/重写字节与投影索引点返回错误，构树类维度整源回退）。跨行引用定义标签（`[foo\nbar]: /u`）现在整篇拒绝复用（reuse 18 例）。证据见 `validation/m0-engine-foundation/group-6/step-6.5`、`step-6.6/fix-n-f2-2-n-f2-3`、`step-6.7/fix-n-f2-1`、`group-6/leader-verify-round-2`。**未覆盖不变**：真实 UI 命中/候选窗/焦点、IME、系统字素、跨块命令与灰色只读呈现；平台仅 macOS arm64。V-07 与 AC-09 仍未通过。
+
+**复核 N-F3-5 限定（映射金样来源）**：“组 6 解析/映射/保护基础夹具证据”段落中“手写映射金样 6 例”的**来源不可证**——08:48 已存在修复前解析器、TSV 时间 08:52:17Z，只能证明该 TSV 先于消费者（09:31:07Z）与 round-1 复核（09:15:27Z）且未被改写，内容另经独立 Python 重算（6 例、0 问题）。
+
+组 7 编辑计划/拒绝/最小命令证据（2026-10-31）：`aline-edit` 已落地纯 `plan_change`/`validate_change`，30 例手写金样（26 个 plan 用例 + 3 个 validate 拒绝 + 1 个 consume）先于实现建立，`tests/goldens.rs` 6 例直接解析该 TSV 断言，`tests/refusals.rs` 16 例（round-2 复核 N-F2-1 后由 15 例补至 16 例）在真实 `StringBuffer` 上比较文本/选区/revision/undo/redo/历史节点数，`tests/protection.rs` 4 例覆盖 front matter/`[toc]`/脚注引用的 Visual 拒绝与 Source 放行；命令面只有 `Replace` 与 `ToggleInlineFormat`（Strong/Strike）。证据见 `validation/m0-engine-foundation/group-7/step-7.1`～`step-7.4`。**已记录的勘误**：金样 `allow_source_footnote` 的目标选区写为 `7..7`，按统一字节规则应为 `8..8`（`4 + 4`），测试保留原值并引用 [step-7.1 报告](./validation/m0-engine-foundation/group-7/step-7.1/report.md) 第 3 节的书面解释，未回填金样。**已接受的语义限制**：隐藏语义比较跳过纯空白隐藏片段，且不比较片段边界与位置，不得据此声称“隐藏片段已完整保留”。**未覆盖**：块打开/提交分组与 900ms 真实计时、IME 确认/取消、离块与 Undo/Redo 交错、自动保存/恢复/导出交错、ED-01 的组合期等待/取消、列表/表格/任务框/代码语言/全文格式化命令、查找替换事务与不可见命中定位、MD-11 粘贴的独立用例（当前与跨区替换共用 `Replace` 路径）、HTML 右端越界与跨整个元素的格式命令、真实 UI/DocCore 消费者与灰色只读呈现、Windows/Linux 与其他 target。**V-07 仍未通过**，AC-04 也未通过。
 
 产物：表格表头/整理的输入输出、跨结构选区命令边界、格式化风格和未知语法/HTML 保护样例；查找按源码、不可见命中定位、环回和退出焦点行为。
 

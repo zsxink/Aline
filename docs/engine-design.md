@@ -176,6 +176,8 @@ source 必须先验输入预算，再验证有效 UTF-8。按已确认WC-03，�
 
 自动链接、Alerts、emoji、`[toc]`、公式定界符和 Front matter 按 PRD 补齐。是否使用原生选项或小型自定义扫描，由 M0 的锁定版本夹具决定，不能把旧“不开 ENABLE_GFM、自研全部 autolink”当不可更改决定；不引入另一 Markdown 解析器。公式的具体定界符/支持清单由 V-03 固化，旧 `\(...\)`、`\[...\]` 是候选覆盖，不能仅据旧稿宣布已冻结或已支持。
 
+**2026-10-31 M0 解析配置记录（任务 6.1/6.2）：** 运行期配置已落地为 `aline-markdown` 的 `ParseConfig`（配置代次 `version`）与 `ParseFeatures`（位集合），Cargo 侧 `pulldown-cmark = "=0.13.6"`、`default-features = false`，未启用任何 Cargo feature 来推断语法。M0 显式打开 `TABLES`、`FOOTNOTES`、`STRIKETHROUGH`、`TASKLISTS`、`MATH`、`GFM` 六个位（位值 `0x00000c1e`，代次 1），映射到 `ENABLE_TABLES`/`ENABLE_FOOTNOTES`/`ENABLE_STRIKETHROUGH`/`ENABLE_TASKLISTS`/`ENABLE_MATH`/`ENABLE_GFM`；代次 0 在解析入口被拒绝，代次变化使旧 `Parsed` 不可复用。未启用原生 metadata 选项，Front matter 由本 crate 的前置改写识别；smart punctuation、heading attributes 保持关闭。选择依据：M0 夹具（`crates/aline-markdown/tests/fixtures/m0/` 的 7 个文档、57 个块/Gap 区间）在关闭默认 features 的锁定版本上逐一对照，GFM 表格/任务列表/删除线/脚注/Alert 均走原生选项，`[toc]`、Front matter 与脚注保护走本 crate 的识别与保护，没有引入第二解析器，也没有为公式/Mermaid 引入渲染后端——M0 只保留并识别源码（`Math` 块、`CodeBlock` 的 info 语言），公式定界符与支持清单仍待 V-03。Alerts 的原生选项只决定引用块分类，五类提示块的产品呈现仍待 V-03/V-07。本节不改变上面的“建议配置”措辞，也不宣称 V-03/V-07 通过；详见[组 6 报告](./validation/m0-engine-foundation/group-6/report.md)及 `step-6.1`。
+
 ### 6.3 改写器的必需能力
 
 | 旧方案 | 复核后的实施条件 | 验证 |
@@ -214,6 +216,8 @@ pulldown 一个事件可能跨多片段，必须保留子段来源，不能仅�
 **存储实现建议（待 V-05/V-07）：**原样片段可仅存源起点及长度，变换片段再存相对偏移/来源记录，避免所有文本逐字分配映射表。[Splat 源码案例与限制](./splat-study.md#43-坐标映射光标与选择)提供了实际紧凑表示，不能据此采用其字符扫描对齐或静默吸附末尾的算法。压缩前后必须具有相同的来源范围、精确性和合法锚点；相对偏移位宽及累计运算受检，不因压缩丢掉一源多字符、隐藏/合成或版本信息。
 
 **2026-10-31 M0 接口基础记录（任务 3.3）：** 恒等投影的 `source_at`/`drawn_at`/`aligned`、局部/全文与 UTF-16 转换已实现并有外部消费者与编译夹具证据；当前仓库扫描未发现调用方手算 `at - range.start`、自建 UTF-16 表或映射外转换，但公开坐标访问器仍可被绕过，扫描不构成结构保证。`Aligned`/`Hidden`/`Synthetic`、实体/HTML/合成换行与块局部映射仍仅契约未验证（第 6 组）；当前没有 UI 生产消费者，不证明真实命中或 IME。详见[任务 3.3 记录](./validation/m0-engine-foundation/group-3/step-3.3/report.md)。
+
+**2026-10-31 M0 映射与保护基础记录（任务 6.4/6.5）：** 上一条“第 6 组仍仅契约未验证”是任务 3.3 时点的状态；组 6 已在 `aline-markdown` 落地片段关系与规范锚点，并以手工金样与外部探针核对。已实现的片段精确性为 `Exact`（同源同长）、`Aligned`（同源异长：转义、实体、硬换行标记）、`Hidden`（有源无绘制：标记、标签、被消费换行）、`Synthetic`（有绘制无源：`<br>` 换行、表格单元格间隔、任务框符号）；`source_at` 对 Exact 取起点加偏移，对 Aligned/Hidden 按 affinity 取区间起止，对 Synthetic 取源锚点；`drawn_at` 对称地按 affinity 取绘制区间起止。手工金样 6 例（实体、多字符实体、软换行、硬换行、`<br>` 合成换行、隐藏+合成混合）逐项记录 drawn 文本、片段 `drawn..→source..` 与精确性、规范锚点，存于 `group-6/step-6.4/goldens/mapping-goldens.tsv`；另以仓外探针核对 ZWJ 家族 emoji（19 字节，`Exact 0..18` + `Hidden 18..19`）、重复文字、连续空白、`\*` 转义、tab 与组合字符。SoftBreak 当前实现投影为带来源的换行（`Exact` 片段，不折成空格），该口径仍待 V-07 冻结，本记录不把任一口径写成产品决定。保护范围（Front matter、`[toc]`、脚注引用/定义、HTML 块与行内标签、整源回退）按块与子区间记录，见 `step-6.5`。`mapping-goldens.tsv` 由 `tests/mapping.rs` 直接解析断言，不再只是证据文件。未验证：真实 UI 命中、IME、字素边界、窗口软折行；这些仍属 V-07。
 
 ### 7.2 操作语义
 
@@ -279,6 +283,8 @@ Buffer 是已提交源码；OpenBlock 是至多一个受控的待提交源码替
 
 命令拒绝必须相对调用前状态零副作用。因此建议在封口待定输入前完成可判定的前置检查，并在候选状态中准备“待定组处理 + 命令”，最终校验后整体发布；不能先清空草稿/改变选区，再发现命令拒绝。若中途工作版本变化，放弃候选而保留当前真实输入。
 
+**2026-10-31 M0 实现记录（组 7）：** `aline-edit` 的 `plan_change`/`validate_change` 已按本节顺序落地为纯逻辑：预检待定输入与组合 → 模式 → 工作版本 → 快照身份 → 投影身份 → 选区合法性 → 选区绑定相等 → 批次在当前快照上重验 → 逐条期望片段重读 → Visual 权限 → 候选重建与同一复读契约 → 目标选区在候选上合法。两个入口只接收 `&TextSnapshot`/`&Parsed`/`&SrcSelection`/`&EditContext`/`&EditCommand`/`EditBudget`，不持有可变 Buffer，也没有 `apply`/`reload`/`undo`/`redo` 或文件写入，因此“拒绝相对调用前状态零副作用”在结构上成立，并由 `tests/refusals.rs` 16 例在真实 `StringBuffer` 上比较文本/选区/revision/undo/redo/历史节点数验证（round-2 复核 N-F2-1 后由 15 例补至 16 例）。本记录**不**包含真实 UI/DocCore 消费者、IME 组合的真实平台事件、块打开/提交分组、自动保存/外改提示与跨平台验证，这些仍属 M1/M2；也不构成 V-07、AC-04 或 M0 出口通过。证据见 [group-7/step-7.2/report.md](./validation/m0-engine-foundation/group-7/step-7.2/report.md)。
+
 ## 9. 补丁、命令事务与历史
 
 ### 9.1 补丁批次的精确定义
@@ -301,6 +307,8 @@ Buffer 是已提交源码；OpenBlock 是至多一个受控的待提交源码替
 
 表格结构命令即使替换整表范围，也必须根据原源片段规划重排/插入，不从展示 Table 序列化回 Markdown。只有用户显式“整理”允许按已冻结风格调整相应表格源码；不能把每次逐格输入都变成整表规范化。
 
+**2026-10-31 M0 实现记录（组 7）：** `aline-edit` 已落地本节的最小协议：`plan_change` 生成绑定 `before_revision`/`before_snapshot`/`before_projection`/`before_selection`/期望片段/受检批次/目标选区/复读契约/解析配置/预算的 `ChangePlan`，并在候选快照上完成预演后才返回；`validate_change` 在执行前重跑同一套检查，旧计划无法把旧范围套到新文本。复读在真实应用前运行，三份契约分别是 `Source`（候选可解析）、`Visible`（隐藏语义保全且候选绘制文本等于“before 绘制文本按替换拼接”的预期）、`Format { marker }`（绘制文本与块种类一致、去掉成对标记后隐藏语义一致）。隐藏语义比较的是非纯空白隐藏片段的原文（含内部空白），`[x](https://e "a b")` 删除标题内空格会被拒绝；**未比较**纯空白隐藏片段与片段边界，这是已接受的 V-07 限制，不得据此声称“隐藏片段已完整保留”。当前只实现 `Replace` 与 `ToggleInlineFormat`（`Strong` `**`、`Strike` `~~`）；列表、任务框、表格、代码语言、全文格式化等命令未实现。Visual `Replace` 的权威范围是命令给出的编辑范围，`before_selection` 只用于 validate 确认选区未被外部改动；`ToggleInlineFormat` 额外要求范围等于选区。M1 消费者必须由选区派生命令范围。证据见 [group-7/step-7.1/report.md](./validation/m0-engine-foundation/group-7/step-7.1/report.md)；本记录不构成 V-07 或 M0 出口通过。
+
 ### 9.3 历史、保存点及重载
 
 History 必须支持正逆补丁、before/after 选区、操作来源、内容身份和当前待定组。900ms 只用于连续相邻普通输入；IME 确认独立、替换/命令/跨块/重载独立。时间由宿主显式传入，纯状态机不创建计时器；计时起止、移动光标后相邻性等用 V-07 金样固定，不能从旧 Zed 300ms 继承。
@@ -322,6 +330,8 @@ TA-02 已确定自动重载与“载入磁盘”都是独立可撤销边界。�
 全文格式化仅用户菜单手动触发。当前快照 → 保留未知/HTML/原文区的源片段补丁计划 → 展示差异 → 用户确认 → 版本复验 → 一次应用、一步撤销。取消或无法安全规划时零修改；差异期间有输入则作废重算，不把旧全文覆盖当前文本。具体风格及 MD-11 区域外的安全重写范围归 V-07，不能以“全文格式化”默许 AST 序列化或重写保护内容。
 
 **2026-10-31 M0 实现记录（组 5）：** `aline-buffer` 已落地 `StringBuffer`（快照、选区、行索引与 `History` 单一持有）、`CheckedBatch` 全量预检、before/after 正逆补丁、`transform_anchor`/`transform_selection` affinity 变换，以及单调 `DocumentRevision`。批次先校验基线、端点、顺序、重叠与 after 选区，剔除内容相同的替换，再构造 after 文本、逆补丁、行索引与历史计划；全部成功后才一次性替换快照并提交历史。拒绝、无变化批次和预算失败不发布，文本/行索引/选区/代次/历史零变化。历史保存正逆补丁、before/after 选区、操作来源与快照身份；900ms 合并只用于相邻普通输入，保存点按快照身份而非栈深判断，重载是独立可撤销边界，裁剪保护保存点与当前节点。证据见 [group-5/step-5.5/report.md](./validation/m0-engine-foundation/group-5/step-5.5/report.md)。本记录不包含命令规划、IME/组合处理、自动保存/外改提示、全文内容指纹与后台比较、资源阈值；TA-02 的真实自动保存暂停/外改提示仍属 M2，这些原语测试不构成 V-07 或 M0 出口通过。
+
+**2026-10-31 M0 实现记录（组 7，查找/替换/格式化基础）：** 本节要求的“替换前重验版本与命中文本”已在 `aline-edit` 得到最小协议支撑：`ChangePlan` 绑定工作版本、快照/投影身份与逐条期望片段，`validate_change` 在应用前重新核对全部绑定，旧命中无法套到新文本。全部替换与格式化的**事务编排**（差异展示、用户确认、取消零修改）仍属 M3，本组没有实现查找、全部替换或全文格式化；只实现了 `Replace` 与 `ToggleInlineFormat` 两个命令。Unicode 大小写、环回、退出焦点等查找样例未执行。证据见 [group-7/step-7.3/report.md](./validation/m0-engine-foundation/group-7/step-7.3/report.md)；本记录不构成 V-07 或 M0 出口通过。
 
 ## 10. IME、Unicode、选区与字符统计
 
@@ -400,6 +410,12 @@ HTML 块消费普通标签、保留可见文字，块级标签换行、折叠空
 
 HTML 核心金样至少包含支持标签/无 href、引号内 `>`、交叉嵌套、注释前后空白、`&amp;`/十进制/十六进制/多字符实体、`<br>`、过滤标签嵌套、不完整输入、仅标签零可见文字、深栈与重复未闭合扫描。保留源范围、展示、样式、命中精确性和命令拒绝六类期望。
 
+**2026-10-31 M0 有限 HTML 实验记录（任务 6.5）：** 已实现并测试：支持标签 `b/strong/i/em/s/del/strike/u/mark/code/kbd/a` 的样式映射与嵌套合并、`a` 仅在 `#`/`/`/`http`/`https`/`mailto` href 时获得链接样式、引号内 `>` 不提前结束标签、交叉嵌套弹栈、注释/处理指令隐藏并保留保护范围、`&amp;` 等实体按 Aligned 片段映射、`script` 等过滤标签按字面文本显示、未闭合支持标签保留样式不 panic、HTML 预算失败整源回退。保护范围按行内标签/HTML 块/整源回退分别记录。**尚未固化/未对齐项**：过滤集对 `title/textarea/xmp/noembed/noframes/plaintext` 的补全、HTML 文本空白折叠（多源合并为 Aligned 片段）、块级标签合成换行、十进制/十六进制/多字符实体与“仅标签零可见文字”的金样，以及非过滤集 void 标签（`input/link/meta/base`）的展示口径；这些在 V-07 冻结前不得写成“有限 HTML 已完成”。组 6 复核对上述缺口的编号与处置见[组 6 复核](./validation/m0-engine-foundation/group-6/review.md)与[遗留项](./validation/m0-engine-foundation/group-6/follow-ups.md)；本节不改变上方规范句，也不宣称 AC-09 或 V-07 通过。
+
+**2026-10-31 M0 有限 HTML 修复记录（任务 6.5，F2-1）：** 上一条列出的“尚未固化/未对齐项”中，已落地并测试的有：过滤集补全 `title/textarea/xmp/noembed/noframes/plaintext`（并保留 `object/embed/form/button/svg/math`），且过滤判定前置于 void 判定；HTML 文本空白折叠（连续空格/tab/换行折叠为一个 `Aligned` 空格片段，源码覆盖全部被消费空白，块首/块尾欠写空白丢弃）；块级标签边界合成 `\n`（`div/p/section/article/header/footer/ul/ol/li/h1–h6/table/tr/td/th/blockquote/pre`）；十进制/十六进制/多字符实体与“仅标签零可见文字”的金样。`cargo test -p aline-markdown --test html` 为 20 例、`--test protection` 为 6 例，均通过。**仍待 V-07 冻结**：非过滤集 void 标签（`input/link/meta/base`）的展示口径仍按“不支持标签隐藏、无可见内容”，代码处已标待定；空白折叠与块级合成换行口径本身同样待 V-07 冻结。仍未验证真实 UI 渲染与灰色只读呈现。本节仍不宣称有限 HTML 完整、AC-09 或 V-07 通过。
+
+**2026-10-31 M0 有限 HTML round-2 处置记录（任务 6.5，复核 N-F3-1/N-F3-2）：** 上一条中“过滤判定前置于 void 判定”对 `input/link/meta/base` 实为 **no-op**：过滤集合（`script/style/iframe/title/textarea/xmp/noembed/noframes/plaintext/object/embed/form/button/svg/math`）与 void 集合（`img/hr/input/meta/link/source/area/base/col`）不相交，这些标签从未进入过滤分支，移动判定顺序不改变其行为，它们仍走 void 分支整体隐藏；`tree/html.rs` 的对应注释已按此更正（N-F3-1）。未支持的非 void 标签（如 `<foo>`）当前绘制为 `"<foo>a   b"`——开标签字面可见、闭标签隐藏、内部连续空白不折叠，与支持标签 `<span>e   f</span>` 的 `"e f"` 不对称；该行为已由 `tests/html.rs` 的 `unsupported_non_void_tags_record_the_v07_pending_asymmetry` 固定为**现状记录**（html 21 例），是否统一处理属 V-07 待定，本记录不把任一口径写成产品决定（N-F3-2）。
+
 ### 11.3 特殊资产的边界
 
 引擎提供公式/图表/代码/图片的源片段、内容身份和必要语义参数；plugin/宿主计算资产，UI 校验版本与配置代次后采纳。关闭或失败保留源文本，不改变历史，插件关闭后的旧任务不能挂回预览。
@@ -417,6 +433,8 @@ HTML 核心金样至少包含支持标签/无 href、引号内 `>`、交叉嵌�
 复用条件除源片段/结构相等，还包括所有影响语义的解析配置及全局依赖结果相容。前文插入使后块绝对偏移变化，后块内容相同也必须 rebase 或使用经映射管理的块相对坐标；旧“映射对象原样复用不失效”不成立。仅凭渲染文本相同会漏掉隐藏 HTML、链接目标及前缀变化。
 
 **验证建议：**优化分支与全量路径比较的不仅是可见文字，还包括块/Gap、全部源范围、映射来源与精确性、保护区及导航目标；记录实际命中优化/回退路径，避免用全部回退的测试冒充增量验证。样本包含前文引用定义改变后文链接、脚注重排、未闭合围栏/HTML、列表缩进及 Front matter 边界变化。[Splat §5](./splat-study.md#5-解析局部更新性能与异常输入)有窗口扩展、全局回退和布局差分的源码先例，仍不改变本节的全量基线。UI 若实验分批派生刷新，占位升级不得改变同一投影的文字、来源或编辑权限；资产尺寸变化另按源码锚点保持定位，任何旧投影都不能接收并静默丢弃当前输入。方法、样本和通过条件归 V-05/V-07，具体调度仍由 UI 负责。
+
+**2026-10-31 M0 复用实验记录（任务 6.7）：** `aline-markdown` 的 `reuse` 已在全量解析基线上实现头尾配对：前后两次解析的结构相同且源片段逐字节相等时配对，旧块绝对范围经 `translate` 重定位到新快照，块外偏移返回 `None` 而不 clamp。已记录的实际命中：前文插入 3 对、单段内编辑 2 对、末尾追加 4 对、不相关文档 0 对；不是“全部回退”冒充优化。拒绝条件已覆盖配置代次变化、整源回退（RawFallback）、Front matter、脚注、`[toc]`、HTML、顶层列表/围栏、引用定义（含块引用与列表容器内的 `[x]: /u`、围栏行，以及**标签跨行的定义**，如 `[foo\nbar]: /u`——复核 N-F2-1 修正前该形态会漏检并可复用出错误可见文本），以及旧绝对范围对新快照失败。差分比较除文本/块种类/重定位后范围外，还比较投影片段来源与精确性、保护范围与样式范围；M0 公开 API 不暴露链接 href，导航只比较标题的 kind/text/range。**更正（复核 N-F3-3/N-F3-7）**：上述差分比较只在测试辅助中成立，生产路径 `same_block` 只比较块种类与块文本；引用定义目标变化（单行）会被拒绝，但行内链接目标变化不在 M0 的复用比较范围，不会触发整体拒绝复用，因此“含链接目标变化的文档因整体拒绝复用而不可比”对行内链接不成立。**补充（复核 N-F2-1 处置）**：跨行标签的定义（如 `[foo\nbar]: /u`）已由逐行字节状态机识别——跨行的闭 `]` 后紧跟 `:` 即命中，空行重置状态，`\[`/`\]` 按转义跳过；删除该定义或改其目标都会整篇拒绝复用，普通跨行段落文字与“跨行标签但无定义”仍可复用（`tests/reuse.rs` 5 例）。仍未覆盖：真实 UI 消费、局部解析优化（未实现）、性能收益、跨块 Aligned/Synthetic 片段的逐对比较（当前样本未触发）。证据见[组 6 报告](./validation/m0-engine-foundation/group-6/report.md)与 `step-6.7`；本节不宣称 V-05 通过。
 
 ### 12.2 失效与采纳
 
@@ -447,6 +465,8 @@ UI 调度任务，引擎只处理显式输入。结果至少携带文档身份�
 | 图片/公式/图表/高亮 | 压缩及解码体积、像素、源长、输出/耗时、缓存 | 宿主限制分配与并发，失败原引用/源码保留 |
 
 所有具体资源数值仍待 V-06；旧 HTML 栈深、64 KiB 高亮、图片 8192px/256MiB 等均不作为新默认。StringBuffer 是建议起点，行表每键全重建是否满足预算必须实测；ropey 不预装。缓存可淘汰，源文本/未提交输入/仍被引用的恢复材料不能作为普通缓存淘汰。
+
+**2026-10-31 M0 预算与敌意输入实验记录（任务 6.6）：** `aline-markdown` 的 `ParseBudget` 已实现八个可注入维度（源码字节、重写字节、映射片段、扫描步数、嵌套、节点、HTML 栈深、投影索引点），`ParseBudget::m0()` 的数值只是测试与无头调用用的保护上限，**不是 V-06 发布限额**。协作式取消已落地为 `CancelCheck` trait 与 `CancelToken`（`Arc<AtomicBool>`）；`parse_with_cancel` 在解析入口、重写编辑之间、front matter 检测前后、每个事件前以及构树/冲刷/收尾循环间轮询取消，取消返回 `ParseError::Cancelled` 且不产出树。已记录的实际测量：321 字节 HTML 密集源二分得到最小可通过扫描步数 80（`step-6.6/scan-budget-probe.stdout.log`），`ParseStats::scan_steps` 在测试中与二分阈值交叉一致（未过滤样本 8/8、80/80；过滤标签样本修复前统计为 8/6/6 而真实阈值为 5/3/3，复核 N-F2-2 后复刻补入过滤分支，现为 5/5、3/3、3/3，见 `step-6.6/fix-n-f2-2-n-f2-3/probe-after.log`）。投影索引点按绘制字符数加一计数；`max_mapping_points` 超限的实际出口是 `Err(ParseError::Mapping(BudgetExceeded))`，**不是整源回退**（复核 N-F2-3 更正）。敌意输入覆盖深层嵌套、巨型输入、预算注入、预取消与取消中途，均在有限步内返回。**盲区如实记录**：`pulldown-cmark` 内部事件生成、重写逐字节循环内部与投影构造本身不可中断，单个超长事件只能在其结束后观察到取消；`html_scan_steps` 是对 `tree/html.rs` 扫描循环的复刻（该循环在模块内私有），现复用真实扫描器的 `is_filtered_tag`/`filtered_close_end` 并由 `HtmlStack::count_scan_steps` 按事件前过滤状态计数，若扫描语义变化仍须同步修改；预算注入的实际诊断种类是 `BudgetExceeded`，`RawFallback` 在公开 `parse` 入口尚无触达路径。本节不改变上方规范句，也不宣称 V-06 通过。
 
 ### 12.4 性能目标与证据
 
@@ -503,6 +523,8 @@ Source 模式只解除 Markdown 产品只读限制，不解除 UTF-8/补丁版�
 | E-T19 性能 | 各尺寸/复杂度冷热 Release 分段计时、P50/P95、主线程停顿/内存；巨块单独验证，不能由虚拟化假设代替 | 引擎 + UI；M1～M6 | PRD §7.2；AC-16；V-01/05/06 |
 
 随机生成只向 buffer/edit 提交合法或预期拒绝的范围；随机 bytes 先走 decode，不能对非 UTF-8 强行构造 str。属性测试应保留最小失败样例。反退化测试建议记录工作步数随输入增长，辅以 Release 扩量基准；旧“4 倍输入耗时 ≤8 倍”仅是噪声敏感的实验形状，不是复杂度证明。
+
+**2026-10-31 M0 覆盖记录（组 7）：** 上表 E-T09（拒绝零副作用）、E-T10（只读保护）、E-T11（HTML 拒绝）、E-T12（命令金样，仅格式与替换）已有 M0 无头基础证据：`aline-edit` 的 `tests/refusals.rs` 16 例（round-2 复核 N-F2-1 后由 15 例补至 16 例）在真实 `StringBuffer` 上比较文本/选区/revision/undo/redo/历史节点数，覆盖 `PendingInput`、`CompositionActive`、`WrongVersion`、`BudgetExceeded`、`RereadFailed`、`ProtectedRange`、`HtmlBoundary`、`UnsupportedVisualBatch` 与 `AlreadyFormatted` 无空步；`tests/protection.rs` 4 例覆盖 front matter/`[toc]`/脚注引用的 Visual 拒绝与 Source 放行；30 例手写金样覆盖 26 个 plan 用例（其中 `allow_source_footnote` 的目标选区有书面勘误，见 [step-7.1 报告](./validation/m0-engine-foundation/group-7/step-7.1/report.md) 第 3 节）。**未覆盖**：真实 UI/DocCore 消费者与“所有已开放写入口”的检查、IME 真实平台事件、列表/表格/任务框/代码语言/全文格式化命令、MD-11 粘贴的独立用例（当前与跨区替换共用 `Replace` 路径）、HTML 右端越界与跨整个元素的格式命令、Windows/Linux 与其他 target、磁盘与自动保存。E-T09～E-T12 仍不构成 V-07 通过。
 
 保真、映射、拒绝测试建立清单棘轮，移除用例必须有可审查理由。无头测试覆盖纯状态机，UI 命中/IME/磁盘/真实产物另做集成；AC-07/10/12/13/15/18～20 的应用壳专项完整追踪仍在架构 §6，本表不以引擎测试冒充全产品验收。
 

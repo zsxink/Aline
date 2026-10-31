@@ -550,6 +550,10 @@ History 使用正/逆补丁及 before/after 源码选区，不保存每次全文
 
 上表状态列只记录 2026-10-31 实际落地，不改变“输入 → 输出/校验/所有者”的已确认契约；完整冻结、错误类别、唯一写入口与相等证据见[任务 3.3 记录](./validation/m0-engine-foundation/group-3/step-3.3/report.md)。未实现接口是契约未验证，不是已完成。
 
+**2026-10-31 组 6 后状态补充（任务 6.8）：** 上表 `parse` 与 `map_position` 两行的“仅契约未验证”是任务 3.3 时点的记录。组 6 已在 `aline-markdown` 落地：`parse(&TextSnapshot, ParseConfig, ParseBudget)` 返回带输入版本、块/Gap、映射、保护、样式与诊断的 `Parsed`；超限的构树类维度（扫描步数、嵌套、节点、HTML 栈深）整源回退、不截断也不发布部分结果，而源码/重写字节、映射片段与投影索引点超限返回 `Err`（`BudgetExceeded` / `Mapping(BudgetExceeded)`）——**更正（复核 N-F3-6）**：原“超限整源回退而不截断”过宽；`ParseConfig` 带代次，代次 0 被拒绝；`ParseBudget` 八维可注入，协作式 `CancelCheck`/`CancelToken` 可取消，`ParseStats` 记录扫描步数/投影索引点/预算触发次数。映射 API 的恒等路径之外已有片段级 `source_at`/`drawn_at`、局部与全文投影、UTF-16 换算与规范锚点，非法端点/旧投影/代理对中间受检拒绝，不做 clamp 或 backscan。仍未实现：`plan_change`/`validate_change` 的 edit 层（第 7 组）、`apply_change` 的单一写入口（第 5/8 组）、`snapshot_current` 内容快照（第 8 组）、`save`/`recover`/`render_asset`；真实 UI 命中、IME 与灰色只读区呈现未验证。证据见[组 6 记录](./validation/m0-engine-foundation/group-6/step-6.8/report.md)。
+
+**2026-10-31 组 7 后状态补充（任务 7.4）：** 上表 `plan_change` / `validate_change` 行的“仅契约未验证”同样是任务 3.3 时点的记录。组 7 已在 `aline-edit` 落地：`plan_change(&TextSnapshot, &Parsed, &SrcSelection, &EditContext, &EditCommand, EditBudget) -> Result<PlanOutcome, EditRefusal>`，成功返回 `ChangePlan`（绑定 `before_revision`、快照/投影身份、`before_selection`、逐条期望片段、`CheckedBatch`、after 目标选区、复读契约、解析配置与预算），无变化返回 `Unchanged(NoChangeReason)`，拒绝返回 `EditRefusal`；`validate_change` 在执行前重验同一套绑定并在候选快照上重跑复读。两入口都不持有可变 Buffer，`apply_change` 仍无 edit 层实现——`ChangePlan::batch()` 交给文档所有者原子发布，本组不发布。命令面只有 `Replace` 与 `ToggleInlineFormat`（`Strong`/`Strike`）。仍未实现：`apply_change` 单一写入口（第 5/8 组）、`snapshot_current` 内容快照（第 8 组）、`save`/`recover`/`render_asset`、列表/表格/任务框/代码语言/全文格式化命令；真实 UI/DocCore 消费者、IME、灰色只读区呈现与跨平台未验证。证据见[组 7 记录](./validation/m0-engine-foundation/group-7/step-7.4/report.md)。
+
 `Change` 至少包含同一快照下的补丁、目标源码选区、预期版本和分组原因；不能只返回裸区间而不说明来源。菜单、快捷键、右键共用命令表的 id/文案 key/前置条件。前置条件还须在执行时重验，不能信任菜单打开时的状态。
 
 ### 7.2 编辑、查找和格式化事务
@@ -561,6 +565,8 @@ History 使用正/逆补丁及 before/after 源码选区，不保存每次全文
 查找纯文本匹配源码，包含注释和链接目标；不纳入整词或正则。匹配携带工作版本和查询代次。替换前再次验版本及实际命中文本，全部替换的一组非重叠补丁只记一步。不可见命中定位打开块；MD-11 命中先切 Source，再执行替换。大小写匹配的 Unicode 样例、环回、退出焦点归 V-07；旧 ASCII-only 实现建议和“4 MiB 毫秒级”说法不作为已确认契约。
 
 格式化仅“编辑 > 格式化 Markdown”手动入口：当前快照 → 受保护片段/未知语法/HTML 的保留计划 → 补丁与差异 → 用户确认 → 版本重验 → 一次应用/一步撤销。版本改变须重新生成差异，不应用旧预览。无安全方案则明确拒绝全文格式化；取消零修改。格式化规则和保护金样待 V-07，不引入第二解析器或 AST → Markdown 的重建路径。
+
+**2026-10-31 组 7 实现记录（M0 范围）：** 本节“取得当前一致快照 → 校验解析/保护范围 → 计算补丁 → 在副本上预演和必要的 `reread` → 检查仍为同一版本 → 一次应用”的链条在 `aline-edit` 已实现到“一次应用”之前：`plan_change` 做前四步并返回 `ChangePlan`，`validate_change` 做第五步（重验版本/快照/投影/选区绑定，在候选上重跑复读），**不**做第六步——`ChangePlan::batch()` 只返回受检批次，由文档所有者（第 8 组 DocCore）原子发布，edit 层没有 `apply`、没有可变 Buffer、没有文件写入。MD-11 保护在 `plan_change` 的 Visual 分支对所有已开放命令生效（`check_visual_permissions`），HTML 区域及边界的格式命令返回 `HtmlBoundary`，Source 模式修改脚注/front matter/`[toc]`/HTML 原文放行。拒绝在 `plan_change`/`validate_change` 返回 `Err`，结构上无法改选区或草稿。查找、全部替换与全文格式化未实现（M2/M3）。证据见[组 7 记录](./validation/m0-engine-foundation/group-7/step-7.4/report.md)；这不构成 V-07 或 M0 出口通过。
 
 ### 7.3 保存、外部变化和关闭
 
