@@ -1,0 +1,324 @@
+R05b 修复后证据（scripts/check_lints.py 修改后，未提交）
+============================================================
+采集时间（UTC）：2026-11-01T06:19:02Z – 2026-11-01T06:22:20Z
+Python 3.9.6；CARGO_NET_OFFLINE=true；RUSTUP_TOOLCHAIN=1.98.1；
+Cargo 一律 --locked --offline，且显式 CARGO_HOME=/Users/xian/.cargo（见 commands.txt 说明）。
+夹具在 /tmp/r05b/ 下，未写入仓库受跟踪路径。
+
+------------------------------------------------------------
+[1] 撞名夹具 —— 现在 fail-closed，带规则名、文件:行号与两条路径
+------------------------------------------------------------
+argv : python3 scripts/check_lints.py --root /tmp/r05b/fixtures/collision
+cwd  : /Users/xian/Project/editor/Aline
+start: 2026-11-01T06:19:02Z
+exit : 1
+stdout: (空)
+stderr:
+lint 检查拒绝: /private/tmp/r05b/fixtures/collision/Cargo.toml:11: ambiguous-table-path: 表路径 ('workspace', 'lints', 'rust')（第 1 行）与 ('workspace', 'lints.rust')（第 11 行） 展平为同一键 'workspace.lints.rust'，Cargo 语义与守卫判定不一致
+
+说明：不按写入顺序选赢家；两条路径不同而展平键相同即拒绝。文件:行号取自
+发生冲突的第二个表（第 11 行，即引号点分键所在行），另一条路径给出起始行。
+
+同一夹具的 Cargo 对照（证明 Cargo 侧确实未生效，本批不改 Cargo 行为）：
+argv : cargo clippy --manifest-path /tmp/r05b/fixtures/collision/Cargo.toml
+       -p aline-buffer --locked --offline -- -D warnings
+cwd  : /tmp/r05b/fixtures/collision
+env  : CARGO_HOME=/Users/xian/.cargo CARGO_NET_OFFLINE=true RUSTUP_TOOLCHAIN=1.98.1
+       CARGO_TARGET_DIR=/tmp/r05b/cargo-target
+start: 2026-11-01T06:19:02Z
+exit : 0
+stderr: warning: Cargo.toml: unused manifest key: workspace.lints.clippy
+        warning: Cargo.toml: unused manifest key: workspace.lints.rust
+
+------------------------------------------------------------
+[2] 已知边界：只有引号点分键、无真实嵌套表
+------------------------------------------------------------
+夹具 /tmp/r05b/fixtures/quoted-only = 真实根清单，但把 [workspace.lints.rust] /
+[workspace.lints.clippy] 两张表替换为 [workspace] 下的引号点分键（无真实嵌套表）。
+argv : python3 scripts/check_lints.py --root /tmp/r05b/fixtures/quoted-only
+cwd  : /Users/xian/Project/editor/Aline
+start: 2026-11-01T06:22:20Z
+exit : 0
+
+argv : cargo clippy --manifest-path /tmp/r05b/fixtures/quoted-only/Cargo.toml
+       -p aline-buffer --locked --offline -- -D warnings
+cwd  : /tmp/r05b/fixtures/quoted-only
+start: 2026-11-01T06:22:20Z
+exit : 101
+stderr（末尾）:
+  Caused by:
+    `workspace.lints` was not defined
+
+说明：该边界不静默——成员 [lints] workspace = true 在 Cargo 侧直接报错。
+本批只关闭危险窗口「真实弱表 + 引号点分键覆盖」，不额外拒绝单引号键形态；
+理由与未覆盖范围见 report.md §5。
+
+------------------------------------------------------------
+[3] 深嵌套 —— 现在输出规范的 CheckError，不是 traceback
+------------------------------------------------------------
+夹具 /tmp/r05b/fixtures/deep（500 层嵌套数组）
+argv : python3 scripts/check_lints.py --root /tmp/r05b/fixtures/deep
+cwd  : /Users/xian/Project/editor/Aline
+start: 2026-11-01T06:19:02Z
+exit : 1
+stderr: lint 检查拒绝: /private/tmp/r05b/fixtures/deep/crates/aline-buffer/Cargo.toml:10: 数组/内联表嵌套深度超过上限 100
+
+补充：显式深度上限之外，RecursionError 也已纳入 main 的异常元组。用
+sys.setrecursionlimit(60) 人为压低递归栈，使 RecursionError 先于深度上限触发：
+argv : python3 <wrapper: sys.setrecursionlimit(60)> scripts/check_lints.py --root /tmp/r05b/fixtures/deep
+cwd  : /Users/xian/Project/editor/Aline
+start: 2026-11-01T06:20:24Z
+return: 1
+stderr: lint 检查拒绝: maximum recursion depth exceeded in comparison
+（无 traceback；return 1 来自 main 的异常元组，不是解释器崩溃）
+
+review 提到的 2000 层点分键与内联表也都被显式上限拒绝（实测）：
+  deep-dotted:1: 键/表路径深度 2000 超过上限 100
+  deep-inline:1: 数组/内联表嵌套深度超过上限 100
+
+------------------------------------------------------------
+[4] 正常仓库 —— 不回归
+------------------------------------------------------------
+argv : python3 scripts/check_lints.py
+cwd  : /Users/xian/Project/editor/Aline
+start: 2026-11-01T06:19:02Z
+exit : 0
+stdout: {"status": "workspace lint 声明有效", "members": {...八个成员...}}
+
+------------------------------------------------------------
+[5] --self-test —— 全绿，68 条断言（基线 57 + 新增 11）
+------------------------------------------------------------
+argv : python3 scripts/check_lints.py --self-test --output-dir /tmp/r05b/evidence/final-selftest-out
+cwd  : /Users/xian/Project/editor/Aline
+env  : RUSTUP_TOOLCHAIN=1.98.1 CARGO_NET_OFFLINE=true
+start: 2026-11-01T06:19:06Z
+end  : 2026-11-01T06:19:09Z
+exit : 0
+
+断言计数（grep "符合预期" = 68，0 条 "不符合预期"，无 traceback）：
+  既有 57 条（self_test_cases 10 组 × 2 profile = 20；inherit-unsafe 8；
+  unsafe-forbid 1；missing-inherit 自检；negative-one-member 1；f08 4；
+  parser_cases 23）= 57，一条不少
+  新增 parser 反例 2（reject-deep-nested-array、reject-deep-dotted-key）
+  新增 table-path 4（2 正 2 反）
+  新增 member 5（1 正 4 反，覆盖多余键 / workspace=false / "true" / 1）
+  合计 57 + 11 = 68
+
+末尾汇总行：
+{"status": "lint 隔离样例通过", ..., "self_test_cases": 10,
+ "profiles": ["debug", "release"], "inheritance_cases": 4,
+ "parser_cases": 25, "table_path_cases": 4, "member_cases": 5}
+
+新增断言逐条输出：
+parser reject-deep-nested-array: 拒绝符合预期 (...:1: 数组/内联表嵌套深度超过上限 100)
+parser reject-deep-dotted-key: 拒绝符合预期 (...:1: 键/表路径深度 101 超过上限 100)
+table-path accept-quoted-dotted-key-without-collision: 通过符合预期
+table-path accept-table-and-distinct-quoted-key: 通过符合预期
+table-path reject-table-then-quoted-dotted-key: 拒绝符合预期 (...:4: ambiguous-table-path: 表路径 ('workspace', 'lints', 'rust')（第 1 行）与 ('workspace', 'lints.rust')（第 4 行） ...)
+table-path reject-quoted-dotted-key-then-table: 拒绝符合预期 (...:3: ambiguous-table-path: 表路径 ('workspace', 'lints.rust')（第 2 行）与 ('workspace', 'lints', 'rust')（第 3 行） ...)
+member accept-exact-workspace-true: 通过符合预期
+member reject-extra-key: 拒绝符合预期 (成员未完整继承 workspace lint: aline-source)
+member reject-workspace-false: 拒绝符合预期 (成员未完整继承 workspace lint: aline-source)
+member reject-workspace-string-true: 拒绝符合预期 (成员未完整继承 workspace lint: aline-source)
+member reject-workspace-integer-one: 拒绝符合预期 (成员未完整继承 workspace lint: aline-source)
+
+------------------------------------------------------------
+[6] 弱化实现后 self-test 必须变红（三组定向弱化）
+------------------------------------------------------------
+每组都在 /tmp/r05b/ 的独立副本上进行，只改 audit_member_manifest 一个条件。
+
+(a) 全弱化（替换为 not isinstance(lints, dict)）
+cwd  : /tmp/r05b/weakrepo2
+argv : python3 scripts/check_lints.py --self-test --output-dir /tmp/r05b/evidence/final-weak-out
+start: 2026-11-01T06:19:20Z
+exit : 1
+末尾: lint 检查拒绝: 成员继承自检应拒绝但通过了: reject-extra-key
+（修复前同形弱化 exit 0，见 pre-fix.txt [2]）
+
+(b) 只去掉键集检查（保留 workspace is True）
+cwd  : /tmp/r05b/weak-nokey
+exit : 1
+末尾: lint 检查拒绝: 成员继承自检应拒绝但通过了: reject-extra-key
+start: 2026-11-01T06:19:23Z
+
+(c) 只去掉值真值检查（保留键集检查）
+cwd  : /tmp/r05b/weak-nolvalue
+exit : 1
+末尾: lint 检查拒绝: 成员继承自检应拒绝但通过了: reject-workspace-false
+start: 2026-11-01T06:19:26Z
+
+补充逐用例矩阵（脚本直接调用 audit_member_manifest，不依赖 cargo）：
+  实现         accept-exact  reject-extra  reject-false  reject-"true"  reject-1
+  修复版       PASS          PASS          PASS          PASS           PASS
+  全弱化       PASS          FAIL          FAIL          FAIL           FAIL
+  无键集检查   PASS          FAIL          PASS          PASS           PASS
+  无值真值检查 PASS          PASS          FAIL          FAIL           FAIL
+说明：三条拒绝各有独立断言，任何单点弱化都会命中至少一条。
+
+(d) 撞名规则自证：副本 /tmp/r05b/weak-flatten 删掉 _flatten_tables 中
+    ambiguous-table-path 的 8 行判断（其余不动），整套 self-test 变红：
+argv : python3 scripts/check_lints.py --self-test --output-dir /tmp/r05b/evidence/final-weak-flatten-out
+cwd  : /tmp/r05b/weak-flatten
+start: 2026-11-01T06:26:47Z / end: 2026-11-01T06:26:50Z
+exit : 1
+末尾: table-path accept-quoted-dotted-key-without-collision: 通过符合预期
+      table-path accept-table-and-distinct-quoted-key: 通过符合预期
+      lint 检查拒绝: 表路径自检应拒绝但通过了: reject-table-then-quoted-dotted-key
+（"符合预期" 61 条，即在第 3 条 table-path 用例处中止；两条 accept 仍通过，
+证明弱化只打掉了拒绝能力，没有误伤正常路径）
+
+(e) 深度上限自证：副本 /tmp/r05b/weak-depth 把 _check_path_depth 与
+    _enter_container 的判断体各换成 pass，整套 self-test 变红：
+argv : python3 scripts/check_lints.py --self-test --output-dir /tmp/r05b/evidence/final-weak-depth-out
+cwd  : /tmp/r05b/weak-depth
+start: 2026-11-01T06:26:50Z / end: 2026-11-01T06:26:53Z
+exit : 1
+末尾: lint 检查拒绝: 解析器自检应拒绝但通过了: reject-deep-nested-array
+（"符合预期" 57 条 = 既有基线全部通过，两条深嵌套用例全部变红）
+
+(f) RecursionError 元组自证：正例见 [3]（sys.setrecursionlimit(60) 下输出
+    「lint 检查拒绝: maximum recursion depth exceeded in comparison」且 return 1）。
+    反例：副本 /tmp/r05b/weak-recerr 把异常元组改回
+    `except (CheckError, OSError, ValueError, KeyError)`，同形调用：
+argv : python3 -c "import sys,runpy; sys.setrecursionlimit(60);
+       sys.argv=['scripts/check_lints.py','--root','/tmp/r05b/fixtures/deep'];
+       runpy.run_path('scripts/check_lints.py', run_name='__main__')"
+cwd  : /tmp/r05b/weak-recerr
+start: 2026-11-01T06:30:11Z
+exit : 1
+输出：出现 Traceback（1 处），末行 RecursionError: maximum recursion depth exceeded
+（即去掉该元组成员后立刻退回 review 描述的 traceback 形态，证明补丁确实生效）
+
+------------------------------------------------------------
+[7] 语料回归 —— 新规则不影响真实 TOML
+------------------------------------------------------------
+argv : python3 -I /tmp/r05b/tools/corpus.py
+cwd  : /Users/xian/Project/editor/Aline
+start: 2026-11-01T06:21:20Z
+end  : 2026-11-01T06:21:56Z
+exit : 0
+输出: files=9488 rejected=0 max_container_depth=5
+
+即仓库内 9488 个 Cargo.toml/Cargo.lock 全部经 tables() 通过，0 拒绝；
+真实语料最大容器深度 5，远低于上限 100，不会误伤。
+
+------------------------------------------------------------
+原始捕获位置（/tmp/r05b/evidence/）
+------------------------------------------------------------
+final-guard-collision.txt / final-cargo-collision.txt
+final-guard-quoted-only.txt / final-cargo-quoted-only.txt
+final-guard-deep.txt / final-recursion-tuple.txt
+final-guard-normal.txt / final-selftest.txt
+final-weak-selftest.txt / final-weak-nokey.txt / final-weak-nolvalue.txt
+final-weak-flatten.txt / final-weak-depth.txt / final-weak-recerr.txt
+final-corpus.txt
+
+============================================================
+[追加] 主 Agent 独立复核后的补强与再验证（2026-11-01）
+============================================================
+背景：主 Agent 独立复核 R05b 时发现，self-test 对「报错信息要件」无断言——
+把冲突行号写死成 0 或 1、或从信息里删掉两条冲突路径 / 展平键，`--self-test` 仍 exit 0。
+复核退回要求「`ambiguous-table-path` + 文件:行号 + 两条路径」可定位，因此补齐断言。
+本节内容全部在 R05b worker 交付之后追加，上面的原始段落保持原样未改。
+
+改动（仍只在 scripts/check_lints.py）：
+- TABLE_PATH_CASES 每条拒绝用例新增第 5 元素 detail：手写期望的行号、两条冲突路径
+  的元组拼写、展平键；MEMBER_CASES 补齐同形 5 元组（detail 为 None，保持原强度）。
+- 新增 `_assert_rejection_detail`：校验 文件:行号 在首段且行号为数字、行号精确等于
+  detail["line"]、两条路径元组拼写都出现、展平键出现。
+- 期望值手写：`reject-table-then-quoted-dotted-key` 的后出现冲突在第 4 行，
+  `reject-quoted-dotted-key-then-table` 在第 3 行（均为 1 起计的行号，按 TOML 文本数行）。
+
+------------------------------------------------------------
+[A1] 补强后的 self-test
+------------------------------------------------------------
+argv : python3 -I scripts/check_lints.py --self-test --output-dir /tmp/r05b-verify3
+cwd  : /Users/xian/Project/editor/Aline
+start: 2026-11-01T06:36:53Z   end: 2026-11-01T06:36:56Z
+exit : 0
+stdout 末尾汇总行：
+{"status": "lint 隔离样例通过", ..., "self_test_cases": 10, "profiles": ["debug", "release"],
+ "inheritance_cases": 4, "parser_cases": 25, "table_path_cases": 4, "member_cases": 5}
+符合预期计数：68（与 worker 交付时相同，未增未减）
+
+------------------------------------------------------------
+[A2] 正常仓库不变
+------------------------------------------------------------
+argv : python3 -I scripts/check_lints.py --root .
+cwd  : /Users/xian/Project/editor/Aline
+start: 2026-11-01T06:36:56Z   end: 2026-11-01T06:36:56Z
+exit : 0（八成员 JSON 与 worker 交付时一致）
+
+------------------------------------------------------------
+[A3] 报错要件弱化 —— 九种变体全部变红（此前三种是绿的）
+------------------------------------------------------------
+方法：把当前脚本复制成临时副本，做单点变异，跑 --self-test，期望 exit 1。
+副本均在 scripts/ 下临时生成，跑完立即删除，未提交。
+
+| 变异 | 目标 | 结果 |
+|------|------|------|
+| weak1-no-ambiguous         | 删撞名判断          | exit 1（reject-table-then-quoted-dotted-key 未被拒） |
+| weak2-member-key-only      | 成员判据只剩键存在  | exit 1（reject-extra-key 未被拒） |
+| weak3-no-recursionerr      | 去掉 RecursionError | exit 0（无对应断言，靠外部观测量级，见 report.md §5） |
+| weak4-no-keypath-depth     | 路径深度检查失效    | exit 1（reject-deep-dotted-key 未被拒） |
+| weak5-no-container-depth   | 容器深度检查失效    | exit 1（reject-deep-nested-array 未被拒） |
+| weak6-line-hardcoded-0     | 冲突行号写死 0      | exit 1（行号不符预期，期望 4 实得 0）**新增保护** |
+| weak7-no-paths             | 信息删掉两条路径    | exit 1（信息未列出冲突路径）**新增保护** |
+| weak8-line-hardcoded-1     | 冲突行号写死 1      | exit 1（行号不符预期，期望 4 实得 1）**新增保护** |
+| weak9-no-key-in-msg        | 信息删掉展平键      | exit 1（信息未列出展平键 'workspace.lints.rust'）**新增保护** |
+
+结论：撞名用例现在保护「拒绝 + 规则名 + 文件:行号 + 两条路径 + 展平键」全部要件；
+弱化行号或信息内容会立刻变红。weak3（RecursionError）仍无断言，属 worker 已声明的
+「无对应断言」项，记为残留（见 report.md §5 第 7 条）。
+
+------------------------------------------------------------
+[A4] 结论
+------------------------------------------------------------
+本批三项退回（撞名 fail-open、成员继承无断言、深嵌套 traceback）全部关闭；
+其中撞名一项的可定位性由主 Agent 追加断言保护。剩余已知边界不变：
+仅引号点分键、无真实嵌套表时守卫仍 exit 0，但 Cargo exit 101（不静默）。
+
+------------------------------------------------------------
+[A5] 主 Agent 独立复现（夹具由主 Agent 自建，不复用 /tmp/r05b）
+------------------------------------------------------------
+夹具 /tmp/r05main/collision：仓库副本，在根 Cargo.toml 的 `[workspace]` 表内
+（members 数组之后、`[workspace.package]` 之前）插入引号点分键
+  "lints.rust" = { unsafe_code = "forbid" }
+  "lints.clippy" = { unwrap_used = "deny" }
+而 `[workspace.lints.rust]` / `[workspace.lints.clippy]` 的真实表仍在文件后部。
+（首次构造误把 `[workspace]` 表头重复写了一次，被解析器以「重复 TOML 表」拒绝，
+说明夹具本身先经过了解析器校验；已改为在既有表内注入。）
+
+[a5-1] HEAD 版本脚本（修复前）——静默 fail-open
+argv : python3 -I scripts/check_lints.py --root .
+cwd  : /tmp/r05main/collision
+start: 2026-11-01T06:38:06Z   end: 2026-11-01T06:38:06Z
+exit : 0
+stdout 首行: {"status": "workspace lint 声明有效", ...}
+stderr: (空)
+
+[a5-2] 同一夹具的 Cargo 对照——强策略实际未生效
+argv : cargo metadata --no-deps --format-version 1 --locked --offline
+cwd  : /tmp/r05main/collision
+env  : CARGO_HOME=/Users/xian/.cargo CARGO_NET_OFFLINE=true RUSTUP_TOOLCHAIN=1.98.1
+start: 2026-11-01T06:38:14Z   end: 2026-11-01T06:38:14Z
+exit : 0   （metadata 不报，说明必须看 lint 告警）
+argv : cargo clippy -p aline-buffer --locked --offline -- -D warnings
+env  : 同上 + CARGO_TARGET_DIR=/tmp/r05main/target
+start: 2026-11-01T06:38:18Z   end: 2026-11-01T06:38:19Z
+exit : 0
+stderr:
+warning: Cargo.toml: unused manifest key: workspace.lints.clippy
+warning: Cargo.toml: unused manifest key: workspace.lints.rust
+warning: workspace (manifest) generated 2 warnings
+
+判定：守卫 exit 0 与 Cargo「引号键未生效」并存，即复核退回所指的静默误放行，
+在**主 Agent 自建夹具**上同样复现成立。
+
+[a5-3] 修复版脚本——同一夹具 fail-closed
+argv : python3 -I scripts/check_lints.py --root .
+cwd  : /tmp/r05main/collision
+start: 2026-11-01T06:38:06Z   end: 2026-11-01T06:38:06Z
+exit : 1
+stderr:
+lint 检查拒绝: /private/tmp/r05main/collision/Cargo.toml:35: ambiguous-table-path: 表路径 ('workspace', 'lints.rust')（第 14 行）与 ('workspace', 'lints', 'rust')（第 35 行） 展平为同一键 'workspace.lints.rust'，Cargo 语义与守卫判定不一致

@@ -105,6 +105,10 @@ _DATETIME = re.compile(
 _DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 _TIME = re.compile(r"\d{2}:\d{2}:\d{2}(?:\.\d+)?")
 _VALUE_END_CHARS = " \t\n,]}#"
+# 显式嵌套上限：解析与展平都拒绝超过该深度的构造，使超深输入输出规范的
+# CheckError，而不是依赖解释器递归栈（后者会抛 RecursionError 并打印 traceback）。
+# 仓库全部 Cargo.toml / Cargo.lock 实测最大容器深度为 5（见 R05/run-2/report.md）。
+MAX_NESTING_DEPTH = 100
 
 
 class _TomlParser(object):
@@ -125,6 +129,10 @@ class _TomlParser(object):
         # 表/数组的身份状态：explicit（[t] 定义）、implicit（被点分键或子表隐式创建）、
         # array（[[t]] 的元素或数组本身）、inline（内联表，TOML 禁止之后再扩展）。
         self.state = {}
+        # 每个表字典的起始行，供展平撞名时给出文件:行号。
+        self.lines = {}
+        # 值容器（数组/内联表）的当前嵌套深度，超过 MAX_NESTING_DEPTH 直接拒绝。
+        self.depth = 0
 
     # -- 基础工具 ---------------------------------------------------------
 
@@ -136,6 +144,10 @@ class _TomlParser(object):
 
     def _fail(self, message, pos=None):
         raise CheckError("%s:%d: %s" % (self.source, self._line(pos), message))
+
+    def _check_path_depth(self, keys, pos):
+        if len(keys) > MAX_NESTING_DEPTH:
+            self._fail("键/表路径深度 %d 超过上限 %d" % (len(keys), MAX_NESTING_DEPTH), pos)
 
     def _skip_inline_ws(self):
         while self.i < self.n and self.s[self.i] in " \t":
@@ -186,20 +198,23 @@ class _TomlParser(object):
 
     def _parse_header(self):
         start = self.i
+        line = self._line(start)
         if self.s.startswith("[[", self.i):
             self.i += 2
             keys = self._parse_key()
+            self._check_path_depth(keys, start)
             if not self.s.startswith("]]", self.i):
                 self._fail("数组表头缺少 ']]'", start)
             self.i += 2
-            self._define_array_table(keys, start)
+            self._define_array_table(keys, start, line)
         else:
             self.i += 1
             keys = self._parse_key()
+            self._check_path_depth(keys, start)
             if self._peek() != "]":
                 self._fail("表头缺少 ']'", start)
             self.i += 1
-            self._define_table(keys, start)
+            self._define_table(keys, start, line)
         self._expect_line_end()
 
     def _parse_key(self):
@@ -227,6 +242,7 @@ class _TomlParser(object):
     def _parse_key_value(self):
         start = self.i
         keys = self._parse_key()
+        self._check_path_depth(keys, start)
         self._skip_inline_ws()
         if self._peek() != "=":
             self._fail("键值对缺少 '='", start)
@@ -237,10 +253,12 @@ class _TomlParser(object):
         self._expect_line_end()
 
     def _insert(self, table, keys, value, pos):
+        line = self._line(pos)
         node = table
         for key in keys[:-1]:
             if key not in node:
                 node[key] = {}
+                self.lines[id(node[key])] = line
                 # 点分键创建的表之后不得再被 [表头] 定义（Cargo 视为 duplicate key）。
                 self.state[id(node[key])] = "dotted"
             child = node[key]
@@ -253,22 +271,25 @@ class _TomlParser(object):
         if last in node:
             self._fail("重复 TOML 键 %r" % last, pos)
         node[last] = value
-        self._mark_inline(value)
+        self._mark_inline(value, line)
 
-    def _mark_inline(self, value):
+    def _mark_inline(self, value, line=None):
         """值位置出现的表（内联表）及其嵌套结构都不可再被 [表头] 定义。"""
         if isinstance(value, dict):
             self.state[id(value)] = "inline"
+            if line is not None:
+                self.lines[id(value)] = line
             for child in value.values():
-                self._mark_inline(child)
+                self._mark_inline(child, line)
         elif isinstance(value, list):
             for child in value:
-                self._mark_inline(child)
+                self._mark_inline(child, line)
 
     def _descend(self, node, key, pos):
         if key not in node:
             node[key] = {}
             self.state[id(node[key])] = "implicit"
+            self.lines[id(node[key])] = self._line(pos)
         child = node[key]
         if isinstance(child, list):
             if not child or not isinstance(child[-1], dict):
@@ -280,7 +301,7 @@ class _TomlParser(object):
             self._fail("内联表 %r 不可再扩展" % key, pos)
         return child
 
-    def _define_table(self, keys, pos):
+    def _define_table(self, keys, pos, line=None):
         node = self.doc
         for key in keys[:-1]:
             node = self._descend(node, key, pos)
@@ -308,9 +329,11 @@ class _TomlParser(object):
             node[last] = {}
             node = node[last]
         self.state[id(node)] = "explicit"
+        if line is not None:
+            self.lines[id(node)] = line
         self.current = node
 
-    def _define_array_table(self, keys, pos):
+    def _define_array_table(self, keys, pos, line=None):
         node = self.doc
         for key in keys[:-1]:
             node = self._descend(node, key, pos)
@@ -318,6 +341,7 @@ class _TomlParser(object):
         if last not in node:
             node[last] = []
             self.state[id(node[last])] = "array"
+            self.lines[id(node[last])] = self._line(pos)
         child = node[last]
         if not isinstance(child, list):
             self._fail("数组表 %r 与已有非数组值冲突" % ".".join(keys), pos)
@@ -325,6 +349,8 @@ class _TomlParser(object):
             self._fail("数组表 %r 与已有非数组表冲突" % ".".join(keys), pos)
         element = {}
         self.state[id(element)] = "array"
+        if line is not None:
+            self.lines[id(element)] = line
         child.append(element)
         self.current = element
 
@@ -341,12 +367,22 @@ class _TomlParser(object):
                 return self._parse_multiline_literal_string()
             return self._parse_literal_string()
         if ch == "[":
-            return self._parse_array()
+            return self._enter_container(self._parse_array)
         if ch == "{":
-            return self._parse_inline_table()
+            return self._enter_container(self._parse_inline_table)
         if ch in ("t", "f"):
             return self._parse_bool()
         return self._parse_number_or_datetime()
+
+    def _enter_container(self, parse):
+        """数组/内联表每进入一层加一，超过 MAX_NESTING_DEPTH 即拒绝。"""
+        if self.depth >= MAX_NESTING_DEPTH:
+            self._fail("数组/内联表嵌套深度超过上限 %d" % MAX_NESTING_DEPTH)
+        self.depth += 1
+        try:
+            return parse()
+        finally:
+            self.depth -= 1
 
     def _parse_bool(self):
         for literal, value in (("true", True), ("false", False)):
@@ -601,12 +637,33 @@ def parse_toml(text, source="<toml>"):
     return _TomlParser(text, source).parse()
 
 
-def _flatten_tables(node, prefix, out):
+def _flatten_tables(node, prefix, out, seen=None, lines=None, source="<toml>"):
+    """把表展平为「点分路径 -> 表字典」，并拒绝不同路径展平成同一键。
+
+    `".".join(path)` 本身会混淆 `[workspace.lints.rust]`（路径 ("workspace","lints","rust")）
+    与 `[workspace]` 下的引号点分键 `"lints.rust"`（路径 ("workspace","lints.rust")）：
+    两者展平键相同而 Cargo 语义不同，后者只报 unused manifest key。这里不按写入顺序
+    选赢家，而是遇到展平键相同、路径不同即 fail-closed。
+    """
+    if seen is None:
+        seen = {}
+    if lines is None:
+        lines = {}
     for key, value in node.items():
         if isinstance(value, dict):
             path = prefix + (key,)
-            out[".".join(path)] = value
-            _flatten_tables(value, path, out)
+            joined = ".".join(path)
+            previous = seen.get(joined)
+            if previous is not None and previous[0] != path:
+                first_path, first_line = previous
+                second_line = lines.get(id(value), 0)
+                raise CheckError(
+                    "%s:%d: ambiguous-table-path: 表路径 %r（第 %d 行）与 %r（第 %d 行）"
+                    " 展平为同一键 %r，Cargo 语义与守卫判定不一致"
+                    % (source, second_line, first_path, first_line, path, second_line, joined))
+            seen[joined] = (path, lines.get(id(value), 0))
+            out[joined] = value
+            _flatten_tables(value, path, out, seen, lines, source)
 
 
 def tables(path):
@@ -616,8 +673,9 @@ def tables(path):
         text = path.read_text(encoding="utf-8")
     except OSError as error:
         raise CheckError("无法读取 TOML %s: %s" % (path, error))
+    parser = _TomlParser(text, str(path))
     result = {}
-    _flatten_tables(parse_toml(text, str(path)), (), result)
+    _flatten_tables(parser.parse(), (), result, lines=parser.lines, source=str(path))
     return result
 
 
@@ -819,6 +877,65 @@ PARSER_CASES = [
     ("reject-bare-cr", '[package]\rname = "a"\n', "error", "裸 CR"),
     ("reject-bom", "\ufeff[package]\n", "error", "BOM"),
     ("reject-bad-header", '[package\nname = "a"\n', "error", "表头"),
+    ("reject-deep-nested-array",
+     "value = " + "[" * (MAX_NESTING_DEPTH + 1) + "]" * (MAX_NESTING_DEPTH + 1) + "\n",
+     "error", "嵌套深度"),
+    ("reject-deep-dotted-key",
+     ".".join(["k"] * (MAX_NESTING_DEPTH + 1)) + " = 1\n", "error", "深度"),
+]
+
+# 展平撞名用例：表头路径与引号点分键展平为同一键时必须 fail-closed。
+# 期望值按 TOML/Cargo 语义手写，不以实现输出为准。
+#
+# 拒绝用例的 detail 是手写的报错要件，不是从实现输出抄来的：
+#   line  —— 报错行号必须等于**后出现**那处冲突所在的行（1 起计）；
+#   paths —— 两条冲突路径的元组拼写必须都出现在信息里（顺序无关）；
+#   key   —— 被展平成的同一个键。
+# 少了任一要件（行号写死、路径不打印）都应判为不符合预期，否则「行号可定位、
+# 两条路径可见」这条复核要求就没有断言保护。
+TABLE_PATH_CASES = [
+    ("accept-quoted-dotted-key-without-collision",
+     '[package]\n"a.b" = 1\nmeta.x = { y = 2 }\n', "ok", "", None),
+    ("accept-table-and-distinct-quoted-key",
+     '[a.b]\nx = 1\n[a]\n"c.d" = { y = 2 }\n', "ok", "", None),
+    ("reject-table-then-quoted-dotted-key",
+     '[workspace.lints.rust]\nunsafe_code = "warn"\n'
+     '[workspace]\n"lints.rust" = { unsafe_code = "forbid" }\n',
+     "error", "ambiguous-table-path",
+     {"line": 4,
+      "paths": ("('workspace', 'lints', 'rust')", "('workspace', 'lints.rust')"),
+      "key": "workspace.lints.rust"}),
+    ("reject-quoted-dotted-key-then-table",
+     '[workspace]\n"lints.rust" = { unsafe_code = "forbid" }\n'
+     '[workspace.lints.rust]\nunsafe_code = "warn"\n',
+     "error", "ambiguous-table-path",
+     {"line": 3,
+      "paths": ("('workspace', 'lints.rust')", "('workspace', 'lints', 'rust')"),
+      "key": "workspace.lints.rust"}),
+]
+
+# 成员 [lints] 的三类拒绝路径必须各有独立断言，使弱化 audit_member_manifest
+# 的实现必然变红。期望值按 Cargo 的 [lints] workspace 继承语义手写。
+MEMBER_CASES = [
+    ("accept-exact-workspace-true",
+     '[package]\nname = "aline-source"\nversion = "0.0.0"\nedition = "2024"\n'
+     '[lints]\nworkspace = true\n', "ok", "", None),
+    ("reject-extra-key",
+     '[package]\nname = "aline-source"\nversion = "0.0.0"\nedition = "2024"\n'
+     '[lints]\nworkspace = true\nextra = 1\n',
+     "error", "成员未完整继承 workspace lint: aline-source", None),
+    ("reject-workspace-false",
+     '[package]\nname = "aline-source"\nversion = "0.0.0"\nedition = "2024"\n'
+     '[lints]\nworkspace = false\n',
+     "error", "成员未完整继承 workspace lint: aline-source", None),
+    ("reject-workspace-string-true",
+     '[package]\nname = "aline-source"\nversion = "0.0.0"\nedition = "2024"\n'
+     '[lints]\nworkspace = "true"\n',
+     "error", "成员未完整继承 workspace lint: aline-source", None),
+    ("reject-workspace-integer-one",
+     '[package]\nname = "aline-source"\nversion = "0.0.0"\nedition = "2024"\n'
+     '[lints]\nworkspace = 1\n',
+     "error", "成员未完整继承 workspace lint: aline-source", None),
 ]
 
 
@@ -845,6 +962,74 @@ def run_parser_self_checks(directory):
         raise CheckError("多行字符串内容未完整保留，无法证明伪继承被解析为字符串")
     print("parser 语义: 伪 [lints] 保留在 description 中，未生成 lints 表", flush=True)
     return len(PARSER_CASES)
+
+
+def _assert_rejection_detail(label, error, detail):
+    """校验拒绝信息里手写的要件：文件:行号在首段、行号精确、两条冲突路径与展平键都在。
+
+    `detail` 为 None 表示该用例只要求拒绝本身成立（历史用例保持原强度）。
+    """
+    message = str(error)
+    head = message.split(" ", 1)[0].rstrip(":")
+    if ":" not in head:
+        raise CheckError("表路径自检错误缺少文件:行号: %s (%s)" % (label, message))
+    if not detail:
+        return
+    if not head.rsplit(":", 1)[1].isdigit():
+        raise CheckError("表路径自检错误行号不是数字: %s (%s)" % (label, message))
+    line = int(head.rsplit(":", 1)[1])
+    if line != detail["line"]:
+        raise CheckError(
+            "表路径自检行号不符预期: %s 期望第 %d 行，实得第 %d 行 (%s)"
+            % (label, detail["line"], line, message))
+    for path_repr in detail["paths"]:
+        if path_repr not in message:
+            raise CheckError(
+                "表路径自检信息未列出冲突路径 %s: %s (%s)" % (path_repr, label, message))
+    if detail["key"] not in message:
+        raise CheckError(
+            "表路径自检信息未列出展平键 %r: %s (%s)" % (detail["key"], label, message))
+
+
+def run_table_path_self_checks(directory):
+    """表头路径与引号点分键展平撞名：必须 fail-closed，且错误带文件:行号与两条路径。"""
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    for index, (label, text, expect, needle, detail) in enumerate(TABLE_PATH_CASES, 1):
+        path = directory / ("%02d-%s.toml" % (index, label))
+        path.write_text(text)
+        try:
+            tables(path)
+        except CheckError as error:
+            if expect != "error" or needle not in str(error):
+                raise CheckError("表路径自检不符合预期: %s (%s)" % (label, error))
+            _assert_rejection_detail(label, error, detail)
+            print("table-path %s: 拒绝符合预期 (%s)" % (label, error), flush=True)
+        else:
+            if expect != "ok":
+                raise CheckError("表路径自检应拒绝但通过了: " + label)
+            print("table-path %s: 通过符合预期" % label, flush=True)
+    return len(TABLE_PATH_CASES)
+
+
+def run_member_self_checks(directory):
+    """成员 [lints] 的键集/值类型/值真值三类拒绝各有一条独立断言。"""
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    for index, (label, text, expect, needle, _detail) in enumerate(MEMBER_CASES, 1):
+        path = directory / ("%02d-%s.toml" % (index, label))
+        path.write_text(text)
+        try:
+            audit_member_manifest("aline-source", path)
+        except CheckError as error:
+            if expect != "error" or needle not in str(error):
+                raise CheckError("成员继承自检不符合预期: %s (%s)" % (label, error))
+            print("member %s: 拒绝符合预期 (%s)" % (label, error), flush=True)
+        else:
+            if expect != "ok":
+                raise CheckError("成员继承自检应拒绝但通过了: " + label)
+            print("member %s: 通过符合预期" % label, flush=True)
+    return len(MEMBER_CASES)
 
 
 def run_self_test(output):
@@ -948,6 +1133,8 @@ def run_self_test(output):
 
     inheritance_cases = check_inheritance_parsing(cases_dir, output, env, root_lints)
     parser_cases = run_parser_self_checks(output / "parser-cases")
+    table_path_cases = run_table_path_self_checks(output / "table-path-cases")
+    member_cases = run_member_self_checks(output / "member-cases")
 
     print(json.dumps({
         "status": "lint 隔离样例通过",
@@ -956,6 +1143,8 @@ def run_self_test(output):
         "profiles": sorted(profiles),
         "inheritance_cases": inheritance_cases,
         "parser_cases": parser_cases,
+        "table_path_cases": table_path_cases,
+        "member_cases": member_cases,
     }, ensure_ascii=False))
     return 0
 
@@ -972,7 +1161,7 @@ def main():
         members = audit_manifests(args.root.resolve())
         print(json.dumps({"status": "workspace lint 声明有效", "members": members}, ensure_ascii=False, indent=2))
         return 0
-    except (CheckError, OSError, ValueError, KeyError) as error:
+    except (CheckError, OSError, ValueError, KeyError, RecursionError) as error:
         print("lint 检查拒绝: " + str(error), file=sys.stderr)
         return 1
 
