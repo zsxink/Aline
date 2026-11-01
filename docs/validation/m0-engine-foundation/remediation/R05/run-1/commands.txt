@@ -1,0 +1,124 @@
+R05 命令记录（argv / cwd / 起止 UTC / exit）
+============================================================
+cwd 除特别标注外均为 /Users/xian/Project/editor/Aline
+Python 3.9.6；RUSTUP_TOOLCHAIN=1.98.1；CARGO_NET_OFFLINE=true
+工具链核实：cargo 1.98.1 (797e8a9bc 2026-08-05)；clippy 0.1.98 (48a229ceae 2026-09-01)
+
+说明：本文件按时间顺序记录。TDD 顺序要求「先失败回归」，故 [P1]–[P3]
+是在修改 scripts/check_lints.py 之前跑的；[P4] 起为修改之后。
+（[P1] 的原始输出另存于 pre-fix.txt。）
+
+------------------------------------------------------------
+P0 环境与夹具存在性核实
+------------------------------------------------------------
+2026-11-01T03:52:13Z  python3 -V                         exit 0  → Python 3.9.6
+2026-11-01T03:52:13Z  cargo -V (RUSTUP_TOOLCHAIN=1.98.1)  exit 0  → cargo 1.98.1
+2026-11-01T03:52:13Z  cargo clippy --version              exit 0  → clippy 0.1.98
+夹具核实：/tmp/aline-m0-independent-review.pTFf8u/D/lint-decoy/ 与
+          /tmp/aline-m0-independent-review.pTFf8u/D/lint-real-inheritance/ 均存在，只读使用。
+
+------------------------------------------------------------
+P1 修复前失败回归（脚本未改动）
+------------------------------------------------------------
+argv : python3 scripts/check_lints.py --root /tmp/aline-m0-independent-review.pTFf8u/D/lint-decoy
+start: 2026-11-01T03:52:13Z   end: 2026-11-01T03:52:13Z
+exit : 0    ← 误判通过（F-08 复现）；stdout 见 pre-fix.txt
+
+------------------------------------------------------------
+P2 修复前基线（正常仓库 / 真实继承）
+------------------------------------------------------------
+argv : python3 scripts/check_lints.py
+exit : 0
+argv : python3 scripts/check_lints.py --root /tmp/aline-m0-independent-review.pTFf8u/D/lint-real-inheritance
+exit : 0
+
+------------------------------------------------------------
+P3 Cargo 对照（夹具自带 Cargo.lock，--locked --offline）
+------------------------------------------------------------
+env  : CARGO_TARGET_DIR=/tmp/aline-r05-cargo-target
+argv : cargo clippy --manifest-path /tmp/aline-m0-independent-review.pTFf8u/D/lint-decoy/Cargo.toml
+       -p aline-buffer --locked --offline -- -D warnings
+exit : 0
+argv : cargo clippy --manifest-path /tmp/aline-m0-independent-review.pTFf8u/D/lint-real-inheritance/Cargo.toml
+       -p aline-buffer --locked --offline -- -D warnings
+exit : 101  → error: missing documentation for the crate / function
+
+另：验证隔离自检夹具在 --locked 下的锁文件可行性（自建临时项目，未进仓库）
+argv : cargo clippy --manifest-path /tmp/aline-r05-locktest/Cargo.toml
+       -p aline-buffer --locked --offline -- -D warnings
+exit : 101  → 与真实继承同诊断，证明自建 version = 4 Cargo.lock 可满足 --locked
+
+------------------------------------------------------------
+P4 修复后：伪继承 / 真实继承 / 正常仓库
+------------------------------------------------------------
+start: 2026-11-01T04:07:27Z
+argv : python3 scripts/check_lints.py --root /tmp/aline-m0-independent-review.pTFf8u/D/lint-decoy
+exit : 1    stderr: lint 检查拒绝: 成员未完整继承 workspace lint: aline-buffer
+argv : python3 scripts/check_lints.py --root /tmp/aline-m0-independent-review.pTFf8u/D/lint-real-inheritance
+exit : 0
+argv : python3 scripts/check_lints.py
+exit : 0
+end  : 2026-11-01T04:07:27Z
+
+------------------------------------------------------------
+P5 修复后：--self-test（隔离输出目录）
+------------------------------------------------------------
+argv : python3 scripts/check_lints.py --self-test --output-dir /tmp/aline-r05-selftest
+env  : RUSTUP_TOOLCHAIN=1.98.1 CARGO_NET_OFFLINE=true
+start: 2026-11-01T04:07:35Z   end: 2026-11-01T04:07:40Z
+exit : 0
+汇总：self_test_cases=10, profiles=[debug, release], inheritance_cases=4, parser_cases=22
+
+------------------------------------------------------------
+P6 修复后：Cargo 对照复测（与 P3 同 argv）
+------------------------------------------------------------
+start: 2026-11-01T04:07:40Z
+decoy  exit 0
+real   exit 101
+end  : 2026-11-01T04:07:40Z
+
+------------------------------------------------------------
+P7 解析器覆盖面抽查（仓库内全部 TOML/LOCK）
+------------------------------------------------------------
+argv : python3 - <<'PY' ... 遍历仓库 *.toml 与 *.lock 调用 check_lints.parse_toml ... PY
+exit : 0    结果：ok 11026  bad 0
+（含 vendor/registry 下的第三方 Cargo.toml 与 Cargo.lock，证明解析器能完整吃掉真实 TOML 语料）
+
+------------------------------------------------------------
+P8 全量门禁（非本批次职责，仅确认 lint 两关未回归）
+------------------------------------------------------------
+argv : python3 scripts/check_workspace.py
+exit : 0（脚本自身汇总）
+其中 lint: exit=0，lint-self-test: exit=0
+clippy/test/public-api 等 exit≠0 属 R02 中间态或既有问题，未在本批次处理。
+
+------------------------------------------------------------
+未核实项
+------------------------------------------------------------
+- 无。所有命令离线执行成功，未联网安装任何依赖。
+
+------------------------------------------------------------
+P9 定稿后复跑（含差分测试发现的一处 fail-open 修正）
+------------------------------------------------------------
+背景：离线构建 Cargo 同版本参考实现 toml 1.1.8（本地 registry 缓存）做差分，
+发现 `a.b = 1` 后写 `[a]` 被本解析器放行而 Cargo 报 duplicate key，
+已在 state 中增加 "dotted" 标记修正，并新增自检 reject-dotted-key-then-header。
+
+argv : python3 scripts/check_lints.py --self-test --output-dir /tmp/aline-r05-selftest
+env  : RUSTUP_TOOLCHAIN=1.98.1 CARGO_NET_OFFLINE=true
+exit : 0    self_test_cases=10, inheritance_cases=4, parser_cases=22
+argv : python3 scripts/check_lints.py                       exit 0
+argv : python3 scripts/check_lints.py --root .../lint-decoy exit 1
+argv : python3 scripts/check_lints.py --root .../lint-real-inheritance exit 0
+
+差分测试（参考实现 /tmp/aline-r05-tomlref，离线 cargo build --offline）
+argv : python3 -I /tmp/aline-r05-fuzz/diff.py
+exit : 0    81 条构造，判定一致 79 条，差异 2 条（内联表尾随逗号、BOM，均为 fail-closed）
+
+语料回归
+argv : python3 -I /tmp/aline-r05-fuzz/corpus.py
+exit : 0    9464 个 Cargo.toml/Cargo.lock，0 解析失败
+
+定稿指纹
+sha256 scripts/check_lints.py = 497923a5bb62c45a12d2a309d2e99fa1f234e6f0db14991f93cc64fea5745ec9
+mtime = 2026-11-01T12:19:41Z（本地时区）

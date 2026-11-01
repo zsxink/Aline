@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""验证 workspace lint 声明和成员继承，并运行隔离的 Rust 诊断样例。"""
+"""验证 workspace lint 声明和成员继承，并运行隔离的 Rust 诊断样例。
+
+本脚本自带 TOML 1.0 子集解析器。成员 [lints] 的判定必须落在真实解析结果上：
+逐行扫描会把多行字符串里的伪 [lints] 表当成真实表（F-08）。无法安全解释的
+构造一律抛 CheckError，不静默忽略。
+"""
 
 import argparse
 import datetime
@@ -34,59 +39,624 @@ EXPECTED_CLIPPY = {
     "unimplemented": "deny",
 }
 
+# F-08 夹具原文：伪继承成员的 Cargo.toml。真实 Cargo 把 [lints] / workspace = true
+# 读作 description 字符串内容，该成员实际没有 [lints] 表。
+DECOY_MEMBER_TEXT = (
+    '[package]\n'
+    'description = """\n'
+    '[lints]\n'
+    'workspace = true\n'
+    '[package.metadata.decoy]\n'
+    '"""\n'
+    'name = "aline-buffer"\n'
+    'version = "0.0.0"\n'
+    'edition = "2024"\n'
+)
+REAL_MEMBER_TEXT = (
+    '[package]\n'
+    'name = "aline-buffer"\n'
+    'version = "0.0.0"\n'
+    'edition = "2024"\n'
+    '[lints]\n'
+    'workspace = true\n'
+)
+
 
 class CheckError(Exception):
     """lint 声明、隔离夹具或实际诊断与预期不符。"""
 
 
+class TomlDatetime(object):
+    """TOML 日期/时间字面量的不透明表示；仅保证解析完整，不参与 lint 语义。"""
+
+    __slots__ = ("text",)
+
+    def __init__(self, text):
+        self.text = text
+
+    def __eq__(self, other):
+        return isinstance(other, TomlDatetime) and self.text == other.text
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        return hash(("toml-datetime", self.text))
+
+    def __repr__(self):
+        return "TomlDatetime(%r)" % self.text
+
+
+_BARE_KEY_CHARS = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-")
+_ESCAPES = {"b": "\b", "t": "\t", "n": "\n", "f": "\f", "r": "\r", '"': '"', "\\": "\\"}
+_HEX_INT = re.compile(r"0x[0-9A-Fa-f](?:_?[0-9A-Fa-f])*")
+_OCT_INT = re.compile(r"0o[0-7](?:_?[0-7])*")
+_BIN_INT = re.compile(r"0b[01](?:_?[01])*")
+_DEC_INT = re.compile(r"[+-]?(?:0|[1-9](?:_?[0-9])*)")
+_FLOAT = re.compile(
+    r"[+-]?(?:inf|nan)"
+    r"|[+-]?(?:0|[1-9](?:_?[0-9])*)\.[0-9](?:_?[0-9])*(?:[eE][+-]?[0-9](?:_?[0-9])*)?"
+    r"|[+-]?(?:0|[1-9](?:_?[0-9])*)[eE][+-]?[0-9](?:_?[0-9])*"
+)
+_DATETIME = re.compile(
+    r"(?P<date>\d{4}-\d{2}-\d{2})[Tt ](?P<time>\d{2}:\d{2}:\d{2})(?:\.\d+)?"
+    r"(?P<offset>[Zz]|[+-]\d{2}:\d{2})?"
+)
+_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+_TIME = re.compile(r"\d{2}:\d{2}:\d{2}(?:\.\d+)?")
+_VALUE_END_CHARS = " \t\n,]}#"
+
+
+class _TomlParser(object):
+    """TOML 1.0 子集递归下降解析器；遇到无法安全解释的构造抛 CheckError。"""
+
+    def __init__(self, text, source):
+        if text.startswith("\ufeff"):
+            raise CheckError("%s:1: 拒绝带 BOM 的 TOML 文件（无法安全解释）" % source)
+        text = text.replace("\r\n", "\n")
+        if "\r" in text:
+            raise CheckError("%s:1: 拒绝裸 CR 行结束符（无法安全解释）" % source)
+        self.s = text
+        self.n = len(text)
+        self.i = 0
+        self.source = source
+        self.doc = {}
+        self.current = self.doc
+        # 表/数组的身份状态：explicit（[t] 定义）、implicit（被点分键或子表隐式创建）、
+        # array（[[t]] 的元素或数组本身）、inline（内联表，TOML 禁止之后再扩展）。
+        self.state = {}
+
+    # -- 基础工具 ---------------------------------------------------------
+
+    def _peek(self):
+        return self.s[self.i] if self.i < self.n else ""
+
+    def _line(self, pos=None):
+        return self.s.count("\n", 0, self.i if pos is None else pos) + 1
+
+    def _fail(self, message, pos=None):
+        raise CheckError("%s:%d: %s" % (self.source, self._line(pos), message))
+
+    def _skip_inline_ws(self):
+        while self.i < self.n and self.s[self.i] in " \t":
+            self.i += 1
+
+    def _skip_comment(self):
+        self.i += 1  # '#'
+        while self.i < self.n and self.s[self.i] != "\n":
+            code = ord(self.s[self.i])
+            if (code < 0x20 and code != 0x09) or code == 0x7F:
+                self._fail("注释中出现控制字符")
+            self.i += 1
+
+    def _skip_ws_nl(self):
+        while self.i < self.n:
+            ch = self.s[self.i]
+            if ch in " \t\n":
+                self.i += 1
+            elif ch == "#":
+                self._skip_comment()
+            else:
+                break
+
+    def _expect_line_end(self):
+        self._skip_inline_ws()
+        if self._peek() == "#":
+            self._skip_comment()
+        if self.i >= self.n:
+            return
+        if self.s[self.i] != "\n":
+            self._fail("行尾存在无法解释的内容")
+        self.i += 1
+
+    def _value_boundary(self, pos):
+        return pos >= self.n or self.s[pos] in _VALUE_END_CHARS
+
+    # -- 文档结构 ---------------------------------------------------------
+
+    def parse(self):
+        while True:
+            self._skip_ws_nl()
+            if self.i >= self.n:
+                return self.doc
+            if self.s[self.i] == "[":
+                self._parse_header()
+            else:
+                self._parse_key_value()
+
+    def _parse_header(self):
+        start = self.i
+        if self.s.startswith("[[", self.i):
+            self.i += 2
+            keys = self._parse_key()
+            if not self.s.startswith("]]", self.i):
+                self._fail("数组表头缺少 ']]'", start)
+            self.i += 2
+            self._define_array_table(keys, start)
+        else:
+            self.i += 1
+            keys = self._parse_key()
+            if self._peek() != "]":
+                self._fail("表头缺少 ']'", start)
+            self.i += 1
+            self._define_table(keys, start)
+        self._expect_line_end()
+
+    def _parse_key(self):
+        keys = []
+        while True:
+            self._skip_inline_ws()
+            ch = self._peek()
+            if ch == '"':
+                keys.append(self._parse_basic_string())
+            elif ch == "'":
+                keys.append(self._parse_literal_string())
+            elif ch in _BARE_KEY_CHARS:
+                begin = self.i
+                while self.i < self.n and self.s[self.i] in _BARE_KEY_CHARS:
+                    self.i += 1
+                keys.append(self.s[begin:self.i])
+            else:
+                self._fail("无法识别 TOML 键")
+            self._skip_inline_ws()
+            if self._peek() == ".":
+                self.i += 1
+                continue
+            return keys
+
+    def _parse_key_value(self):
+        start = self.i
+        keys = self._parse_key()
+        self._skip_inline_ws()
+        if self._peek() != "=":
+            self._fail("键值对缺少 '='", start)
+        self.i += 1
+        self._skip_inline_ws()
+        value = self._parse_value()
+        self._insert(self.current, keys, value, start)
+        self._expect_line_end()
+
+    def _insert(self, table, keys, value, pos):
+        node = table
+        for key in keys[:-1]:
+            if key not in node:
+                node[key] = {}
+                # 点分键创建的表之后不得再被 [表头] 定义（Cargo 视为 duplicate key）。
+                self.state[id(node[key])] = "dotted"
+            child = node[key]
+            if not isinstance(child, dict):
+                self._fail("点分键 %r 与非表值冲突" % key, pos)
+            if self.state.get(id(child)) == "inline":
+                self._fail("内联表 %r 不可再扩展" % key, pos)
+            node = child
+        last = keys[-1]
+        if last in node:
+            self._fail("重复 TOML 键 %r" % last, pos)
+        node[last] = value
+        self._mark_inline(value)
+
+    def _mark_inline(self, value):
+        """值位置出现的表（内联表）及其嵌套结构都不可再被 [表头] 定义。"""
+        if isinstance(value, dict):
+            self.state[id(value)] = "inline"
+            for child in value.values():
+                self._mark_inline(child)
+        elif isinstance(value, list):
+            for child in value:
+                self._mark_inline(child)
+
+    def _descend(self, node, key, pos):
+        if key not in node:
+            node[key] = {}
+            self.state[id(node[key])] = "implicit"
+        child = node[key]
+        if isinstance(child, list):
+            if not child or not isinstance(child[-1], dict):
+                self._fail("表路径 %r 无法安全解析" % key, pos)
+            child = child[-1]
+        if not isinstance(child, dict):
+            self._fail("表路径 %r 与非表值冲突" % key, pos)
+        if self.state.get(id(child)) == "inline":
+            self._fail("内联表 %r 不可再扩展" % key, pos)
+        return child
+
+    def _define_table(self, keys, pos):
+        node = self.doc
+        for key in keys[:-1]:
+            node = self._descend(node, key, pos)
+        last = keys[-1]
+        if last in node:
+            child = node[last]
+            if isinstance(child, list):
+                if not child or not isinstance(child[-1], dict):
+                    self._fail("表 %r 与已有数组表同名" % ".".join(keys), pos)
+                child = child[-1]
+            elif not isinstance(child, dict):
+                self._fail("表 %r 与非表值冲突" % ".".join(keys), pos)
+            kind = self.state.get(id(child))
+            if kind == "explicit":
+                self._fail("重复 TOML 表 %r" % ".".join(keys), pos)
+            if kind == "array":
+                self._fail("普通表 %r 与已有数组表同名" % ".".join(keys), pos)
+            if kind == "inline":
+                self._fail("内联表 %r 不可再扩展" % ".".join(keys), pos)
+            if kind == "dotted":
+                # 点分键已定义过该表；Cargo 报 duplicate key，[表头] 不得再次定义它。
+                self._fail("点分键已定义表 %r，不得再用表头定义" % ".".join(keys), pos)
+            node = child
+        else:
+            node[last] = {}
+            node = node[last]
+        self.state[id(node)] = "explicit"
+        self.current = node
+
+    def _define_array_table(self, keys, pos):
+        node = self.doc
+        for key in keys[:-1]:
+            node = self._descend(node, key, pos)
+        last = keys[-1]
+        if last not in node:
+            node[last] = []
+            self.state[id(node[last])] = "array"
+        child = node[last]
+        if not isinstance(child, list):
+            self._fail("数组表 %r 与已有非数组值冲突" % ".".join(keys), pos)
+        if self.state.get(id(child)) != "array":
+            self._fail("数组表 %r 与已有非数组表冲突" % ".".join(keys), pos)
+        element = {}
+        self.state[id(element)] = "array"
+        child.append(element)
+        self.current = element
+
+    # -- 值 ---------------------------------------------------------------
+
+    def _parse_value(self):
+        ch = self._peek()
+        if ch == '"':
+            if self.s.startswith('"""', self.i):
+                return self._parse_multiline_basic_string()
+            return self._parse_basic_string()
+        if ch == "'":
+            if self.s.startswith("'''", self.i):
+                return self._parse_multiline_literal_string()
+            return self._parse_literal_string()
+        if ch == "[":
+            return self._parse_array()
+        if ch == "{":
+            return self._parse_inline_table()
+        if ch in ("t", "f"):
+            return self._parse_bool()
+        return self._parse_number_or_datetime()
+
+    def _parse_bool(self):
+        for literal, value in (("true", True), ("false", False)):
+            if self.s.startswith(literal, self.i):
+                end = self.i + len(literal)
+                if end < self.n and self.s[end] in _BARE_KEY_CHARS:
+                    self._fail("布尔字面量后紧跟无法解释的字符")
+                self.i = end
+                return value
+        self._fail("无法识别的 TOML 值")
+
+    def _parse_array(self):
+        self.i += 1  # '['
+        items = []
+        while True:
+            self._skip_ws_nl()
+            if self._peek() == "]":
+                self.i += 1
+                return items
+            items.append(self._parse_value())
+            self._skip_ws_nl()
+            ch = self._peek()
+            if ch == ",":
+                self.i += 1
+                continue
+            if ch == "]":
+                self.i += 1
+                return items
+            self._fail("数组中缺少 ',' 或 ']'")
+
+    def _parse_inline_table(self):
+        self.i += 1  # '{'
+        table = {}
+        self._skip_ws_nl()
+        if self._peek() == "}":
+            self.i += 1
+            return table
+        while True:
+            self._skip_ws_nl()
+            start = self.i
+            keys = self._parse_key()
+            self._skip_inline_ws()
+            if self._peek() != "=":
+                self._fail("内联表键值对缺少 '='", start)
+            self.i += 1
+            self._skip_inline_ws()
+            value = self._parse_value()
+            self._insert(table, keys, value, start)
+            self._skip_ws_nl()
+            ch = self._peek()
+            if ch == ",":
+                self.i += 1
+                self._skip_ws_nl()
+                if self._peek() == "}":
+                    self._fail("内联表不允许尾随逗号")
+                continue
+            if ch == "}":
+                self.i += 1
+                return table
+            self._fail("内联表中缺少 ',' 或 '}'")
+
+    def _parse_number_or_datetime(self):
+        start = self.i
+        match = _DATETIME.match(self.s, self.i)
+        if match and self._value_boundary(match.end()):
+            self.i = match.end()
+            self._validate_date(match.group("date"), start)
+            self._validate_time(match.group("time"), start)
+            offset = match.group("offset")
+            if offset and offset not in ("Z", "z"):
+                hours, minutes = offset[1:].split(":")
+                if int(hours) > 23 or int(minutes) > 59:
+                    self._fail("日期时间偏移非法", start)
+            return TomlDatetime(match.group(0))
+        match = _DATE.match(self.s, self.i)
+        if match and self._value_boundary(match.end()):
+            self.i = match.end()
+            self._validate_date(match.group(0), start)
+            return TomlDatetime(match.group(0))
+        match = _TIME.match(self.s, self.i)
+        if match and self._value_boundary(match.end()):
+            self.i = match.end()
+            self._validate_time(match.group(0), start)
+            return TomlDatetime(match.group(0))
+        match = _FLOAT.match(self.s, self.i)
+        if match and self._value_boundary(match.end()):
+            self.i = match.end()
+            return float(match.group(0).replace("_", ""))
+        for pattern, base in ((_HEX_INT, 16), (_OCT_INT, 8), (_BIN_INT, 2)):
+            match = pattern.match(self.s, self.i)
+            if match and self._value_boundary(match.end()):
+                self.i = match.end()
+                return self._make_integer(match.group(0), base, start)
+        match = _DEC_INT.match(self.s, self.i)
+        if match and self._value_boundary(match.end()):
+            self.i = match.end()
+            return self._make_integer(match.group(0), 10, start)
+        self._fail("无法识别的 TOML 值", start)
+
+    def _make_integer(self, text, base, start):
+        cleaned = text.replace("_", "")
+        value = int(cleaned, 10) if base == 10 else int(cleaned[2:], base)
+        if value < -(2 ** 63) or value >= 2 ** 63:
+            self._fail("整数超出 TOML i64 范围: %r" % text, start)
+        return value
+
+    def _validate_date(self, text, start):
+        try:
+            datetime.date(int(text[0:4]), int(text[5:7]), int(text[8:10]))
+        except ValueError:
+            self._fail("非法日期字面量 %r" % text, start)
+
+    def _validate_time(self, text, start):
+        hour, minute, second = (int(part) for part in text.split(":")[:3])
+        if hour > 23 or minute > 59 or second > 60:
+            self._fail("非法时间字面量 %r" % text, start)
+
+    # -- 字符串 -----------------------------------------------------------
+
+    def _parse_escape(self):
+        start = self.i
+        self.i += 1  # '\\'
+        if self.i >= self.n:
+            self._fail("转义序列不完整", start)
+        ch = self.s[self.i]
+        if ch in _ESCAPES:
+            self.i += 1
+            return _ESCAPES[ch]
+        if ch in ("u", "U"):
+            width = 4 if ch == "u" else 8
+            self.i += 1
+            digits = self.s[self.i:self.i + width]
+            if len(digits) != width or not all(c in "0123456789abcdefABCDEF" for c in digits):
+                self._fail("\\%s 转义需要 %d 位十六进制" % (ch, width), start)
+            self.i += width
+            code = int(digits, 16)
+            if 0xD800 <= code <= 0xDFFF or code > 0x10FFFF:
+                self._fail("\\%s 转义码位非法" % ch, start)
+            return chr(code)
+        self._fail("未知转义序列 \\%s" % ch, start)
+
+    def _reject_control(self, ch, allow_tab=True):
+        code = ord(ch)
+        if (code < 0x20 and (not allow_tab or code != 0x09)) or code == 0x7F:
+            self._fail("字符串中出现控制字符")
+
+    def _parse_basic_string(self):
+        start = self.i
+        self.i += 1  # '"'
+        out = []
+        while True:
+            if self.i >= self.n:
+                self._fail("基本字符串未闭合", start)
+            ch = self.s[self.i]
+            if ch == '"':
+                self.i += 1
+                return "".join(out)
+            if ch == "\\":
+                out.append(self._parse_escape())
+                continue
+            if ch == "\n":
+                self._fail("基本字符串不能跨行", start)
+            self._reject_control(ch)
+            out.append(ch)
+            self.i += 1
+
+    def _parse_literal_string(self):
+        start = self.i
+        self.i += 1  # "'"
+        out = []
+        while True:
+            if self.i >= self.n:
+                self._fail("字面字符串未闭合", start)
+            ch = self.s[self.i]
+            if ch == "'":
+                self.i += 1
+                return "".join(out)
+            if ch == "\n":
+                self._fail("字面字符串不能跨行", start)
+            self._reject_control(ch)
+            out.append(ch)
+            self.i += 1
+
+    def _parse_multiline_basic_string(self):
+        start = self.i
+        self.i += 3  # '"""'
+        if self.i < self.n and self.s[self.i] == "\n":
+            self.i += 1
+        out = []
+        while True:
+            if self.i >= self.n:
+                self._fail("多行基本字符串未闭合", start)
+            if self.s.startswith('"""', self.i):
+                count = 0
+                while self.i + count < self.n and self.s[self.i + count] == '"':
+                    count += 1
+                if count > 5:
+                    self._fail("多行基本字符串结尾引号过多", start)
+                out.append('"' * (count - 3))
+                self.i += count
+                return "".join(out)
+            ch = self.s[self.i]
+            if ch == "\\":
+                j = self.i + 1
+                while j < self.n and self.s[j] in " \t":
+                    j += 1
+                if j < self.n and self.s[j] == "\n":
+                    self.i = j + 1
+                    while self.i < self.n and self.s[self.i] in " \t\n":
+                        self.i += 1
+                    continue
+                out.append(self._parse_escape())
+                continue
+            if ch == "\n":
+                out.append("\n")
+                self.i += 1
+                continue
+            self._reject_control(ch)
+            out.append(ch)
+            self.i += 1
+
+    def _parse_multiline_literal_string(self):
+        start = self.i
+        self.i += 3  # "'''"
+        if self.i < self.n and self.s[self.i] == "\n":
+            self.i += 1
+        out = []
+        while True:
+            if self.i >= self.n:
+                self._fail("多行字面字符串未闭合", start)
+            if self.s.startswith("'''", self.i):
+                count = 0
+                while self.i + count < self.n and self.s[self.i + count] == "'":
+                    count += 1
+                if count > 5:
+                    self._fail("多行字面字符串结尾引号过多", start)
+                out.append("'" * (count - 3))
+                self.i += count
+                return "".join(out)
+            ch = self.s[self.i]
+            if ch == "\n":
+                out.append("\n")
+                self.i += 1
+                continue
+            self._reject_control(ch)
+            out.append(ch)
+            self.i += 1
+
+
+def parse_toml(text, source="<toml>"):
+    """按 TOML 语法解析为字典；无法安全解释的构造抛 CheckError。"""
+    return _TomlParser(text, source).parse()
+
+
+def _flatten_tables(node, prefix, out):
+    for key, value in node.items():
+        if isinstance(value, dict):
+            path = prefix + (key,)
+            out[".".join(path)] = value
+            _flatten_tables(value, path, out)
+
+
 def tables(path):
-    """读取本仓库所用的简单 TOML 键值表，遇到未知语法就拒绝。"""
+    """读取 TOML 文件，返回全部表（点分路径 -> 表字典）。"""
+    path = Path(path)
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as error:
+        raise CheckError("无法读取 TOML %s: %s" % (path, error))
     result = {}
-    current = None
-    for line_number, raw_line in enumerate(Path(path).read_text().splitlines(), 1):
-        line = raw_line.strip()
-        if not line or line.startswith("#"):
-            continue
-        if line.startswith("[") and line.endswith("]"):
-            current = line[1:-1]
-            if current in result:
-                raise CheckError("重复 TOML 表 %s:%d" % (path, line_number))
-            if current in ("workspace.lints.rust", "workspace.lints.clippy", "lints") or current.startswith("lints."):
-                result[current] = {}
-            continue
-        if current not in result:
-            continue
-        match = re.fullmatch(r'([A-Za-z0-9_-]+)\s*=\s*("([^"\\]*)"|true|false)', line)
-        if current is None or match is None:
-            raise CheckError("无法安全解释 TOML 行 %s:%d" % (path, line_number))
-        value = match.group(3) if match.group(3) is not None else match.group(2) == "true"
-        if match.group(1) in result[current]:
-            raise CheckError("重复 TOML 键 %s:%d" % (path, line_number))
-        result[current][match.group(1)] = value
+    _flatten_tables(parse_toml(text, str(path)), (), result)
     return result
+
+
+def _strict_equal(left, right):
+    """区分 bool/int 的严格相等，避免 True == 1 混过 lint 值校验。"""
+    if isinstance(left, bool) or isinstance(right, bool):
+        return isinstance(left, bool) and isinstance(right, bool) and left == right
+    if isinstance(left, dict) and isinstance(right, dict):
+        if set(left) != set(right):
+            return False
+        return all(_strict_equal(left[key], right[key]) for key in left)
+    if isinstance(left, list) and isinstance(right, list):
+        return len(left) == len(right) and all(_strict_equal(a, b) for a, b in zip(left, right))
+    if type(left) is not type(right):
+        return False
+    return left == right
 
 
 def audit_manifests(root=ROOT):
     manifest_tables = tables(root / "Cargo.toml")
     rust_lints = manifest_tables.get("workspace.lints.rust")
     clippy_lints = manifest_tables.get("workspace.lints.clippy")
-    if rust_lints != EXPECTED_RUST:
+    if not _strict_equal(rust_lints, EXPECTED_RUST):
         raise CheckError("根 workspace rust lint 与登记策略不符: " + repr(rust_lints))
-    if clippy_lints != EXPECTED_CLIPPY:
+    if not _strict_equal(clippy_lints, EXPECTED_CLIPPY):
         raise CheckError("根 workspace clippy lint 与登记策略不符: " + repr(clippy_lints))
     checked = {}
     for name, relative in MEMBERS.items():
         manifest = root / relative / "Cargo.toml"
-        parsed = tables(manifest)
-        if parsed.get("lints") != {"workspace": True} or any(key.startswith("lints.") for key in parsed):
-            raise CheckError("成员未完整继承 workspace lint: " + name)
+        audit_member_manifest(name, manifest)
         checked[name] = str(manifest.relative_to(root))
     return checked
 
 
 def audit_member_manifest(name, manifest):
     parsed = tables(manifest)
-    if parsed.get("lints") != {"workspace": True} or any(key.startswith("lints.") for key in parsed):
+    lints = parsed.get("lints")
+    # 恰好是 {"workspace": true}：子表 [lints.*]、数组表 [[lints]]、其他键都在这里被拒。
+    if not isinstance(lints, dict) or set(lints) != {"workspace"} or lints["workspace"] is not True:
         raise CheckError("成员未完整继承 workspace lint: " + name)
 
 
@@ -165,6 +735,116 @@ def write_fixture(project, package_name, source, root_lints, target=None, inheri
         (member / "benches").mkdir(exist_ok=True)
         (member / "benches/fixture.rs").write_text(source)
     return Path(project) / "Cargo.toml", member
+
+
+def write_member_project(project, root_lints, decoy):
+    """按真实仓库的八个成员布局生成隔离 workspace；aline-buffer 用伪/真继承清单。"""
+    project = Path(project)
+    project.mkdir(parents=True, exist_ok=True)
+    workspace_text = cargo_toml(root_lints, "aline-buffer", workspace_members=list(MEMBERS.values()))
+    (project / "Cargo.toml").write_text(workspace_text.split("\n[package]\n", 1)[0] + "\n")
+    lock = [
+        "# This file is automatically @generated by Cargo.",
+        "# It is not intended for manual editing.",
+        "version = 4",
+        "",
+    ]
+    for name, relative in MEMBERS.items():
+        member = project / relative
+        (member / "src").mkdir(parents=True, exist_ok=True)
+        manifest = member / "Cargo.toml"
+        if name == "aline-buffer":
+            manifest.write_text(DECOY_MEMBER_TEXT if decoy else REAL_MEMBER_TEXT)
+        else:
+            manifest.write_text(
+                '[package]\nname = "%s"\nversion = "0.0.0"\nedition = "2024"\n\n[lints]\nworkspace = true\n' % name)
+        (member / "src/lib.rs").write_text("//! 继承解析隔离夹具。\npub fn undocumented() {}\n")
+        lock.extend(['[[package]]', 'name = "%s"' % name, 'version = "0.0.0"', ""])
+    (project / "Cargo.lock").write_text("\n".join(lock))
+    return project
+
+
+def check_inheritance_parsing(cases_dir, output, env, root_lints):
+    """F-08 回归：伪继承必须被守卫拒绝，真实继承必须通过，并用 Cargo 实际诊断对照。"""
+    results = output / "results"
+    decoy_project = write_member_project(cases_dir / "f08-decoy-inheritance", root_lints, decoy=True)
+    real_project = write_member_project(cases_dir / "f08-real-inheritance", root_lints, decoy=False)
+    script = str(Path(__file__).resolve())
+    check_expected("f08-decoy-guard", [sys.executable, script, "--root", str(decoy_project)],
+                   decoy_project, results, env, 1, "成员未完整继承 workspace lint: aline-buffer")
+    check_expected("f08-real-guard", [sys.executable, script, "--root", str(real_project)],
+                   real_project, results, env, 0, "workspace lint 声明有效")
+    clippy = ["cargo", "clippy", "--manifest-path", str(decoy_project / "Cargo.toml"),
+              "-p", "aline-buffer", "--locked", "--offline", "--", "-D", "warnings"]
+    check_expected("f08-decoy-cargo-control", clippy, decoy_project, results, env, 0)
+    clippy = ["cargo", "clippy", "--manifest-path", str(real_project / "Cargo.toml"),
+              "-p", "aline-buffer", "--locked", "--offline", "--", "-D", "warnings"]
+    check_expected("f08-real-cargo-control", clippy, real_project, results, env, 101, "missing documentation")
+    return 4
+
+
+PARSER_CASES = [
+    ("accept-decoy-description-multiline", DECOY_MEMBER_TEXT, "ok", ""),
+    ("accept-real-inheritance", REAL_MEMBER_TEXT, "ok", ""),
+    ("accept-multiline-literal-decoy",
+     "[package]\ndescription = '''\n[lints]\nworkspace = true\n'''\n", "ok", ""),
+    ("accept-basic-escapes",
+     '[package]\ndescription = "quote \\" and tab \\t and \\u0041"\n', "ok", ""),
+    ("accept-comments-and-multiline-array",
+     '[package]\nkeywords = [\n  "a", # 行内注释\n  "b",\n]\n', "ok", ""),
+    ("accept-inline-table",
+     '[package.metadata.x]\nvalue = { a = 1, b = "two", c = true }\n', "ok", ""),
+    ("accept-quoted-and-dotted-keys",
+     '[package]\n"a.b" = 1\nmeta.x = { y = 2 }\n', "ok", ""),
+    ("accept-array-of-tables",
+     '[[bin]]\nname = "one"\n[[bin]]\nname = "two"\n', "ok", ""),
+    ("accept-numbers-and-datetime",
+     '[package]\nchecksum = 0xff\nratio = 1.5\ndate = 1979-05-27T07:32:00Z\n', "ok", ""),
+    ("accept-super-table-after-subtable",
+     '[a.b]\nx = 1\n[a]\ny = 2\n', "ok", ""),
+    ("reject-inline-table-extended-by-header",
+     'a = {x = 1}\n[a]\ny = 2\n', "error", "内联表"),
+    ("reject-array-table-then-normal-table",
+     '[[a]]\nx = 1\n[a]\n', "error", "数组表"),
+    ("reject-dotted-key-then-header",
+     'a.b = 1\n[a]\nc = 2\n', "error", "点分键已定义表"),
+    ("reject-newline-in-basic-string", '[package]\nname = "abc\n', "error", "跨行"),
+    ("reject-unterminated-string", '[package]\nname = "abc', "error", "未闭合"),
+    ("reject-unknown-escape", '[package]\nname = "a\\q"\n', "error", "未知转义"),
+    ("reject-duplicate-key", '[package]\nname = "a"\nname = "b"\n', "error", "重复 TOML 键"),
+    ("reject-duplicate-table", '[package]\n[package]\n', "error", "重复 TOML 表"),
+    ("reject-inline-table-trailing-comma",
+     '[package.metadata]\nx = { a = 1, }\n', "error", "尾随逗号"),
+    ("reject-leading-zero-integer", '[package]\ncount = 01\n', "error", "无法识别"),
+    ("reject-bare-cr", '[package]\rname = "a"\n', "error", "裸 CR"),
+    ("reject-bom", "\ufeff[package]\n", "error", "BOM"),
+    ("reject-bad-header", '[package\nname = "a"\n', "error", "表头"),
+]
+
+
+def run_parser_self_checks(directory):
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    for index, (label, text, expect, needle) in enumerate(PARSER_CASES, 1):
+        (directory / ("%02d-%s.toml" % (index, label))).write_text(text)
+        try:
+            parse_toml(text, label)
+        except CheckError as error:
+            if expect != "error" or needle not in str(error):
+                raise CheckError("解析器自检不符合预期: %s (%s)" % (label, error))
+            print("parser %s: 拒绝符合预期 (%s)" % (label, error), flush=True)
+        else:
+            if expect != "ok":
+                raise CheckError("解析器自检应拒绝但通过了: " + label)
+            print("parser %s: 解析符合预期" % label, flush=True)
+    decoy = parse_toml(DECOY_MEMBER_TEXT, "decoy")
+    if "lints" in decoy:
+        raise CheckError("多行字符串内的伪 [lints] 表被当成真实表")
+    description = decoy.get("package", {}).get("description", "")
+    if "[lints]" not in description:
+        raise CheckError("多行字符串内容未完整保留，无法证明伪继承被解析为字符串")
+    print("parser 语义: 伪 [lints] 保留在 description 中，未生成 lints 表", flush=True)
+    return len(PARSER_CASES)
 
 
 def run_self_test(output):
@@ -266,7 +946,17 @@ def run_self_test(output):
                    ["python3", str(Path(__file__).resolve()), "--root", str(complete_negative)],
                    complete_negative, output / "results", env, 1, "成员未完整继承 workspace lint: aline-source")
 
-    print(json.dumps({"status": "lint 隔离样例通过", "formal_members": actual_members, "self_test_cases": len(samples), "profiles": sorted(profiles)}, ensure_ascii=False))
+    inheritance_cases = check_inheritance_parsing(cases_dir, output, env, root_lints)
+    parser_cases = run_parser_self_checks(output / "parser-cases")
+
+    print(json.dumps({
+        "status": "lint 隔离样例通过",
+        "formal_members": actual_members,
+        "self_test_cases": len(samples),
+        "profiles": sorted(profiles),
+        "inheritance_cases": inheritance_cases,
+        "parser_cases": parser_cases,
+    }, ensure_ascii=False))
     return 0
 
 

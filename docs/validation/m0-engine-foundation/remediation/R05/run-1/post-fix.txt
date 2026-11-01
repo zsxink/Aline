@@ -1,0 +1,164 @@
+R05 F-08 修复后证据
+============================================================
+采集时间（UTC）：2026-11-01T04:07:27Z – 2026-11-01T04:07:41Z
+脚本：scripts/check_lints.py（本批次修改后）
+Python：3.9.6（标准库实现，无 tomllib/tomli/toml，无外部依赖）
+工具链：RUSTUP_TOOLCHAIN=1.98.1，CARGO_NET_OFFLINE=true，--locked --offline
+
+------------------------------------------------------------
+[1] 伪继承夹具 —— 守卫必须拒绝（修复前 exit 0 误判通过）
+------------------------------------------------------------
+argv : python3 scripts/check_lints.py --root /tmp/aline-m0-independent-review.pTFf8u/D/lint-decoy
+cwd  : /Users/xian/Project/editor/Aline
+exit : 1
+stdout: (空)
+stderr: lint 检查拒绝: 成员未完整继承 workspace lint: aline-buffer
+
+说明：真实解析后 description 的值是
+  "[lints]\nworkspace = true\n[package.metadata.decoy]\n"
+aline-buffer 的 [package] 段里没有 lints 表，因此 lints is None，拒绝。
+规则/路径：audit_member_manifest → tables() 真实解析 → 成员 lints 缺失。
+
+------------------------------------------------------------
+[2] 真实继承夹具 —— 守卫必须通过
+------------------------------------------------------------
+argv : python3 scripts/check_lints.py --root /tmp/aline-m0-independent-review.pTFf8u/D/lint-real-inheritance
+cwd  : /Users/xian/Project/editor/Aline
+exit : 0
+stdout:
+{
+  "status": "workspace lint 声明有效",
+  "members": {
+    "aline": "app/Cargo.toml",
+    "aline-app-core": "crates/aline-app-core/Cargo.toml",
+    "aline-buffer": "crates/aline-buffer/Cargo.toml",
+    "aline-edit": "crates/aline-edit/Cargo.toml",
+    "aline-markdown": "crates/aline-markdown/Cargo.toml",
+    "aline-plugin": "crates/aline-plugin/Cargo.toml",
+    "aline-source": "crates/aline-source/Cargo.toml",
+    "aline-ui": "crates/aline-ui/Cargo.toml"
+  }
+}
+stderr: (空)
+
+------------------------------------------------------------
+[3] 正常仓库 —— 不得回归
+------------------------------------------------------------
+argv : python3 scripts/check_lints.py
+cwd  : /Users/xian/Project/editor/Aline
+exit : 0
+stdout: 同 [2]（status = "workspace lint 声明有效"，八个成员全部列出）
+stderr: (空)
+
+------------------------------------------------------------
+[4] --self-test —— 不得回归，用例数不得减少
+------------------------------------------------------------
+argv : python3 scripts/check_lints.py --self-test --output-dir /tmp/aline-r05-selftest
+cwd  : /Users/xian/Project/editor/Aline
+env  : RUSTUP_TOOLCHAIN=1.98.1 CARGO_NET_OFFLINE=true
+exit : 0
+起止 : 04:07:35Z – 04:07:40Z
+
+用例数对照：
+  修改前（原脚本）：10 个 lint 样例 × 2 profile = 20 条 check_expected
+                    + 8 条 inherit-unsafe-* + unsafe-forbid + missing-inherit 自检
+                    + negative-one-member-inheritance-guard = 30 条 check_expected
+                    汇总字段 self_test_cases = 10
+  修改后：同样 30 条原有 check_expected 全部保留并通过
+                    + f08-decoy-guard / f08-real-guard / f08-decoy-cargo-control /
+                      f08-real-cargo-control = 4 条新增
+                    + parser 自检 22 条（PARSER_CASES 22 项，逐条记录）
+                    汇总：self_test_cases = 10, inheritance_cases = 4, parser_cases = 22
+  结论：原有 10 组 debug/release 正反例与继承反例一条不少，且新增 26 条。
+
+末尾汇总行：
+{"status": "lint 隔离样例通过", "formal_members": {...8 成员...},
+ "self_test_cases": 10, "profiles": ["debug", "release"],
+ "inheritance_cases": 4, "parser_cases": 22}
+
+新增用例逐条输出：
+f08-decoy-guard: 符合预期 (exit=1; 预期=1; 诊断=成员未完整继承 workspace lint: aline-buffer)
+f08-real-guard: 符合预期 (exit=0; 预期=0; 诊断=workspace lint 声明有效)
+f08-decoy-cargo-control: 符合预期 (exit=0; 预期=0; 诊断=无)
+f08-real-cargo-control: 符合预期 (exit=101; 预期=101; 诊断=missing documentation)
+parser 22 条：9 条 accept 解析符合预期，13 条 reject 拒绝符合预期
+parser 语义: 伪 [lints] 保留在 description 中，未生成 lints 表
+
+所有夹具写在 /tmp/aline-r05-selftest/fixtures/ 与 /tmp/aline-r05-selftest/parser-cases/，
+未写入仓库受跟踪路径。
+
+------------------------------------------------------------
+[5] 附加：check_workspace.py 全量门禁（非本批次职责，仅证明 lint 两关未回归）
+------------------------------------------------------------
+argv : python3 scripts/check_workspace.py
+exit : 0（该脚本自身汇总退出 0）
+其中 lint: exit=0，lint-self-test: exit=0
+其余 clippy/test/public-api 等 exit≠0 属 R02 中间态或既有问题，与本批次无关，未追查。
+
+------------------------------------------------------------
+结论
+------------------------------------------------------------
+F-08 已修复：伪继承夹具 exit 1 被拒；真实继承与正常仓库仍 exit 0；
+self-test 通过且用例数由 30 条 check_expected 增至 56 条（含 22 条解析器自检）。
+
+============================================================
+[6] 勘误补录：dotted-key 修正的自检断言（原第 4 节表述不成立）
+============================================================
+协调者复核发现：`state="dotted"` 的 fail-open 修正确实进了代码
+（scripts/check_lints.py:245 标记、:303 拒绝），但 `PARSER_CASES` 里**没有**
+对应用例，等于「修了但无断言守着」。本段补上该用例并重跑。
+
+新增用例（PARSER_CASES 第 20 项）：
+  ("reject-dotted-key-then-header", 'a.b = 1\n[a]\nc = 2\n', "error", "点分键已定义表")
+
+argv : python3 scripts/check_lints.py --self-test --output-dir /tmp/aline-r05-final2
+env  : RUSTUP_TOOLCHAIN=1.98.1 CARGO_NET_OFFLINE=true
+exit : 0
+「不符合预期」计数：0
+「符合预期」计数：57（原 56 + 新增 1）
+新增用例原始输出：
+parser reject-dotted-key-then-header: 拒绝符合预期 (reject-dotted-key-then-header:2: 点分键已定义表 'a'，不得再用表头定义)
+末尾汇总行：
+{"status": "lint 隔离样例通过", ..., "self_test_cases": 10, "profiles": ["debug", "release"], "inheritance_cases": 4, "parser_cases": 23}
+
+parser_cases 由 22 → 23。
+
+============================================================
+[7] 第 5 节第 3、6 条的实测输出（过度拒绝，fail-closed）
+============================================================
+本解析器（scripts/check_lints.py）实测：
+  REJECT x41 escape        -> x41 escape:1: 未知转义序列 \x
+  REJECT e escape          -> e escape:1: 未知转义序列 \e
+  REJECT time-no-sec       -> time-no-sec:1: 无法识别的 TOML 值
+  REJECT datetime-no-sec   -> datetime-no-sec:1: 无法识别的 TOML 值
+  REJECT datetime-offset-no-sec -> datetime-offset-no-sec:1: 无法识别的 TOML 值
+
+参考实现 toml 1.1.8（离线构建 /tmp/aline-r05-tomlref）实测：
+  x41-escape              ref=OK {"a":"A"}
+  e-escape                ref=OK {"a":"\u001b"}
+  time-no-sec             ref=OK {"a":{"$__toml_private_datetime":"07:32"}}
+  datetime-no-sec         ref=OK {"a":{"$__toml_private_datetime":"1979-05-27T07:32"}}
+  datetime-offset-no-sec  ref=OK {"a":{"$__toml_private_datetime":"1979-05-27T07:32Z"}}
+
+对照结论：这 5 条在 TOML 1.1 合法，本解析器拒绝 → 方向为过度拒绝（fail-closed），
+不会误放行。仓库语料 9464 个 Cargo 清单中未出现这些写法。
+
+反向确认（第 5 节未列、但同一处修正）：
+  dotted-key-then-header  ref=ERR TOML parse error at line 2, column 2（Cargo 拒绝）
+  本解析器              -> 点分键已定义表 'a'，不得再用表头定义（拒绝）
+  方向一致，且已有断言守着。
+
+============================================================
+[8] 定稿指纹（补录后）
+============================================================
+sha256 scripts/check_lints.py = 4ed5a4971d2a9ca8e866b6672206e456e23cb47f29cd2fb7f598050bd4a6b929
+mtime  = 2026-11-01T12:21:57Z（本地时区）
+行数   = 981
+
+补录后复跑：
+  python3 scripts/check_lints.py                                  exit 0
+  python3 scripts/check_lints.py --root .../lint-decoy            exit 1
+  python3 scripts/check_lints.py --root .../lint-real-inheritance exit 0
+  --self-test                                                     exit 0，parser_cases=23
+  语料回归 9464 个 Cargo.toml/Cargo.lock                          0 失败
+  差分测试 81 条                                                  一致 79，差异 2（均为 fail-closed）
