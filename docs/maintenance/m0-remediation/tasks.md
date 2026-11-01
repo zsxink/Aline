@@ -10,11 +10,11 @@
 
 | 运行状态 | 当前值 |
 |---|---|
-| 当前批次 | R02 已完成（`0820e8e`）、R05 已完成（`e4a6af0`），两者待独立复核；R03 已解锁（R02 已结束，同 crate 串行） |
-| 下一可执行批次 | R03（F-04，R02 已结束，可开工）、R06（与 R05 无文件重叠）、R11（只读取证）。R05/R06 的原复核夹具本轮已确认仍在 `/tmp/aline-m0-independent-review.pTFf8u/D/` |
-| 已完成批次 | R00、文档保全提交 `c7232ed`（任务表 + R00 证据 + R01–R14 契约，未触碰源码）；R01（`79c3b54`）；R02（`0820e8e`）；R05（`e4a6af0`） |
+| 当前批次 | R02 已完成（`0820e8e`）、R05 已完成（`e4a6af0`）、R11 已完成（`ac2baaa`），三者待独立复核；R03 已解锁（R02 已结束，同 crate 串行） |
+| 下一可执行批次 | R03（F-04，R02 已结束，可开工）、R06（与 R05 无文件重叠）。R05/R06 的原复核夹具本轮已确认仍在 `/tmp/aline-m0-independent-review.pTFf8u/D/` |
+| 已完成批次 | R00、文档保全提交 `c7232ed`（任务表 + R00 证据 + R01–R14 契约，未触碰源码）；R01（`79c3b54`）；R02（`0820e8e`）；R05（`e4a6af0`）；R11（`ac2baaa`，只读取证，未改代码） |
 | 活跃写入 Agent / 文件所有权 | 无活跃写入。R02 已收束（`crates/aline-markdown/src/pre/rewrite.rs`、`crates/aline-markdown/tests/rewrite.rs`）；R05 已收束（`scripts/check_lints.py`）。R06 将独占 `scripts/check_safety.py` |
-| 最近验证与审查 | R01 独立复核返回 APPROVE_WITH_CONCERNS（无阻断）：在 `79c3b54` 干净检出复跑 30/8 目标/45 ok/0 failed、clippy exit 0、fmt exit 0；BASE 探针复现 F-01/F-05。其 4 项 finding 我逐条复核均成立，第 1 项（「workspace 62 ok」实为整份文件合计，该段实为 45）已按 §5 追加勘误到 `report.md`/`commands.txt`/`handoff.md`，原文保留。记录见 `R01/run-1/review.md`。R02/R05 已由主 Agent 独立复核（指纹比对 + 自跑测试/自检），详见各自 `report.md`；两批次的独立 reviewer 尚未派发 |
+| 最近验证与审查 | R01 独立复核返回 APPROVE_WITH_CONCERNS（无阻断）：在 `79c3b54` 干净检出复跑 30/8 目标/45 ok/0 failed、clippy exit 0、fmt exit 0；BASE 探针复现 F-01/F-05。其 4 项 finding 我逐条复核均成立，第 1 项（「workspace 62 ok」实为整份文件合计，该段实为 45）已按 §5 追加勘误到 `report.md`/`commands.txt`/`handoff.md`，原文保留。记录见 `R01/run-1/review.md`。R02/R05 已由主 Agent 独立复核（指纹比对 + 自跑测试/自检），详见各自 `report.md`；两批次的独立 reviewer 尚未派发。R11 由主 Agent 直接执行并复核：独立复算旧缺口为 105 份 / 14 缺字段，与报告一致；17 条新命令均含 argv/cwd/起止 UTC/exit/原始输出；敏感标识已打码，全目录扫描无残留 |
 | 契约就绪 | R01–R14 共 14 份 `run-1/brief.md` 已全部落盘（R00 已完成无 brief）；R13/R14 契约本轮新写，分别覆盖 F-12/F-17/F-18 与全量门禁+出口独立裁决 |
 | 待裁决事项 | T-8-17（undo 后新草稿时 Buffer redo 分支与草稿 redo 的失效时序）已按「受检拒绝」实现，仍待独立复核确认；R04 契约另含 tasks.md「redo 存在时拒绝」与 design.md:87/§9.3「实际新编辑才截 redo」的契约冲突，须带引文裁决并登记 |
 
@@ -55,7 +55,7 @@
 | R08 | F-11：删除/粘贴/HTML 跨界负例 | R04 | simple_worker 或 complex_worker → reviewer | edit protection/refusal 与必要 DocCore 集成测试 | 空删除、替换、粘贴意图及左右/整段 HTML 跨界金样；比较真实完整状态 | 待开始 |
 | R09 | F-07：E3 同夹具可审查 dump | R02/R03 | simple_worker 或 complex_worker → reviewer | markdown dump/Display、dump 测试/独立预期 | 同一 basic 夹具包含文字、来源片段、precision、源码身份、块/Gap、保护与诊断 | 待开始 |
 | R10 | F-06：独立预期与探针身份勘误 | R02/R03/R07/R09 | 未参与对应实现/预期编写的 reviewer 独立复算；文档由另一负责人整理 | mapping 金样、独立计算原件、新证据与现行报告勘误 | 外部消费和独立计算分开；保全当前独立预期/输出；旧 TSV 创作来源无法追认就明确保留，不造历史 | 待开始 |
-| R11 | F-13：候选/工具/设备采集补证 | R00 | scout 收集事实，主 Agent 或 simple_worker 补采集 | 保全候选输入、工具/设备命令及新证据 | argv/cwd/时间/输入身份/原始输出齐全；无法复现旧环境明确登记，只称新证据；不擅装工具或升级依赖 | 待开始 |
+| R11 | F-13：候选/工具/设备采集补证 | R00 | scout 收集事实，主 Agent 或 simple_worker 补采集 | 保全候选输入、工具/设备命令及新证据 | argv/cwd/时间/输入身份/原始输出齐全；无法复现旧环境明确登记，只称新证据；不擅装工具或升级依赖 | 完成 → 证据 `docs/validation/m0-engine-foundation/remediation/R11/run-1/`（`ac2baaa`）；17 条命令全 exit 0；旧缺口 105/14 已登记；U-1～U-9 不可复现项已列；待独立复核 |
 | R12 | F-16：嵌套 Cargo 锁定与口径 | R05/R06 | simple_worker；涉及采集协议时 complex_worker → reviewer | 相关工程脚本、实际命令与说明 | 初始生成 lock 与后续 locked/offline 检查分列；嵌套真实 argv 可核；不能用离线环境冒充 locked | 待开始 |
 | R13 | F-12/F-17/F-18：现行状态与历史勘误一致 | R01–R12 | simple_worker → 独立文档核对 | AGENTS、docs 入口、工程基线/专项/流程、适用报告 | “无 workspace/守卫未启用”按事实更新或标历史；31/32勘误；scope 偏差登记；不重写 Git 历史、不提前宣布 M0 完成 | 待开始 |
 | R14 | F-14及全部 findings：全量验证与出口独立裁决 | R01–R13 | 统一验证负责人；新 reviewer 分范围审查，主 Agent 汇总 | 当前全部实现/新证据、原46任务、E1–E7与现行回填 | 18项处置表、46任务三态表、全部Requirement/Scenario及E出口有证据；适用全量门禁；独立审查保全原始输出；如实给出M0/M1结论 | 待开始 |
