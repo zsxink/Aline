@@ -37,3 +37,15 @@
 - `commands.txt`：argv / cwd / 起止时间 / exit / CARGO_HOME 探测结论。
 - `report.md` **未落盘**（worker 环境禁止写报告类文件）：根因、规则表、逐条断言对照、未覆盖范围
   见本次 worker 最终回复正文，请主 Agent 需要时转存。
+
+## 复核后追加（R06b，不改上文）
+
+独立复核 `review.md` 返回 APPROVE_WITH_CONCERNS（D1–D4）。复核后实际改动与勘误见
+`report.md` §8，要点：
+
+- D1 目录符号链接逃逸 fail-open 已修复（`rglob` 换显式 `collect`，按 `realpath` 判定落点）。
+  原交接第 12 行「成员内符号链接逃逸同样拒绝」在提交 `60ace78` 时**不成立**，现已成立。
+- 第 26 行「成员内 `build.rs` 范围扩大」**作废**（仓库唯一 `build.rs` 旧脚本本已扫到）。
+- D2 已补 `missing-target-path` + 3 个符号链接 case + `dangling-target-symlink`；
+  `--self-test` 现 65/65（`60ace78` 为 60）。
+- D4（`targets=[]` 无守卫）与 `mkdtemp` 不清理登记为已知限制，不修。

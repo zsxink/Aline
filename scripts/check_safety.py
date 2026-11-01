@@ -177,19 +177,50 @@ def member_scan(root, relative, package, scanned):
             rejected_external.add(real_source)
             continue
         if not real_source.is_file():
+            # 声明路径不存在或为悬空符号链接：Cargo 接受清单，rustc 编译时才失败。
             failures.append({'file': str(manifest), 'line': 1, 'rule': 'target-path-missing',
                              'detail': '%s %s' % (','.join(kinds), source)})
+            rejected_external.add(real_source)
             continue
         target_files.add(real_source)
     files = set(target_files)
-    for path in directory.rglob('*.rs'):
-        real_path = Path(os.path.realpath(path))
-        if inside(real_path, directory):
-            files.add(real_path)
-        elif real_path not in rejected_external:
-            # 成员内符号链接指向目录外：rustc 会编译它，等同目录外 target，明确拒绝而非静默丢弃。
-            failures.append({'file': str(path), 'line': 1, 'rule': 'external-target-path',
-                             'detail': 'symlink escapes member: %s' % real_path})
+
+    def collect(start):
+        """显式下降成员目录；符号链接按真实落点判定，逃逸成员外一律拒绝。
+
+        `Path.rglob` 在 Python 3.9 不下降目录符号链接，会让 `mod linkdir;` 加载的成员外
+        源码静默漏扫（rustc 却会编译它），故不依赖 rglob。留在成员内的符号链接按真实路径
+        计入，与普通文件同权；指向成员外的文件或目录都给出 external-target-path。
+        """
+        visited = {Path(os.path.realpath(start))}
+        pending = [start]
+        while pending:
+            current = pending.pop()
+            for name in sorted(os.listdir(str(current))):
+                candidate = current / name
+                real_path = Path(os.path.realpath(candidate))
+                if not inside(real_path, directory):
+                    if real_path not in rejected_external:
+                        failures.append({'file': str(candidate), 'line': 1, 'rule': 'external-target-path',
+                                         'detail': 'symlink escapes member: %s' % real_path})
+                    continue
+                if candidate.is_dir():
+                    if real_path not in visited:
+                        visited.add(real_path)
+                        pending.append(real_path)
+                    continue
+                if name.endswith('.rs'):
+                    if real_path in rejected_external:
+                        # target 级检查已给出具体规则，不重复报告同一落点。
+                        continue
+                    if not real_path.is_file():
+                        # 悬空符号链接：Cargo 接受该声明，rustc 编译时才失败，这里明确拒绝。
+                        failures.append({'file': str(candidate), 'line': 1, 'rule': 'target-path-missing',
+                                         'detail': 'dangling symlink: %s' % candidate})
+                        continue
+                    files.add(real_path)
+
+    collect(directory)
     files = sorted(files)
     test_files = {path for path in files if path.relative_to(directory).parts[0] == 'tests'}
     test_targets, production_targets = set(), set()
@@ -322,7 +353,7 @@ def self_test(output):
     work = Path(tempfile.mkdtemp(prefix='aline-safety-self-test-'))
     records = []
 
-    def run_case(name, argv, expected, expectation):
+    def run_case(name, argv, expected, expectation, count=None):
         start = datetime.datetime.now(datetime.timezone.utc).isoformat()
         result = subprocess.run(argv, cwd=str(ROOT), text=True, capture_output=True,
                                 env=dict(os.environ, PYTHONDONTWRITEBYTECODE='1'))
@@ -330,10 +361,14 @@ def self_test(output):
         (output / (name + '.stderr.log')).write_text(result.stderr)
         actual = json.loads(result.stdout)
         rules = sorted({item['rule'] for item in actual['failures']})
+        failures = len(actual['failures'])
+        # 规则集合相等不足以发现「同一落点被报告两次」这类回归，可选断言失败条数。
+        matches = rules == sorted(expected) and (count is None or failures == count)
         records.append({'name': name, 'argv': argv, 'cwd': str(ROOT), 'started_utc': start,
                         'finished_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(),
                         'exit_code': result.returncode, 'expected_rules': expected, 'actual_rules': rules,
-                        'passed': rules == sorted(expected) and result.returncode == (1 if expected else 0),
+                        'expected_failures': count, 'actual_failures': failures,
+                        'passed': matches and result.returncode == (1 if expected else 0),
                         'independent_expectation': expectation})
 
     for case in cases:
@@ -430,6 +465,11 @@ def self_test(output):
             'outside-build.rs': '#[allow(clippy::unwrap_used)]\npub fn bad(v: Option<u8>) -> u8 { v.unwrap() }\n'},
          {}, ['external-target-path']),
         ('member-not-in-workspace', {}, ('crates/aline-edit',), ['member-not-in-workspace']),
+        # 复核 R06 D2：target 声明指向不存在的路径。Cargo metadata 接受该清单（实测 exit 0），
+        # rustc 编译时才失败，故守卫必须显式拒绝，不能因「路径不存在」静默少扫一个入口。
+        ('missing-target-path', {'crates/aline-buffer/Cargo.toml':
+            '[package]\nname = "aline-buffer"\nversion = "0.0.0"\nedition = "2024"\n\n[lib]\npath = "src/absent.rs"\n'},
+         {}, ['target-path-missing']),
     ]
     for name, overrides, undeclared, expected in scope_cases:
         fake_root = work / 'workspace-fixtures' / name
@@ -437,6 +477,40 @@ def self_test(output):
         build_workspace(fake_root, undeclared=undeclared, overrides=overrides)
         run_case(name, [sys.executable, str(Path(__file__).resolve()), '--root', str(fake_root)], expected,
                  'Cargo 实际 target 入口受审：目录外 target/build script 明确拒绝；未声明成员不静默跳过')
+    # 复核 R06 D1/D2：符号链接落点。成员内链接逃逸到成员外时 rustc 仍会编译目标，
+    # 必须拒绝；链接留在成员内时按真实路径计入扫描，不得漏扫也不得误拒。
+    symlink_cases = [
+        ('symlink-directory-escapes-member', 'dir', ('external-target-path',), 'directory link'),
+        ('symlink-file-escapes-member', 'file', ('external-target-path',), 'file link'),
+        ('symlink-inside-member-is-scanned', 'inside', (), 'internal link'),
+    ]
+    for name, shape, expected, label in symlink_cases:
+        fake_root = work / 'workspace-fixtures' / name
+        build_workspace(fake_root)
+        outside_dir = work / 'symlink-outside' / name
+        outside_dir.mkdir(parents=True, exist_ok=True)
+        target = outside_dir / ('mod.rs' if shape == 'dir' else 'checks.rs')
+        target.write_text('#[allow(clippy::unwrap_used)]\npub fn bad(v: Option<u8>) -> u8 { v.unwrap() }\n')
+        link = fake_root / 'crates/aline-buffer/src' / ('linkdir' if shape == 'dir' else 'linked.rs')
+        if shape == 'inside':
+            target.write_text('pub fn ok() {}\n')
+            target = fake_root / 'crates/aline-buffer/src/real_checks.rs'
+            target.write_text('pub fn ok() {}\n')
+            link.symlink_to(target)
+        else:
+            link.symlink_to(outside_dir if shape == 'dir' else target)
+        run_case(name, [sys.executable, str(Path(__file__).resolve()), '--root', str(fake_root)], list(expected),
+                 '符号链接按真实落点判定：逃逸成员外必须拒绝（%s）；留在成员内必须照常受扫' % label)
+    # 复核 R06：悬空符号链接作 target 时，target 声明与目录枚举会看到同一落点；
+    # 规则集合相同但重复诊断会误导修复方向，故此处额外断言失败条数为 1。
+    dangling_root = work / 'workspace-fixtures' / 'dangling-target-symlink'
+    build_workspace(dangling_root)
+    dangling = dangling_root / 'crates/aline-buffer/src/dangling.rs'
+    dangling.symlink_to(dangling_root / 'crates/aline-buffer/src/missing.rs')
+    (dangling_root / 'crates/aline-buffer/Cargo.toml').write_text(
+        '[package]\nname = "aline-buffer"\nversion = "0.0.0"\nedition = "2024"\n\n[lib]\npath = "src/dangling.rs"\n')
+    run_case('dangling-target-symlink', [sys.executable, str(Path(__file__).resolve()), '--root', str(dangling_root)],
+             ['target-path-missing'], '悬空符号链接必须拒绝，且同一落点只报一条', count=1)
     run_case('root-missing', [sys.executable, str(Path(__file__).resolve()), '--root',
                               str(work / 'workspace-fixtures' / 'absent-root')], ['root-missing'],
              '不存在的根必须非零退出并给出 root-missing；空扫描不等于通过')

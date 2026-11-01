@@ -163,3 +163,70 @@ argv = ['cargo', 'metadata', '--no-deps', '--format-version', '1',
 7. **残留（不阻断）**：目录外 target 只拒绝不受审；`build.rs` 扫描范围扩大；
    两个既有 case 期望加强为 `member-package-identity + missing-member`（复核者需裁决
    这是否可接受——主 Agent 判断为同一夹具的必然结论，非放宽）。
+
+## 8. 独立复核返回后的勘误与 R06b 修复（追加，不改上文）
+
+独立复核见 `review.md`，结论 **APPROVE_WITH_CONCERNS**，发现 D1–D4。本节记录裁决与
+复核后的实际改动，全部由主 Agent 独立复现并测量；上文（含 §5）保留原样，只在下方作勘误。
+
+### 8.1 勘误：§5 第 4 条不属实
+
+原 §5 第 4 条称「成员内 `build.rs` 纳入 `engine-production` 扫描，属范围扩大」。
+复核独立核实：仓库唯一 `build.rs` 是 `crates/aline-markdown/src/build.rs`，旧脚本的
+`rglob('*.rs')` 本就会扫到它，新旧 kind 均为 `engine-production`。**不存在范围扩大**，
+该条作废；真正的范围扩大是「成员目录内符号链接按真实落点纳入扫描」（见 8.2）。
+
+### 8.2 D1（中）目录符号链接逃逸 fail-open —— 已修复
+
+复核夹具：`crates/aline-buffer/src/linkdir -> /tmp/.../outside-dir`，`outside-dir/mod.rs`
+含 `v.unwrap()`，`lib.rs` 写 `mod linkdir;`；新脚本 exit 0 / `failures=[]` / `scanned=8`，
+而 `rustc 1.98.1 --edition=2024` 实际编译了该文件。根因已由主 Agent 独立证实：
+**Python 3.9.6 的 `Path.rglob('**')` 不下降目录符号链接**（裸探针只返回 `member/src/lib.rs`）。
+
+修复：把 `directory.rglob('*.rs')` 换成显式 `collect(start)` 下降，逐项按
+`os.path.realpath` 判定落点——逃逸成员外一律 `external-target-path` 拒绝；留在成员内按真实
+路径计入扫描（与普通文件同权，不得漏扫）。修复后主 Agent 自建夹具 `/tmp/symfx`：
+exit 1、`external-target-path`、detail `symlink escapes member: /private/tmp/symfx-outside`。
+旧脚本在同一夹具上同样 exit 0，故这是**既有缺陷、非本批回归**；按复核 §E 裁决
+「必须删除或修正过强声明」——本批选择让实现兑现声明，而非删掉声明。
+
+### 8.3 D2（低）两条新规则无断言 —— 已补
+
+复核的 M6/M7 存活证明 `target-path-missing` 与符号链接文件拒绝无 case 覆盖。补：
+`missing-target-path`（`[lib] path = "src/absent.rs"`）、`symlink-directory-escapes-member`、
+`symlink-file-escapes-member`、`symlink-inside-member-is-scanned`（成员内链接必须照常受扫，
+不得误拒）。另补显式「悬空符号链接」分支：此前它落到通用 `input-failure`，现为
+`target-path-missing`（detail `dangling symlink`）。
+
+### 8.4 主 Agent 新发现（复核未点名）：重复诊断不可观测 —— 已补
+
+去重分支 `rejected_external`（target 声明与目录枚举看到同一落点时只报一条）原本无断言：
+删掉该分支后 self-test 仍 exit 0（变异 C 存活）。给 `run_case` 加可选 `count` 参数，
+并新增 `dangling-target-symlink` case（期望 `target-path-missing` **恰好 1 条**）。
+
+### 8.5 D4（低）`targets=[]` 无显式守卫 —— 登记为已知限制
+
+复核实测 shim 返回合法 JSON 且 `targets=[]` 时脚本 exit 0 / `scanned=8`；真实 cargo 对
+无 target 包直接失败（`no targets specified in the manifest`），故当前不可经真实 cargo 触发。
+本批**不修**，登记为纵深防御缺口（见 8.6 第 3 条）。
+
+### 8.6 验证（主 Agent 实测，2026-11-01）
+
+| 项 | 结果 |
+|----|------|
+| `--self-test`（`/tmp/r06b-st`） | exit 0、`cases=65`、`passed=true`、failed `[]`、`workspace_after_fixtures.failures=0` |
+| `dangling-target-symlink` | `expected_failures=1` / `actual_failures=1` / rules `['target-path-missing']` |
+| 真实仓库 `--root .` | exit 0、`failures=0`、`scanned=89`（与复核基线一致） |
+| 变异 A（`collect` 去掉包含判定） | exit 1；红：`symlink-directory-escapes-member`、`symlink-file-escapes-member` |
+| 变异 B（去掉 target 级 `is_file()`） | exit 1；红：`missing-target-path`、`dangling-target-symlink` |
+| 变异 C（删 `rejected_external` 去重） | exit 1；红：`dangling-target-symlink`（规则同、条数 2≠1） |
+
+新增 case 计数：60（`60ace78`）→ 65（+`missing-target-path`、+3 符号链接、+`dangling-target-symlink`）。
+变异副本均置于 `scripts/_rev{A,B,C}.py`，跑后 `rm -f`，`git status scripts/` 仅剩本批改动。
+
+### 8.7 仍不修（登记）
+
+1. `tempfile.mkdtemp` 临时目录从不清理（复核非阻断项）。
+2. `targets=[]` 无显式守卫（D4，纵深防御）。
+3. Q3 夹具把 `member-package-identity` 与 `missing-member` 绑在一例（复核可选拆分，非阻断；
+   拆分不影响断言强度，留待后续批次）。
