@@ -63,3 +63,9 @@
 1. 复核 `report.md` §3 断言对照与 `post-fix-tests.txt` 原始输出。
 2. 裁决 T-8-17；若改为「新分支协议结算」，只需替换 `redo()` 中 `PendingInput` 守卫。
 3. 合并后同步 `docs/maintenance/m0-remediation/tasks.md` 的 R01 状态（不在本 worker 文件范围内）。
+
+## 勘误：2026-11-01（独立复核后追加）
+
+上文「`cargo test --workspace`（exit 0，62 个 ok）」口径错误：62 是整份
+`post-fix-tests.txt` 六段合计，workspace 段自身为 **45 ok / 0 failed**。详见 `report.md`
+末尾「勘误」一节。复核裁决为 APPROVE_WITH_CONCERNS，未阻断。

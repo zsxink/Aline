@@ -66,3 +66,16 @@
    但宿主侧 `match` 需补分支。
 3. `pre-fix-tests.txt` 前两次运行因测试引用尚未存在的 `PendingInput` 而编译失败（E0599）；
    已在 `commands.txt` 与 `handoff.md` 如实记录该 TDD 顺序偏差及改正方式。
+
+## 勘误：2026-11-01（独立复核 R01 后追加，不改上文）
+
+1. **上文「`cargo test --workspace`：exit 0，62 个 `test result: ok`」口径错误。**
+   复核后逐段重数 `post-fix-tests.txt`：全文 6 段共 62 行 `test result: ok`，其中第 6 段
+   （`cargo test --workspace --locked --offline`，文件第 446 行起）为 **45**。正确表述是
+   「workspace 45 个 ok」；62 是整份证据文件的合计，不能记作 workspace 数量。
+   同一错误也出现在 `commands.txt` 第 12 行与 `handoff.md` 的「62 个 ok」处。
+2. **该 workspace 段落跑在含并行 worker（R02）未提交改动的树上**（`post-fix-tests.txt:444`
+   已注明「含并行 worker 的 aline-markdown 未提交改动，仅供参照」，但上文未复述）。
+   独立复核在 `79c3b54` 的干净检出上复跑，得 45 ok / 0 failed，与本段一致。
+3. **`commands.txt` 第 8、9 项无起止时间戳**（原文以 `—` 占位）。复核指出后保留原样，
+   不补造时间。

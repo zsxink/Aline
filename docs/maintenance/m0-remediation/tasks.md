@@ -10,11 +10,11 @@
 
 | 运行状态 | 当前值 |
 |---|---|
-| 当前批次 | R01 待独立审查（实现已提交 `79c3b54`）/ R02 实现中 |
-| 下一可执行批次 | R03（须待 R02 结束，同 crate 串行）、R05、R11 |
-| 已完成批次 | R00 |
-| 活跃写入 Agent / 文件所有权 | R01 实现已收束（无活跃写入）；R02 → `crates/aline-markdown/src/pre/rewrite.rs`、`crates/aline-markdown/tests/rewrite.rs`（工作树当前 ` M tests/rewrite.rs`） |
-| 最近验证与审查 | R01 独立 reviewer 运行中（未参与实现）；已向该 reviewer 澄清：工作树 ` M tests/rewrite.rs` 属 R02 在写的 pre-fix 用例，其 2 个 FAILED 不得计入 R01；R02 已落盘 `pre-fix-tests.txt`（exit 101，9 passed / 2 failed），正在改 `compose` |
+| 当前批次 | R02 已完成（`0820e8e`）、R05 已完成（`e4a6af0`），两者待独立复核；R03 已解锁（R02 已结束，同 crate 串行） |
+| 下一可执行批次 | R03（F-04，R02 已结束，可开工）、R06（与 R05 无文件重叠）、R11（只读取证）。R05/R06 的原复核夹具本轮已确认仍在 `/tmp/aline-m0-independent-review.pTFf8u/D/` |
+| 已完成批次 | R00、文档保全提交 `c7232ed`（任务表 + R00 证据 + R01–R14 契约，未触碰源码）；R01（`79c3b54`）；R02（`0820e8e`）；R05（`e4a6af0`） |
+| 活跃写入 Agent / 文件所有权 | 无活跃写入。R02 已收束（`crates/aline-markdown/src/pre/rewrite.rs`、`crates/aline-markdown/tests/rewrite.rs`）；R05 已收束（`scripts/check_lints.py`）。R06 将独占 `scripts/check_safety.py` |
+| 最近验证与审查 | R01 独立复核返回 APPROVE_WITH_CONCERNS（无阻断）：在 `79c3b54` 干净检出复跑 30/8 目标/45 ok/0 failed、clippy exit 0、fmt exit 0；BASE 探针复现 F-01/F-05。其 4 项 finding 我逐条复核均成立，第 1 项（「workspace 62 ok」实为整份文件合计，该段实为 45）已按 §5 追加勘误到 `report.md`/`commands.txt`/`handoff.md`，原文保留。记录见 `R01/run-1/review.md`。R02/R05 已由主 Agent 独立复核（指纹比对 + 自跑测试/自检），详见各自 `report.md`；两批次的独立 reviewer 尚未派发 |
 | 契约就绪 | R01–R14 共 14 份 `run-1/brief.md` 已全部落盘（R00 已完成无 brief）；R13/R14 契约本轮新写，分别覆盖 F-12/F-17/F-18 与全量门禁+出口独立裁决 |
 | 待裁决事项 | T-8-17（undo 后新草稿时 Buffer redo 分支与草稿 redo 的失效时序）已按「受检拒绝」实现，仍待独立复核确认；R04 契约另含 tasks.md「redo 存在时拒绝」与 design.md:87/§9.3「实际新编辑才截 redo」的契约冲突，须带引文裁决并登记 |
 
@@ -45,11 +45,11 @@
 | 批次 | Finding / 单一闭环 | 前置 | 推荐执行与审查 | 主要文件/范围 | 完成标准 | 状态 / 交接 |
 |---|---|---|---|---|---|---|
 | R00 | 恢复基线、建立运行与所有权记录 | 无 | 主 Agent；定位不清时 scout | 本表、当前工作树、当前 change 状态 | 记录实际 HEAD/改动；识别已有整改；建立证据目录；不把原任务全勾选当通过 | 完成 → `docs/validation/m0-engine-foundation/remediation/R00/run-1/handoff.md` |
-| R01 | F-01/F-05：待定组 Redo 输入保全与方向选区 | R00 | complex_worker → reviewer | UI document 的 doc_core/open_block、typing 测试 | 两种独立失败回归修复；不吞草稿，恢复对应 anchor/head，分支与分组符合现行契约 | 待审查 → 实现 `79c3b54`；证据 `docs/validation/m0-engine-foundation/remediation/R01/run-1/` |
-| R02 | F-03：RewriteMap 多阶段来源复合 | R00 | complex_worker → reviewer | markdown pre/rewrite、rewrite 测试 | 恒等复合保留每片；Exact/Aligned/Hidden/Synthetic 与跨片段来源/锚点正确 | 进行中 |
+| R01 | F-01/F-05：待定组 Redo 输入保全与方向选区 | R00 | complex_worker → reviewer | UI document 的 doc_core/open_block、typing 测试 | 两种独立失败回归修复；不吞草稿，恢复对应 anchor/head，分支与分组符合现行契约 | 完成 → 实现 `79c3b54`；证据 `docs/validation/m0-engine-foundation/remediation/R01/run-1/`；复核 `review.md`（APPROVE_WITH_CONCERNS）；T-8-17 待裁决 |
+| R02 | F-03：RewriteMap 多阶段来源复合 | R00 | complex_worker → reviewer | markdown pre/rewrite、rewrite 测试 | 恒等复合保留每片；Exact/Aligned/Hidden/Synthetic 与跨片段来源/锚点正确 | 完成 → 实现 `0820e8e`；证据 `docs/validation/m0-engine-foundation/remediation/R02/run-1/`；待独立复核（含源码端片段重叠应然性裁决） |
 | R03 | F-04：复用重定位的受检坐标边界 | R00 | complex_worker → reviewer | markdown reuse、公开导出及消费者/编译测试 | 旧/新快照身份与 UTF-8 边界受检；无裸公共坐标捷径；旧消费者和替代路径清理 | 待开始 |
 | R04 | F-02：edit→DocCore 消费与 Visual 权限 | R01/R02/R03 | 必要时先 deep_thinker 形成最小方案，再 complex_worker → reviewer | UI document、edit 计划/验证及必要内部依赖、宿主集成测试 | 实际受检消费链；普通/组合输入保护一致；Source 合法路径保留；拒绝完整状态不变；每键不全文解析 | 待开始 |
-| R05 | F-08：lint 继承真实解析 | R00 | complex_worker 或范围明确后的 simple_worker → reviewer | check_lints 及对应隔离夹具 | 多行字符串假继承被拒；真实继承通过；Cargo 实际诊断与声明检查一致 | 待开始 |
+| R05 | F-08：lint 继承真实解析 | R00 | complex_worker 或范围明确后的 simple_worker → reviewer | check_lints 及对应隔离夹具 | 多行字符串假继承被拒；真实继承通过；Cargo 实际诊断与声明检查一致 | 完成 → 实现 `e4a6af0`；证据 `docs/validation/m0-engine-foundation/remediation/R05/run-1/`；待独立复核 |
 | R06 | F-09/F-15：安全扫描范围有效 | R00 | complex_worker → reviewer | check_safety、必要 safety_lex 与夹具 | 目录外实际 Cargo target 受审或被明确拒绝；空根/缺成员非零；正常范围恢复通过 | 待开始 |
 | R07 | F-10：字素边界独立验收 | R03 | complex_worker → reviewer | 映射/字素纯边界及测试；依赖如需新增先准入 | 独立字素移动边界与标量/代理对分开验收；不以字符串含 ZWJ 冒充覆盖，不静默下放 scenario | 待开始 |
 | R08 | F-11：删除/粘贴/HTML 跨界负例 | R04 | simple_worker 或 complex_worker → reviewer | edit protection/refusal 与必要 DocCore 集成测试 | 空删除、替换、粘贴意图及左右/整段 HTML 跨界金样；比较真实完整状态 | 待开始 |

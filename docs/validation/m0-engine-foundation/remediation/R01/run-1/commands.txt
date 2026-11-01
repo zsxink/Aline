@@ -25,3 +25,9 @@
 后重跑（第 3 项）才拿到真实的行为失败；修复完成后再把断言收紧为 `DocError::PendingInput`。
 
 原始 stdout/stderr 全部在 `pre-fix-tests.txt` 与 `post-fix-tests.txt` 中逐条保留（含命令、时间戳、exit code）。
+
+## 勘误：2026-11-01（独立复核后追加，不改上表）
+
+第 12 项「62 个 `test result: ok`」为**整份 `post-fix-tests.txt` 的合计**（6 段累加）；
+该段自身（`cargo test --workspace`）实为 **45 个 ok / 0 failed**。独立复核在 `79c3b54`
+干净检出上复跑亦为 45。第 8、9 项起止时间当时未记录，以 `—` 占位，不事后补造。
