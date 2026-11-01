@@ -1,4 +1,0 @@
-# 组 8.2 命令证据（UTC）
-# 格式：start<TAB>end<TAB>exit<TAB>command
-# 原始 stdout/stderr：targeted-tests/cargo-test-document_typing.log
-2026-10-31T11:13:04Z	2026-10-31T11:13:04Z	0	cargo test -p aline-ui --test document_typing --locked --offline

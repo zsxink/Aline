@@ -1,9 +1,0 @@
-
-running 4 tests
-test toc_visual_refused_source_allowed ... ok
-test front_matter_visual_refused_source_allowed ... ok
-test visual_body_beside_front_matter_allowed ... ok
-test visual_cross_region_replacement_refused_source_allowed ... ok
-
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-

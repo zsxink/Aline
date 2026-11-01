@@ -1,3 +1,0 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s
-     Running tests/document_followups.rs (target/debug/deps/document_followups-375a37122d753719)
-error: test failed, to rerun pass `-p aline-ui --test document_followups`

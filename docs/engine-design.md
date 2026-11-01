@@ -142,7 +142,7 @@ source 必须先验输入预算，再验证有效 UTF-8。按已确认WC-03，�
 - `StorageRange` 是当前唯一公开的存储字节范围类型，显式绑定 `BaselineId`，并注明不等同源码 UTF-8 范围；source 不提供以磁盘偏移索引编辑源码的接口。
 - 最小 I/O 只实现 create-only 发布：同目录 `create_new` staging → 分块完整写入 → `sync_all` → `hard_link` 到尚不存在的目标。目标已存在普通文件返回 `MetadataPreservationUnverified`，符号链接/目录/其他非普通文件返回 `ExistingTarget{kind}`，检查后的竞争返回 `Conflict`；不覆盖、不截断、不删除，也不回退为原地写。
 
-证据：4.1～4.4 的金样、测试与门禁见 `docs/validation/m0-engine-foundation/group-4/`；K-08 偏移人工复核见 `step-4.5/report.md`。未验证：ACL/xattr/权限复制、目录 fsync/断电、跨进程 CAS、现有文件覆盖保存、Windows/Linux、网络/外接卷与真实应用保存闭环。V-06/V-07/V-08 与 M0 出口均未据此判通过。
+证据：4.1～4.4 的金样在 `crates/aline-source/tests/fixtures/`，测试与门禁见 `crates/aline-source/tests/`、`scripts/check_*.py`；K-08 偏移人工复核见 `docs/validation/m0-engine-foundation/group-4/step-4.5/report.md`。未验证：ACL/xattr/权限复制、目录 fsync/断电、跨进程 CAS、现有文件覆盖保存、Windows/Linux、网络/外接卷与真实应用保存闭环。V-06/V-07/V-08 与 M0 出口均未据此判通过。
 
 ## 6. 解析管线及预处理映射
 

@@ -29,7 +29,7 @@
 
 ### 4.1 旧版复现
 
-用 `git show HEAD:scripts/check_safety.py` 取旧版到 `/tmp/old_check_safety.py`（同目录复制 `safety_lex.py`），对仓库根执行：
+用 `git show HEAD:scripts/check_safety.py` 取旧版到 `<tmp>/old_check_safety.py`（同目录复制 `safety_lex.py`），对仓库根执行：
 
 - exit 1，`failures=4`，`scanned=84`，全部为 `test-module-resolution`，`detail=common`，文件正是 `crates/aline-ui/tests/document.rs`、`document_composition.rs`、`document_results.rs`、`document_typing.rs`。与背景事实一致。
 
@@ -39,7 +39,7 @@
 
 ### 4.3 self-test
 
-- `python3 scripts/check_safety.py --self-test --output-dir /tmp/aline-review-selftest-final` exit 0，50/50 用例通过，其中新增 5 例全部通过；结尾 `workspace_after_fixtures` 为 0 failures、84 files。
+- `python3 scripts/check_safety.py --self-test --output-dir <tmp>/aline-review-selftest-final` exit 0，50/50 用例通过，其中新增 5 例全部通过；结尾 `workspace_after_fixtures` 为 0 failures、84 files。
 
 ### 4.4 Cargo/rustc 语义对照（独立于实现）
 
@@ -57,7 +57,7 @@
 
 ### 4.5 对抗性 fixture（评审者临时目录，未写入仓库）
 
-17 个 fixture root（`/tmp/aline-review-fixtures*`）逐项结果：
+17 个 fixture root（`<tmp>/aline-review-fixtures*`）逐项结果：
 
 - a) `tests/a.rs mod b;`：`b` 存在 → exit 0；缺失 → exit 1 `test-module-resolution`。✅
 - b) 仅 `src/src_mod.rs` 存在 → exit 1 拒绝。✅（集成测试根不解析到 `src`）
@@ -69,7 +69,7 @@
 
 ### 4.6 变异测试（检验 self-test 负例是否真的抓回归）
 
-在 `/tmp/aline-mut`（脚本与 fixture 的隔离副本）上逐项改坏实现的副本，运行 self-test，然后恢复（仓库未动）：
+在 `<tmp>/aline-mut`（脚本与 fixture 的隔离副本）上逐项改坏实现的副本，运行 self-test，然后恢复（仓库未动）：
 
 | 变异 | self-test | 结论 |
 |---|---|---|
@@ -98,7 +98,7 @@
 ### F1 — LOW（本次改动引入的 fail-open 边界）
 `tests/a.rs` 中 `mod a;` 现在解析到文件自身并被接受；rustc 报 `error: circular modules: tests/a.rs -> tests/a.rs`，旧守卫报 `test-module-resolution`。这是模块存在性检查的窄口径漏报，不改变任何测试/生产作用域（该文件本就在 `test_files`），且该源码本身无法通过编译；但属于本次改动相对旧版在严格性上的回退。
 
-- 位置：`/Users/xian/Project/editor/Aline/scripts/check_safety.py:119-127`
+- 位置：`<repo>/scripts/check_safety.py:119-127`
 - 建议（未动手）：解析结果若等于声明所在文件自身，按 `test-module-resolution` 拒绝；补一个 self-test 用例。
 
 ### F2 — LOW（self-test 负例覆盖不足，实现本身正确）

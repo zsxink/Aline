@@ -1,5 +1,0 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.03s
-     Running unittests src/lib.rs (target/debug/deps/aline_markdown-90346524485eca21)
-     Running tests/identity_mapping.rs (target/debug/deps/identity_mapping-ecc77ee2bd14d6dc)
-     Running tests/public_boundaries.rs (target/debug/deps/public_boundaries-88b79ebe551053c5)
-   Doc-tests aline_markdown

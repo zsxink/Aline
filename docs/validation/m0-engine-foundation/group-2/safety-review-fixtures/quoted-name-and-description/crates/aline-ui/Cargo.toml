@@ -1,8 +1,0 @@
-[package]
-"name" = "aline-source"
-version = "0.0.0"
-edition = "2024"
-description = """
-name = "aline-ui"
-"""
-[workspace]

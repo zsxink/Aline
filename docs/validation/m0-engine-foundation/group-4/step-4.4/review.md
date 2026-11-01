@@ -42,11 +42,11 @@
 #### 1. 源码身份与历史
 
 ```text
-$ cd /Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-4/step-4.4/macos-probe
+$ cd <repo>/docs/validation/m0-engine-foundation/group-4/step-4.4/macos-probe
 $ shasum -a 256 Cargo.toml expected.v1.txt main.rs
 9bbcfd0663ce735f60f06eba544f0679da882751598b0db9d42e93b087d4b10d  Cargo.toml
 f1216f2ba3f39bc46a8e5d079fdc189026685b67b69745ba28ecddf283807a1d  expected.v1.txt
-624d8e02311e71173d04ddaea9a44a6a05428a30f8baa1d0a818643aa5360369  main.rs
+bdc374c7b03bd649c2420dcec2eb6d246267b873e0de1765e79fb9c5dcf0262e  main.rs
 # exit 0
 ```
 
@@ -131,7 +131,7 @@ probe          exit=0  2026-10-31T04:29:08.445151Z–04:29:08.879476Z
 build-cleanup  ended 2026-10-31T04:29:08.891608Z, cleanup_error=null
 ```
 
-- 构建 stderr 只有 `Compiling libc v0.2.191`、`Compiling aline-macos-metadata-probe`、`Finished dev profile ... in 1.05s`，无 warning；构建 stdout 为 0 字节。锁命令为 `cargo generate-lockfile --offline`，构建为 `cargo build --locked --offline`，环境含 `CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`。
+- 构建 stderr 只有 `Compiling libc v0.2.191`、`Compiling aline-macos-metadata-probe`、`Finished dev profile ... in 1.05s`，无 warning；构建 stdout 为 0 字节。锁命令为 `cargo generate-lockfile --offline`，构建为 `cargo build --locked --offline`，环境含 `CARGO_HOME=<cargo-home>`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`。
 - `Cargo.lock` 中只有探针包与 `libc 0.2.191`（唯一第三方依赖）；libc 校验和为 `65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a`，与缓存 `.crate` 的 SHA-256 一致。构建日志没有下载/联网失败记录。
 - execution-2 源码哈希与当前文件一致；execution-1 的 `probe.command.json` 退出码为 1，`probe.stdout.log` 只有 5 个 `CASE` 而无 `SUMMARY`，`probe.stderr.log` 有 `CLEANUP_FLAGS_ERROR .../immutable.md No such file or directory`。这与 `report.md` 所说“execution-1 以清理错误退出”一致；因 `main.rs` 哈希不同，execution-1 不是当前源码证据。
 - 执行后 temp 根检查：execution-1 的 `aline-44-probe-build-t906prq6`、`aline-macos-metadata-65982-1793420930024383000-0` 均不存在；以 `aline-44-probe-build-*`、`aline-macos-metadata-*` 为前缀的 `find` 计数为 0。execution-2 的 build/probe 根同样无残留。构建根和探针根的清理记录与文件系统观察一致。
@@ -139,7 +139,7 @@ build-cleanup  ended 2026-10-31T04:29:08.891608Z, cleanup_error=null
 ### 发现的不一致、缺口或过度解读
 
 1. **“最后一行输出为 SUMMARY”不准确。** `report.md` 第 65 行称 SUMMARY 为最后一行；实际 `probe.stdout.log` 第 18 行是 `SUMMARY passed=6 unsafe_calls=4 production_admission=false`，第 19 行是 `CLEANUP_ROOT removed=...`。这不影响“探针退出 0、清理成功”的结论，但该表述应按日志更正。就 `run()` 函数范围而言 SUMMARY 确实是其最后一行，但报告没有限定这个范围，读者会把它理解为整个进程的最后输出。
-2. **“APFS Data 卷”没有直接日志证据。** `filesystem.stdout.log` 的 `df -P` 只显示 `Filesystem /dev/disk3s5` 与挂载点 `/System/Volumes/Data`，没有 `apfs` 字样；报告把常见的 macOS Data 卷推断写成事实。更准确的表述是“构建根位于 `/System/Volumes/Data` 挂载下，日志未记录文件系统类型”。这不改变探针结果，但影响跨文件系统结论的证据强度。
+2. **“APFS Data 卷”没有直接日志证据。** `filesystem.stdout.log` 的 `df -P` 只显示 `Filesystem /dev/disk3s5` 与挂载点 `<system-volume>/Data`，没有 `apfs` 字样；报告把常见的 macOS Data 卷推断写成事实。更准确的表述是“构建根位于 `<system-volume>/Data` 挂载下，日志未记录文件系统类型”。这不改变探针结果，但影响跨文件系统结论的证据强度。
 3. **“Apple arm64”是推断而非直接系统记录。** `system.stdout.log` 只有 `sw_vers`，没有 `uname -m`/`arch`；arm64 来自 `rustc -Vv` 的 host `aarch64-apple-darwin`。这通常足以说明工具链运行在 arm64，但“Apple arm64 主机”本身没有独立硬件/内核架构记录。报告应写成“rustc host 为 aarch64-apple-darwin”，或补充 `uname -m`。
 4. **“fd 未关闭、未悬空、未复用”是源码结构结论，不是日志观察。** execution-2 没有 fd 编号或生命周期记录；只读目标句柄在调用期间由 Rust 借用持有，源码没有裸 fd 重建，但日志不能独立证明该运行时属性。报告第 62 行应标明“由源码保证/静态核对”，而不是与 FACT 同等的事实。
 5. **`unsafe_calls=4` 是尝试计数，不是成功调用数。** 计数在 unsafe 调用之前递增，`immutable-target` 的 `EPERM` 也计入。实际成功调用为 3 次（metadata、acl-only、readonly），包装层还提前拒绝了同 inode 和非普通文件两次。报告的表格用“调用计数”尚可，但若被读成“四次成功 fcopyfile”则是过度解读。
@@ -266,8 +266,8 @@ $ git ls-files -- docs/validation/m0-engine-foundation/group-4/step-4.4
 | `step-4.4/atomic-golden.v1.txt` | `d49465a4d18426fb5e28bf0c48192a20d0504f813257aabfe20f390bdb1b4015` |
 | `step-4.4/report.md` | `8f7e21c5d0dcfd3e4996e7133e2423d6f5b4bc0ad05d906d062e3b5f5f633b7d` |
 | `step-4.4/review.md`（追加前） | `45187cbbfcb52c4c81d17056cc1b897a10ae2e6555b2ad04acc98880420299d8` |
-| `step-4.4/targeted-test/targeted-test.command.json` | `bb44a1a10eaf7a0446f1b5d185a0c1cc7fdbf4e4c5b8ecea405651b6feaa1041` |
-| `step-4.4/workspace-gates/summary.json` | `6dfde917025c33ad4170db17854f5c74546ac00223735f14d4416d81516a057c` |
+| `step-4.4/targeted-test/targeted-test.command.json` | `30f0ec77a472729fced926a4a35b4095b21daac492fc57e7769c3934d1cd9d5f` |
+| `step-4.4/workspace-gates/summary.json` | `c7914c0b63bd7a5d8f336ead161acba40070ed7e12ff62a068f1640793ea8498` |
 
 文件系统 mtime（本地时区，仅作弱时间线索）：`atomic-golden.v1.txt` 13:14:09，`atomic.rs` 13:19:20，`tests/atomic.rs` 13:19:26，`report.md` 12:50:14，`review.md` 12:49:34。金样早于源码/测试与“实现前手写”相容，但目录未被 Git 跟踪，mtime 可改，不能作为时序证明。
 
@@ -275,7 +275,7 @@ $ git ls-files -- docs/validation/m0-engine-foundation/group-4/step-4.4
 
 ### 本次实际执行的命令
 
-以下命令均设置 `CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`。时间为本次复核的 UTC 记录：
+以下命令均设置 `CARGO_HOME=<cargo-home>`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`。时间为本次复核的 UTC 记录：
 
 | 命令 | UTC 起止 | exit | 实际结果 |
 |---|---|---:|---|
@@ -350,7 +350,7 @@ $ git ls-files -- docs/validation/m0-engine-foundation/group-4/step-4.4
 #### F8（次要）路径校验是词法比较，可能错误拒绝同目录的不同写法
 
 - 证据位置：`atomic.rs:461-474` 只比较 `target == staging`、绝对路径和两个 `parent()` 的词法相等；没有 canonicalize，也不处理大小写/符号链接等价。
-- 具体场景：`/tmp/d/file.md` 与 `/tmp/d/./staging.tmp`、或 `/tmp/d/sub/../staging.tmp` 可能被分类为 `DifferentDirectory`，即使它们实际同目录；反过来，大小写不敏感文件系统上不同拼写可能指向同一路径。后者不会造成覆盖：`create_new` 和发布前目标分类会拒绝已存在的同一 inode，最坏是安全失败；前者是可用性/分类问题。
+- 具体场景：`<tmp>/d/file.md` 与 `<tmp>/d/./staging.tmp`、或 `<tmp>/d/sub/../staging.tmp` 可能被分类为 `DifferentDirectory`，即使它们实际同目录；反过来，大小写不敏感文件系统上不同拼写可能指向同一路径。后者不会造成覆盖：`create_new` 和发布前目标分类会拒绝已存在的同一 inode，最坏是安全失败；前者是可用性/分类问题。
 - 建议：在文档中写明“路径前提按词法比较，不承诺 canonicalize 语义”，并增加上述路径的测试；不要为了消除词法差异而引入有 TOCTOU 风险的 canonicalize 更新。
 
 #### F9（次要）staging 在 prepare 后被删除时，失败回执仍报告 `Some(staging)`，与“路径存在”文档不一致

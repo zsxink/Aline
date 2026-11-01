@@ -7,7 +7,7 @@
 ## A. 规格合规
 - 达标：真实 TOML 解析替代正则；零外部依赖；成员 `{"workspace": true}` 严格校验；self-test 增补（parser_cases 23 → 含 13 条反例）；正常仓库不回归。
 - **[严重] 1 — 引号点分键与真实嵌套表撞名**：`_flatten_tables`（`scripts/check_lints.py:604-609`）用 `".".join(path)` 生成键，**不区分** `[workspace.lints.rust]` 表与 `[workspace]` 下引号点分键 `"lints.rust" = {...}`；读取处 `:641` 因此可能拿到后写入者。守卫 exit 0，而 Cargo 只报 `unused manifest key: workspace.lints.rust`——即守卫认为策略已生效、Cargo 实际未生效，与 F-08 同类的**静默误放行**。
-  **主 Agent 已独立复现**（`/tmp/r05f4`）：根清单同时含弱表（`unsafe_code="warn"`、`missing_docs="allow"`、`unwrap_used="warn"`）与引号点分键（强策略），`python3 scripts/check_lints.py --root` → **exit 0「workspace lint 声明有效」**；`cargo clippy -p aline-buffer --offline -- -D warnings` → `warning: Cargo.toml: unused manifest key: workspace.lints.rust` + `workspace.lints.clippy`。**结论成立**。
+  **主 Agent 已独立复现**（`<tmp>/r05f4`）：根清单同时含弱表（`unsafe_code="warn"`、`missing_docs="allow"`、`unwrap_used="warn"`）与引号点分键（强策略），`python3 scripts/check_lints.py --root` → **exit 0「workspace lint 声明有效」**；`cargo clippy -p aline-buffer --offline -- -D warnings` → `warning: Cargo.toml: unused manifest key: workspace.lints.rust` + `workspace.lints.clippy`。**结论成立**。
   补充边界（主 Agent 实测）：若**只有**引号点分键、无任何真实嵌套表，成员 `[lints] workspace = true` 会因 Cargo 侧 `workspace.lints was not defined` 而报错（本机 clippy exit 101），此时不可静默；**危险窗口是「真实弱表 + 引号点分键覆盖」这一组合**。
 
 ## B. 独立复跑（全部实跑）
@@ -25,7 +25,7 @@
 ## D. 反「照实现写测试」
 - 10 正 / 13 反；外科式删掉 dotted 拒绝后 self-test 立即变红，该用例确为有效断言
 - **[严重] 2 — 键集/类型/值三条拒绝路径无断言**：把 `audit_member_manifest` 弱化为 `isinstance(lints, dict)`，整套 `--self-test` 仍 exit 0；extra-key 清单被弱化守卫放行；仅「继承缺失」被覆盖。
-  **主 Agent 已独立复现**（`/tmp/weakrepo`）：仅把 `:636` 的 `set(lints) != {"workspace"} or lints["workspace"] is not True` 换成 `not isinstance(lints, dict)`，在仓库副本上跑 `--self-test` → **exit 0**，输出 `"status": "lint 隔离样例通过"`、`inheritance_cases: 4`、`parser_cases: 23`。**结论成立**：self-test 对「多余键 / `workspace=false` / 非 bool 值」三类拒绝没有独立用例，弱化实现不会被发现。
+  **主 Agent 已独立复现**（`<tmp>/weakrepo`）：仅把 `:636` 的 `set(lints) != {"workspace"} or lints["workspace"] is not True` 换成 `not isinstance(lints, dict)`，在仓库副本上跑 `--self-test` → **exit 0**，输出 `"status": "lint 隔离样例通过"`、`inheritance_cases: 4`、`parser_cases: 23`。**结论成立**：self-test 对「多余键 / `workspace=false` / 非 bool 值」三类拒绝没有独立用例，弱化实现不会被发现。
 - **[一般] 3**：`check_expected` 把 `clippy::unwrap_used` 换成 `unwrap-used`，实际只在 `-D clippy::unwrap-used` 提示行命中（既有代码，非本批引入）
 
 ## E. 其他

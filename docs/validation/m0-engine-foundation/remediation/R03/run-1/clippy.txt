@@ -1,2 +1,0 @@
-    Checking aline-markdown v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-markdown)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.82s

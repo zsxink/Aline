@@ -1,5 +1,0 @@
-argv: cargo test -p aline-markdown --test reuse --locked --offline f04_translate_must_reject_half_char_old_offset
-cwd: /Users/xian/Project/editor/Aline
-started_utc: 2026-11-01T04:52:41Z
-finished_utc: 2026-11-01T04:52:41Z
-exit_code: 101

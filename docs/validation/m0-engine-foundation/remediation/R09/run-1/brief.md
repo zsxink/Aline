@@ -1,6 +1,6 @@
 # R09 派发契约：F-07 E3 同夹具可审查 dump（文字/来源/精确性/源码身份）
 
-基线 HEAD：`2f1dcea46d5998f4e2ba213e73c11de166f943c4`。仓库根 `/Users/xian/Project/editor/Aline`。前置 R02（`pre/rewrite.rs`）与 R03（`reuse.rs`）已完成；**不要写这两个文件**。
+基线 HEAD：`2f1dcea46d5998f4e2ba213e73c11de166f943c4`。仓库根 `<repo>`。前置 R02（`pre/rewrite.rs`）与 R03（`reuse.rs`）已完成；**不要写这两个文件**。
 
 ## 文件所有权（只有你可写这些文件）
 

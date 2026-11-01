@@ -50,7 +50,7 @@
 - `curl --fail --location --connect-timeout 15 --max-time 60 --output docs/validation/m0-engine-foundation/admission-2026-10-30/gpui-pre-0.3.9.registry.json https://crates.io/api/v1/crates/gpui-pre/0.3.9` 退出 56，HTTP 403。未把 API 失败当准入通过；实际 Cargo registry 下载及 lock 校验成功，形成了替代来源证据。
 - 第一版本地摘要命令尝试 `import tomllib`，因本机默认 Python 未提供该模块退出 1；后续直接从 Cargo 元数据与 lock 中提取，无需安装 Python 库。
 - 第一条 Clippy 调用把 `--manifest-path` 误放在 `-- -D warnings` 之后，退出 101；修正 CLI 参数顺序后退出 0。保留原始失败日志，不把调用错误归因为候选代码缺陷。
-- `xcrun --find metal` 退出 72；本机当前开发目录为 `/Library/Developer/CommandLineTools`。GPUI 核心库消费方实际构建通过，但原生后端、Metal shader 编译与 M1 冒烟均未执行，不据此申请安装 Xcode 或改变全局开发目录。
+- `xcrun --find metal` 退出 72；本机当前开发目录为 `<command-line-tools>`。GPUI 核心库消费方实际构建通过，但原生后端、Metal shader 编译与 M1 冒烟均未执行，不据此申请安装 Xcode 或改变全局开发目录。
 - 五引擎与八成员 workspace 均尚未建立；没有五引擎闭包、成员 lint、catalog 或 M0 出口通过结论。Windows/Linux 与 Intel Mac 未构建或运行；V-01～V-09 未通过。
 
 ## 后续裁决

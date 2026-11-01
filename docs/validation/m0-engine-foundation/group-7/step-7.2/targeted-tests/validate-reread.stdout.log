@@ -1,8 +1,0 @@
-
-running 3 tests
-test golden_validate_after_change ... ok
-test golden_validate_changed_selection ... ok
-test golden_validate_reparsed ... ok
-
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
-

@@ -78,7 +78,7 @@
 | 2026-10-31T09:21:09Z | `cargo test -p aline-edit --locked --offline --test protection` | 0 | 4 passed | `step-7.3/targeted-tests/protection.stdout.log` |
 | 2026-10-31T09:21:09Z | `cargo test -p aline-edit --locked --offline` | 0 | 17 passed（6+4+7，doc-tests 0） | `step-7.4/targeted-tests/full-crate.stdout.log` |
 
-环境：`CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`，`--locked --offline`；macOS arm64 / Darwin 27.2.0 / rustc 1.98.1。命令、起止 UTC 与退出码另见 `group-7/commands.log`。
+环境：`CARGO_HOME=<cargo-home>`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`，`--locked --offline`；macOS arm64 / Darwin 27.2.0 / rustc 1.98.1。命令、起止 UTC 与退出码另见 `group-7/commands.log`。
 
 ## 6. 独立复核指出的语义缺口（F2-1/F2-2）
 

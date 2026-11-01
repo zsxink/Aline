@@ -67,7 +67,7 @@ elif testing:
 
 | UTC | 命令（摘要） | exit | 结果 |
 |---|---|---|---|
-| 2026-10-31T13:09:06Z | `python3 /tmp/…/pre-fix/check_safety.py --root <repo>`（HEAD `1dd0174` 的守卫副本） | 1 | 复现 4 条 `test-module-resolution`（`pre-fix-workspace.stdout.json`） |
+| 2026-10-31T13:09:06Z | `python3 <tmp>/…/pre-fix/check_safety.py --root <repo>`（HEAD `1dd0174` 的守卫副本） | 1 | 复现 4 条 `test-module-resolution`（`pre-fix-workspace.stdout.json`） |
 | 2026-10-31T13:09:08Z | `python3 scripts/check_safety.py --root <repo>` | 0 | 0 失败，扫描 84 个文件（`post-fix-workspace.stdout.json`） |
 | 2026-10-31T13:09:10Z | `python3 scripts/check_safety.py --self-test --output-dir …/self-test` | 0 | 50 例全部符合预期；`workspace_after_fixtures` 0 失败（`self-test/summary.json`） |
 | 2026-10-31T13:12:24Z–13:12:42Z | `python3 scripts/check_workspace.py …` | 0 | 19/19 exit 0；`cargo test --workspace` 44 个 `test result` 行合计 295 passed、0 failed（`workspace-gates/summary.json`） |
@@ -81,7 +81,7 @@ elif testing:
 本目录 `commands.log` 的早先版本有两条不可信记录，已整体替换并保留更正说明：
 
 1. 前三条 `git rev-parse/show/hash-object` 的 `exit=0` 是写日志时硬编码的占位值，不是实测；
-2. 一条 `exit=128` 被错误归给一条 Python 命令——该 Python 命令实际从未执行，其所在 `&&` 链因前一条 `git show … > /tmp/…` 失败而中断。
+2. 一条 `exit=128` 被错误归给一条 Python 命令——该 Python 命令实际从未执行，其所在 `&&` 链因前一条 `git show … > <tmp>/…` 失败而中断。
 
 重写后每条命令单独执行并立即捕获 `$?`。其中 `git hash-object HEAD:<path>` 确实失败（`git hash-object` 不支持该语法，`exit=128`，stderr 保留在 `hash-pre-fix.stderr.log`），改用 `git rev-parse HEAD:scripts/check_safety.py` 取得旧版 blob。
 
@@ -107,7 +107,7 @@ elif testing:
 | 13:43:15Z | 变异 M-F1（删掉自引用拒绝分支）self-test | 1 | 只失败 `integration-self-reference-is-rejected`（`mutant-M-F1.stdout.json`） |
 | 13:43:17Z | 恢复原实现后 self-test | 0 | 53 例全部通过（`mutant-restored.stdout.json`） |
 
-变异在 `/tmp/aline-mut-followups/` 的隔离副本上进行，仓库内脚本未被变异；每个变异只让**目标负例**失败，其余 52 例仍通过，说明三条负例确实钉住了评审指出的边界（此前 M2/M7 变异下 50 例全通过，即评审 F2/F3 的原始观察）。
+变异在 `<tmp>/aline-mut-followups/` 的隔离副本上进行，仓库内脚本未被变异；每个变异只让**目标负例**失败，其余 52 例仍通过，说明三条负例确实钉住了评审指出的边界（此前 M2/M7 变异下 50 例全通过，即评审 F2/F3 的原始观察）。
 
 处置后全量 19 项门禁重跑（`workspace-gates-after-followups/`，2026-10-31T13:43:39Z–13:43:59Z）：19/19 exit 0，`cargo test --workspace` 295 passed、0 failed。
 

@@ -1,8 +1,0 @@
-[package]
-name = "aline-buffer-probe"
-version = "0.0.0"
-edition = "2024"
-license = "UNLICENSED"
-
-[lib]
-path = "src/lib.rs"

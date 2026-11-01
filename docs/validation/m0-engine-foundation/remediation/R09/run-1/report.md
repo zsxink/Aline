@@ -70,7 +70,7 @@ dump 打印 `unavailable` 而不是给假摘要。文档注释明确声明它**�
 
 `derivation.md` 记录了推导全过程：只依赖 `pulldown-cmark =0.13.6` 的独立探针事件表 +
 fixture 原始字节 + 四条 M0 规则（R1 标记隐藏 / R2 文字绘制 / R3 源码切片整体绘制 /
-R4 表格合成 tab），由 `/tmp/r09derive.py` 生成片段表。
+R4 表格合成 tab），由 `<tmp>/r09derive.py` 生成片段表。
 
 比对结果：
 
@@ -107,7 +107,7 @@ R4 表格合成 tab），由 `/tmp/r09derive.py` 生成片段表。
 
 `basic.dump.expected.txt` 的字节是在实现已能输出扩展 dump **之后**才落盘的，因此不能声称
 「在完全看不到实现输出时盲写期望」。独立性依据是：`pulldown-cmark` 探针与
-`/tmp/r09derive.py` 的推导独立于 `aline-markdown`，且三项结论（49 片段 / 197 字节 / 摘要）
+`<tmp>/r09derive.py` 的推导独立于 `aline-markdown`，且三项结论（49 片段 / 197 字节 / 摘要）
 均由该推导先行得出并与文件逐行一致。该顺序上的弱点已在 `derivation.md` 第 6 节与
 `handoff.md` 中如实记录，交由独立复核者判断。
 

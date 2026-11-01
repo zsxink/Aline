@@ -1,8 +1,0 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
-     Running unittests src/lib.rs (target/debug/deps/aline_buffer-0c7c8ae644d1fe57)
-     Running tests/anchors.rs (target/debug/deps/anchors-5066148ef7670eae)
-     Running tests/checked_batch.rs (target/debug/deps/checked_batch-ec4a25aa83270eb9)
-     Running tests/history.rs (target/debug/deps/history-af7e5f7dc8d66f32)
-     Running tests/patch_goldens.rs (target/debug/deps/patch_goldens-fa8ee724cfc02708)
-     Running tests/public_boundaries.rs (target/debug/deps/public_boundaries-350481ea1a718dae)
-     Running tests/rejections.rs (target/debug/deps/rejections-0c081280014cca81)

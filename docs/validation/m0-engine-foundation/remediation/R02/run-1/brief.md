@@ -1,6 +1,6 @@
 # R02 派发契约：F-03 RewriteMap 多阶段来源复合
 
-基线 HEAD：`2f1dcea46d5998f4e2ba213e73c11de166f943c4`。仓库根 `/Users/xian/Project/editor/Aline`。
+基线 HEAD：`2f1dcea46d5998f4e2ba213e73c11de166f943c4`。仓库根 `<repo>`。
 
 ## 文件所有权（只有你可写这些文件）
 

@@ -94,11 +94,11 @@ hard_link 保证的是新路径不覆盖已有目标，不能据此声称同目�
 
 ```sh
 rustc --print sysroot
-rg -n 'fn copy|COPYFILE_|fcopyfile|fclonefileat' /Users/xian/.rustup/toolchains/1.98.1-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/sys/fs/unix.rs
-sed -n '2300,2383p' /Users/xian/.rustup/toolchains/1.98.1-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/sys/fs/unix.rs
+rg -n 'fn copy|COPYFILE_|fcopyfile|fclonefileat' <rustup-home>/toolchains/1.98.1-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/sys/fs/unix.rs
+sed -n '2300,2383p' <rustup-home>/toolchains/1.98.1-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/sys/fs/unix.rs
 ```
 
-实际输出：sysroot 是 `/Users/xian/.rustup/toolchains/1.98.1-aarch64-apple-darwin`；Apple 分支第 2317 行开始，2335 行 `fclonefileat(..., 0)` 成功即返回；EEXIST/ENOTSUP/EXDEV 后进入 fcopyfile 分支，2362 行对普通目标使用 COPYFILE_ALL。此为锁定本机源码事实，不是文件系统复制试验。
+实际输出：sysroot 是 `<rustup-home>/toolchains/1.98.1-aarch64-apple-darwin`；Apple 分支第 2317 行开始，2335 行 `fclonefileat(..., 0)` 成功即返回；EEXIST/ENOTSUP/EXDEV 后进入 fcopyfile 分支，2362 行对普通目标使用 COPYFILE_ALL。此为锁定本机源码事实，不是文件系统复制试验。
 
 外部 primary 资料核对：
 

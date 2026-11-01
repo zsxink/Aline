@@ -14,7 +14,7 @@
 
 - 主机：macOS 27.0.1（build 26A434），Darwin 27.0.0，`arm64`。记录见 `environment/sw-vers.*`、`environment/uname.*`。
 - 工具链：Rust/Cargo 1.98.1、rustfmt 1.9.0、Clippy 0.1.98、edition 2024；`rustfmt --print-config current` 实际输出 `max_width = 100`、`edition = "2024"`。见 `workspace-gates/rustc-version.*`、`cargo-version.*`、`fmt-version.*`、`clippy-version.*`、`fmt-effective-config.*`。
-- 隔离 `CARGO_HOME`：`/Users/xian/Library/Caches/aline-m0/cargo-home`。复核时发现 `admission-2026-10-30/isolation.json` 登记的临时目录已被系统清理（路径不存在）；本次以 APFS clone 从既有 `~/.cargo` 建立新的隔离缓存，并执行 `cargo fetch --locked` 补齐 lock 中已存在但缓存缺失的包。实际补齐 16 个包，其中 11 个在缓存中完全缺失：`arbitrary 1.5.0`、`cc 1.10.0`、`fontconfig-parser 0.5.8`、`js-sys 0.3.107`、`roxmltree 0.20.0`、`which 8.0.6`、`windows 0.62.2`、`windows-collections 0.3.2`、`windows-future 0.3.2`、`windows-numerics 0.3.1`、`windows-threading 0.2.1`。
+- 隔离 `CARGO_HOME`：`<cargo-home>`。复核时发现 `admission-2026-10-30/isolation.json` 登记的临时目录已被系统清理（路径不存在）；本次以 APFS clone 从既有 `~/.cargo` 建立新的隔离缓存，并执行 `cargo fetch --locked` 补齐 lock 中已存在但缓存缺失的包。实际补齐 16 个包，其中 11 个在缓存中完全缺失：`arbitrary 1.5.0`、`cc 1.10.0`、`fontconfig-parser 0.5.8`、`js-sys 0.3.107`、`roxmltree 0.20.0`、`which 8.0.6`、`windows 0.62.2`、`windows-collections 0.3.2`、`windows-future 0.3.2`、`windows-numerics 0.3.1`、`windows-threading 0.2.1`。
 - `cargo fetch --locked` 不修改 `Cargo.lock`、不新增依赖，版本与校验和由 lock 固定；后续全部门禁仍以 `CARGO_NET_OFFLINE=true` 执行。`environment/offline-fetch-check` 在补齐后再次离线执行，退出 0 且无下载，证明缓存完整。
 - 首次统一入口在补齐前实际失败：`dependency` 因离线缺少 `arbitrary v1.5.0` 退出 1，整体退出 1。原始记录保留在 `workspace-gates-missing-cache-failure/`，未计为通过；补齐后重跑全绿。该失败是环境缓存缺口，不是代码或规则失败。
 

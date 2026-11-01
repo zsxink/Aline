@@ -110,10 +110,10 @@ sh docs/validation/m0-engine-foundation/group-4/step-4.5/run-k08-audit.sh \
 2026-10-31T05:48:13.296145+00:00 至 05:48:30.215264+00:00，在仓库根以隔离环境运行统一门禁：
 
 ```sh
-CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home \
+CARGO_HOME=<cargo-home> \
 RUSTUP_TOOLCHAIN=1.98.1 CARGO_NET_OFFLINE=true \
 python3 scripts/check_workspace.py \
-  --cargo-home /Users/xian/Library/Caches/aline-m0/cargo-home \
+  --cargo-home <cargo-home> \
   --output-dir docs/validation/m0-engine-foundation/group-4/step-4.5/workspace-gates-execution-1
 ```
 

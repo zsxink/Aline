@@ -1,7 +1,0 @@
-    Checking aline-m0-gpui-candidate v0.0.0 (/private/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-admission-k4_p5j6a/gpui-0.3.9)
-error: Unrecognized option: 'manifest-path'
-
-error: could not compile `aline-m0-gpui-candidate` (lib)
-
-Caused by:
-  process didn't exit successfully: `/Users/xian/.rustup/toolchains/1.98.1-aarch64-apple-darwin/bin/clippy-driver rustc --crate-name aline_m0_gpui_candidate --edition=2024 src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata -C embed-bitcode=no -C debuginfo=2 -C split-debuginfo=unpacked --cfg 'feature="font-kit"' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("font-kit", "test-support", "wayland", "windows-manifest", "x11"))' -C metadata=6d2c2782a726653c -C extra-filename=-2b7d51e105c6cde1 --out-dir /var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-admission-k4_p5j6a/target/aarch64-apple-darwin/debug/deps --target aarch64-apple-darwin -C incremental=/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-admission-k4_p5j6a/target/aarch64-apple-darwin/debug/incremental -L dependency=/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-admission-k4_p5j6a/target/aarch64-apple-darwin/debug/deps -L dependency=/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-admission-k4_p5j6a/target/debug/deps --extern gpui=/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-admission-k4_p5j6a/target/aarch64-apple-darwin/debug/deps/libgpui-c2ee563bb31e10f1.rmeta` (exit status: 1)

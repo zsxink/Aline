@@ -38,7 +38,7 @@ CARGO_HOME=$HOME/.cargo`（隔离 CARGO_HOME 注册表为空，需解析依赖�
 
 ## 如实说明（复核者重点看这里）
 `basic.dump.expected.txt` 是在实现已能输出扩展 dump **之后**才落盘的，不能称「盲写期望」。
-独立性建立在：独立探针 + `/tmp/r09derive.py` 推导先行得出三项结论并与文件逐行一致；
+独立性建立在：独立探针 + `<tmp>/r09derive.py` 推导先行得出三项结论并与文件逐行一致；
 每个片段的源码切片可用 `od -c` 从 fixture 字节直接复核。详见 `derivation.md` 第 6 节。
 
 ## 未覆盖

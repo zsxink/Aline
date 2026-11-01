@@ -8,7 +8,7 @@
 
 ## 环境和命令证据
 
-宿主环境为 macOS `aarch64-apple-darwin`。命令记录均包含完整 argv、cwd、环境覆盖、开始/结束时间、退出码及 stdout/stderr SHA-256；对应完整输出分别保存在同目录的 `.stdout.log` / `.stderr.log`。环境使用已记录的隔离 Cargo home：`/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-admission-k4_p5j6a/cargo-home`，固定 `RUSTUP_TOOLCHAIN=1.98.1`。来源记录见 [isolation.json](../pure-candidates-2026-10-30/isolation.json)。所有 Cargo 依赖命令均带 `--locked --offline`。
+宿主环境为 macOS `aarch64-apple-darwin`。命令记录均包含完整 argv、cwd、环境覆盖、开始/结束时间、退出码及 stdout/stderr SHA-256；对应完整输出分别保存在同目录的 `.stdout.log` / `.stderr.log`。环境使用已记录的隔离 Cargo home：`<tmp>/aline-m0-admission-k4_p5j6a/cargo-home`，固定 `RUSTUP_TOOLCHAIN=1.98.1`。来源记录见 [isolation.json](../pure-candidates-2026-10-30/isolation.json)。所有 Cargo 依赖命令均带 `--locked --offline`。
 
 | 检查 | 完整 argv | 退出码 | 结果 |
 |---|---|---:|---|

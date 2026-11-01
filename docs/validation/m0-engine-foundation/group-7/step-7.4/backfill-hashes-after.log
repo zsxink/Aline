@@ -1,9 +1,0 @@
-7211b27750393f39f71e310f0e9c588cd9aaf17e7e9de3ce318f6c504818f107  docs/engine-design.md
-0b6c5cbbf820a7431712cee9c8a6fc3ccee3ae4c6e1bdd8c4d5a70a56e9b1d14  docs/v1-architecture.md
-e6cadea4263ea08eaaaf1c3e4f0a5195ca785a9901aa8fcec1a683860fbfb8f4  docs/v1-prd.md
-762a1010954fe0202cd96b565cdbdd0bac407bf9ce46242104e23cfc8d604851  docs/v1-validation-plan.md
- docs/engine-design.md      | 20 ++++++++++++++++++++
- docs/v1-architecture.md    |  6 ++++++
- docs/v1-prd.md             |  4 ++++
- docs/v1-validation-plan.md |  8 ++++++++
- 4 files changed, 38 insertions(+)

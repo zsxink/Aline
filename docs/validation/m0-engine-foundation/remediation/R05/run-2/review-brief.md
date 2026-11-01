@@ -16,8 +16,8 @@
 
 ## 必须独立回答的问题（逐条给出结论 + 你自己跑出来的证据）
 
-1. **撞名 fail-open 是否真修复**：**自建**夹具（不复用 `/tmp/r05f4`、`/tmp/r05main`、
-   `/tmp/weakrepo`）：在一个已有 `[lints.rust]` 表的 crate 里，用**引号点分键**
+1. **撞名 fail-open 是否真修复**：**自建**夹具（不复用 `<tmp>/r05f4`、`<tmp>/r05main`、
+   `<tmp>/weakrepo`）：在一个已有 `[lints.rust]` 表的 crate 里，用**引号点分键**
    （`"clippy.unwrap_used" = ...`）让守卫误认为已配置、而 Cargo 报
    `unused manifest key`。用 `git show e4a6af0:scripts/check_lints.py` 导出旧脚本，
    证明旧脚本 exit 0（fail-open）；新脚本 exit 非 0 且 detail 含行号与路径。

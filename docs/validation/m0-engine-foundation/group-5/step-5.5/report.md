@@ -27,10 +27,10 @@
 2026-10-31T06:29:09.117462Z 至 06:29:31.775798Z，在仓库根以隔离环境运行：
 
 ```sh
-CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home \
+CARGO_HOME=<cargo-home> \
 RUSTUP_TOOLCHAIN=1.98.1 CARGO_NET_OFFLINE=true \
 python3 scripts/check_workspace.py \
-  --cargo-home /Users/xian/Library/Caches/aline-m0/cargo-home \
+  --cargo-home <cargo-home> \
   --output-dir docs/validation/m0-engine-foundation/group-5/step-5.5/workspace-gates
 ```
 

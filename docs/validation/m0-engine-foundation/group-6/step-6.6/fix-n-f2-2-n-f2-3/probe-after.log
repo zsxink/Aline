@@ -1,9 +1,0 @@
-Sat Oct 31 10:22:10 UTC 2026
-$ CARGO_HOME=... RUSTUP_TOOLCHAIN=1.98.1 CARGO_NET_OFFLINE=true cargo run -q -p aline-markdown --example probe_scan_steps --locked --offline
-filtered-newline: stats=5 threshold=5
-filtered-compact: stats=3 threshold=3
-filtered-nested: stats=3 threshold=3
-unfiltered-div: stats=8 threshold=8
-repeated-b: stats=80 threshold=80
-link: stats_points=2 segments=3
-exit=0

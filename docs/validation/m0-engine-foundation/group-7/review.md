@@ -2,7 +2,7 @@
 
 - 复核日期：2026-10-31
 - 复核对象：OpenSpec change `m0-engine-foundation` 组 7（任务 7.1–7.4），包含 `aline-edit` 的 `budget/command/errors/permissions/plan/refusal/reread/validate` 源码、`crates/aline-edit/tests/{goldens,refusals,protection}.rs`、`docs/validation/m0-engine-foundation/group-7/step-7.1/goldens/edit-goldens.tsv` 与 `group-7/` 证据
-- 仓库与基线：`/Users/xian/Project/editor/Aline`，分支 `main`，HEAD `99867bf2c5775aae4e8ed910713496d4ff84323c`
+- 仓库与基线：`<repo>`，分支 `main`，HEAD `99867bf2c5775aae4e8ed910713496d4ff84323c`
 - 复核立场：实现者不是复核者。实现者的报告、日志与探针只作为待验材料；本报告的结论来自本次独立重跑、独立重算、外部探针与读码，不把实现者自述当作已证明事实
 - 写入范围：仅本文件。未修改 Rust 源码、测试、金样、Cargo、lint/guard、`tasks.md`、其他 `docs/*.md` 或 OpenSpec 文件；未执行 `git add`、`git commit` 或 `git push`
 - 快照说明：工作区状态抓取于 2026-10-31T09:37:06Z（HEAD 未变）；独立重跑窗口为 2026-10-31T09:30:51Z–09:40:25Z。复核期间仍有组 6 并发写入：快照时 `docs/engine-design.md` +10 行、`docs/v1-validation-plan.md` +4 行；快照后（UTC 09:38–09:44）组 6 的 6.8 回填又给 `docs/v1-architecture.md`/`docs/v1-prd.md` 各加 2 行、给前两者各加 2 行，逐字核对均为组 6 记录；`crates/aline-markdown` 仍在改动。09:30:53Z 的 `cargo test -p aline-edit` 曾因 `aline-markdown` 中间态编译失败，09:31:13Z 后恢复；本报告不以该瞬时失败判 `aline-edit` 失败。晚于 09:40:25Z 的追加不在覆盖范围内
@@ -82,7 +82,7 @@ A  docs/validation/m0-engine-foundation/group-7/step-7.1/goldens/edit-goldens.ts
 
 - 主机：`Darwin XianMac.local 27.2.0`（Darwin Kernel 27.2.0，`arm64`，Apple T8142）
 - 工具链：`rustc 1.98.1 (48a229cea 2026-09-01)`，`cargo 1.98.1 (797e8a9bc 2026-08-05)`
-- 环境变量：`CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`
+- 环境变量：`CARGO_HOME=<cargo-home>`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`
 - 所有 cargo 命令均使用 `--locked --offline`；本次复核未联网，未新增依赖
 
 ### 2.2 本次实际执行的命令与结果
@@ -98,8 +98,8 @@ A  docs/validation/m0-engine-foundation/group-7/step-7.1/goldens/edit-goldens.ts
 | `cargo clippy -p aline-edit --all-targets --no-deps --locked --offline -- -D warnings` | 2026-10-31T09:37:37Z | 0 | 无 warning |
 | `cargo clippy -p aline-edit --all-targets --locked --offline -- -D warnings` | 2026-10-31T09:40:25Z | 0 | 精确命令重跑，无 warning |
 | `cargo tree -p aline-edit --locked --offline` | 2026-10-31T09:37:42Z | 0 | 仅 `aline-buffer`、`aline-markdown`、`pulldown-cmark 0.13.6`（传递 `bitflags`、`memchr`、`unicase`） |
-| `python3 -I /tmp/aline-g7-recalc/recalc.py <goldens.tsv>` | 2026-10-31T09:38:41Z | 1 | 26 个 plan 用例中 25 个一致；仅 `allow_source_footnote` 目标 7 vs 8 |
-| 仓外探针 `/tmp/aline-g7-probe` 的 `cargo run --quiet` | 2026-10-31T09:37:01Z、09:39:59Z | 0 | 17 项检查，见第 3 节 |
+| `python3 -I <tmp>/aline-g7-recalc/recalc.py <goldens.tsv>` | 2026-10-31T09:38:41Z | 1 | 26 个 plan 用例中 25 个一致；仅 `allow_source_footnote` 目标 7 vs 8 |
+| 仓外探针 `<tmp>/aline-g7-probe` 的 `cargo run --quiet` | 2026-10-31T09:37:01Z、09:39:59Z | 0 | 17 项检查，见第 3 节 |
 | `rg` 禁用的 `unwrap/expect/panic/todo/unimplemented/unsafe` | 2026-10-31T09:37:42Z | 0 | `crates/aline-edit` 0 命中 |
 | `rg` 写入通道与 `&mut` 扫描 | 2026-10-31T09:39Z | 0 | `aline-edit/src` 无 `StringBuffer`/`apply`/`undo`/`redo`/`fs`/`File` 命中；`&mut` 仅 `fmt` |
 | `git status/stat/show/log`、`stat`、`shasum` | 2026-10-31T09:37:06Z–09:39Z | 0 | 用于金样先行、mtime、状态与日志一致性核对 |
@@ -121,7 +121,7 @@ A  docs/validation/m0-engine-foundation/group-7/step-7.1/goldens/edit-goldens.ts
 
 ### 3.2 金样独立重算（≥8 例）
 
-我用仓外 Python 脚本 `/tmp/aline-g7-recalc/recalc.py` 只读取 TSV 与源字符串，不读取实现输出，按 UTF-8 字节独立计算补丁、目标选区和预览，再与金样逐项比对。结果：26 个 plan 用例中 25 个一致，1 个不一致（`allow_source_footnote` 的目标选区）。
+我用仓外 Python 脚本 `<tmp>/aline-g7-recalc/recalc.py` 只读取 TSV 与源字符串，不读取实现输出，按 UTF-8 字节独立计算补丁、目标选区和预览，再与金样逐项比对。结果：26 个 plan 用例中 25 个一致，1 个不一致（`allow_source_footnote` 的目标选区）。
 
 手算/重算摘录：
 
@@ -186,7 +186,7 @@ A  docs/validation/m0-engine-foundation/group-7/step-7.1/goldens/edit-goldens.ts
 - `group-7/commands.log` 共 12 条命令记录（另有 3 行表头注释），时间 2026-10-31T09:08:50Z–09:23:06Z，全部 `exit=0`；包括金样 staged、环境、git 状态、`-- --list`、goldens/validate-reread/consume/refusals/protection/full-crate、workspace gates、人工写入通道审查。命令、日志、时间与 `summary.json` 一致，未发现伪造迹象。
 - `step-7.4/workspace-gates/summary.json`：`passed=true`，19 项结果全部 `exit_code=0`，时间 09:21:09.760743Z–09:21:48.833532Z；workspace 测试日志 39 个 `test result` 行、151 passed、0 failed。该记录**未在并发写入窗口内独立重跑**，只作为快照核对。
 - 定向日志计数与本次重跑一致：goldens 6、validate-reread 3、consume 1、refusals 7、protection 4、full-crate 17（6+4+7，另有 0 doc-tests）。
-- `step-7.4/environment.stdout.log` 只打印了 `CARGO_HOME`；这是 macOS `/usr/bin/printenv A B C` 只打印第一个存在变量的行为，不代表另外两个变量未设置。`summary.json` 的 `env_overrides` 明确记录 `CARGO_HOME`、`CARGO_NET_OFFLINE`、`RUSTUP_TOOLCHAIN`、`PYTHONDONTWRITEBYTECODE`（F3-5）。
+- `step-7.4/environment.stdout.log` 只打印了 `CARGO_HOME`；这是 macOS `printenv A B C` 只打印第一个存在变量的行为，不代表另外两个变量未设置。`summary.json` 的 `env_overrides` 明确记录 `CARGO_HOME`、`CARGO_NET_OFFLINE`、`RUSTUP_TOOLCHAIN`、`PYTHONDONTWRITEBYTECODE`（F3-5）。
 - `step-7.4/manual-write-channel-review.log` 的结论（aline-edit 公开面无可变写入 API、src 中只有两处 `CheckedBatch::new`、workspace 生产代码无实际写入入口、文件写入只在 `aline-source/src/atomic.rs`）方向正确；但日志没有记录具体的 `rg`/`sed` 命令，复现性有限（F3-3）。我在 `aline-edit/src` 独立扫描确认无 `StringBuffer`/`apply`/`undo`/`redo`/`fs`/`File`；workspace 级结论未独立重扫全仓。
 - 组 7 证据全部未跟踪、未提交；复核期间组 6 仍在写 `docs/engine-design.md`/`docs/v1-validation-plan.md` 与 `aline-markdown`。本报告固定 09:37:06Z 状态与 09:30:51Z–09:40:25Z 重跑窗口，晚到的追加不在覆盖范围（F3-8）。
 

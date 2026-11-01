@@ -26,7 +26,7 @@
 | 只读核对 | 6.8 宣称边界检索（AC-09/公式/图表/V-06/V-07 通过） | 13:14:21Z / 0 | `review-round-4-evidence/claims-check.log` |
 | 未执行 | 19 项工作区门禁、`cargo clippy`/`fmt`、`cargo test --workspace`、`dump_tree` 示例、`step-6.1`–`step-6.8` 历史日志逐字节复跑、链接检查器、Windows/Linux/CI | — | — |
 
-环境：`CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`；cargo 一律 `--locked --offline`。
+环境：`CARGO_HOME=<cargo-home>`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`；cargo 一律 `--locked --offline`。
 
 ## 2. 更正核验
 

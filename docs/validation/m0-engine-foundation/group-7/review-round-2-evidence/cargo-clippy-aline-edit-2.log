@@ -1,5 +1,0 @@
-# run start: 2026-10-31T10:32:03Z
-# command: cargo clippy -p aline-edit --all-targets --locked --offline -- -D warnings
-    Checking aline-markdown v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-markdown)
-    Checking aline-edit v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-edit)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.43s

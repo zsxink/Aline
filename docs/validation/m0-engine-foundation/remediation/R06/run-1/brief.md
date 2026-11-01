@@ -1,6 +1,6 @@
 # R06 派发契约：F-09/F-15 安全扫描范围有效
 
-基线 HEAD：`2f1dcea46d5998f4e2ba213e73c11de166f943c4`。仓库根 `/Users/xian/Project/editor/Aline`。
+基线 HEAD：`2f1dcea46d5998f4e2ba213e73c11de166f943c4`。仓库根 `<repo>`。
 
 ## 文件所有权（只有你可写这些文件）
 
@@ -14,7 +14,7 @@
 
 **F-09（严重）**：`workspace_scan()` 虽然用 `cargo read-manifest` 拿到了 `targets[].src_path`，却仍然只遍历成员目录下的 `*.rs`。Cargo 合法的目录外 target（例如成员 `Cargo.toml` 写 `[lib] path = "../../outside.rs"`，或 `build.rs`）完全不被扫描，`failures=[]`、exit 0，而该文件可以含生产 `unwrap()` 并带局部 `#![allow(clippy::unwrap_used)]`，同时躲过词法扫描和 Clippy deny。
 
-原复核夹具：`/tmp/aline-m0-independent-review.pTFf8u/D/safety-external-target/`（八成员副本 + buffer `[lib] path="../../outside.rs"`）。若已不存在，按同样形状在你的证据目录下的临时副本重建。
+原复核夹具：`<tmp>/aline-m0-independent-review.pTFf8u/D/safety-external-target/`（八成员副本 + buffer `[lib] path="../../outside.rs"`）。若已不存在，按同样形状在你的证据目录下的临时副本重建。
 
 **F-15（一般）**：根不存在时 `python3 scripts/check_safety.py --root /不存在的路径` 仍 exit 0，`failures/scanned/member_reads` 均为空——空扫描被当成通过。
 

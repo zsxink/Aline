@@ -71,7 +71,7 @@ name | input_hex | frozen_hex | budget | expected | output_hex | reused_original
 
 ## 4. 验证
 
-环境与时间：2026-10-31T03:32:32Z 起，macOS Darwin 27.0.0 arm64，`rustc 1.98.1`、`cargo 1.98.1`，`CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home`，离线 Cargo。证据见 `gates/commands.log` 与 `workspace-gates/*.command.json`。
+环境与时间：2026-10-31T03:32:32Z 起，macOS Darwin 27.0.0 arm64，`rustc 1.98.1`、`cargo 1.98.1`，`CARGO_HOME=<cargo-home>`，离线 Cargo。证据见 `gates/commands.log` 与 `workspace-gates/*.command.json`。
 
 直接门禁（`gates/run-direct-gates.sh`）：
 

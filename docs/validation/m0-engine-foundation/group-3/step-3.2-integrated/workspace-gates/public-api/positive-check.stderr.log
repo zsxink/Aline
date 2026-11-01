@@ -1,9 +1,0 @@
-   Compiling pulldown-cmark v0.13.6
-    Checking bitflags v2.13.2
-    Checking unicase v2.10.0
-    Checking memchr v2.8.3
-    Checking aline-buffer v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-buffer)
-    Checking aline-source v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-source)
-    Checking aline-markdown v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-markdown)
-    Checking aline-m0-api-positive v0.0.0 (/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-3/step-3.2-integrated/workspace-gates/public-api/fixtures/positive)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.55s

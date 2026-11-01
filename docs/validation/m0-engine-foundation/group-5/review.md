@@ -2,7 +2,7 @@
 
 - 复核日期：2026-10-31
 - 复核对象：OpenSpec change `m0-engine-foundation` 组 5（任务 5.1–5.5）
-- 仓库与基线：`/Users/xian/Project/editor/Aline`，分支 `main`，HEAD `9b93381cb647eec0dddec869674e6bd86759e001`
+- 仓库与基线：`<repo>`，分支 `main`，HEAD `9b93381cb647eec0dddec869674e6bd86759e001`
 - 工作树状态：组 5 的源码、测试、金样与证据均为未提交或未跟踪文件（见 `evidence/git-state.stdout.log`）；复核期间除本文件外未改动其他文件
 - 复核立场：实现者不是复核者。报告与日志中的自述只作为待验材料；本报告的结论来自本次独立重跑、独立重算与读码，不把自述当成已证明
 - 写入范围：仅本文件
@@ -13,7 +13,7 @@
 
 - 主机：macOS arm64，Darwin 27.2.0（本次复核时）；证据 `environment.stdout.log` 记录 Darwin 27.0.0（见 F3-6）
 - 工具链：rustc 1.98.1 (48a229cea 2026-09-01)，cargo 1.98.1 (797e8a9bc 2026-08-05)
-- 环境变量：`CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home`，`RUSTUP_TOOLCHAIN=1.98.1`，`CARGO_NET_OFFLINE=true`
+- 环境变量：`CARGO_HOME=<cargo-home>`，`RUSTUP_TOOLCHAIN=1.98.1`，`CARGO_NET_OFFLINE=true`
 - 所有 cargo 命令均使用 `--locked --offline`
 
 ### 1.2 实际执行的命令与结果
@@ -28,7 +28,7 @@
 | `git diff --stat -- docs/`；`git diff --check` | 0 | 5 个文档、10 行新增、0 行删除；无空白错误 |
 | Python 读取 `step-5.5/workspace-gates/summary.json` | 0 | 顶层 `passed=true`，19 项结果全部 `exit_code=0` |
 | 汇总 `workspace-gates/*.log` 的 `test result: ok.` | 0 | 29 条结果行，合计 76 个测试通过 |
-| `/tmp/aline-review-probe` 的 `cargo run --offline` | 0 | 对抗性探针 C1–C6，输出见第 4 节 |
+| `<tmp>/aline-review-probe` 的 `cargo run --offline` | 0 | 对抗性探针 C1–C6，输出见第 4 节 |
 | `uname -a`、`stat`、`nl`、`rg` 读码与证据核对 | 0 | 用于行号、mtime、环境与日志一致性核对 |
 
 说明：
@@ -36,15 +36,15 @@
 - 本次复核未单独重跑 `--test anchors`、`--test rejections`、`--test history` 三个过滤命令；全 crate 运行已包含这些测试并全部通过，且实现者 `commands.log` 中对应行均为 `exit=0`。
 - 本次复核未重跑 `step-5.3/run-audit.sh`，只核对其 `audit.stdout.log`。
 - 本次复核未重跑 19 项 workspace gates，只核对 `summary.json`、`test.stdout.log` 与命令记录。
-- 证据中的环境日志只显示 `CARGO_HOME`，经本机复现，macOS `/usr/bin/printenv A B C` 只打印第一个参数，因此不能据此判断另外两个变量未设置；`run-targeted-tests.sh:7-9` 与 `workspace-gates/summary.json` 的 `env_overrides` 均记录了三者。
+- 证据中的环境日志只显示 `CARGO_HOME`，经本机复现，macOS `printenv A B C` 只打印第一个参数，因此不能据此判断另外两个变量未设置；`run-targeted-tests.sh:7-9` 与 `workspace-gates/summary.json` 的 `env_overrides` 均记录了三者。
 
 ### 1.3 临时产物
 
-- `/tmp/aline-review-crate.log`：全 crate 测试输出
-- `/tmp/aline-review-patch.log`：`patch` 过滤测试输出
-- `/tmp/aline-review-probe/`：对抗性探针 crate（`Cargo.toml`、`src/main.rs`，以 path 依赖 `aline-buffer`）
-- `/tmp/aline-review-probe.out`、`/tmp/aline-review-probe.err`：探针输出
-- `/tmp/envsim.out`、`/tmp/envsim.err`：`printenv` 行为复现输出
+- `<tmp>/aline-review-crate.log`：全 crate 测试输出
+- `<tmp>/aline-review-patch.log`：`patch` 过滤测试输出
+- `<tmp>/aline-review-probe/`：对抗性探针 crate（`Cargo.toml`、`src/main.rs`，以 path 依赖 `aline-buffer`）
+- `<tmp>/aline-review-probe.out`、`<tmp>/aline-review-probe.err`：探针输出
+- `<tmp>/envsim.out`、`<tmp>/envsim.err`：`printenv` 行为复现输出
 
 除上述系统临时目录产物和本文件外，未写入仓库文件。
 
@@ -141,7 +141,7 @@
 ### F2-1 锚点变换与 `apply` 对无操作补丁的处理不一致
 
 - 位置：`crates/aline-buffer/src/anchors.rs:53`（`transform_anchor` 直接使用 `batch.patches()`）、`crates/aline-buffer/src/anchors.rs:65-66`（`transform_selection` 同样使用原始补丁）；`crates/aline-buffer/src/string_buffer.rs:152`（`apply` 使用 `effective_patches`）、`:377-400`（剔除空插入和内容相同的替换）。
-- 复现（本次探针 `/tmp/aline-review-probe`，exit 0）：
+- 复现（本次探针 `<tmp>/aline-review-probe`，exit 0）：
   - C1：before 文本 `"abcd"`，批次 `[(1..3, "bc"), (3..3, "X")]`。`apply` 返回 `Changed`，文本 `"abcXd"`，after 偏移 2 是合法 UTF-8 边界；但 `transform_anchor(before, offset 2, batch, Before)` 返回 `Ok(Invalidated)`。
   - C2：before 文本 `"abcd"`，纯无操作批次 `[(1..3, "bc")]`。`apply` 返回 `Unchanged`，revision 仍为 0；但同一批次的锚点 2 仍返回 `Ok(Invalidated)`。
 - 实际：`apply` 把内容相同的替换视为未变化并只发布实际变化的插入；锚点变换却按原始补丁把偏移 2 判为“非空替换内部”，返回失效。`transform_selection` 在任一端失效时返回 `None`，会把选区整组丢弃。

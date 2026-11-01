@@ -11,7 +11,7 @@
 | HEAD | `99867bf2c5775aae4e8ed910713496d4ff84323c`（复核开始时的 `git status` 快照与 10:40:18Z 的 `git rev-parse HEAD` 一致） |
 | 证据窗口 | 2026-10-31T10:21:05Z–10:42:33Z（本报告在窗口结束后撰写） |
 | 工作区状态 | 未冻结：复核期间组 6 继续写 `docs/engine-design.md`（mtime 10:35:43Z）、`docs/v1-validation-plan.md`（mtime 10:36:17Z）与 `crates/aline-markdown`；金样索引状态在窗口内从 `A ` 变为 `??`。详见 §4.5 |
-| 环境 | macOS 27.2 / Darwin 27.2.0 arm64；`rustc 1.98.1 (48a229cea 2026-09-01)`；`cargo 1.98.1`；`CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home`；`RUSTUP_TOOLCHAIN=1.98.1`；`CARGO_NET_OFFLINE=true` |
+| 环境 | macOS 27.2 / Darwin 27.2.0 arm64；`rustc 1.98.1 (48a229cea 2026-09-01)`；`cargo 1.98.1`；`CARGO_HOME=<cargo-home>`；`RUSTUP_TOOLCHAIN=1.98.1`；`CARGO_NET_OFFLINE=true` |
 
 读取的材料：`openspec/changes/m0-engine-foundation/specs/engine/edit/spec.md`（2 个 ADDED Requirement、6 个 Scenario）、`tasks.md` 第 72–75 行（7.1–7.4 仍为 `[ ]`）、四份 step 报告、round-1 `review.md`、`crates/aline-edit/src/{plan,reread,validate,refusal,budget,command,permissions,errors,lib}.rs`、`crates/aline-edit/tests/{goldens,refusals,protection}.rs`、金样 TSV、实现者与调度方的 `commands*.log`/`summary.json`/`test.stdout.log`。
 
@@ -26,7 +26,7 @@
 | 10:31:59–10:32:03 | `cargo test -p aline-edit --locked --offline`（第二遍） | 0 | 25 passed（同上） | `cargo-test-aline-edit-2.log` |
 | 10:32:03–10:32:04 | `cargo clippy -p aline-edit --all-targets --locked --offline -- -D warnings`（第二遍） | 0 | 无 warning | `cargo-clippy-aline-edit-2.log` |
 | 10:32:04 | `cargo fmt --all --check`（第二遍） | 0 | 无输出 | `cargo-fmt-check-2.log` |
-| 10:33:47–10:33:49 | 仓外探针 `/tmp/aline-g7-r2/probe`：`cargo run --offline --quiet` | 0 | 14 个用例；`buffer state unchanged: true` 14 次、`false` 0 次 | `probe-run.log` |
+| 10:33:47–10:33:49 | 仓外探针 `<tmp>/aline-g7-r2/probe`：`cargo run --offline --quiet` | 0 | 14 个用例；`buffer state unchanged: true` 14 次、`false` 0 次 | `probe-run.log` |
 | 10:34:01 | 只读静态核对（porcelain、sha256、diff、TSV 分类、索引、mtime、写入通道扫描） | 0 | 见日志 | `static-checks.log` |
 | 10:38:13 | 文档最终快照 | 0 | 见日志 | `docs-snapshot-final.log` |
 | 10:40:18–10:40:19 | 结束快照（HEAD、mtime、金样哈希与索引状态） | 0 | 见日志 | `final-head-mtimes.log` |

@@ -98,7 +98,7 @@ if previous is not None and previous[0] != path:     # 展平键相同、路径�
 
 ## 3. 逐条断言对照（自证有效性）
 
-「弱化实现 → 对应断言必须变红」逐项实测，副本在 `/tmp/r05b/` 下，均不提交：
+「弱化实现 → 对应断言必须变红」逐项实测，副本在 `<tmp>/r05b/` 下，均不提交：
 
 | 弱化方式 | 变红的断言 | 实测结果 |
 |----------|-----------|----------|
@@ -107,7 +107,7 @@ if previous is not None and previous[0] != path:     # 展平键相同、路径�
 | 只删 `lints["workspace"] is not True` | `reject-workspace-false` | exit 1 |
 | 删 `_flatten_tables` 的撞名分支 | `reject-table-then-quoted-dotted-key` | exit 1；两条 accept 仍通过 |
 | `_check_path_depth` 与 `_enter_container` 判断改 `pass` | `reject-deep-nested-array` | exit 1；既有 57 条仍全过 |
-| 从异常元组去掉 `RecursionError` | 无对应断言，直接观测量级 | `setrecursionlimit(60)` 下立刻退回 Traceback（副本 /tmp/r05b/weak-recerr） |
+| 从异常元组去掉 `RecursionError` | 无对应断言，直接观测量级 | `setrecursionlimit(60)` 下立刻退回 Traceback（副本 `<tmp>`/r05b/weak-recerr） |
 
 逐用例矩阵（直接调用 `audit_member_manifest`，不依赖 cargo）：
 
@@ -149,7 +149,7 @@ if previous is not None and previous[0] != path:     # 展平键相同、路径�
 5. **未运行 Rust 构建/测试**。本批零 Rust 改动；`--self-test` 内部已跑 clippy 的
    debug/release 双 profile 继承用例（沿用 R05 既有机制）。
 6. **`CARGO_HOME` 覆盖**：本机默认指向 admission 隔离目录（空 registry），故 Cargo
-   对照显式用 `CARGO_HOME=/Users/xian/.cargo`，仍 `--locked --offline`；这是环境规避，
+   对照显式用 `CARGO_HOME=<cargo-home>`，仍 `--locked --offline`；这是环境规避，
    不是产品行为，记录在 `commands.txt`。
 
 ## 6. 证据索引
@@ -157,8 +157,8 @@ if previous is not None and previous[0] != path:     # 展平键相同、路径�
 - `pre-fix.txt` —— 三项缺陷修复前的实际输出
 - `post-fix.txt` —— 修复后各命令输出与弱化自证
 - `commands.txt` —— argv / cwd / 起止 UTC / exit code / 环境
-- 原始捕获：`/tmp/r05b/evidence/`（`pre-*.txt`、`final-*.txt`）
-- 夹具：`/tmp/r05b/fixtures/{collision,deep,quoted-only}`；弱化副本：`/tmp/r05b/{weakrepo2,weak-nokey,weak-nolvalue,weak-flatten,weak-depth,weak-recerr}`
+- 原始捕获：`<tmp>/r05b/evidence/`（`pre-*.txt`、`final-*.txt`）
+- 夹具：`<tmp>/r05b/fixtures/{collision,deep,quoted-only}`；弱化副本：`<tmp>/r05b/{weakrepo2,weak-nokey,weak-nolvalue,weak-flatten,weak-depth,weak-recerr}`
 
 ## 7. 主 Agent 独立复核后的补强（追加，不改上文）
 

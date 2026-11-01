@@ -26,7 +26,7 @@
 
 ## 3. 定向证据
 
-环境：`CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home`，`RUSTUP_TOOLCHAIN=1.98.1`，`CARGO_NET_OFFLINE=true`；macOS arm64，`rustc 1.98.1 (48a229cea 2026-09-01)`。完整环境/git 状态见 `../evidence/environment.stdout.log`、`../evidence/git-state.stdout.log`。
+环境：`CARGO_HOME=<cargo-home>`，`RUSTUP_TOOLCHAIN=1.98.1`，`CARGO_NET_OFFLINE=true`；macOS arm64，`rustc 1.98.1 (48a229cea 2026-09-01)`。完整环境/git 状态见 `../evidence/environment.stdout.log`、`../evidence/git-state.stdout.log`。
 
 | UTC | 命令 | 退出 | 日志 |
 |---|---|---|---|

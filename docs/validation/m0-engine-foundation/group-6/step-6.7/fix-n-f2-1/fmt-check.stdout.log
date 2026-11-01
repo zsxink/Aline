@@ -1,8 +1,0 @@
-Diff in /Users/xian/Project/editor/Aline/crates/aline-markdown/examples/probe_events.rs:1:
- //! Temporary probe: print pulldown-cmark events for hostile HTML samples.
- 
-[31m-use pulldown_cmark::{Parser, Options};
-(B[m[32m+use pulldown_cmark::{Options, Parser};
-(B[m 
- fn main() {
-     for source in [

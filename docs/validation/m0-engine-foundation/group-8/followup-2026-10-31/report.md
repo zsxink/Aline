@@ -35,7 +35,7 @@
 
 ## 实际执行与失败保留
 
-环境：`CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`、`PYTHONDONTWRITEBYTECODE=1`。当前主机 macOS arm64；`--all-targets` 不代表其他 OS/target。
+环境：`CARGO_HOME=<cargo-home>`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`、`PYTHONDONTWRITEBYTECODE=1`。当前主机 macOS arm64；`--all-targets` 不代表其他 OS/target。
 
 原始 stdout/stderr 各自原样保存；[commands.log](./commands.log) 逐项记录 `date -u +%Y-%m-%dT%H:%M:%SZ` 取得的起止 UTC、实际命令原文及退出码。runner 的 stdout 没有作为子命令结果使用。Cargo 测试和 Clippy 明确带 `--locked --offline`；cargo fmt 不解析依赖，使用任务指定语法。
 

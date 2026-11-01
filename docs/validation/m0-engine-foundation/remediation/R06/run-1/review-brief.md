@@ -13,8 +13,8 @@
 
 ## 必须独立回答的问题（逐条给出结论 + 你自己跑出来的证据）
 
-1. **F-09 是否真修复**：**自建**一个八成员形状的夹具（不要复用 `/tmp/aline-m0-independent-review.*`、
-   不要复用 `/tmp/r06*`），在 `crates/aline-buffer/Cargo.toml` 写
+1. **F-09 是否真修复**：**自建**一个八成员形状的夹具（不要复用 `<tmp>/aline-m0-independent-review.*`、
+   不要复用 `<tmp>/r06*`），在 `crates/aline-buffer/Cargo.toml` 写
    `[lib] path = "../../outside.rs"`，`outside.rs` 内放 `v.unwrap()`。
    用 `git show 60ace78^:scripts/check_safety.py` 导出旧脚本（**同时导出 `safety_lex.py` 到同一目录**），
    证明旧脚本 exit 0 且 `failures=[]`；新脚本 exit 1 且规则为 `external-target-path`。

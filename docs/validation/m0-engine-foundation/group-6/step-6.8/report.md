@@ -42,10 +42,10 @@
 2026-10-31T09:42:36.350886Z 至 09:43:04.038768Z，在仓库根以隔离环境运行：
 
 ```sh
-CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home \
+CARGO_HOME=<cargo-home> \
 RUSTUP_TOOLCHAIN=1.98.1 CARGO_NET_OFFLINE=true \
 python3 scripts/check_workspace.py \
-  --cargo-home /Users/xian/Library/Caches/aline-m0/cargo-home \
+  --cargo-home <cargo-home> \
   --output-dir docs/validation/m0-engine-foundation/group-6/step-6.8/workspace-gates-post-fix
 ```
 
@@ -77,7 +77,7 @@ python3 scripts/check_workspace.py \
 
 ## 5. 环境与平台
 
-逐变量 `printenv` 证据（`step-6.8/environment-per-variable.stdout.log`，2026-10-31T09:23:35Z）显示 `CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`；`uname -a` 为 Darwin 27.2.0 arm64，`rustc` 为 1.98.1 aarch64-apple-darwin。
+逐变量 `printenv` 证据（`step-6.8/environment-per-variable.stdout.log`，2026-10-31T09:23:35Z）显示 `CARGO_HOME=<cargo-home>`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`；`uname -a` 为 Darwin 27.2.0 arm64，`rustc` 为 1.98.1 aarch64-apple-darwin。
 
 说明：首次尝试在同一脚本中用 `printenv CARGO_HOME RUSTUP_TOOLCHAIN CARGO_NET_OFFLINE` 时三变量都显示“未设置”，因为该命令在新 shell 中先于 `export` 执行；随后在同一日志中以显式 `export` 再跑一遍，得到上述真实值。这次修正保留在同一条证据日志中，未删除首次输出。
 

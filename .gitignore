@@ -29,5 +29,10 @@ __pycache__/
 **/cargo-target/
 **/target/
 
-# docs/validation/** 下的 JSON、日志与夹具是门禁证据，报告会逐条引用；
-# 只忽略其中的构建缓存（见上），不要整体忽略证据文件。
+# 本地验证产物与临时日志：不入库。
+# 可复现输入（golden/夹具/基线）在 crates/*/tests/fixtures 与 scripts/fixtures。
+/logs/
+*.log
+docs/validation/**/*.command.json
+docs/validation/**/*.stdout.json
+docs/validation/**/*.stderr.json

@@ -1,1 +1,0 @@
-{"kind": "读取已有日志，未重新运行测试", "checks": 19, "exit_zero": 19, "workspace_passed": 312, "workspace_failed": 0, "external_tests": 180, "unobserved": []}

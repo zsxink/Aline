@@ -15,7 +15,7 @@
 | 只读核对 | `git rev-parse/log/cat-file/ls-tree/ls-files/shasum`；`summary.json` 字段；`rg`/`sed` 读 `plan.rs`、`refusals.rs`、报告与金样 |
 | 未执行 | 19 项工作区门禁复跑、`cargo clippy`/`fmt`、`cargo test --workspace`、真实 UI/DocCore/IME、Windows/Linux；10:38:13Z 时点的哈希无法从 git 重建 |
 
-命令与退出码：`docs/validation/m0-engine-foundation/group-7/review-round-3-evidence/commands.log`；git 与 summary.json 原始输出同目录 `git-verification.log`；测试与重跑日志同目录 `cargo-test-*.log`、`write-channel-review-rerun.log`。环境：`CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`。
+命令与退出码：`docs/validation/m0-engine-foundation/group-7/review-round-3-evidence/commands.log`；git 与 summary.json 原始输出同目录 `git-verification.log`；测试与重跑日志同目录 `cargo-test-*.log`、`write-channel-review-rerun.log`。环境：`CARGO_HOME=<cargo-home>`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`。
 
 ## 2. 逐项判定
 

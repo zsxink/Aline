@@ -1,8 +1,0 @@
-positive 符合预期
-drawn-is-not-source 符合预期
-drawn-is-not-utf16 符合预期
-source-is-not-storage 符合预期
-private-source-fields 符合预期
-private-snapshot-id 符合预期
-private-projection-id 符合预期
-tuple-view-is-immutable 符合预期

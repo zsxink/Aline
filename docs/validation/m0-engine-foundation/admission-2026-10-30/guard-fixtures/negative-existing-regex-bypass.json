@@ -1,9 +1,0 @@
-{
-  "kind": "明确合成的输入变异，不是真实 Cargo 输出",
-  "base": "metadata-base-final.json / tree-all-base-packages.stdout.log / candidate/Cargo.lock",
-  "transformation": "negative-existing-regex-bypass",
-  "expected_diagnostic": "旁路",
-  "expected_exit_code": 1,
-  "metadata_sha256": "8a30c5aa48177fd1222d3109ebab5f55b0e981afb9db5601889aa2dfdd821a4f",
-  "temporary_inputs": "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-candidate-guard-tests-ld3kmb2z/negative-existing-regex-bypass"
-}

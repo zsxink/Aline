@@ -43,7 +43,7 @@
 ## 硬性约束
 
 - 工具链 1.98.1，所有 cargo 命令带 `--locked --offline` 且在 `--` 之前；
-  需要解析依赖时用 `CARGO_HOME=/Users/xian/.cargo`（隔离 CARGO_HOME 注册表为空会 exit 101）。
+  需要解析依赖时用 `CARGO_HOME=<cargo-home>`（隔离 CARGO_HOME 注册表为空会 exit 101）。
 - 不得联网、不得安装工具；无法核实的事项写「未核实」，不要猜。
 - **不得修改任何被复核代码或测试**（临时变异必须还原并核对 sha256）。
 - 不得 `git reset`、不得回退他人改动、**不得 commit**。

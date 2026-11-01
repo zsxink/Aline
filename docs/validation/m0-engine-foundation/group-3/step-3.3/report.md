@@ -151,7 +151,7 @@
 ## 8. 证据与环境
 
 - 追踪脚本与输出：`trace/run-trace.sh`、`trace/commands.log`、`trace/*.stdout.log`（含 `trace/consumer-types.stdout.log`）、`trace/*.stderr.log`、`trace/mapping-consumers-outside-mapping.log`、`trace/utf16-outside-mapping.log`、`trace/coordinate-arithmetic-outside-buffer-mapping.log`、`trace/subtraction-calls-outside-buffer-mapping.log`。
-- 环境：macOS Darwin 27.0.0 arm64；Rust/Cargo 1.98.1；隔离 `CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home`；离线 Cargo。见 `trace/environment.stdout.log`。
+- 环境：macOS Darwin 27.0.0 arm64；Rust/Cargo 1.98.1；隔离 `CARGO_HOME=<cargo-home>`；离线 Cargo。见 `trace/environment.stdout.log`。
 - 基线：重跑时 HEAD 仍为 `c925166c57a4c1e6c42b362a8c008d7b0a7e07ae`；工作区包含四份回填文档修改与未跟踪的 `docs/validation/m0-engine-foundation/group-3/step-3.3/`（首次追踪时仅后者）。`tasks.md` 在本记录与复核处理完成后才勾选。见 `trace/git-state.stdout.log`。
 - 本任务没有 Rust 代码改动、没有新增依赖、没有开窗口。追踪阶段没有重跑 workspace 门禁；外部消费者夹具的 5 passed 只用于公开面追踪，不等同于 workspace 门禁结论。提交前另行实际运行的三条门禁与统一入口结果如下，原始命令/UTC/退出码在 `gates/` 与 `workspace-gates/`。
 
@@ -160,7 +160,7 @@
 | `cargo fmt --all --check` | exit 0 | `gates/commands.log`、`gates/fmt.*` |
 | `cargo clippy --workspace --all-targets -- -D warnings` | exit 0 | `gates/commands.log`、`gates/clippy.*` |
 | `cargo test --workspace --locked --offline` | exit 0，20 passed、0 failed | `gates/commands.log`、`gates/test.*` |
-| `python3 scripts/check_workspace.py --cargo-home /Users/xian/Library/Caches/aline-m0/cargo-home --output-dir /Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-3/step-3.3/workspace-gates` | exit 0，19 项全部 0，`summary.json.passed=true`；`public-api` self-test 8/8（夹具自测，不是对仓库实际公开面的检查，后者见 `trace/public-surface.stdout.log`） | `workspace-gates/`，实际 argv 见各 `*.command.json` |
+| `python3 scripts/check_workspace.py --cargo-home <cargo-home> --output-dir <repo>/docs/validation/m0-engine-foundation/group-3/step-3.3/workspace-gates` | exit 0，19 项全部 0，`summary.json.passed=true`；`public-api` self-test 8/8（夹具自测，不是对仓库实际公开面的检查，后者见 `trace/public-surface.stdout.log`） | `workspace-gates/`，实际 argv 见各 `*.command.json` |
 
 ## 9. 下一步
 

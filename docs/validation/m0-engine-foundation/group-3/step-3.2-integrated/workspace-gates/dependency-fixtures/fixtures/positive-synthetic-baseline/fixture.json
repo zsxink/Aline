@@ -1,6 +1,0 @@
-{
-  "kind": "明确的图/lock变异",
-  "base": "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/engineering-live-graphs",
-  "transformation": "positive-synthetic-baseline",
-  "independent_expectation": "现行架构§3.2精确身份/边/target/features；任务2.2"
-}

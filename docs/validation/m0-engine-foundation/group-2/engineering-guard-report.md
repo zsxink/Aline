@@ -41,3 +41,11 @@
 ## 限制
 
 本项仅证明依赖规则与当前具体解析组合，未执行跨平台构建/窗口/真实输入，不能宣称 V-01～V-09、E1 或完整 M0 通过。源码安全、成员 lint 实际继承、catalog 和完整 Cargo 检查仍由后续编号任务分别取证。第三方包源码未因本守卫全面安全审计；未知动态宿主的语义不能仅按包名自动识别，新增依赖仍须先走准入审阅。metadata 在选包边上可能过近似，检查器保守拒绝，不静默扩大例外。
+
+## R12 勘误（2026-11-01）
+
+本报告第 5 行“Cargo 始终 `--locked --offline`”描述的是本报告所记录的正式依赖图采集命令，不能泛化为当时全部脚本嵌套的 Cargo 调用。R12 对 `scripts/*.py` 进行了 AST 调用点审计：此前 `check_lints.py` 四处隔离依赖检查及 `engineering_self_test.py` 一处正向 metadata 检查缺少 `--locked`，已于本轮修复。无锁 fixture 的首次依赖解析单独登记为 `cargo generate-lockfile --offline`；lock 生成后，后续依赖检查使用 `--locked --offline`。`engineering_self_test.py` 中专门验证 Cargo 对缺失 lock 报错的 `metadata --offline` 负例仍有意不带 `--locked`。初始生成和该负例是两个不同的例外；报告原文及历史命令记录均保留。逐调用点结果见 [R12 AST 审计](../remediation/R12/run-1/nested-cargo-audit.md) 与 [R12 报告](../remediation/R12/run-1/report.md)。
+
+### R12 补充更正（2026-11-01）
+
+上段曾把 `engineering_self_test.py` 的 `metadata --offline` 负例称为“缺失 lock 错误路径”。复核其真实 argv 与夹具后确认，该调用使用不存在的 `fixtures/missing/Cargo.toml`，期望诊断为 `does not exist`，验证的是 manifest 缺失，不是 Cargo.lock 缺失。R12 已为该命令加 `--locked` 并在新输出目录重跑 engineering self-test（97/97 通过）。因此该调用不是缺锁例外；最终 AST 审计为 25 个调用点、16 个依赖检查全部带 `--locked`、0 个缺锁、3 个初始 lock 生成例外。此前把它列为例外的审计/勘误草稿已保留在 `nested-cargo-audit-review-1.*` 和旧报告副本；最终结果见 [R12 最终 AST 审计](../remediation/R12/run-1/nested-cargo-audit.md)、[补充验证](../remediation/R12/run-1/post-fix-supplement.txt)。

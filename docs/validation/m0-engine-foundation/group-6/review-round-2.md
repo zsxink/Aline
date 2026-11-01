@@ -7,13 +7,13 @@
 - **HEAD**：`99867bf2c5775aae4e8ed910713496d4ff84323c`（`main`）。复核开始与结束时均为该提交，期间未变。
 - **读取窗口**：2026-10-31 约 09:15Z 至 10:02Z（结束时 `date -u` 为 `Sat Oct 31 10:01:38 UTC 2026`）。窗口内实现者仍在写入组 6 证据：`step-6.8/report.md` 生成于 09:46:01Z，工作区门禁运行于 09:42:36Z–09:43:04Z，回填哈希日志生成于 09:45:51Z。本报告读取的是这些写入完成后的工作区；晚于读取窗口的追加不在覆盖范围。
 - **工作区**：`git status --porcelain` 显示组 6 证据整体仍未跟踪（`?? docs/validation/m0-engine-foundation/group-6/`）。HEAD 未变，因此本轮复核的不是一个不可变提交快照，而是工作区最终态。
-- **环境**：macOS Darwin 27.2.0 arm64；`rustc 1.98.1`；`CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`。
+- **环境**：macOS Darwin 27.2.0 arm64；`rustc 1.98.1`；`CARGO_HOME=<cargo-home>`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`。
 - **方法**：只读代码、测试与证据；用上述隔离环境重跑 `cargo test -p aline-markdown --locked --offline` 与定向测试；在 `/tmp` 自建探针 crate 与独立 Python 脚本重算金样。实现者报告中的计数与结论不作为证据，均以代码、日志与自跑结果为准。
 
 本轮实际执行（关键）：
 
 ```sh
-CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home \
+CARGO_HOME=<cargo-home> \
 RUSTUP_TOOLCHAIN=1.98.1 CARGO_NET_OFFLINE=true \
 cargo test -p aline-markdown --locked --offline
 # 98 passed, 0 failed（与 6.8 证据一致）
@@ -21,7 +21,7 @@ cargo test -p aline-markdown --locked --offline
 # 定向：spec 10、rewrite 9、mapping 16、html 20、protection 6、
 #       hostile 15、reuse 13、diagnostics 5，均 0 failed
 
-python3 -I /tmp/verify_mapping_goldens.py \
+python3 -I <tmp>/verify_mapping_goldens.py \
   docs/validation/m0-engine-foundation/group-6/step-6.4/goldens/mapping-goldens.tsv
 # cases=6 problems=0
 ```
@@ -133,7 +133,7 @@ python3 -I /tmp/verify_mapping_goldens.py \
 ### 3.5 F3-1：映射金样消费者与独立重算成立
 
 - 消费者：`tests/mapping.rs:450-492` 的 `mapping_goldens_tsv_matches_parser_output` 用 `include_str!` 读取 `mapping-goldens.tsv`，断言 6 个用例的 drawn、每个 segment 的 drawn/source 范围与精度，以及每个 anchor 经 `drawn_offset`/`source_at` 的结果；不是只做文件存在性检查。
-- 独立重算：本轮在 `/tmp/verify_mapping_goldens.py` 用 Python 独立解析 TSV，按文档模型检查：segment 连续铺满 drawn、Exact 两侧字节相等、Aligned 两侧非空、Hidden 无绘制/有来源、Synthetic 有绘制/无来源、源码切片为合法 UTF-8，以及 `segment_for_drawn` + affinity 的锚点规则（跳过 Hidden；Exact 为 start+delta；Aligned/Hidden 按 Before/After 取 start/end；Synthetic 取 source start）。结果 `cases=6 problems=0`，退出 0。该脚本不依赖 `aline-markdown`。
+- 独立重算：本轮在 `<tmp>/verify_mapping_goldens.py` 用 Python 独立解析 TSV，按文档模型检查：segment 连续铺满 drawn、Exact 两侧字节相等、Aligned 两侧非空、Hidden 无绘制/有来源、Synthetic 有绘制/无来源、源码切片为合法 UTF-8，以及 `segment_for_drawn` + affinity 的锚点规则（跳过 Hidden；Exact 为 start+delta；Aligned/Hidden 按 Before/After 取 start/end；Synthetic 取 source start）。结果 `cases=6 problems=0`，退出 0。该脚本不依赖 `aline-markdown`。
 - 来源：TSV 生成时间 08:52:17Z，消费者 `tests/mapping.rs` 生成 09:31:07Z，round-1 `review.md` 生成 09:15:27Z；TSV 的 mtime 仍为 08:52:17Z，未在复核后被回填或改写。`step-6.4/goldens-check/` 的探针日志与 TSV 一致。
 - 限制（N-F3-5）：6.4 报告称 TSV 为“实现前手写”，但 08:48 已存在修复前解析器，08:52 的 TSV 不能排除由该解析器生成；只能证明“先于消费者与 round-1 复核且未改”，不能证明“手写”。内容本身经独立模型复算无误，故 F3-1 仍判成立，但报告措辞应限定。
 

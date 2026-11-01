@@ -1,6 +1,6 @@
 # R12 派发契约：F-16 嵌套 Cargo 锁定口径与初始 lock 生成分开登记
 
-基线 HEAD：`2f1dcea46d5998f4e2ba213e73c11de166f943c4`。仓库根 `/Users/xian/Project/editor/Aline`。前置：R05（`check_lints.py`）与 R06（`check_safety.py`）已完成并提交——先读它们的 handoff 与最终脚本，不要与它们并行改同一文件。
+基线 HEAD：`2f1dcea46d5998f4e2ba213e73c11de166f943c4`。仓库根 `<repo>`。前置：R05（`check_lints.py`）与 R06（`check_safety.py`）已完成并提交——先读它们的 handoff 与最终脚本，不要与它们并行改同一文件。
 
 ## 文件所有权（只有你可写这些文件）
 

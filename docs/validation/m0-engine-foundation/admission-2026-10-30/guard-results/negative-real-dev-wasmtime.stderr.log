@@ -1,1 +1,0 @@
-拒绝: 禁用包/GPUI 旁路: wasmtime@0.0.0，入边 [{"from": "fixture-negative-real-dev-wasmtime@0.0.0", "to": "wasmtime@0.0.0", "alias": "host_alias", "kinds": [{"kind": "dev", "target": null}]}]

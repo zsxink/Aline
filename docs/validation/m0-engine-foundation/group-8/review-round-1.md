@@ -22,7 +22,7 @@
 - **cargo：** 1.98.1 (797e8a9bc 2026-08-05)
 - **HEAD：** `1dd0174ca8fc4aa975209ee5d6c3169c36695fad`
 - **目标 commit：** `96c65732bf69630c56dd6e72feb2505dac59abb5`（组 8 impl+evidence 提交）
-- **环境变量：** `CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home`, `RUSTUP_TOOLCHAIN=1.98.1`, `CARGO_NET_OFFLINE=true`
+- **环境变量：** `CARGO_HOME=<cargo-home>`, `RUSTUP_TOOLCHAIN=1.98.1`, `CARGO_NET_OFFLINE=true`
 - **工作树状态：** `crates/aline-ui/src/document/*` 与 `tests/*.rs` 自 `96c6573` 后未改动；但有其他修改（见 §2-R1-F3）。
 
 证据文件与 UTC/exit（全部在 `docs/validation/m0-engine-foundation/group-8/review-round-1-evidence/`）：
@@ -274,7 +274,7 @@ Column-by-column automated numeric verification was limited due to fixture-based
 
 ---
 
-**报告路径：** `/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-8/review-round-1.md`
+**报告路径：** `<repo>/docs/validation/m0-engine-foundation/group-8/review-round-1.md`
 
 **结论（最终回复）：**
 - **8.1：部分通过（不可闭合）** — 资源可达引用缺失（spec MUST）; open block range expectation inconsistency needs owner adjudication.

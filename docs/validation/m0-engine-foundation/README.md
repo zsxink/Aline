@@ -4,11 +4,17 @@
 
 范围：`m0-engine-foundation` 第 1～9 组的证据入口；具体结论以各原始日志和独立复核为准。
 
+路径约定：证据中的本机路径统一写作 `<repo>`、`<tmp>`、`<cargo-home>` 等占位符（生成与还原规则见 `scripts/evidence_paths.py`），不记录具体机器位置；历史脚本复跑前须按当前机器还原这些占位符。
+
+原始证据分发说明（2026-11-01）：本目录只保留 `.md` 报告、复核结论与交接记录；各批次的 `command.json`、stdout/stderr 日志及原始 `.rs`/`.json`/`.tsv` 副本不随仓库分发。报告中的相对链接因此可能指向已移除的本地文件，这是预期状态，不代表结论失效。
+
+可复现输入已迁出到仓库资产：Rust 金样与夹具在 `crates/*/tests/fixtures/`，门禁夹具、隔离配置与工程基线在 `scripts/fixtures/`，门禁实现在 `scripts/check_*.py`。复跑时按报告记录的 argv/cwd 执行，输出写到 `logs/validation/`（已被 `.gitignore` 排除）；未入库的历史原始证据另存本地备份，不随仓库分发，已提交部分仍可从提交历史追溯。
+
 当前入口：第 1～8 组已有分项证据，第 9 组证据包与回填已完成独立核对。任务勾选不代替出口验收，完整 M0 出口和 V-01～V-09 均不据此宣称通过。下方早期环境、依赖及“本组状态与限制”是第 1～2 组开工时的历史快照，其“尚未”表述不是当前状态。
 
 | 组 | 证据入口与范围 |
 |---|---|
-| 1–2 | [候选准入与交接](./group-1-report.md)、[准入身份](./group-1-admission.json)、[工程门禁与 catalog](./group-2/report.md) |
+| 1–2 | [候选准入与交接](./group-1-report.md)、准入身份（原 `group-1-admission.json`，未随仓库分发）、[工程门禁与 catalog](./group-2/report.md) |
 | 3 | [公共接口与身份基础](./group-3/step-3.3/report.md) |
 | 4 | [source 编码与回填](./group-4/step-4.5/report.md) |
 | 5 | [buffer 与历史回填](./group-5/step-5.5/report.md) |
@@ -43,7 +49,7 @@
 | 命令 | 退出码 | 关键输出 |
 |---|---:|---|
 | `sw_vers` | 0 | macOS 27.0.1，build 26A434 |
-| `uname -a` | 0 | Darwin XianMac.local 27.0.0，`arm64` |
+| `uname -a` | 0 | Darwin [REDACTED] 27.0.0，`arm64` |
 | `system_profiler SPHardwareDataType` | 0 | MacBook Pro / Apple M5 / 10 cores / 32 GB；敏感设备标识未抄录 |
 | `system_profiler SPDisplaysDataType` | 0 | 内建 Liquid Retina XDR 3024×1964；外接显示器 4096×2304，UI Looks like 2048×1152 @ 75 Hz |
 | `rustup show` | 0 | 默认 stable；活动工具链 `stable-aarch64-apple-darwin`；另装 `1.98.1-aarch64-apple-darwin`；列出的四个 target 如上 |
@@ -66,8 +72,8 @@
 
 GPUI 候选检查（只读本地检查）：
 
-- `find /Users/xian/.cargo/registry/src /Users/xian/.cargo/git/checkouts /Users/xian/.cargo/git/db -maxdepth 5 -iname '*gpui*' -print 2>/dev/null`：未发现 GPUI crate/cache。未从网络下载依赖。
-- `/Users/xian/Project/book/zed` 当前 HEAD 为 `a5c4ca8bf6c4717a328a4a61b42d6d1d38949bcc`（2026-10-25，主线提交）；本地状态干净。它不是已证明的 `gpui-pre` 候选，不能用来替代锁定来源。
+- `find <cargo-home>/registry/src <cargo-home>/git/checkouts <cargo-home>/git/db -maxdepth 5 -iname '*gpui*' -print 2>/dev/null`：未发现 GPUI crate/cache。未从网络下载依赖。
+- `<external>/zed` 指仓库外的参考克隆（不在本仓库内，也不随本仓库分发）当前 HEAD 为 `a5c4ca8bf6c4717a328a4a61b42d6d1d38949bcc`（2026-10-25，主线提交）；本地状态干净。它不是已证明的 `gpui-pre` 候选，不能用来替代锁定来源。
 - 本地 registry/git cache 未发现 GPUI。Zed checkout `a5c4ca8bf6c4717a328a4a61b42d6d1d38949bcc` 是主线，不是可直接认作 `gpui-pre` 的锁定来源。
 - 只读 GitHub 检索发现 `gpui-pre` 0.3.9 的镜像 manifest 声明 Zed 源快照 `93d745668805029476e6d7fbb19652116fed51de`、Apache-2.0、edition 2024。更关键的是，直接读取该快照对应的 [Zed 官方 `crates/gpui/Cargo.toml`](https://github.com/zed-industries/zed/blob/93d745668805029476e6d7fbb19652116fed51de/crates/gpui/Cargo.toml)，其中列有非 optional `regex = { workspace = true, default-features = true }`。按当前 `engineering-gates` change 的全闭包禁用要求，GPUI 依赖方向 `app/aline-ui/aline-plugin → gpui-pre 0.3.9 (gpui) → regex` 会违反准入条件。镜像的[规范化 manifest](https://github.com/wormhole-terminal/gpui-pre/blob/main/Cargo.toml)也显示此依赖。该源码证据是对官方 Zed 快照的只读审查，不等于 Cargo 发布包校验/构建证据。
 - 另检查 `gpui-pre` 0.3.6 所声明的官方 Zed 快照 `bcf6582ce3500df93a8a39366640173e6786cea6`：[官方 GPUI manifest](https://github.com/zed-industries/zed/blob/bcf6582ce3500df93a8a39366640173e6786cea6/crates/gpui/Cargo.toml)同样列出 `regex.workspace = true`。因此已检查的两个历史候选版本均无法满足当前全闭包禁令；这不证明所有版本都不合规，但没有找到任何合规候选。

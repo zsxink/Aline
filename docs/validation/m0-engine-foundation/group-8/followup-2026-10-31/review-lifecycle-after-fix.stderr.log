@@ -1,3 +1,0 @@
-   Compiling aline-ui v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-ui)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.60s
-     Running tests/document_followups.rs (target/debug/deps/document_followups-79eccc470025bd16)

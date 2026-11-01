@@ -83,7 +83,7 @@ argv = ['cargo', 'metadata', '--no-deps', '--format-version', '1',
 | `root-not-workspace` | 根是目录但无 `Cargo.toml` | `root-not-workspace` |
 | `empty-scan` | `members = []` 的空 workspace | `empty-scan` + `missing-member` |
 
-主 Agent 变异自证（4 处，均变红，副本在 `/tmp/r06main/mut/`）：
+主 Agent 变异自证（4 处，均变红，副本在 `<tmp>/r06main/mut/`）：
 
 | 变异 | 变红的 case |
 |------|-------------|
@@ -134,25 +134,25 @@ argv = ['cargo', 'metadata', '--no-deps', '--format-version', '1',
 - `pre-fix.txt` —— 修复前实际输出（含 `zz_probe_seg.rs` 说明，见 §7 第 3 条）
 - `post-fix.txt` —— 修复后各命令输出；主 Agent 复核追加在「[追加]」段
 - `commands.txt` —— argv / cwd / 起止 UTC / exit code / CARGO_HOME 探测
-- 原始输出：`/tmp/r06main/`（主 Agent 复核）、`/tmp/r06-*`（worker）
+- 原始输出：`<tmp>/r06main/`（主 Agent 复核）、`<tmp>/r06-*`（worker）
 
 ## 7. 主 Agent 独立复核（追加，不改上文）
 
 复核于 2026-11-01 独立执行，不采信 worker 自述：
 
-1. **自测**：`python3 scripts/check_safety.py --self-test --output-dir /tmp/r06main`
+1. **自测**：`python3 scripts/check_safety.py --self-test --output-dir <tmp>/r06main`
    start `2026-11-01T06:47:01Z` / end `06:47:06Z`，exit 0，`cases=60`、`passed=true`、
    `failed cases=[]`、`workspace_after_fixtures failures=0`、`scanned=89`。
    基线计数独立复算：`git show HEAD:scripts/check_safety.py` 导出副本跑 `--self-test`
    → exit 0、`cases=53`、`passed=true`。故 60 = 53 + 7，既有项无删减。
 2. **扫描范围无漂移**：旧脚本 `--root .` → `scanned=89`；新脚本 → `scanned=89`；
    `(file, kind)` 集合差集**双向为空**，`failures` 均为 0。
-3. **F-09 自建夹具**（不复用 worker 的 `/tmp/aline-m0-independent-review.pTFf8u`）：
-   在 `/tmp/r06main/fx/ext-target` 按八成员形状重建，`crates/aline-buffer/Cargo.toml`
+3. **F-09 自建夹具**（不复用 worker 的 `<tmp>/aline-m0-independent-review.pTFf8u`）：
+   在 `<tmp>/r06main/fx/ext-target` 按八成员形状重建，`crates/aline-buffer/Cargo.toml`
    写 `[lib] path = "../../outside.rs"`，`outside.rs` 内含 `v.unwrap()`。
    旧脚本 exit 0、`failures=[]`、`scanned=8`（静默 fail-open）；
    新脚本 exit 1、`external-target-path`、detail `lib .../crates/aline-buffer/../../outside.rs`。
-4. **F-15 自建夹具**：`--root /tmp/r06main/fx/nope` → exit 1 `root-missing`；
+4. **F-15 自建夹具**：`--root <tmp>/r06main/fx/nope` → exit 1 `root-missing`；
    `--root <成员清单目录>` → exit 1 `root-not-workspace`，
    detail `workspace_root=... root_is_package=True`。
 5. **变异自证**：§3 表格 4 处变异全部使 self-test exit 1 并命中预期 case。
@@ -178,15 +178,15 @@ argv = ['cargo', 'metadata', '--no-deps', '--format-version', '1',
 
 ### 8.2 D1（中）目录符号链接逃逸 fail-open —— 已修复
 
-复核夹具：`crates/aline-buffer/src/linkdir -> /tmp/.../outside-dir`，`outside-dir/mod.rs`
+复核夹具：`crates/aline-buffer/src/linkdir -> <tmp>/.../outside-dir`，`outside-dir/mod.rs`
 含 `v.unwrap()`，`lib.rs` 写 `mod linkdir;`；新脚本 exit 0 / `failures=[]` / `scanned=8`，
 而 `rustc 1.98.1 --edition=2024` 实际编译了该文件。根因已由主 Agent 独立证实：
 **Python 3.9.6 的 `Path.rglob('**')` 不下降目录符号链接**（裸探针只返回 `member/src/lib.rs`）。
 
 修复：把 `directory.rglob('*.rs')` 换成显式 `collect(start)` 下降，逐项按
 `os.path.realpath` 判定落点——逃逸成员外一律 `external-target-path` 拒绝；留在成员内按真实
-路径计入扫描（与普通文件同权，不得漏扫）。修复后主 Agent 自建夹具 `/tmp/symfx`：
-exit 1、`external-target-path`、detail `symlink escapes member: /private/tmp/symfx-outside`。
+路径计入扫描（与普通文件同权，不得漏扫）。修复后主 Agent 自建夹具 `<tmp>/symfx`：
+exit 1、`external-target-path`、detail `symlink escapes member: <tmp>/symfx-outside`。
 旧脚本在同一夹具上同样 exit 0，故这是**既有缺陷、非本批回归**；按复核 §E 裁决
 「必须删除或修正过强声明」——本批选择让实现兑现声明，而非删掉声明。
 
@@ -214,7 +214,7 @@ exit 1、`external-target-path`、detail `symlink escapes member: /private/tmp/s
 
 | 项 | 结果 |
 |----|------|
-| `--self-test`（`/tmp/r06b-st`） | exit 0、`cases=65`、`passed=true`、failed `[]`、`workspace_after_fixtures.failures=0` |
+| `--self-test`（`<tmp>/r06b-st`） | exit 0、`cases=65`、`passed=true`、failed `[]`、`workspace_after_fixtures.failures=0` |
 | `dangling-target-symlink` | `expected_failures=1` / `actual_failures=1` / rules `['target-path-missing']` |
 | 真实仓库 `--root .` | exit 0、`failures=0`、`scanned=89`（与复核基线一致） |
 | 变异 A（`collect` 去掉包含判定） | exit 1；红：`symlink-directory-escapes-member`、`symlink-file-escapes-member` |

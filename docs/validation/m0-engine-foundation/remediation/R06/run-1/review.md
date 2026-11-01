@@ -10,7 +10,7 @@
 
 ### Q1 F-09 真修复
 
-自建 8 成员夹具 `/tmp/r06review.qtrajS/fx-lib`（`crates/aline-buffer/Cargo.toml` 写 `[lib] path = "../../outside.rs"`，`outside.rs` 含 `v.unwrap()`）。旧脚本由 `git show 340152c:scripts/check_safety.py` 导出，同目录同时导出 `safety_lex.py`：
+自建 8 成员夹具 `<tmp>/r06review.qtrajS/fx-lib`（`crates/aline-buffer/Cargo.toml` 写 `[lib] path = "../../outside.rs"`，`outside.rs` 含 `v.unwrap()`）。旧脚本由 `git show 340152c:scripts/check_safety.py` 导出，同目录同时导出 `safety_lex.py`：
 
 - 旧：exit 0，`failures=[]`，`scanned=8`，`outside.rs` 不在 `scanned`；
 - 新：exit 1，唯一规则 `external-target-path`，detail `lib .../crates/aline-buffer/../../outside.rs`，outside 未被扫描。
@@ -76,7 +76,7 @@ M2–M5 与 report §3 四处无对应；M1 与报告第一处效果同域，但
 
 ## D 发现的缺陷
 
-1. **中：目录符号链接逃逸仍 fail-open，且与代码/报告声明矛盾。** 自建夹具：`crates/aline-buffer/src/linkdir -> /tmp/.../outside-dir`，`outside-dir/mod.rs` 含 `v.unwrap()`，`lib.rs` 写 `mod linkdir;`。新脚本 exit 0、`failures=[]`、`scanned=8`，outside 文件未被扫描；`rustc 1.98.1 --edition=2024` 实际编译了它（warning 指向 `src/linkdir/mod.rs:2`）。原因：Python 3.9 `Path.rglob('**')` 不下降目录符号链接，拒绝分支只覆盖「被枚举到的文件符号链接」；`mod` 解析虽找到 `linkdir/mod.rs`，但 `production_targets` 从未加入扫描集合。旧脚本同样 exit 0（非本提交引入的回归），但本提交的代码注释与 §2.1 表格声称「成员内符号链接指向目录外 → external-target-path 拒绝」，该声明不成立，§5 也未登记。
+1. **中：目录符号链接逃逸仍 fail-open，且与代码/报告声明矛盾。** 自建夹具：`crates/aline-buffer/src/linkdir -> <tmp>/.../outside-dir`，`outside-dir/mod.rs` 含 `v.unwrap()`，`lib.rs` 写 `mod linkdir;`。新脚本 exit 0、`failures=[]`、`scanned=8`，outside 文件未被扫描；`rustc 1.98.1 --edition=2024` 实际编译了它（warning 指向 `src/linkdir/mod.rs:2`）。原因：Python 3.9 `Path.rglob('**')` 不下降目录符号链接，拒绝分支只覆盖「被枚举到的文件符号链接」；`mod` 解析虽找到 `linkdir/mod.rs`，但 `production_targets` 从未加入扫描集合。旧脚本同样 exit 0（非本提交引入的回归），但本提交的代码注释与 §2.1 表格声称「成员内符号链接指向目录外 → external-target-path 拒绝」，该声明不成立，§5 也未登记。
 2. **低：两处新规则无自测断言。** M6/M7 存活证明 `target-path-missing` 与符号链接文件拒绝均无 case 覆盖；自测中没有任何符号链接夹具。
 3. **低（文档）：`report.md` §5 第 4 条错误**，见 Q7。
 4. **低（纵深防御）：`targets=[]` 无显式守卫**，仅依赖 cargo 自身拒绝无 target 包。
@@ -95,4 +95,4 @@ M2–M5 与 report §3 四处无对应；M1 与报告第一处效果同域，但
 - 未声明的残留：D1 目录符号链接；D2 两规则无断言；D4 `targets=[]` 依赖 cargo 自身拒绝。
 - 未发现相对旧脚本的新增行为盲区：真实仓库新旧 `scanned` 89 条完全一致，新增 target 校验只会更严。
 
-（取证临时目录 `/tmp/r06review.qtrajS` 已按要求清理。）
+（取证临时目录 `<tmp>/r06review.qtrajS` 已按要求清理。）

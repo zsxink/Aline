@@ -17,13 +17,13 @@
 | 只读核对 | `git rev-parse/log/cat-file/ls-tree/show --stat`；`rg`/`sed` 读源码与报告；逐条比对 `parse.rs`/`build.rs`/`projection.rs`/`reuse.rs`/`tree/html.rs` |
 | 未执行 | 19 项工作区门禁、`cargo clippy`/`fmt`、`cargo test --workspace`、`dump_tree` 示例、修复前日志逐字节复跑、Windows/Linux |
 
-命令与退出码：`docs/validation/m0-engine-foundation/group-6/review-round-3-evidence/commands.log`；git 核对原始输出同目录 `git-verification.log`；链接检查 `link-check.log`；测试日志同目录 `cargo-test-*.log`。环境：`CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`。
+命令与退出码：`docs/validation/m0-engine-foundation/group-6/review-round-3-evidence/commands.log`；git 核对原始输出同目录 `git-verification.log`；链接检查 `link-check.log`；测试日志同目录 `cargo-test-*.log`。环境：`CARGO_HOME=<cargo-home>`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`。
 
 ## 2. 逐项判定
 
 | ID | 判定 | 依据方式 | 证据指针（代码/日志/git） |
 |---|---|---|---|
-| N-F1-1 组级报告与链接 | **关闭** | 实跑 + 只读核对 | `group-6/report.md` 存在且含逐任务索引；`link-check.log` 中 14 条 `GROUP_LINK` 全部 OK；`docs/engine-design.md:179`、`:437` 的组 6 报告链接解析成功；111 个缺失链接全部为 `docs/splat-study.md`（80 个绝对路径 `</Users/...>`）与 `docs/maintenance/deletion-readiness`（31 个）既有链接，无一在 `docs/validation/` |
+| N-F1-1 组级报告与链接 | **关闭** | 实跑 + 只读核对 | `group-6/report.md` 存在且含逐任务索引；`link-check.log` 中 14 条 `GROUP_LINK` 全部 OK；`docs/engine-design.md:179`、`:437` 的组 6 报告链接解析成功；111 个缺失链接全部为 `docs/splat-study.md`（80 个清理前使用绝对路径的链接）与 `docs/maintenance/deletion-readiness`（31 个）既有链接，无一在 `docs/validation/` |
 | F3-8 证据已提交 | **关闭** | 只读核对 | `git cat-file -t 55bd376`=`commit`；`git ls-tree 55bd376` 列出 group-6 证据（如 `report.md` blob `665c9745…`、`review-round-2.md` blob `5e9aadff…`、`probe-after.log` blob `f6b80def…`）；`55bd376` 全树 `.codegraph/` 计数 0；`report.md` §5 的 `58fa382`/`55bd376`/`45d4324` 与 `git log` 一致 |
 | N-F2-1 跨行引用定义 | **关闭** | 实跑 + 只读核对 | `crates/aline-markdown/src/reuse.rs:250-286`：逐行状态机，`[` 置开态、`]` 闭合并记录 `label_spans_lines`，跨行闭 `]` 后紧跟 `:` 即返回 true，空行重置，`\` 跳过下一字节；`tests/reuse.rs:209-315` 的 5 个跨行用例；`--test reuse` 18 passed |
 | N-F2-2 过滤扫描步数 | **关闭** | 实跑 + 只读核对 | `tests/hostile.rs:227-244` 三个过滤样本期望 5/3/3；`cross_validate_scan_steps`（同文件 64-102）用二分逼近真实预算阈值并与 `stats().scan_steps` 断言相等；`step-6.6/fix-n-f2-2-n-f2-3/probe-after.log` 实测 5/5、3/3、3/3、8/8、80/80；复刻循环 `tree/html.rs:648-702` 复用真实扫描器的 `is_filtered_tag`/`filtered_close_end`，报告明确称其为复刻；`--test hostile` 19 passed |

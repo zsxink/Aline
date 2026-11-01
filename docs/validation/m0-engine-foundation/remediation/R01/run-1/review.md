@@ -19,8 +19,8 @@
 | fmt | `cargo fmt --all --check` | exit 0 |
 | 工作树 | 因 R02 在写 `aline-markdown` 而编译失败（E0425） | **失败源为 R02，未计入 R01** |
 
-我核对了 `/tmp/r01-verify-ws.log`：45 条 `test result: ok`、0 条 `FAILED`；
-`/tmp/r01-verify-clippy.log` 末行 `Finished` 无 warning。
+我核对了 `<tmp>/r01-verify-ws.log`：45 条 `test result: ok`、0 条 `FAILED`；
+`<tmp>/r01-verify-clippy.log` 末行 `Finished` 无 warning。
 
 ## reviewer 的六项逐条结论（摘要）
 

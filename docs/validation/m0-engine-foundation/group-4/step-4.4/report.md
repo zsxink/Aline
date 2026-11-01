@@ -13,7 +13,7 @@
 
 ## 执行证据
 
-`python3 docs/validation/m0-engine-foundation/group-4/step-4.4/check-std-probes.py` 于 2026-10-31T04:04:54.688192Z 开始、04:04:55.503432Z 结束，退出 0（两个反例均按预期复现）；完整子命令和输出见 `probe-logs/probes.log`，命令环境与起止/退出码见 `probe-logs/probes.json`。探针位置位于 macOS 27.0.1、Apple arm64 的 APFS Data 卷，Rust 1.98.1；Cargo 环境为离线，`CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`。测试用 ACL/xattr 及路径故障均在临时目录内生成，退出后删除。
+`python3 docs/validation/m0-engine-foundation/group-4/step-4.4/check-std-probes.py` 于 2026-10-31T04:04:54.688192Z 开始、04:04:55.503432Z 结束，退出 0（两个反例均按预期复现）；完整子命令和输出见 `probe-logs/probes.log`，命令环境与起止/退出码见 `probe-logs/probes.json`。探针位置位于 macOS 27.0.1、Apple arm64 的 APFS Data 卷，Rust 1.98.1；Cargo 环境为离线，`CARGO_HOME=<cargo-home>`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`。测试用 ACL/xattr 及路径故障均在临时目录内生成，退出后删除。
 
 ## 未解决问题与下一步
 
@@ -35,13 +35,13 @@ SAFE-06、架构 §7.3 与 R-15-07 要求权限失败受检、替换失败保全
 |---|---|
 | `macos-probe/Cargo.toml` | `9bbcfd0663ce735f60f06eba544f0679da882751598b0db9d42e93b087d4b10d` |
 | `macos-probe/expected.v1.txt` | `f1216f2ba3f39bc46a8e5d079fdc189026685b67b69745ba28ecddf283807a1d` |
-| `macos-probe/main.rs` | `624d8e02311e71173d04ddaea9a44a6a05428a30f8baa1d0a818643aa5360369` |
+| `macos-probe/main.rs` | `bdc374c7b03bd649c2420dcec2eb6d246267b873e0de1765e79fb9c5dcf0262e` |
 
 `macos-probe-execution` 是早期 `main.rs`（哈希 `b5da6111…`）的执行，运行以清理错误退出，不是当前源码证据；只有 execution-2 对应上表版本。两份探针日志分别为 `probe-logs/probes.log`（两个 std 反例）与 `macos-probe-execution-2/probe.stdout.log`（机制探针）。
 
 ### 构建与执行
 
-环境：macOS 27.0.1 (26A434)；`rustc 1.98.1 (48a229cea 2026-09-01)`，host `aarch64-apple-darwin`（`system.stdout.log` 只记录 `sw_vers`，未记录 `uname -m`；arm64 是工具链 host 事实，不是独立硬件/内核记录）。构建根位于 `/System/Volumes/Data` 挂载下；`filesystem.stdout.log` 的 `df -P` 未记录文件系统类型，不能据此写成“APFS”。`CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`。
+环境：macOS 27.0.1 (26A434)；`rustc 1.98.1 (48a229cea 2026-09-01)`，host `aarch64-apple-darwin`（`system.stdout.log` 只记录 `sw_vers`，未记录 `uname -m`；arm64 是工具链 host 事实，不是独立硬件/内核记录）。构建根位于 `<system-volume>/Data` 挂载下；`filesystem.stdout.log` 的 `df -P` 未记录文件系统类型，不能据此写成“APFS”。`CARGO_HOME=<cargo-home>`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`。
 
 | 命令 | UTC 起止 | 退出码 |
 |---|---|---:|
@@ -68,7 +68,7 @@ SAFE-06、架构 §7.3 与 R-15-07 要求权限失败受检、替换失败保全
 
 ### 限制与未覆盖项
 
-1. 这是 macOS 27.0.1、`aarch64-apple-darwin` 工具链、`/System/Volumes/Data` 挂载下的单机观察（`df` 日志未记录文件系统类型）；未覆盖 Intel Mac、Windows、Linux、网络卷、外接卷或其他文件系统。
+1. 这是 macOS 27.0.1、`aarch64-apple-darwin` 工具链、`<system-volume>/Data` 挂载下的单机观察（`df` 日志未记录文件系统类型）；未覆盖 Intel Mac、Windows、Linux、网络卷、外接卷或其他文件系统。
 2. `readonly-target` 成功只说明本机该系统调用可对只读 fd 执行元数据复制，不是跨平台或跨文件系统的保证；`immutable-target` 只形成 `EPERM` 失败样本，不构成完整权限错误矩阵。
 3. 未测试 owner/group、setuid/setgid 等特殊模式位、ACL 继承标志、ACL allow/deny 变体、资源限制与跨进程并发。
 4. 未测试父目录替换、临时路径被替换、发布前后路径竞争、跨进程 CAS、目录同步或断电保证；探针不替换用户文件，也不执行真实应用保存。
@@ -148,12 +148,12 @@ SAFE-06、架构 §7.3 与 R-15-07 要求权限失败受检、替换失败保全
 
 ### 实际命令与结果
 
-环境：macOS 当前主机；`rustc 1.98.1`；`CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`。以下均为实际执行，不是手工补写。
+环境：macOS 当前主机；`rustc 1.98.1`；`CARGO_HOME=<cargo-home>`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`。以下均为实际执行，不是手工补写。
 
 | 命令 | UTC 起止 | 退出码 | 证据 |
 |---|---|---:|---|
 | `cargo test -p aline-source atomic` | 2026-10-31T05:35:29.420976Z–05:35:29.515896Z | 0 | `targeted-test-execution-3/targeted-test.command.json`、stdout/stderr |
-| `python3 scripts/check_workspace.py --cargo-home /Users/xian/Library/Caches/aline-m0/cargo-home --output-dir docs/validation/m0-engine-foundation/group-4/step-4.4/workspace-gates-execution-3` | 2026-10-31T05:35:05.861970Z–05:35:25.634078Z | 0（19 条记录全部 0） | `workspace-gates-execution-3/summary.json`、逐命令日志 |
+| `python3 scripts/check_workspace.py --cargo-home <cargo-home> --output-dir docs/validation/m0-engine-foundation/group-4/step-4.4/workspace-gates-execution-3` | 2026-10-31T05:35:05.861970Z–05:35:25.634078Z | 0（19 条记录全部 0） | `workspace-gates-execution-3/summary.json`、逐命令日志 |
 
 定向测试日志先显示 `10 passed`（`atomic::tests`）和 `7 passed`（`tests/atomic.rs`）；随后四个 0-test 的测试二进制是 cargo 对同一过滤词在其他集成测试目标中的“0 passed / N filtered”，不是失败。定向测试不能替代工作区门禁；工作区门禁也不能替代 V-08 或跨平台验证。
 

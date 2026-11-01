@@ -10,7 +10,7 @@
    没有对受跟踪文件的改动（见 `baseline-status.txt`）。没有 reset、没有覆盖用户改动。
 3. 记录工具链与环境：`rustc 1.98.1`、`cargo 1.98.1`、host `aarch64-apple-darwin`（见 `toolchain.txt`、`env.txt`）。
 4. 建立新证据根目录 `docs/validation/m0-engine-foundation/remediation/`，按批次/运行编号分目录，不覆盖既有 `group-1..9` 历史证据。
-5. 核对既有整改：除本任务表外，工作树中没有其它进行中的整改产物；原复核临时目录 `/tmp/aline-m0-independent-review.pTFf8u/` 仍存在，
+5. 核对既有整改：除本任务表外，工作树中没有其它进行中的整改产物；原复核临时目录 `<tmp>/aline-m0-independent-review.pTFf8u/` 仍存在，
    其 `C/independent_tests.rs`、`C/repro.rs`、`C/rewrite_repro.rs`、`root/reuse_probe.rs` 已在本轮原样重读并记录（见任务表 §4）。
 6. 明确不把原 tasks.md 的 46 条已勾选当通过：原任务勾选保持不动，最终在 R14 重新裁决。
 

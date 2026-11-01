@@ -1,6 +1,6 @@
 # R04 派发契约：F-02 edit→DocCore 受检消费（普通/IME 提交不再绕过 plan/validate）
 
-基线 HEAD：以派发时 `git rev-parse HEAD` 为准（**必须晚于 R01 的 `79c3b54`**，R01 已改 `doc_core.rs`；不要再基于 `2f1dcea` 复述旧行号）。仓库根 `/Users/xian/Project/editor/Aline`。前置 R01（已完成）、R02、R03（markdown 侧）已落地；**不得写 `crates/aline-markdown/**`、`crates/aline-edit/**`、`crates/aline-buffer/**` 的任何源码**。
+基线 HEAD：以派发时 `git rev-parse HEAD` 为准（**必须晚于 R01 的 `79c3b54`**，R01 已改 `doc_core.rs`；不要再基于 `2f1dcea` 复述旧行号）。仓库根 `<repo>`。前置 R01（已完成）、R02、R03（markdown 侧）已落地；**不得写 `crates/aline-markdown/**`、`crates/aline-edit/**`、`crates/aline-buffer/**` 的任何源码**。
 
 ## 文件所有权（只有你可写这些文件）
 
@@ -16,7 +16,7 @@
 
 ## 失败事实（F-02，阻断，维度 D1/D4/D6）
 
-原独立复核探针（`/tmp/aline-m0-independent-review.pTFf8u/C/repro.rs`，实测原文）：
+原独立复核探针（`<tmp>/aline-m0-independent-review.pTFf8u/C/repro.rs`，实测原文）：
 
 ```
 protect mode=Visual

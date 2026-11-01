@@ -1,7 +1,0 @@
-   Compiling pulldown-cmark v0.13.6
-   Compiling bitflags v2.13.2
-   Compiling memchr v2.8.3
-   Compiling aline-markdown-probe v0.0.0 (/private/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-pure-candidates-s7evczrv/crates/aline-markdown-probe)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.58s
-     Running `/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-m0-pure-candidates-s7evczrv/target/debug/examples/probe-consume`
-pulldown-cmark events=6

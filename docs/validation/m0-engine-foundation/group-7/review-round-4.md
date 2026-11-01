@@ -17,7 +17,7 @@
 | 只读核对 | 残留文本全局搜索：`10:04:56`、`从未进入提交`、`当前不可复现` |
 | 未执行 | 19 项工作区门禁复跑、`cargo clippy`/`fmt`、`cargo test --workspace`、真实 UI/DocCore/IME、Windows/Linux；`summary.json` 的历史时点不可由 git 重建 |
 
-环境：`CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`，cargo 一律 `--locked --offline`。
+环境：`CARGO_HOME=<cargo-home>`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`，cargo 一律 `--locked --offline`。
 
 命令与退出码：`review-round-4-evidence/commands.log`；git 与 summary.json 原始输出：`git-verification.log`、`summary-verification.log`；测试日志：`cargo-test-refusals.stdout.log`、`cargo-test-goldens.stdout.log`、`cargo-test-full.stdout.log`；扫描与残留搜索：`write-channel-and-code-scan.log`、`workspace-write-channel-at-head.log`、`residual-search.log`。
 

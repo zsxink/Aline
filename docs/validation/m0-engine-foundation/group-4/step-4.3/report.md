@@ -13,7 +13,7 @@
 
 ## 实际命令与环境
 
-macOS 27.0.1 (26A434)，Apple arm64，`rustc 1.98.1 (48a229cea 2026-09-01)`，`cargo 1.98.1 (797e8a9bc 2026-08-05)`，host `aarch64-apple-darwin`。`CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`。统一执行开始 2026-10-31T03:56:35.172687Z，结束 2026-10-31T03:56:53.922653Z；各条 UTC 起止、命令、环境及退出码见 `gates/*.json`，输出见同名 `.log`。
+macOS 27.0.1 (26A434)，Apple arm64，`rustc 1.98.1 (48a229cea 2026-09-01)`，`cargo 1.98.1 (797e8a9bc 2026-08-05)`，host `aarch64-apple-darwin`。`CARGO_HOME=<cargo-home>`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`。统一执行开始 2026-10-31T03:56:35.172687Z，结束 2026-10-31T03:56:53.922653Z；各条 UTC 起止、命令、环境及退出码见 `gates/*.json`，输出见同名 `.log`。
 
 | 命令 | 退出码 | 结果 |
 |---|---:|---|
@@ -24,7 +24,7 @@ macOS 27.0.1 (26A434)，Apple arm64，`rustc 1.98.1 (48a229cea 2026-09-01)`，`c
 | `cargo clippy --workspace --all-targets -- -D warnings` | 0 | 通过 |
 | `cargo test --workspace` | 0 | 通过 |
 | `openspec validate m0-engine-foundation --strict --no-interactive` | 0 | change 结构有效；不是 M0 验收 |
-| `python3 scripts/check_workspace.py --cargo-home /Users/xian/Library/Caches/aline-m0/cargo-home --output-dir docs/validation/m0-engine-foundation/group-4/step-4.3/workspace-gates` | 0 | 子检查及 self-test 均退出 0，逐项日志见 `workspace-gates/` |
+| `python3 scripts/check_workspace.py --cargo-home <cargo-home> --output-dir docs/validation/m0-engine-foundation/group-4/step-4.3/workspace-gates` | 0 | 子检查及 self-test 均退出 0，逐项日志见 `workspace-gates/` |
 
 开发中 source 局部 Clippy 首次报告 `chunks_exact_to_as_chunks`，修改测试后重跑退出 0；上表为最终版本执行记录。`--all-targets` 仅覆盖当前宿主，不代表其他操作系统或全部 feature 组合。`public-api` 守卫是既有夹具自测，不代表扫描全部公开 API。
 

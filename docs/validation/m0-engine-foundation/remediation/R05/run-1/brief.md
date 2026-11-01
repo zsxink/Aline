@@ -1,6 +1,6 @@
 # R05 派发契约：F-08 lint 继承必须真实解析
 
-基线 HEAD：`2f1dcea46d5998f4e2ba213e73c11de166f943c4`。仓库根 `/Users/xian/Project/editor/Aline`。
+基线 HEAD：`2f1dcea46d5998f4e2ba213e73c11de166f943c4`。仓库根 `<repo>`。
 
 ## 文件所有权（只有你可写这些文件）
 
@@ -16,7 +16,7 @@
 原复核夹具（本机仍在）：
 
 ```
-/tmp/aline-m0-independent-review.pTFf8u/D/lint-decoy/
+<tmp>/aline-m0-independent-review.pTFf8u/D/lint-decoy/
 ```
 
 其 `crates/aline-buffer/Cargo.toml` 为：
@@ -33,7 +33,7 @@ version="0.0.0"
 edition="2024"
 ```
 
-原实测：`python3 scripts/check_lints.py --root <该夹具>` exit **0**，输出「workspace lint 声明有效」。而真实 Cargo 把这段读成 description。对照夹具 `/tmp/aline-m0-independent-review.pTFf8u/D/lint-real-inheritance/`（真实继承）在 `cargo clippy --manifest-path ... -p aline-buffer --locked --offline -- -D warnings` 下 exit 101（`missing documentation for the crate`），伪继承夹具同命令 exit 0。
+原实测：`python3 scripts/check_lints.py --root <该夹具>` exit **0**，输出「workspace lint 声明有效」。而真实 Cargo 把这段读成 description。对照夹具 `<tmp>/aline-m0-independent-review.pTFf8u/D/lint-real-inheritance/`（真实继承）在 `cargo clippy --manifest-path ... -p aline-buffer --locked --offline -- -D warnings` 下 exit 101（`missing documentation for the crate`），伪继承夹具同命令 exit 0。
 
 若 `/tmp` 夹具已不存在，按上面的 manifest 原文在**你自己的证据目录下的临时副本**里重建（不得写进仓库受跟踪路径）。
 

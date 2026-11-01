@@ -116,10 +116,10 @@ S-5/S-7/S-12 属安全/治理条目，本组只贡献“拒绝路径类型化、
 命令（第二次）：
 
 ```sh
-CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home \
+CARGO_HOME=<cargo-home> \
 RUSTUP_TOOLCHAIN=1.98.1 CARGO_NET_OFFLINE=true \
 python3 scripts/check_workspace.py \
-  --cargo-home /Users/xian/Library/Caches/aline-m0/cargo-home \
+  --cargo-home <cargo-home> \
   --output-dir docs/validation/m0-engine-foundation/group-7/step-7.4/leader-verify-post-fix/workspace-gates
 ```
 

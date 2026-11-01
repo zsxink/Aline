@@ -1,0 +1,24 @@
+# R10 交接（2026-11-01）
+
+- 状态：DONE_WITH_CONCERNS，交主 Agent 验证；遵照派发禁令未 commit。
+- 基线 HEAD：96024867f7ae949d7328232b05d93ed5bc6033d9；dirty 工作树用 current-input-sha256.json + current-source-diff.stdout.log 绑定。
+- 根因：旧 6.4 报告把调用 aline_markdown::parse 的探针误称「独立工具复算」。
+- 独立实现：independent/src/main.rs，仅依赖 pulldown-cmark，未导入/调用被测 Aline crate；不读取旧期望表/TSV。
+- 独立性证据：Cargo.toml/Cargo.lock、independent-dependencies.stdout.log、independent-source-review.stdout.log，以及完整可审查源码。
+- 从原始 basic.md 字节识别 front matter，第三方 offset 事件生成可见文本/Hidden/Aligned/Synthetic；FNV 读取全部字节。
+- 当前 fixture：319 字节，SHA-256 4da2cff1c689141b3c8af8dec66ffc4825e3f0f183025d79d5edd981d2197bc5。
+- 结果：197 绘制字节、49 片段；Hidden21/Exact24/Aligned1/Synthetic3；FNV 0xacb96228ce0d7842。
+- 差异：source身份+drawn+49 segment 共51行，逐行diff 0处（新增0/删除0）；diff.txt为空，系统diff -u exit0。
+- 原始输出：independent-output.txt、impl-output.txt；实现完整dump单独保留，impl-comparable.txt只筛选三种原行族。
+- 原始事件：independent-events.stdout.log；全部运行元数据：commands.txt及逐命令JSON/stdout/stderr。
+- 验证：Rust/Cargo1.98.1；离线锁定运行；独立测试4通过、Clippy -D warnings通过、fmt完整flags复验通过。
+- 历史保全：19个历史文件SHA/字节/mtime不变；54项当前源码输入哈希稳定。
+- 旧报告：仅追加14行（78–91），勘误标题79；原前77行逐字节不变。
+- goldens-check：只新增R10-evidence-index.md，未改旧探针/日志。
+- 三类证据分别见report.md §2独立推导、§3第二宿主、§4实现自证；不混用。
+- 限制：读过R09既有材料，不声称盲写；不追认旧TSV创作方式、不补造先行时间。
+- 参数偏差：最初cargo fmt argv缺--locked/--offline，环境始终offline；日志保留，后续cargo --locked --offline fmt --check通过。
+- 初始lock生成按brief例外单列initial-lock-generation；没有下载、没有冷缓存失败。
+- 不覆盖：旧六例TSV全量独立重算、实体/HTML/CRLF、真实UI/IME、其他平台、V/AC/M0完整出口。
+- 未修改crates/scripts/OpenSpec，未回退其他Agent改动；Cargo全部完成，已通知主Agent不再启动Cargo。
+- 下一步：主Agent核对证据、安排独立审查及统一CodeGraph同步/最终门禁后裁决F-06。

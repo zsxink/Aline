@@ -1,9 +1,0 @@
-{
-  "metadata_json_equal": true,
-  "tree_bytes_equal": true,
-  "lock_changed_lines": [
-    "-checksum = \"43b6dd56e85d9483277cde964fd1bdb0428de4fec5ebba7540995639a21cb32b\"",
-    "+checksum = \"0000000000000000000000000000000000000000000000000000000000000000\""
-  ],
-  "expectation": "仅rav1e未选节点lock checksum改变，metadata语义和tree字节完全不变"
-}

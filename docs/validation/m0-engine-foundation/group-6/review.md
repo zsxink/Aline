@@ -2,7 +2,7 @@
 
 - 复核日期：2026-10-31
 - 复核对象：OpenSpec change `m0-engine-foundation` 组 6（任务 6.1–6.8），包含 `aline-markdown` 的 pre/build/tree/blocks/protection/budget/reuse 源码、测试、夹具、示例与 `docs/validation/m0-engine-foundation/group-6/` 证据
-- 仓库与基线：`/Users/xian/Project/editor/Aline`，分支 `main`，HEAD `99867bf2c5775aae4e8ed910713496d4ff84323c`
+- 仓库与基线：`<repo>`，分支 `main`，HEAD `99867bf2c5775aae4e8ed910713496d4ff84323c`
 - 复核立场：实现者不是复核者。实现者的报告、日志与探针只作为待验材料；本报告的结论来自本次独立重跑、独立重算、外部探针与读码，不把实现者自述当作已证明事实
 - 写入范围：仅本文件。未修改 Rust 源码、测试、夹具、Cargo、lint/guard、`tasks.md`、其他 `docs/*.md` 或 OpenSpec 文件；未执行 `git commit`
 - 快照说明：复核期间工作区仍有并发写入（`step-6.4/goldens-check/` 于 2026-10-31T09:10:14Z 出现；`group-7` 后台实现仍在生成文件）。除特别注明外，本报告结论以 2026-10-31T09:10:44Z–09:13:36Z 读到的状态为准，HEAD 未变；晚于该快照的追加内容不在本报告覆盖范围内
@@ -59,7 +59,7 @@ A  docs/validation/m0-engine-foundation/group-7/step-7.1/goldens/edit-goldens.ts
 
 - 主机：`Darwin XianMac.local 27.2.0`（Darwin Kernel 27.2.0，`arm64`，Apple T8142）
 - 工具链：`rustc 1.98.1 (48a229cea 2026-09-01)`，`cargo 1.98.1 (797e8a9bc 2026-08-05)`
-- 环境变量：`CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`
+- 环境变量：`CARGO_HOME=<cargo-home>`、`RUSTUP_TOOLCHAIN=1.98.1`、`CARGO_NET_OFFLINE=true`
 - 所有 cargo 命令均使用 `--locked --offline`；本次复核未联网，未新增依赖
 
 ### 2.2 本次实际执行的命令与结果
@@ -69,10 +69,10 @@ A  docs/validation/m0-engine-foundation/group-7/step-7.1/goldens/edit-goldens.ts
 | `cargo fmt --all --check` | 2026-10-31T09:00:49Z–09:00:57Z 窗口 | 0 | 无格式差异 |
 | `cargo clippy --workspace --all-targets -- -D warnings` | 2026-10-31T09:00:49Z–09:00:57Z 窗口 | 0 | 无 warning，未触发 `-D warnings` |
 | `cargo test --workspace` | 2026-10-31T09:00:49Z–09:00:57Z 窗口 | 0 | workspace 合计 `134 passed`、0 failed |
-| `python3 scripts/check_workspace.py --cargo-home /Users/xian/Library/Caches/aline-m0/cargo-home --output-dir <临时输出目录>` | 2026-10-31T09:06:42Z–09:07:01Z | 0 | 19/19 项 `exit_code=0`，`summary.json` 顶层 `passed=true`；测试合计 134 |
-| 独立 Python 重算组 6 块/Gap 金样（`python3 -I /tmp/aline-review-goldens.py /Users/xian/Project/editor/Aline`） | 2026-10-31T09:08:56Z | 0 | 7 个夹具、57 个区间、0 问题 |
+| `python3 scripts/check_workspace.py --cargo-home <cargo-home> --output-dir <临时输出目录>` | 2026-10-31T09:06:42Z–09:07:01Z | 0 | 19/19 项 `exit_code=0`，`summary.json` 顶层 `passed=true`；测试合计 134 |
+| 独立 Python 重算组 6 块/Gap 金样（`python3 -I <tmp>/aline-review-goldens.py <repo>`） | 2026-10-31T09:08:56Z | 0 | 7 个夹具、57 个区间、0 问题 |
 | `cargo test -p aline-markdown --test {spec,rewrite,mapping,html,protection,hostile,reuse} --locked --offline` | 2026-10-31T09:11:28Z–09:11:38Z | 每项 0 | 8 / 6 / 10 / 11 / 6 / 10 / 7，合计 58 passed |
-| 外部探针 `/tmp/aline-review-probe` 的 `cargo run --offline` | 2026-10-31T09:13:28Z–09:13:30Z | 0 | 输出映射片段/规范锚点、复用命中/拒绝、HTML 行为（见第 3 节） |
+| 外部探针 `<tmp>/aline-review-probe` 的 `cargo run --offline` | 2026-10-31T09:13:28Z–09:13:30Z | 0 | 输出映射片段/规范锚点、复用命中/拒绝、HTML 行为（见第 3 节） |
 | `cargo tree -p aline-markdown --locked --offline` | 2026-10-31T09:13:36Z | 0 | 直接依赖仅 `aline-buffer` 与 `pulldown-cmark 0.13.6` |
 | `git log/show/stat`、`stat`、`sed`、`grep` 读码与证据核对 | 2026-10-31T09:0xZ–09:1xZ | 0 | 用于夹具先行、mtime、状态、日志一致性与代码路径核对 |
 
@@ -106,7 +106,7 @@ A  docs/validation/m0-engine-foundation/group-7/step-7.1/goldens/edit-goldens.ts
 
 ### 3.3 映射契约手算与探针
 
-我在不读取实现输出的情况下先手算以下用例的片段、来源范围、精确性、规范锚点，再用仓外探针 `/tmp/aline-review-probe` 对照；结果全部一致，也与 `step-6.4/goldens/mapping-goldens.tsv` 的 6 个用例一致。
+我在不读取实现输出的情况下先手算以下用例的片段、来源范围、精确性、规范锚点，再用仓外探针 `<tmp>/aline-review-probe` 对照；结果全部一致，也与 `step-6.4/goldens/mapping-goldens.tsv` 的 6 个用例一致。
 
 | 用例 | 源（转义） | 手算片段（drawn → source，precision） | 规范锚点 |
 | --- | --- | --- | --- |
@@ -181,7 +181,7 @@ A  docs/validation/m0-engine-foundation/group-7/step-7.1/goldens/edit-goldens.ts
 - `docs/validation/m0-engine-foundation/group-6/commands.log` 共 13 行，UTC 08:48:11–08:48:13Z，全部 `exit=0`；命令、环境、git 状态、定向测试、dump、全 crate 与独立金样日志与记录一致。未发现伪造日志的迹象。
 - 定向测试计数与本次重跑一致：spec 8、rewrite 6、mapping 10、html 11、protection 6、hostile 10、reuse 7；全 crate 合计 62（58 个定向 + 2 identity + 2 public API），workspace 合计 134。
 - `step-6.8/workspace-gates/summary.json` 顶层 `passed=true`，19 项结果全部 `exit_code=0`；`env_overrides` 明确记录三个环境变量；作用域为当前 macOS，未记录 CI。本次统一脚本重跑同为 19/19。
-- 环境日志只打印 `CARGO_HOME` 的现象已复现：本机 macOS `/usr/bin/printenv A B C` 只打印第一个存在的变量。因此不能据此判断 `RUSTUP_TOOLCHAIN`/`CARGO_NET_OFFLINE` 未设置；`run-targeted-tests.sh` 与 `workspace-gates/summary.json` 均记录三者，rustc/cargo 版本也与固定工具链一致（F3-7）。
+- 环境日志只打印 `CARGO_HOME` 的现象已复现：本机 macOS `printenv A B C` 只打印第一个存在的变量。因此不能据此判断 `RUSTUP_TOOLCHAIN`/`CARGO_NET_OFFLINE` 未设置；`run-targeted-tests.sh` 与 `workspace-gates/summary.json` 均记录三者，rustc/cargo 版本也与固定工具链一致（F3-7）。
 - 组 6 证据全部未跟踪、未提交；复核期间 `step-6.4/goldens-check/` 于 09:10:14Z 被追加（非本报告产物），说明证据集不是不可变快照。本报告固定了读取时间，晚到的追加证据不在覆盖范围（F3-8）。
 
 ## 4. 逐项结论（6.1–6.8）

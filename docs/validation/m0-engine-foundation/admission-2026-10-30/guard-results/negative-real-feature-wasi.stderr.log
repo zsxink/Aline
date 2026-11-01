@@ -1,1 +1,0 @@
-拒绝: 禁用包/GPUI 旁路: wasi@0.0.0，入边 [{"from": "fixture-negative-real-feature-wasi@0.0.0", "to": "wasi@0.0.0", "alias": "sandbox", "kinds": [{"kind": null, "target": null}]}]

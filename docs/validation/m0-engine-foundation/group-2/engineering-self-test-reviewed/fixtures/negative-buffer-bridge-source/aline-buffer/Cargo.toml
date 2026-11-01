@@ -1,8 +1,0 @@
-[package]
-name = "aline-buffer"
-version = "0.0.0"
-edition = "2024"
-publish = false
-
-[dependencies]
-hidden_alias = { package = "fixture-helper", path = "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-2/engineering-self-test-reviewed/fixtures/packages/negative-buffer-bridge-source-helper" }

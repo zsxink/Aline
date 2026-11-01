@@ -1,9 +1,0 @@
-{
-  "kind": "明确合成的输入变异，不是真实 Cargo 输出",
-  "base": "metadata-base-final.json / tree-all-base-packages.stdout.log / candidate/Cargo.lock",
-  "transformation": "negative-checksum-drift",
-  "expected_diagnostic": "校验和",
-  "expected_exit_code": 1,
-  "metadata_sha256": "7a9e1ca1c2a3945d26d153a1a739e60675f720a8d4626e255ad983f17d968cf9",
-  "temporary_inputs": "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-candidate-guard-tests-ld3kmb2z/negative-checksum-drift"
-}

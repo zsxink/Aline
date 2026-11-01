@@ -23,7 +23,7 @@
 3. 新增 `MAX_NESTING_DEPTH = 100`：`_enter_container`（值容器）、`_check_path_depth`
    （键/表路径）显式拒绝；`main` 异常元组追加 `RecursionError` 兜底。
 
-## 验证（全绿；原始捕获在 /tmp/r05b/evidence/）
+## 验证（全绿；原始捕获在 `<tmp>`/r05b/evidence/）
 - 正常仓库 `python3 scripts/check_lints.py` → exit 0，八成员不变。
 - `--self-test` → exit 0，**68 条符合预期 / 0 条不符**（基线 57 一条未减 + 新增 11），
   `parser_cases 25, table_path_cases 4, member_cases 5`。
@@ -49,7 +49,7 @@
    这一危险窗口，未额外拒绝单引号键形态（避免误伤 `[package]` 下 `"a.b" = 1` 这类真实写法）。
 3. **深度上限 100 是策略值**（真实语料最大 5）。若未来合法清单超过 100 层会被误拒，
    阈值是单一常量，便于调整。
-4. **Cargo 结论只在本机 1.98.1 实测**；Cargo 对照统一 `CARGO_HOME=/Users/xian/.cargo`
+4. **Cargo 结论只在本机 1.98.1 实测**；Cargo 对照统一 `CARGO_HOME=<cargo-home>`
    （默认指向 admission 隔离目录、registry 为空），理由写在 `commands.txt`。
 5. 本批零 Rust 改动，未跑 `cargo test` / `cargo build`。
 

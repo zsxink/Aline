@@ -45,7 +45,7 @@
 
 - 阅读 `run-k08-audit.sh`：只包含 `git rev-parse`、`cd`、`date`、`rustc --version`、`rg`、`sed`、`python3 -I`、`git diff`、`git status`、`printf`；没有写仓库文件的命令，输出由调用方重定向。
 - 独立重跑（只写 `/tmp`）：
-  `sh docs/validation/m0-engine-foundation/group-4/step-4.5/run-k08-audit.sh > /tmp/k08-review-14141.stdout.log 2> /tmp/k08-review-14141.stderr.log`
+  `sh docs/validation/m0-engine-foundation/group-4/step-4.5/run-k08-audit.sh > <tmp>/k08-review-14141.stdout.log 2> <tmp>/k08-review-14141.stderr.log`
   → exit 0；`utc_start=2026-10-31T05:51:02Z`，`utc_end=2026-10-31T05:51:02Z`；stdout 410 行；stderr 0 字节；`head=fd26bd8`；`rustc 1.98.1 (48a229cea 2026-09-01)`。
 - `diff -u <(sed -E 's/^(utc_start|utc_end)=.*/\1=<normalized>/' <已提交日志>) <(同样规范化 /tmp 日志)` → exit 0，0 行差异；即除 UTC 行外，重跑输出与已提交 `k08-offset-audit.stdout.log` 完全一致。
 - 已提交日志：`utc_start/utc_end=2026-10-31T05:46:35Z`，410 行，stderr 0 字节，HEAD 与工具链同上。
@@ -192,7 +192,7 @@ report §2（第 29 行）和 §3（第 35 行）本身已正确限定为“已�
 - 其余硬性检查通过：回填为纯追加（17 行新增、0 行删除）；哈希全部匹配；审计脚本只读且重跑输出与已提交日志一致；V-06/V-07 仍明确未通过，V-08 未触及；未测权限/替换竞争未被写成已验证；门禁 19/19 exit 0，UTC 与 report §8 一致；`crates/` 干净；相对链接可解析。
 - 修复 F1～F3 后，任务所有者可按流程决定是否勾选 `tasks.md` 4.5；本次复核不代替修复后的复审。
 
-本次复核未修改代码、文档、报告、脚本、日志或 `tasks.md`；唯一写入是新建本文件。审计重跑临时输出在 `/tmp/k08-review-14141.stdout.log` 和 `/tmp/k08-review-14141.stderr.log`。
+本次复核未修改代码、文档、报告、脚本、日志或 `tasks.md`；唯一写入是新建本文件。审计重跑临时输出在 `<tmp>/k08-review-14141.stdout.log` 和 `<tmp>/k08-review-14141.stderr.log`。
 
 ## 4. 增量复审（2026-10-31）
 
@@ -207,7 +207,7 @@ UTC：本轮命令执行于 `2026-10-31T06:00:01Z`–`2026-10-31T06:02:53Z`；�
 | 当前哈希 | `shasum -a 256 docs/engine-design.md docs/v1-architecture.md docs/v1-validation-plan.md docs/architecture-guide.md` | engine `675670da265f3bf5adc7d897b875fca665a1a97ee69790ede54ae0b990f37349`；arch `9bb8a98e44828e80929a7e7ea59386fa795868a1e28a7fb76b59c358f5c49ef9`；validation `e60a36a7b9fa130fd6e5664d69a3b4d8d33a3adc68449f2a0ef235049d64f0a5`；guide `f6f54d17d4f790e41cd7417e2ab34fde3e89e74d94f26b5558887668ec9465eb`；exit 0 |
 | 回填前哈希 | `git show HEAD:docs/<file> \| shasum -a 256` | engine `a4918c77fa54dc5d9fb739cadcae1537faf6e6ad9528bcd0ca23abac2bb92667`；arch `851debcba8fa9c928d449e64dd3c60d7f62ffd507089ac4e3e209c3a6d8c65fb`；validation `a0d21cfbc4ee04c26df8f264f020a221039b3efea15b4af2ba262917d698210d`；guide 与当前相同；exit 0 |
 | diff | `git diff --numstat -- docs/engine-design.md docs/v1-architecture.md docs/v1-validation-plan.md`；`git diff --check -- ...` | engine 11/0、arch 2/0、validation 4/0；合计 17 新增、0 删除；`diff --check` exit 0 |
-| 审计重跑 | `sh docs/validation/m0-engine-foundation/group-4/step-4.5/run-k08-audit.sh > /tmp/k08-review-incr.stdout.log 2> /tmp/k08-review-incr.stderr.log` | exit 0；stdout 410 行，stderr 0 字节；`utc_start`/`utc_end` 均为 `2026-10-31T06:01:25Z`；`HEAD=fd26bd8`；归一化 UTC 后与已提交 `k08-offset-audit.stdout.log` 的 diff 为 0 行（diff exit 0） |
+| 审计重跑 | `sh docs/validation/m0-engine-foundation/group-4/step-4.5/run-k08-audit.sh > <tmp>/k08-review-incr.stdout.log 2> <tmp>/k08-review-incr.stderr.log` | exit 0；stdout 410 行，stderr 0 字节；`utc_start`/`utc_end` 均为 `2026-10-31T06:01:25Z`；`HEAD=fd26bd8`；归一化 UTC 后与已提交 `k08-offset-audit.stdout.log` 的 diff 为 0 行（diff exit 0） |
 | 源码偏移符号 | `rg -n 'src_off\|source_off\|disk_off\|storage_off' crates/aline-source/src` | exit 1（无命中） |
 | crate 外消费者 | `rg -n 'aline_source\|SourceBaseline\|StorageSnapshot' crates app --glob '!crates/aline-source/**' --glob '!Cargo.toml'`；`rg -n 'aline-source' crates app --glob 'Cargo.toml'`；`rg -n 'StorageRange\|SourceBaseline\|StorageSnapshot' crates --glob '!crates/aline-source/**'` | 代码级消费者 exit 1；manifest 查询 exit 0，仅 `crates/aline-source/Cargo.toml:2` 自身包名与 `crates/aline-ui/Cargo.toml:15` 未使用依赖；crate 外 `StorageRange` 等 exit 1 |
 | 旧虚假表述 | `rg -n '没有公开\|尚未在代码中引入\|尚未实现.*src_off\|无消费者' docs/validation/m0-engine-foundation/group-4/step-4.5/report.md`；`rg -n '尚未追加' .../report.md` | 前者 exit 1（无命中）；后者 exit 0，仅命中第 3 行陈旧状态句（见 N1） |

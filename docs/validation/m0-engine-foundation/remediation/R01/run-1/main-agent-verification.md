@@ -57,7 +57,7 @@ fn ensure_ready(&self) -> Result<(), DocError> {
 工作树里 `cargo test -p aline-markdown --test rewrite` 的 2 条 FAILED 属 R02 未提交的 pre-fix 用例，
 若直接在工作树复跑 workspace 全量，会把 R02 的中间态混进 R01 结论。因此复跑须在 `79c3b54` 的**干净检出副本**上进行。
 
-**本轮该复跑由独立 reviewer 执行（不是我）。** reviewer 实际在 `/tmp/aline-r01-head` 检出 `79c3b54` 并运行了
+**本轮该复跑由独立 reviewer 执行（不是我）。** reviewer 实际在 `<tmp>/aline-r01-head` 检出 `79c3b54` 并运行了
 `cargo test --workspace --locked --offline`、`cargo test -p aline-ui --locked --offline`、
 `cargo clippy -p aline-ui --all-targets -D warnings`，其原始输出归入 R01 审查证据。
 我本人核对的是落盘文件（`post-fix-tests.txt` 的 62 条 ok / 0 failed / exit 0），以及对 `git diff` 与测试源码的阅读——

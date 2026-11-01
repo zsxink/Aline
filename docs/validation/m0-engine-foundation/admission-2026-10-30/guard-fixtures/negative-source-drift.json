@@ -1,9 +1,0 @@
-{
-  "kind": "明确合成的输入变异，不是真实 Cargo 输出",
-  "base": "metadata-base-final.json / tree-all-base-packages.stdout.log / candidate/Cargo.lock",
-  "transformation": "negative-source-drift",
-  "expected_diagnostic": "来源",
-  "expected_exit_code": 1,
-  "metadata_sha256": "6a5a6ad76b972ac9ab3f8d1b1aac885c57ad93e80b2dbe82dc826eab2ae723a9",
-  "temporary_inputs": "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-candidate-guard-tests-ld3kmb2z/negative-source-drift"
-}

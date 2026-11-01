@@ -1,8 +1,0 @@
-# final status start: 2026-10-31T10:42:33Z
-HEAD 99867bf2c5775aae4e8ed910713496d4ff84323c
-## porcelain (group-7 review paths)
-?? docs/validation/m0-engine-foundation/group-7/review-round-2-evidence/
-?? docs/validation/m0-engine-foundation/group-7/review-round-2.md
-## porcelain (golden)
-?? docs/validation/m0-engine-foundation/group-7/step-7.1/goldens/edit-goldens.tsv
-# final status end: 2026-10-31T10:42:33Z

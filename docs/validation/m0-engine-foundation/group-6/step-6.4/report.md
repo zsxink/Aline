@@ -75,3 +75,17 @@
 - 真实 UI 命中、像素/候选窗、焦点、系统字素边界、IME 均未验证。
 - 窗口软折行不进入映射；折行只属布局层。
 - 未做跨块 Aligned/Synthetic 片段的逐对比较（复用差分对这类片段直接报错而不是比较，见 6.7）。
+
+## 6. 勘误：2026-11-01（R10）
+
+本节为 2026-11-01 本轮追加，不改写此前正文（含原 §6）或历史证据。
+
+原第 60 行：「这些值与 `tests/mapping.rs` 的断言一致，属于“独立工具复算同一期望”，不是由被测实现反向生成。」该表述有事实性错误，在此撤回其“独立推导”定性。
+
+`goldens-check/probe-main.rs` 直接 `use aline_markdown::{ParseBudget, ParseConfig, parse};`，并调用 `parse`、`projection().segments()` 与映射 API；它是**同实现的第二宿主**，不是独立推导。原 §4/§5 的探针及日志可支持「相同实现在仓外宿主输出了这些片段/锚点，与当时断言一致」的有限结论，不能独立证明算法或期望正确，也不能证明 TSV 的创作方式。原 §2 的来源限定继续有效。
+
+本轮真正的独立推导位于 [`R10/run-1/independent/src/main.rs`](../../remediation/R10/run-1/independent/src/main.rs)，仅依赖 `pulldown-cmark`，从 R09 `basic.md` 原始字节重算；不导入或调用 `aline_markdown` 的解析、投影、映射 API，不读取旧 TSV/期望表。原始输出见 [`independent-output.txt`](../../remediation/R10/run-1/independent-output.txt)，第三方原始事件见 [`independent-events.stdout.log`](../../remediation/R10/run-1/independent-events.stdout.log)。
+
+独立结果与本轮实现输出的身份、绘制文字和 49 片段共 51 行逐行比较为 0 处差异（197 绘制字节）；[`report.md`](../../remediation/R10/run-1/report.md)、[`diff.txt`](../../remediation/R10/run-1/diff.txt) 与 [`fixture-identity.txt`](../../remediation/R10/run-1/fixture-identity.txt) 保全方法、差异和输入身份。实现输出仅作比较对象，不能作为期望来源。本次读过既有材料后编写的新推导不声称盲写或早于实现；它只覆盖当前同夹具映射，不追认其它样本及 V-07/真实 UI 验收。
+
+**不追认旧 TSV 的创作方式，不补造先行时间**；不修改旧 TSV、旧日志的内容或 mtime，不把本轮新证据写成原复核时已经存在。

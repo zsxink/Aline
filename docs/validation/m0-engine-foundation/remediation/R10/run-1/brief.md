@@ -1,6 +1,6 @@
 # R10 派发契约：F-06 独立预期与探针身份勘误
 
-基线 HEAD：派发时 `git rev-parse HEAD`（须晚于 R02/R03/R07/R09 的提交）。仓库根 `/Users/xian/Project/editor/Aline`。前置 R02、R03、R07、R09 已落地。
+基线 HEAD：派发时 `git rev-parse HEAD`（须晚于 R02/R03/R07/R09 的提交）。仓库根 `<repo>`。前置 R02、R03、R07、R09 已落地。
 
 ## 文件所有权（只有你可写这些文件）
 

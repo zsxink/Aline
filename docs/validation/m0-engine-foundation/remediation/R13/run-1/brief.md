@@ -1,6 +1,6 @@
 # R13 派发契约：F-12/F-17/F-18 现行状态与历史勘误一致
 
-基线 HEAD：派发时 `git rev-parse HEAD`（须晚于 R01–R12 全部提交）。仓库根 `/Users/xian/Project/editor/Aline`。
+基线 HEAD：派发时 `git rev-parse HEAD`（须晚于 R01–R12 全部提交）。仓库根 `<repo>`。
 
 ## 文件所有权（只有你可写这些文件）
 

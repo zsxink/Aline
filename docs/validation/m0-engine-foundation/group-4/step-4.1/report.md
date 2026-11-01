@@ -59,7 +59,7 @@ name | input_hex | decode_budget | expected | source_hex | bom | crlf_pairs | un
 
 ## 4. 验证
 
-环境与时间：2026-10-31T03:08:08Z 起，macOS Darwin 27.0.0 arm64，`rustc 1.98.1`、`cargo 1.98.1`，`CARGO_HOME=/Users/xian/Library/Caches/aline-m0/cargo-home`，离线 Cargo。证据见 `gates/commands.log` 与 `workspace-gates/*.command.json`。
+环境与时间：2026-10-31T03:08:08Z 起，macOS Darwin 27.0.0 arm64，`rustc 1.98.1`、`cargo 1.98.1`，`CARGO_HOME=<cargo-home>`，离线 Cargo。证据见 `gates/commands.log` 与 `workspace-gates/*.command.json`。
 
 直接门禁（`gates/run-direct-gates.sh`）：
 
@@ -104,3 +104,7 @@ name | input_hex | decode_budget | expected | source_hex | bom | crlf_pairs | un
 | 统一入口 | `workspace-gates/` 下逐命令 JSON 与日志 |
 
 直接门禁运行时的 HEAD 仍是 `6731ff2d57e78916e659ea95e517ea598053501b`，工作区包含本任务的实现、测试、金样、复核记录与规范裁决；复核与裁决已完成，提交时勾选 `tasks.md` 4.1。
+
+## 5. 后续勘误（R13，2026-11-01）
+
+本节为后续追加勘误，不改写上文的历史记录。上文“加载时同时绑定用例总数为 31”是报告文字错误：当前代码 `crates/aline-source/tests/decode_golden.rs` 的 `EXPECTED_CASE_COUNT` 为 32，金样 `decode-golden.v1.txt` 有 32 行用例，独立核对输出为 `checked=32 ok=21 err=11`。三项事实一致指向 32；实现与金样未发现数量差异。原报告的 31 保留作为历史文本，并由本段纠正。核对命令和原始输出见 `docs/validation/m0-engine-foundation/remediation/R13/run-1/`。

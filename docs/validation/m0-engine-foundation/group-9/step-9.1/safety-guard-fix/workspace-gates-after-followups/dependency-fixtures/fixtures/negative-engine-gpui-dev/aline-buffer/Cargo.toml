@@ -1,8 +1,0 @@
-[package]
-name = "aline-buffer"
-version = "0.0.0"
-edition = "2024"
-publish = false
-
-[dev-dependencies]
-hidden_alias = { package = "gpui-pre", path = "/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/group-9/step-9.1/safety-guard-fix/workspace-gates-after-followups/dependency-fixtures/fixtures/packages/gpui-pre" }

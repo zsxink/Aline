@@ -2,7 +2,7 @@
 
 - 批次：R02b / run-1（R02 复核移交的既有缺陷，须先于 R04/R10）
 - 基线 HEAD：`3b10ac042d102b155adb841b0b726ff5db970f79`
-- 仓库根：`/Users/xian/Project/editor/Aline`；工具链 1.98.1，`CARGO_NET_OFFLINE=true`
+- 仓库根：`<repo>`；工具链 1.98.1，`CARGO_NET_OFFLINE=true`
 - 实现者：主 Agent（无空闲 worker；并发上限内已有一个复核 agent 在跑）
 - 审查要求：**必须由未参与本批实现的 reviewer 复核**（主 Agent 是作者，不能自任复核）
 

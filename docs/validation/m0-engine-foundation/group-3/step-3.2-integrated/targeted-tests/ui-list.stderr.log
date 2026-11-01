@@ -1,4 +1,0 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s
-     Running unittests src/lib.rs (target/debug/deps/aline_ui-6a4ea95e58d353f7)
-     Running tests/public_boundaries.rs (target/debug/deps/public_boundaries-d9c1fd9f41282e06)
-   Doc-tests aline_ui

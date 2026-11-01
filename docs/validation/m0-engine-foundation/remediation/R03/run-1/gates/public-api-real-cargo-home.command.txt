@@ -1,6 +1,0 @@
-argv: python3 scripts/check_public_api.py --output-dir docs/validation/m0-engine-foundation/remediation/R03/run-1/gates/public-api-real-cargo-home
-cwd: /Users/xian/Project/editor/Aline
-env: CARGO_HOME=$HOME/.cargo CARGO_NET_OFFLINE=true RUSTUP_TOOLCHAIN=1.98.1
-started_utc: 2026-11-01T05:11:34Z
-finished_utc: 2026-11-01T05:11:36Z
-exit_code: 0

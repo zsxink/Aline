@@ -59,6 +59,7 @@ cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 
 - **规范是实现约束（不改变上述权威分工）**：按 `openspec/CODE_STANDARDS.md` 和工程治理规格检查职责、依赖、唯一状态所有者及可测试边界；模块行数仅提示复核，不机械拆文件或 crate。相关 change 的 design 必须解释模式解决的问题、最简单可行方案、代价和验证；允许直接使用具体类型/函数，禁止无需求的模式包装。工程规则调整同步本文入口、OpenSpec 与相关现行文档，不能以局部 allow 或 design 绕过铁律。
 - **不写本机绝对路径**：文档、证据与脚本只写仓库内相对路径或 `<repo>`、`<tmp>`、`<home>` 等占位符，不记录本机用户目录、临时目录或仓库外磁盘位置；生成证据的脚本统一经 `scripts/evidence_paths.py` 归一化，读回时用 `resolve_path` 还原。shebang 的解释器行是唯一例外。
+- **验证产物只在本地产出**：命令记录、stdout/stderr 与临时夹具写入 `logs/validation/...`（`logs/` 已由 `.gitignore` 排除），不提交；仓库只提交可复现输入（`crates/*/tests/fixtures`、`scripts/fixtures`）、门禁脚本（`scripts/check_*.py`）与 `.md` 报告。报告须写清复跑命令与预期，不依赖未分发的原始日志。
 - **按里程碑推进**（v1-architecture 第 13 章）：M0 引擎地基 → M1 单文档只读 → M2 可编辑核心（可日用）→ M3 命令与表格 → M4 插件与主题 → M5 应用壳 → M6 收尾。阶段可形成内部预览，验收按三平台分别取证；先 macOS 后 Windows/Linux 验证，正式 V1 三平台同发（PRD §9、V-01）。
 - 新增依赖先对照 engine-design §18.2 和 v1-architecture §3.2 的准入规则，同类功能不得引入第二个库。
 - 实现期对照：ElyMark 完整历史关键文件索引已保全于 `docs/archive/migration-evidence/engine-design.md`，当前入口见 engine-design §18.3；Zed 克隆放在仓库外的参考目录，不随本仓库分发（gpui 新架构与锁定的 gpui-pre 存在 API 代差，机制线索参考 docs/zed-notes.md §0及其完整历史证据，具体 API 及性能结论须重新取证）。Aline 全部自写实现，外部源码只作对照参考。

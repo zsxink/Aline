@@ -1,9 +1,0 @@
-{
-  "kind": "明确合成的输入变异，不是真实 Cargo 输出",
-  "base": "metadata-base-final.json / tree-all-base-packages.stdout.log / candidate/Cargo.lock",
-  "transformation": "negative-existing-gpui-pre-plus-raw-gpui",
-  "expected_diagnostic": "禁止替代 GPUI",
-  "expected_exit_code": 1,
-  "metadata_sha256": "9bd2cc476b4c29b2ea928766bf2ce8338dac6d69be33fdc0f1aeb08b1010c8c3",
-  "temporary_inputs": "/var/folders/rx/cwp1dm6536789l30qt9hf9rm0000gn/T/aline-candidate-guard-tests-ld3kmb2z/negative-existing-gpui-pre-plus-raw-gpui"
-}

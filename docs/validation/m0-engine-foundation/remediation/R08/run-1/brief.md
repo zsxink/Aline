@@ -1,6 +1,6 @@
 # R08 派发契约：F-11 删除/粘贴/HTML 跨界的独立负例
 
-基线 HEAD：派发时 `git rev-parse HEAD`（须晚于 R04 的提交）。仓库根 `/Users/xian/Project/editor/Aline`。前置 R04 已落地（DocCore 已实际消费 `plan_change`/`validate_change`）。
+基线 HEAD：派发时 `git rev-parse HEAD`（须晚于 R04 的提交）。仓库根 `<repo>`。前置 R04 已落地（DocCore 已实际消费 `plan_change`/`validate_change`）。
 
 ## 文件所有权（只有你可写这些文件）
 
@@ -68,3 +68,11 @@
 ## 返回给我（≤800 中文字）
 
 status（DONE / DONE_WITH_CONCERNS / NEEDS_CONTEXT / BLOCKED）、提交哈希、一行测试小结、新增用例数（按空删除/粘贴/HTML 三类分列）、是否发现实现缺陷、concerns、证据路径。不要贴长日志。
+
+## 执行勘误（2026-11-01，主 Agent 核规范后）
+
+原“受保护区间左/右相邻插入均允许”与现行规范冲突。`docs/engine-design.md` §4.2 规定作用范围触及保护子区间须拒绝；`crates/aline-edit/src/permissions.rs` §11、§41–43 明确端点按闭区间相交，边界点触及即拒绝。因此，恰在保护区间左端/右端的零长度插入均按 `ProtectedRange` 验收，不改生产权限逻辑。补测两侧端点 `start..start` 与 `end..end`，各自从 `Parsed` 读取保护区间，并核对完整状态及 redo。无跨入保护范围的左侧相邻插入（区间左侧一字节）仍应允许；Source 模式仍允许原文修改。
+
+## 门禁分工补充
+
+本批完成 `cargo test -p aline-edit --locked --offline` 及该 crate all-target Clippy、fmt 与 diff 检查。全 workspace `cargo test --workspace` / workspace 完整门禁由 R14 统一执行，R08 不重复运行；`post-fix.txt` 如实注明未运行。

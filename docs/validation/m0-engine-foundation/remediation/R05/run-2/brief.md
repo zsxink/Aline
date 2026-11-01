@@ -1,6 +1,6 @@
 # R05b 派发契约：修复独立复核退回的 2 项严重（F-08 同类静默放行）
 
-基线 HEAD：`128954e`（R03 已提交）。仓库根 `/Users/xian/Project/editor/Aline`。
+基线 HEAD：`128954e`（R03 已提交）。仓库根 `<repo>`。
 本批是 R05（`e4a6af0`）的修复轮，**不是重做**：R05 的既有成果（真实 TOML 解析、零外部依赖、`--self-test` 57/0）必须全部保留。
 
 ## 文件所有权（只有你可写这些文件）
@@ -18,7 +18,7 @@
 
 `_flatten_tables`（`scripts/check_lints.py:604-609`）用 `".".join(path)` 生成表键，**不区分**表头路径 `[workspace.lints.rust]` 与 `[workspace]` 下的引号点分键 `"lints.rust" = {...}`；读取处 `:641` 因此可能取到后写入者。
 
-主 Agent 复现（`/tmp/r05f4`，构造已在 review.md 记录）：
+主 Agent 复现（`<tmp>/r05f4`，构造已在 review.md 记录）：
 
 - 根清单 = 真实**弱**表（`unsafe_code="warn"`、`missing_docs="allow"`、`unwrap_used="warn"`）+ `[workspace]` 下的引号点分键（强策略，且顺序在后）
 - `python3 scripts/check_lints.py --root` → **exit 0「workspace lint 声明有效」**
@@ -30,7 +30,7 @@
 
 ### 严重 2：三条拒绝路径无 self-test 断言
 
-把 `audit_member_manifest` 的 `set(lints) != {"workspace"} or lints["workspace"] is not True` 弱化为 `not isinstance(lints, dict)` 后，整套 `--self-test` **仍 exit 0**（主 Agent 在 `/tmp/weakrepo` 复现，输出 `"status": "lint 隔离样例通过"`）。也就是说「多余键 / `workspace = false` / 非 bool 值」三类拒绝没有任何独立用例，弱化实现不会被发现。
+把 `audit_member_manifest` 的 `set(lints) != {"workspace"} or lints["workspace"] is not True` 弱化为 `not isinstance(lints, dict)` 后，整套 `--self-test` **仍 exit 0**（主 Agent 在 `<tmp>/weakrepo` 复现，输出 `"status": "lint 隔离样例通过"`）。也就是说「多余键 / `workspace = false` / 非 bool 值」三类拒绝没有任何独立用例，弱化实现不会被发现。
 
 ### 一般 4：深嵌套逃出异常元组
 

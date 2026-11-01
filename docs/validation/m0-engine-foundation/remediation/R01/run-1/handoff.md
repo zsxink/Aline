@@ -18,7 +18,7 @@
 
 ## 验证结果与证据路径
 
-证据目录 `/Users/xian/Project/editor/Aline/docs/validation/m0-engine-foundation/remediation/R01/run-1/`：
+证据目录 `<repo>/docs/validation/m0-engine-foundation/remediation/R01/run-1/`：
 
 - `pre-fix-tests.txt`：4 次运行原始输出（前 2 次为编译失败，见下方偏差；后 2 次为真实行为失败）。
 - `post-fix-tests.txt`：document_typing（30 passed）、`cargo test -p aline-ui`（8 目标全 ok）、

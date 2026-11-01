@@ -1,4 +1,0 @@
-2026-10-31T14:00:31.3NZ exit=0 cmd=cargo fmt --all --check
-2026-10-31T14:00:31.3NZ exit=0 cmd=cargo clippy --workspace --all-targets --locked --offline -- -D warnings
-2026-10-31T14:00:31.3NZ exit=0 cmd=cargo test --workspace --locked --offline
-2026-10-31T14:00:32.3NZ done

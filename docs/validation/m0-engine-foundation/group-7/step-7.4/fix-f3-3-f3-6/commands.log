@@ -1,6 +1,0 @@
-# 字面命令补跑（复核 F3-6）
-# 任务 7.2 原文写的是 cargo test -p aline-edit refusal；此前只跑了 --test refusals。
-# 格式：start<TAB>end<TAB>exit<TAB>command
-2026-10-31T10:55:15Z	2026-10-31T10:55:15Z	0	cargo test -p aline-edit --locked --offline refusal
-2026-10-31T10:55:15Z	2026-10-31T10:55:15Z	0	cargo test -p aline-edit --locked --offline --test refusals
-2026-10-31T10:55:15Z	2026-10-31T10:55:15Z	0	rg -n '^pub use|^pub mod' crates/aline-edit/src/lib.rs

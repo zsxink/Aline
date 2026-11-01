@@ -1,2 +1,0 @@
-?? docs/maintenance/m0-remediation/
-?? docs/validation/m0-engine-foundation/remediation/

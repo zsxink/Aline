@@ -1,4 +1,0 @@
-source_bytes 321
-scan_step_threshold 80
-diagnostics_at_threshold Ok(0)
-diagnostics_below Ok(1)

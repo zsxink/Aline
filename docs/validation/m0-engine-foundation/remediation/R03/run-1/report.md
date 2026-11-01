@@ -70,7 +70,7 @@ pub fn translate(
 | （无） | `translate_rejects_outside_old_block` |
 | （无） | `translate_accepts_in_block_endpoints_and_is_byte_exact`：遍历**闭区间** `start..=end`，逐字节断言对应关系 |
 
-新增 5 条用例中的期望值全部是手写常量，并在修复前树上实测失败（`pre-fix.txt`），不是照实现抄写。
+**独立复核勘误（2026-11-01）**：上句扩大了修复前运行与独立期望的证据范围，应以本段为准。`pre-fix.txt` 只证明 F-04 单例在修复前失败（1 failed / 18 filtered out），不证明其余四条曾在修复前运行；`tests/reuse.rs:140–144` 的逐字节预期也通过范围算术生成，并非全部字面常量。准确表述为：F-04 单例修复前失败；其余新增用例是契约回归，在修复后通过；期望的构造方式按各断言实际来源区分。复核者另以独立外部常量探针验证当前行为，不能追认旧运行。原始日志保留，完整依据见 [独立复核](review.md) 及 `review-evidence/`。
 
 ## 4. 闭区间右端的取舍
 

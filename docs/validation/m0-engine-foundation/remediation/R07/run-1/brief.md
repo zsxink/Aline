@@ -1,6 +1,6 @@
 # R07 派发契约：F-10 字素边界与标量边界分开验收
 
-基线 HEAD：`2f1dcea46d5998f4e2ba213e73c11de166f943c4`。仓库根 `/Users/xian/Project/editor/Aline`。前置：R03 已完成（`ReusedBlock` 受检化，不影响本批写入范围）。
+基线 HEAD：`2f1dcea46d5998f4e2ba213e73c11de166f943c4`。仓库根 `<repo>`。前置：R03 已完成（`ReusedBlock` 受检化，不影响本批写入范围）。
 
 ## 文件所有权（只有你可写这些文件）
 
