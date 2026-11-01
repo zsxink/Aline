@@ -14,6 +14,18 @@ use aline_markdown::{
 /// 快照读取预算；只用于构造测试输入，与解析预算无关。
 const SNAPSHOT_BUDGET: usize = 1024 * 1024;
 
+/// 只取 `dump_tree()` 中某一类行，供**负向**断言使用。
+///
+/// dump 自 R09 起含 `drawn <len> text "…"` 与 `segment …`，整篇源码文字会进入 dump；
+/// 因此 `!dump.contains("Table")` 这类断言会被源码正文里的同名词语误触发。
+/// 负向断言必须先限定到对应行族，否则它测的是「夹具文本不含该词」而不是结构。
+fn dump_lines_of(dump: &str, prefix: &str) -> String {
+    dump.lines()
+        .filter(|line| line.starts_with(prefix))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 fn snapshot_of(text: &str) -> Result<TextSnapshot, Box<dyn Error>> {
     Ok(TextSnapshot::new(
         text.to_string(),
@@ -139,8 +151,10 @@ fn node_budget_fallback_keeps_full_source_without_partial_tree() -> Result<(), B
     let len = source.len();
     let dump = parsed.dump_tree();
     assert!(dump.contains(&format!("block 0..{len} Raw")));
-    assert!(!dump.contains("CodeBlock"));
-    assert!(!dump.contains("Table"));
+    // 负向断言限定在 block 行族：dump 现含源码正文，直接 contains 会被文本误触发。
+    let blocks = dump_lines_of(&dump, "block ");
+    assert!(!blocks.contains("CodeBlock"));
+    assert!(!blocks.contains("Table"));
     Ok(())
 }
 
@@ -237,7 +251,13 @@ fn mermaid_fence_is_source_only_code_block_without_render_backend() -> Result<()
     let dump = parsed.dump_tree();
     assert!(dump.contains("block 0..23 CodeBlock"));
     assert!(dump.contains("gap 23..24"));
-    assert!(!dump.contains("diagnostic"));
+    // 同上：源码正文里的「diagnostic」不算，只断言没有 diagnostic 行。
+    assert_eq!(
+        dump.lines()
+            .filter(|line| line.starts_with("diagnostic "))
+            .count(),
+        0
+    );
     assert_eq!(block_kind_name(BlockKind::CodeBlock), "CodeBlock");
 
     // 语言信息只存在于源码围栏文本中，可由块范围定位；公开 API 没有渲染后端类型，

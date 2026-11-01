@@ -120,3 +120,46 @@ R4 表格合成 tab），由 `/tmp/r09derive.py` 生成片段表。
 - `commands.txt` — 命令与环境的完整记录
 - `report.md` — 本文件
 - `handoff.md` — 交接摘要
+
+## 11. 独立复核返回后的处理（追加，不改上文）
+
+独立复核见 `run-1/review.md`，结论 **APPROVE_WITH_CONCERNS**（3 条一般，无阻断）。
+F-07 已实质关闭（复核自造同长 319 字节 A/B 源码：旧 dump 完全相同、新 dump 可区分）。
+
+### 11.1 勘误：期望 dump 行数
+
+上文 §「验证」表与 §「证据」索引写的「65 行期望 dump」**错误**。实测
+`basic.dump.expected.txt` 为 **74 行**（`wc -l`），`tests/dump.rs` 的逐行比对亦以 74 行为准。
+提交 `72c8bc6` 的 message 同样沿用了「65 行」，一并作废。行数写错不影响实现与测试。
+
+### 11.2 F1（一般）负向断言变内容敏感 —— 已修
+
+R09 新增的 `drawn <len> text "…"` 把整篇源码文字并入 dump，使
+`tests/diagnostics.rs` 的三处负向断言从「只可能被 block 行触发」变成「源码正文也能触发」：
+
+| 位置 | 原断言 | 实测风险 |
+|---|---|---|
+| `:142-143` | `!dump.contains("CodeBlock")` / `!dump.contains("Table")` | 源码含这些词即误红 |
+| `:240` | `!dump.contains("diagnostic")` | 同上 |
+
+主 Agent 独立复现：源码 `Table and CodeBlock words\ndiagnostic word\n` 的新 dump 中
+`Table`/`CodeBlock`/`diagnostic` 各命中 **1** 次，全部来自新增的 `drawn … text "…"` 行；
+旧 dump 为 0。
+
+修复：负向断言限定到对应行族（`dump_lines_of(&dump, "block ")`、
+`dump_lines_of(&dump, "diagnostic ")` 计数为 0）。并用临时探针证明该修复必要：
+同一源码 `OLD_STYLE_WHOLE_DUMP_HAS_TABLE=true` 而 `BLOCK_FAMILY_HAS_TABLE=false`。
+探针 `tests/_rev_f1_probe.rs` 跑后即删，`git status crates/` 仅剩 `tests/diagnostics.rs`。
+
+### 11.3 F3（一般）`unavailable` 分支无覆盖 —— 登记，不修
+
+复核确认该路径经公开 API 不可达（`parts()` 仅在 `Backing::Overlay` 越界时返回
+`InvalidBacking`，而 Overlay 构造前已由 `validate_range` 校验）。非缺陷，登记为无回归护栏。
+
+### 11.4 验证（主 Agent实测，2026-11-01）
+
+| 项 | 结果 |
+|---|---|
+| `cargo test -q -p aline-markdown --locked --offline` | 12 段全 ok，合计 **125 passed / 0 failed**，exit 0 |
+| `cargo clippy … --all-targets -- -D warnings` | exit 0，无告警 |
+| `cargo fmt -p aline-markdown --check` | exit 0（先 fmt 再 check） |
