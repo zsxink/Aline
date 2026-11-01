@@ -403,6 +403,140 @@ fn compose_keeps_hidden_anchor_outside_non_exact_merged_piece() -> Result<(), Bo
 }
 
 #[test]
+fn compose_zero_source_pieces_anchor_to_empty_points_only() -> Result<(), Box<dyn Error>> {
+    // R02b / F-01：第二层空来源片段锚定到第一层 Aligned / Hidden 片段时，不得获得非空来源。
+    // `compose` 文档明写「合成内容不伪造非空来源」，本用例逐点固定该不变式。
+    //
+    // 第一层：源码 "aXYdef"，把 1..3 替换为 "xy"，声明 Exact 但内容不同 → 实为 Aligned。
+    // 片段为 Exact 0..1 -> 0..1、Aligned 1..3 -> 1..3、Exact 3..6 -> 3..6。
+    let first = Rewrite::apply(
+        "aXYdef",
+        &[edit(1..3, "xy", MappingPrecision::Exact)?],
+        ParseBudget::m0(),
+    )?;
+    assert_eq!(first.text(), "axydef");
+    assert_eq!(
+        segments_of(first.map()),
+        vec![
+            (0..1, 0..1, MappingPrecision::Exact),
+            (1..3, 1..3, MappingPrecision::Aligned),
+            (3..6, 3..6, MappingPrecision::Exact),
+        ]
+    );
+
+    // 锚在 Aligned 片起点（副本点 1）：空来源合成片必须仍是空区间 1..1，不是整段 1..3。
+    let at_start = Rewrite::apply(
+        first.text(),
+        &[edit(1..1, "!", MappingPrecision::Synthetic)?],
+        ParseBudget::m0(),
+    )?;
+    assert_eq!(
+        segments_of(at_start.map()),
+        vec![
+            (0..1, 0..1, MappingPrecision::Exact),
+            (1..1, 1..2, MappingPrecision::Synthetic),
+            (1..6, 2..7, MappingPrecision::Exact),
+        ]
+    );
+    let at_start_composed = first.map().compose(at_start.map())?;
+    assert_eq!(
+        segments_of(&at_start_composed),
+        vec![
+            (0..1, 0..1, MappingPrecision::Exact),
+            (1..1, 1..2, MappingPrecision::Synthetic),
+            (1..3, 2..4, MappingPrecision::Aligned),
+            (3..6, 4..7, MappingPrecision::Exact),
+        ]
+    );
+    let synthetic = at_start_composed.to_source(1..2)?;
+    assert_eq!(synthetic.source_range(), 1..1);
+    assert_eq!(synthetic.precision(), MappingPrecision::Synthetic);
+
+    // 锚在 Aligned 片内部（副本点 2）：端点约定取该片结束点 3，仍为零宽 3..3。
+    let inside = Rewrite::apply(
+        first.text(),
+        &[edit(2..2, "!", MappingPrecision::Synthetic)?],
+        ParseBudget::m0(),
+    )?;
+    assert_eq!(
+        segments_of(inside.map()),
+        vec![
+            (0..2, 0..2, MappingPrecision::Exact),
+            (2..2, 2..3, MappingPrecision::Synthetic),
+            (2..6, 3..7, MappingPrecision::Exact),
+        ]
+    );
+    let inside_composed = first.map().compose(inside.map())?;
+    assert_eq!(
+        segments_of(&inside_composed),
+        vec![
+            (0..1, 0..1, MappingPrecision::Exact),
+            (1..3, 1..2, MappingPrecision::Aligned),
+            (3..3, 2..3, MappingPrecision::Synthetic),
+            (1..3, 3..4, MappingPrecision::Aligned),
+            (3..6, 4..7, MappingPrecision::Exact),
+        ]
+    );
+    let synthetic = inside_composed.to_source(2..3)?;
+    assert_eq!(synthetic.source_range(), 3..3);
+    assert_eq!(synthetic.precision(), MappingPrecision::Synthetic);
+
+    // 锚在第一层 Hidden 片（源码 "ab" 隐藏 "b"，副本 "a"，点在 1..1 即 Hidden 片终点）：
+    // 必须为零宽 1..1，不是被隐藏的 1..2。
+    let hidden_first = Rewrite::apply(
+        "ab",
+        &[edit(1..2, "", MappingPrecision::Hidden)?],
+        ParseBudget::m0(),
+    )?;
+    assert_eq!(hidden_first.text(), "a");
+    assert_eq!(
+        segments_of(hidden_first.map()),
+        vec![
+            (0..1, 0..1, MappingPrecision::Exact),
+            (1..2, 1..1, MappingPrecision::Hidden),
+        ]
+    );
+    let second = Rewrite::apply(
+        hidden_first.text(),
+        &[edit(1..1, "!", MappingPrecision::Synthetic)?],
+        ParseBudget::m0(),
+    )?;
+    assert_eq!(
+        segments_of(second.map()),
+        vec![
+            (0..1, 0..1, MappingPrecision::Exact),
+            (1..1, 1..2, MappingPrecision::Synthetic),
+        ]
+    );
+    let composed = hidden_first.map().compose(second.map())?;
+    assert_eq!(
+        segments_of(&composed),
+        vec![
+            (0..1, 0..1, MappingPrecision::Exact),
+            (1..1, 1..2, MappingPrecision::Synthetic),
+        ]
+    );
+    let synthetic = composed.to_source(1..2)?;
+    assert_eq!(synthetic.source_range(), 1..1);
+    assert_eq!(synthetic.precision(), MappingPrecision::Synthetic);
+
+    // 全局不变式：三个锚定位置（Aligned 起点 / Aligned 内部 / Hidden）的复合结果里，
+    // 所有 Synthetic 片段的 source 都必须为空。
+    for map in [&at_start_composed, &inside_composed, &composed] {
+        for segment in map.segments() {
+            if segment.precision() == MappingPrecision::Synthetic {
+                assert!(
+                    segment.source_range().is_empty(),
+                    "Synthetic 片段伪造成非空来源：{:?}",
+                    segments_of(map)
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn control_bytes_do_not_collide_with_synthetic_markers() -> Result<(), Box<dyn Error>> {
     let source = "abc";
     let rewrite = Rewrite::apply(

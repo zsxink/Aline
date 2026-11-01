@@ -623,7 +623,13 @@ fn rewritten_point(
     }
 }
 
-/// 把第一副本的源码点投影回源码锚点；`Exact` 平移，其余取片段来源区间。
+/// 把第一副本的源码点投影回源码锚点。
+///
+/// `Exact` 片段逐字节平移，返回零宽点；其余片段无法定位内部点，只能取端点，且必须返回
+/// **零宽**锚点：空来源的第二层片段经 `middle_anchor` 走这里，若返回整段来源就会把
+/// `Synthetic` 片伪造成非空来源，与 [`RewriteMap::compose`] 文档「合成内容不伪造非空来源」
+/// 冲突。取端点沿用 [`rewritten_point`] 的方向约定：点在片段起点取 `source.start`，
+/// 否则取 `source.end`，保持隐藏来源与相邻内容的先后关系。
 fn source_point(segment: &RewriteSegment, point: usize) -> Result<Range<usize>, RewriteError> {
     match segment.precision {
         MappingPrecision::Exact => {
@@ -638,7 +644,12 @@ fn source_point(segment: &RewriteSegment, point: usize) -> Result<Range<usize>, 
             Ok(start..start)
         }
         MappingPrecision::Aligned | MappingPrecision::Hidden | MappingPrecision::Synthetic => {
-            Ok(segment.source.clone())
+            let anchor = if point == segment.rewritten.start {
+                segment.source.start
+            } else {
+                segment.source.end
+            };
+            Ok(anchor..anchor)
         }
     }
 }

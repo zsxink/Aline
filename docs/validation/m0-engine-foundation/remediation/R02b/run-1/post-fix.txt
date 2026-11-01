@@ -1,0 +1,370 @@
+# R02b post-fix 原始证据
+# 基线 HEAD: 3b10ac042d102b155adb841b0b726ff5db970f79
+# 工具链: cargo 1.98.1 (797e8a9bc 2026-08-05) / rustc 1.98.1 (48a229cea 2026-09-01)
+# 主机平台: Darwin 27.2.0
+
+## A. 修复后代码指纹
+SHA256 rewrite.rs      = aa730fb81caa167826de781cc896676e8bd489c225427a76e109a3dd57c2f522
+SHA256 tests/rewrite.rs = cdb5598e25d84c842fbbd24c693b6c9c95eb02cd518800831458d6aab4d7aa55
+
+## B. 归档探针修复后重跑（同一份 pre-fix-probe.rs，未改一字）
+START=2026-11-01T07:35:23Z
+CWD=/Users/xian/Project/editor/Aline
+ARGV=cargo test -p aline-markdown --test zz_probe_r02b --locked --offline -- --nocapture
+ENV=CARGO_NET_OFFLINE=true
+----- raw stdout/stderr -----
+   Compiling aline-markdown v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-markdown)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.15s
+     Running tests/zz_probe_r02b.rs (target/debug/deps/zz_probe_r02b-11b3e7b185793ad7)
+
+running 1 test
+L1 text = "axydef"
+L1: [(0..1, 0..1, Exact), (1..3, 1..3, Aligned), (3..6, 3..6, Exact)]
+L2@1: [(0..1, 0..1, Exact), (1..1, 1..2, Synthetic), (1..6, 2..7, Exact)]
+COMPOSED@1: [(0..1, 0..1, Exact), (1..1, 1..2, Synthetic), (1..3, 2..4, Aligned), (3..6, 4..7, Exact)]
+SYNTHETIC@1 = [(1..1, 1..2)]
+L2@2: [(0..2, 0..2, Exact), (2..2, 2..3, Synthetic), (2..6, 3..7, Exact)]
+COMPOSED@2: [(0..1, 0..1, Exact), (1..3, 1..2, Aligned), (3..3, 2..3, Synthetic), (1..3, 3..4, Aligned), (3..6, 4..7, Exact)]
+SYNTHETIC@2 = [(3..3, 2..3)]
+H1: [(0..1, 0..1, Exact), (1..2, 1..1, Hidden)]
+H2@1: [(0..1, 0..1, Exact), (1..1, 1..2, Synthetic)]
+HCOMPOSED@1: [(0..1, 0..1, Exact), (1..1, 1..2, Synthetic)]
+HSYNTHETIC@1 = [(1..1, 1..2)]
+test probe_synthetic_anchors_are_empty ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+PROBE_EXIT=0
+END=2026-11-01T07:35:25Z
+
+## C. 全包测试
+START=2026-11-01T07:35:30Z
+CWD=/Users/xian/Project/editor/Aline
+ARGV=cargo test -q -p aline-markdown --locked --offline
+ENV=CARGO_NET_OFFLINE=true
+----- raw stdout/stderr -----
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 5 tests
+.....
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 7 tests
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 19 tests
+...................
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 21 tests
+.....................
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 17 tests
+.................
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 23 tests
+.......................
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 14 tests
+..............
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 10 tests
+..........
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+TEST_EXIT=0
+END=2026-11-01T07:35:30Z
+
+## D. clippy
+START=2026-11-01T07:35:36Z
+CWD=/Users/xian/Project/editor/Aline
+ARGV=cargo clippy -q -p aline-markdown --all-targets --locked --offline -- -D warnings
+ENV=CARGO_NET_OFFLINE=true
+----- raw stdout/stderr -----
+CLIPPY_EXIT=0
+END=2026-11-01T07:35:36Z
+
+## E. fmt check
+START=2026-11-01T07:35:36Z
+CWD=/Users/xian/Project/editor/Aline
+ARGV=cargo fmt -p aline-markdown --check
+----- raw stdout/stderr -----
+FMT_EXIT=0
+END=2026-11-01T07:35:36Z
+
+## F. 新回归用例在「修复前源码」上的失败（临时还原 HEAD 版 rewrite.rs，取证后立即还原）
+说明：tests/rewrite.rs 为新版（含新用例），src/pre/rewrite.rs 还原为 HEAD 版（sha256 ef9b46ac…bd4bc397），
+      以此证明新用例确实能捕获 F-01 残留，而不是照实现写期望。
+START=2026-11-01T07:36:22Z
+CWD=/Users/xian/Project/editor/Aline
+ARGV=cargo test -p aline-markdown --test rewrite --locked --offline compose_zero_source_pieces_anchor_to_empty_points_only
+ENV=CARGO_NET_OFFLINE=true
+PRE_FIX_SRC_SHA256=ef9b46acc686d6a3a0fdc87f8be8794ca62225eb452a9997c62b795bbd4bc397
+----- raw stdout/stderr -----
+   Compiling aline-markdown v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-markdown)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.30s
+     Running tests/rewrite.rs (target/debug/deps/rewrite-05cf926af7a4ce05)
+
+running 1 test
+test compose_zero_source_pieces_anchor_to_empty_points_only ... FAILED
+
+failures:
+
+---- compose_zero_source_pieces_anchor_to_empty_points_only stdout ----
+
+thread 'compose_zero_source_pieces_anchor_to_empty_points_only' (3740779) panicked at crates/aline-markdown/tests/rewrite.rs:442:5:
+assertion `left == right` failed
+  left: [(0..1, 0..1, Exact), (1..3, 1..2, Synthetic), (1..3, 2..4, Aligned), (3..6, 4..7, Exact)]
+ right: [(0..1, 0..1, Exact), (1..1, 1..2, Synthetic), (1..3, 2..4, Aligned), (3..6, 4..7, Exact)]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    compose_zero_source_pieces_anchor_to_empty_points_only
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p aline-markdown --test rewrite`
+PREFIX_TEST_EXIT=101
+RESTORED_SHA256=aa730fb81caa167826de781cc896676e8bd489c225427a76e109a3dd57c2f522
+END=2026-11-01T07:36:23Z
+
+## G. 还原修复后源码的最终重跑
+START=2026-11-01T07:36:30Z
+SRC_SHA256=aa730fb81caa167826de781cc896676e8bd489c225427a76e109a3dd57c2f522
+TESTS_SHA256=cdb5598e25d84c842fbbd24c693b6c9c95eb02cd518800831458d6aab4d7aa55
+ARGV=cargo test -q -p aline-markdown --locked --offline
+----- raw stdout/stderr -----
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 5 tests
+.....
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 7 tests
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 19 tests
+...................
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+
+running 21 tests
+.....................
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 17 tests
+.................
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 23 tests
+.......................
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 14 tests
+..............
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 10 tests
+..........
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+TEST_EXIT=0
+PASSED_TOTAL=253
+END=2026-11-01T07:36:39Z
+
+## 勘误（紧接上文追加，不改上文）
+上文 §G 的 `PASSED_TOTAL=253` 是把 §C 与 §G 两次全包运行的结果相加（126 + 126）所致，
+**不是单次运行的通过数**。§G 单次运行的实际通过数为 **126**，与该行前一行 `TEST_EXIT=0` 对应。
+按段统计：§C 126、§G 126，各自 12 个测试目标全 ok。
+
+## H. 终版测试文件修订后的重取证（§F/§G 对应的是上一版 tests/rewrite.rs）
+修订内容：把三处锚定用例的复合结果各自绑定（at_start_composed / inside_composed / composed），
+并把「Synthetic 片段必须空来源」的全局不变式从只覆盖 Hidden 用例扩展到三个锚定位置全覆盖。
+TESTS_SHA256_FINAL=c6387fec712ca19dac66782adcbadba7604192d908655bf4553e76da5ada35d2
+SRC_SHA256=aa730fb81caa167826de781cc896676e8bd489c225427a76e109a3dd57c2f522
+
+### H1. 终版用例在修复前源码上必须失败
+START=2026-11-01T07:39:47Z
+ARGV=cargo test -p aline-markdown --test rewrite --locked --offline compose_zero_source_pieces_anchor_to_empty_points_only
+ENV=CARGO_NET_OFFLINE=true
+PRE_FIX_SRC_SHA256=ef9b46acc686d6a3a0fdc87f8be8794ca62225eb452a9997c62b795bbd4bc397
+----- raw stdout/stderr -----
+   Compiling aline-markdown v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-markdown)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.77s
+     Running tests/rewrite.rs (target/debug/deps/rewrite-05cf926af7a4ce05)
+
+running 1 test
+test compose_zero_source_pieces_anchor_to_empty_points_only ... FAILED
+
+failures:
+
+---- compose_zero_source_pieces_anchor_to_empty_points_only stdout ----
+
+thread 'compose_zero_source_pieces_anchor_to_empty_points_only' (3759459) panicked at crates/aline-markdown/tests/rewrite.rs:442:5:
+assertion `left == right` failed
+  left: [(0..1, 0..1, Exact), (1..3, 1..2, Synthetic), (1..3, 2..4, Aligned), (3..6, 4..7, Exact)]
+ right: [(0..1, 0..1, Exact), (1..1, 1..2, Synthetic), (1..3, 2..4, Aligned), (3..6, 4..7, Exact)]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    compose_zero_source_pieces_anchor_to_empty_points_only
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p aline-markdown --test rewrite`
+H1_EXIT=101
+H1_RESTORED_SRC_SHA256=aa730fb81caa167826de781cc896676e8bd489c225427a76e109a3dd57c2f522
+END=2026-11-01T07:39:49Z
+
+### H2. 终版用例在修复后源码上通过（全 crate）
+START=2026-11-01T07:39:57Z
+SRC_SHA256=aa730fb81caa167826de781cc896676e8bd489c225427a76e109a3dd57c2f522
+TESTS_SHA256=c6387fec712ca19dac66782adcbadba7604192d908655bf4553e76da5ada35d2
+ARGV=cargo test -q -p aline-markdown --locked --offline
+----- raw stdout/stderr -----
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 5 tests
+.....
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 7 tests
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 19 tests
+...................
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 21 tests
+.....................
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 17 tests
+.................
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 23 tests
+.......................
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 14 tests
+..............
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 10 tests
+..........
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+H2_TEST_EXIT=0
+H2_PASSED_TOTAL=126
+END=2026-11-01T07:40:05Z
+
+### H3. clippy / fmt（终版）
+START=2026-11-01T07:40:05Z
+ARGV=cargo clippy -q -p aline-markdown --all-targets --locked --offline -- -D warnings
+----- raw stdout/stderr -----
+H3_CLIPPY_EXIT=0
+ARGV=cargo fmt -p aline-markdown --check
+H3_FMT_EXIT=0
+END=2026-11-01T07:40:06Z

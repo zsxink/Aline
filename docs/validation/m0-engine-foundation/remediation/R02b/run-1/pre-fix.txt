@@ -1,0 +1,24 @@
+   Compiling aline-markdown v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-markdown)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.30s
+     Running tests/zz_probe_r02b.rs (target/debug/deps/zz_probe_r02b-11b3e7b185793ad7)
+
+running 1 test
+L1 text = "axydef"
+L1: [(0..1, 0..1, Exact), (1..3, 1..3, Aligned), (3..6, 3..6, Exact)]
+L2@1: [(0..1, 0..1, Exact), (1..1, 1..2, Synthetic), (1..6, 2..7, Exact)]
+COMPOSED@1: [(0..1, 0..1, Exact), (1..3, 1..2, Synthetic), (1..3, 2..4, Aligned), (3..6, 4..7, Exact)]
+SYNTHETIC@1 = [(1..3, 1..2)]
+
+thread 'probe_synthetic_anchors_are_empty' (3676238) panicked at crates/aline-markdown/tests/zz_probe_r02b.rs:44:5:
+Synthetic 片段必须锚定空来源，实际 [(1..3, 1..2)]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test probe_synthetic_anchors_are_empty ... FAILED
+
+failures:
+
+failures:
+    probe_synthetic_anchors_are_empty
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p aline-markdown --test zz_probe_r02b`

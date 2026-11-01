@@ -1,0 +1,35 @@
+# R02b / run-1 命令与身份记录
+
+- 仓库根：`/Users/xian/Project/editor/Aline`（以下命令 CWD 均为该目录）
+- 基线 HEAD：`3b10ac042d102b155adb841b0b726ff5db970f79`
+- 工具链：`cargo 1.98.1 (797e8a9bc 2026-08-05)` / `rustc 1.98.1 (48a229cea 2026-09-01)`
+- 平台：`Darwin 27.2.0`（`uname -s`/`-r`，不含主机名与账号）
+- 环境：`CARGO_NET_OFFLINE=true`；所有 cargo 命令带 `--locked --offline`（置于 `--` 之前）
+
+## 修复前（pre-fix.txt）
+
+1. 探针 `crates/aline-markdown/tests/zz_probe_r02b.rs`（源码另存为 `pre-fix-probe.rs`）
+   `CARGO_NET_OFFLINE=true cargo test -p aline-markdown --test zz_probe_r02b --locked --offline -- --nocapture`
+   → exit 101，`SYNTHETIC@1 = [(1..3, 1..2)]`，panic「Synthetic 片段必须锚定空来源」
+   修复前源码身份：`rewrite.rs` sha256 `ef9b46acc686d6a3a0fdc87f8be8794ca62225eb452a9997c62b795bbd4bc397`
+   `tests/rewrite.rs` sha256 `767895fe403ee582954ca663c859c2ac0da16c71edf83a1f2de2f5361f5e7e15`
+   采集时刻 `2026-11-01T07:29:30Z`
+
+## 修复后（post-fix.txt，逐段记录起止 UTC 与退出码）
+
+- §A 代码指纹：`rewrite.rs` `aa730fb8…d57c2f522`、`tests/rewrite.rs` `cdb5598e…4d7aa55`
+- §B 同一份 `pre-fix-probe.rs` 原样重跑 → `PROBE_EXIT=0`，三处 `SYNTHETIC@1/@2/H…` 全为空区间
+- §C `cargo test -q -p aline-markdown --locked --offline` → `TEST_EXIT=0`，12 目标全 ok，126 passed
+- §D `cargo clippy -q -p aline-markdown --all-targets --locked --offline -- -D warnings` → `CLIPPY_EXIT=0`
+- §E `cargo fmt -p aline-markdown --check` → `FMT_EXIT=0`
+- §F 新用例在「修复前源码」上失败（临时把 `src/pre/rewrite.rs` 还原为 HEAD 版，
+  取证后立刻还原并核 sha256）→ `PREFIX_TEST_EXIT=101`，`left (1..3, 1..2, Synthetic)`
+  `RESTORED_SHA256=aa730fb81caa167826de781cc896676e8bd489c225427a76e109a3dd57c2f522`（与 §A 一致）
+- §G 还原后最终重跑 `cargo test -q -p aline-markdown --locked --offline` → `TEST_EXIT=0`，126 passed
+  （§G 段的 `PASSED_TOTAL=253` 系 §C+§G 两次相加，已在文件末尾追加勘误更正为 126）
+
+## 清理
+
+- 探针 `crates/aline-markdown/tests/zz_probe_r02b.rs` 跑后即 `rm -f`；
+  每次取证后 `git status --short crates/` 只剩 `src/pre/rewrite.rs`、`tests/rewrite.rs` 两项。
+- 未改动 `scripts/**`、未改 `Cargo.toml`/`Cargo.lock`、未新增依赖。
