@@ -49,3 +49,12 @@
 ## 返回给我（≤800 中文字）
 
 status、提交哈希、一行测试小结、concerns、证据路径。不要贴长日志。
+
+## 勘误（2026-11-01 追加，不改原文）
+
+上文「目标 3」写「原 45 项正反例」，与实测不符。本轮在 `e2b12bc` 上用
+`CARGO_NET_OFFLINE=true RUSTUP_TOOLCHAIN=1.98.1 python3 scripts/check_safety.py --self-test`
+实测：`passed: true`，`cases` 数组长度 **53**，exit 0。
+
+因此下限以 **53** 为准：不得减少任何一项既有 case，并在其上**至少新增 3 项**（目标 4），
+即完成后 case 数 ≥ 56。原文的「45」是笔误，不构成放宽依据。
