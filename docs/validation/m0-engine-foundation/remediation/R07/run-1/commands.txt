@@ -1,0 +1,30 @@
+# R07 commands（argv / cwd / 起止 UTC / exit code）
+
+cwd: /Users/xian/Project/editor/Aline
+toolchain: rustc 1.98.1 (48a229cea 2026-09-01)
+env: CARGO_NET_OFFLINE=true  RUSTUP_TOOLCHAIN=<unset>  CARGO_HOME=<unset>
+说明：本机 CARGO_HOME 未指向 admission 隔离目录，直接使用默认 $HOME/.cargo；全部命令 --locked --offline。
+
+--- cargo test -p aline-markdown --test mapping --locked --offline ---
+start: 2026-11-01T05:29:26Z  end: 2026-11-01T05:29:27Z  exit_code: 0
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.36s
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+--- cargo test -p aline-markdown --locked --offline ---
+start: 2026-11-01T05:29:27Z  end: 2026-11-01T05:29:27Z  exit_code: 0
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.03s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+--- cargo clippy -p aline-markdown --all-targets --locked --offline -- -D warnings ---
+start: 2026-11-01T05:29:27Z  end: 2026-11-01T05:29:27Z  exit_code: 0
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.20s
+
+--- cargo fmt --check ---
+start: 2026-11-01T05:29:27Z  end: 2026-11-01T05:29:27Z  exit_code: 0
+

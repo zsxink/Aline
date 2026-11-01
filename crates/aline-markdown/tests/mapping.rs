@@ -713,3 +713,296 @@ fn local_projection_combines_utf16_offsets_with_source_ranges() -> Result<(), Bo
     ));
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// R07 / F-10：字素簇边界与 UTF-8 标量边界分开验收
+//
+// 本段**不实现**任何字素分段算法：仓内没有 UAX #29 实现，也没有分段依赖
+// （`docs/engine-design.md:246` 只建议映射层提供「字素边界适配」，
+// `design.md:44` 规定 Unicode 分段依赖须经准入、金样由 V-07 收口）。
+// 因此这里的两套边界集合全部**手写**，只用它们去验收映射层已经暴露的
+// `drawn_offset` 接受集合；任何一方都不是由另一方或实现输出生成的。
+//
+// 断言分工：
+// 1. 映射层实际接受的绘制偏移集合 **恰好等于** 该类的标量边界集合；
+// 2. 手写字素集合 ⊂ 标量集合，且差集逐元素列出（对照组差集为空）；
+// 3. 以手写集合为纯数据的「字素移动」轨迹只落在字素集合上。
+// ---------------------------------------------------------------------------
+
+/// 一类字素簇夹具：字符串、两套**手写**边界集合、差集与 UAX #29 依据。
+struct ClusterCase {
+    /// 夹具名，出现在断言消息里。
+    name: &'static str,
+    /// 送入 `parse` 的源码（含尾部换行，换行在绘制层隐藏）。
+    source: &'static str,
+    /// 期望的绘制文本（不含被隐藏的尾部换行）。
+    drawn: &'static str,
+    /// 绘制文本的字节长度，手写常量。
+    drawn_len: usize,
+    /// 手写的 UTF-8 标量边界集合（绘制字节偏移）。
+    scalar: &'static [usize],
+    /// 手写的字素簇边界集合（UAX #29 用户字符边界）。
+    grapheme: &'static [usize],
+    /// 手写的 `scalar \ grapheme` 差集；对照组为空。
+    diff: &'static [usize],
+    /// 推导依据（UAX #29 规则编号）。
+    rule: &'static str,
+}
+
+/// R07 夹具表。每行两套边界都由人手写死，不由任何实现生成。
+const CLUSTER_CASES: &[ClusterCase] = &[
+    ClusterCase {
+        name: "combining-acute",
+        // U+0065 LATIN SMALL LETTER E + U+0301 COMBINING ACUTE ACCENT
+        source: "e\u{301}\n",
+        drawn: "e\u{301}",
+        drawn_len: 3,
+        scalar: &[0, 1, 3],
+        grapheme: &[0, 3],
+        diff: &[1],
+        rule: "GB9 ×Extend：U+0301 为 Grapheme_Cluster_Break=Extend，不得在 e 与它之间断",
+    },
+    ClusterCase {
+        name: "combining-acute-then-circumflex",
+        // U+0065 + U+0301 + U+0302，两个连续 Extend
+        source: "e\u{301}\u{302}\n",
+        drawn: "e\u{301}\u{302}",
+        drawn_len: 5,
+        scalar: &[0, 1, 3, 5],
+        grapheme: &[0, 5],
+        diff: &[1, 3],
+        rule: "GB9 连续 Extend 全部并入基字，链式不断开",
+    },
+    ClusterCase {
+        name: "zwj-family",
+        // U+1F468 ZWJ U+1F469 ZWJ U+1F467
+        source: "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}\n",
+        drawn: "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}",
+        drawn_len: 18,
+        scalar: &[0, 4, 7, 11, 14, 18],
+        grapheme: &[0, 18],
+        diff: &[4, 7, 11, 14],
+        rule: "GB11 ExtPict × ZWJ × ExtPict：ZWJ 及其两侧 emoji 属同一簇",
+    },
+    ClusterCase {
+        name: "skin-tone-modifier",
+        // U+1F44D + U+1F3FD (Emoji_Modifier)
+        source: "\u{1F44D}\u{1F3FD}\n",
+        drawn: "\u{1F44D}\u{1F3FD}",
+        drawn_len: 8,
+        scalar: &[0, 4, 8],
+        grapheme: &[0, 8],
+        diff: &[4],
+        rule: "GB9 Emoji_Modifier 的 GCB=Extend，肤色修饰并入基 emoji",
+    },
+    ClusterCase {
+        name: "regional-indicator-flag",
+        // U+1F1E8 + U+1F1F3（两个 regional indicator）
+        source: "\u{1F1E8}\u{1F1F3}\n",
+        drawn: "\u{1F1E8}\u{1F1F3}",
+        drawn_len: 8,
+        scalar: &[0, 4, 8],
+        grapheme: &[0, 8],
+        diff: &[4],
+        rule: "GB12/GB13 RI 成对：两个 regional indicator 合为一个旗帜簇",
+    },
+    ClusterCase {
+        name: "variation-selector",
+        // U+2764 + U+FE0F VS16
+        source: "\u{2764}\u{FE0F}\n",
+        drawn: "\u{2764}\u{FE0F}",
+        drawn_len: 6,
+        scalar: &[0, 3, 6],
+        grapheme: &[0, 6],
+        diff: &[3],
+        rule: "GB9 U+FE0F 的 GCB=Extend，变体选择符不单独成簇",
+    },
+    ClusterCase {
+        name: "cjk-equal-control",
+        source: "中文字\n",
+        drawn: "中文字",
+        drawn_len: 9,
+        scalar: &[0, 3, 6, 9],
+        grapheme: &[0, 3, 6, 9],
+        diff: &[],
+        rule: "GB999 任意：每个 CJK 表意字自成一簇，与标量边界相同（对照组）",
+    },
+    ClusterCase {
+        name: "repeated-space-equal-control",
+        source: "a  b\n",
+        drawn: "a  b",
+        drawn_len: 4,
+        scalar: &[0, 1, 2, 3, 4],
+        grapheme: &[0, 1, 2, 3, 4],
+        diff: &[],
+        rule: "GB999 任意：UAX #29 不在空格之间断开，重复空白与标量边界相同（对照组）",
+    },
+    ClusterCase {
+        name: "crlf-normalized-by-mapping",
+        // 源码 "a\r\nb\n"：CRLF 在绘制层被并成单个 LF，\r 归入 Aligned 片段。
+        source: "a\r\nb\n",
+        drawn: "a\nb",
+        drawn_len: 3,
+        scalar: &[0, 1, 2, 3],
+        grapheme: &[0, 1, 2, 3],
+        diff: &[],
+        rule: "GB3/GB4：CR 与 LF 之间不断（CRLF 属同一字素簇），映射层把 \\r\\n 折成单个 \\n",
+    },
+];
+
+/// 收集映射层实际接受的绘制偏移，作为集合返回；不逐点散断言。
+fn accepted_drawn_offsets(projection: &Projection) -> Vec<usize> {
+    let mut accepted = Vec::new();
+    for offset in 0..=projection.drawn_text().len() {
+        if projection.drawn_offset(offset).is_ok() {
+            accepted.push(offset);
+        }
+    }
+    accepted
+}
+
+/// 以手写集合为纯数据的「字素移动」：只允许落在集合元素上。
+///
+/// 返回的轨迹是从 0 起反复「移到下一个簇边界」得到的位置序列；
+/// 它必须恰好等于手写字素集合本身，且永不落在仅标量合法的偏移上。
+fn grapheme_move_trajectory(grapheme: &[usize]) -> Vec<usize> {
+    let mut trajectory = Vec::new();
+    let mut cursor = 0usize;
+    trajectory.push(cursor);
+    while let Some(next) = grapheme.iter().copied().find(|&offset| offset > cursor) {
+        trajectory.push(next);
+        cursor = next;
+    }
+    trajectory
+}
+
+/// 反向移动：从末端反复「移到上一个簇边界」。
+fn grapheme_move_reverse(grapheme: &[usize]) -> Vec<usize> {
+    let mut trajectory = Vec::new();
+    let Some(&last) = grapheme.last() else {
+        return trajectory;
+    };
+    let mut cursor = last;
+    trajectory.push(cursor);
+    while let Some(prev) = grapheme
+        .iter()
+        .rev()
+        .copied()
+        .find(|&offset| offset < cursor)
+    {
+        trajectory.push(prev);
+        cursor = prev;
+    }
+    trajectory
+}
+
+#[test]
+fn grapheme_and_scalar_boundaries_verified_separately() -> Result<(), Box<dyn Error>> {
+    assert!(
+        CLUSTER_CASES.len() >= 6,
+        "至少 6 类簇，实有 {}",
+        CLUSTER_CASES.len()
+    );
+    for case in CLUSTER_CASES {
+        // 0) 依据必须写明，否则「两套边界」只是数字对照，无从复核。
+        assert!(
+            !case.rule.is_empty(),
+            "case {} 必须写明 UAX #29 依据",
+            case.name
+        );
+        // 1) 夹具本身与手写常量一致：绘制文本、字节长度。
+        let parsed = parse_text(case.source)?;
+        let projection = parsed.projection();
+        assert_eq!(projection.drawn_text(), case.drawn, "case {}", case.name);
+        assert_eq!(
+            projection.drawn_text().len(),
+            case.drawn_len,
+            "case {} 绘制字节长度",
+            case.name
+        );
+
+        // 2) 映射层接受集合 **恰好等于** 手写标量集合。
+        let accepted = accepted_drawn_offsets(projection);
+        assert_eq!(
+            accepted,
+            case.scalar.to_vec(),
+            "case {} 接受集合必须恰等于标量集合",
+            case.name
+        );
+
+        // 3) 手写字素集合 ⊂ 标量集合，且差集逐元素核对。
+        for boundary in case.grapheme {
+            assert!(
+                case.scalar.contains(boundary),
+                "case {} 字素边界 {boundary} 必须是标量边界",
+                case.name
+            );
+        }
+        let mut computed_diff: Vec<usize> = case
+            .scalar
+            .iter()
+            .copied()
+            .filter(|offset| !case.grapheme.contains(offset))
+            .collect();
+        computed_diff.sort_unstable();
+        assert_eq!(
+            computed_diff,
+            case.diff.to_vec(),
+            "case {} 差集 scalar\\grapheme 必须逐元素一致",
+            case.name
+        );
+        assert_eq!(
+            case.grapheme.first().copied(),
+            Some(0),
+            "case {} 字素集合必须含 0",
+            case.name
+        );
+        assert_eq!(
+            case.grapheme.last().copied(),
+            Some(case.drawn_len),
+            "case {} 字素集合必须含绘制末端",
+            case.name
+        );
+
+        // 4) 字素移动是纯数据断言：正向轨迹恰为字素集合，反向轨迹为其逆序。
+        let forward = grapheme_move_trajectory(case.grapheme);
+        assert_eq!(
+            forward,
+            case.grapheme.to_vec(),
+            "case {} 正向字素移动轨迹必须只落在字素边界",
+            case.name
+        );
+        let mut reverse = grapheme_move_reverse(case.grapheme);
+        reverse.reverse();
+        assert_eq!(
+            reverse,
+            case.grapheme.to_vec(),
+            "case {} 反向字素移动轨迹必须与正向一致",
+            case.name
+        );
+
+        // 5) 仅标量合法的偏移不得出现在轨迹里；这正是两套边界的分野。
+        for offset in case.diff {
+            assert!(
+                projection.drawn_offset(*offset).is_ok(),
+                "case {} 差集偏移 {offset} 在标量层面必须被接受",
+                case.name
+            );
+            assert!(
+                !forward.contains(offset),
+                "case {} 差集偏移 {offset} 不是字素边界，不得出现在移动轨迹",
+                case.name
+            );
+        }
+
+        // 6) 差集非空即证明「分开验证」有实际内容；对照组必须为空。
+        let is_control = case.diff.is_empty();
+        assert_eq!(
+            is_control,
+            case.scalar == case.grapheme,
+            "case {} 差集为空当且仅当两套边界相等",
+            case.name
+        );
+    }
+    Ok(())
+}

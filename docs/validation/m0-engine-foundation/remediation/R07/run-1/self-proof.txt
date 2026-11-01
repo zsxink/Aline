@@ -1,0 +1,36 @@
+# R07 自证：新用例是否真的把「两套边界」钉死（临时变异 → 必须变红 → 已还原）
+
+基线文件 sha256: 0905156564e9a8c59a571a99bc47095aba73889c59935addebc557c0e81a2179
+
+## 变异 M1：把 combining-acute 的**标量**集合手写错成 [0, 3]（相当于误以为映射层只接受字素边界）
+exit_code=101
+test grapheme_and_scalar_boundaries_verified_separately ... FAILED
+thread 'grapheme_and_scalar_boundaries_verified_separately' (3100754) panicked at crates/aline-markdown/tests/mapping.rs:921:9:
+assertion `left == right` failed: case combining-acute 接受集合必须恰等于标量集合
+  left: [0, 1, 3]
+ right: [0, 3]
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.00s
+
+## 变异 M2：把 combining-acute 的**字素**集合手写错成 [0, 1, 3]（相当于误把标量边界当字素边界）
+exit_code=101
+test grapheme_and_scalar_boundaries_verified_separately ... FAILED
+thread 'grapheme_and_scalar_boundaries_verified_separately' (3100997) panicked at crates/aline-markdown/tests/mapping.rs:943:9:
+assertion `left == right` failed: case combining-acute 差集 scalar\grapheme 必须逐元素一致
+  left: []
+ right: [1]
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.00s
+
+## 变异 M3：把手写字素集合从 ZWJ 家族里删掉一个标量边界之外的元素（改成 [0, 7, 18]，簇内漏掉一个边界）
+exit_code=101
+test grapheme_and_scalar_boundaries_verified_separately ... FAILED
+thread 'grapheme_and_scalar_boundaries_verified_separately' (3101348) panicked at crates/aline-markdown/tests/mapping.rs:943:9:
+assertion `left == right` failed: case zwj-family 差集 scalar\grapheme 必须逐元素一致
+  left: [4, 11, 14]
+ right: [4, 7, 11, 14]
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.00s
+
+还原后 sha256: 0905156564e9a8c59a571a99bc47095aba73889c59935addebc557c0e81a2179
+还原后复跑：
+test grapheme_and_scalar_boundaries_verified_separately ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.01s
+exit_code=0
