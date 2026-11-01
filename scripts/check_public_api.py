@@ -6,30 +6,79 @@ import datetime
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
 
+from evidence_paths import resolve_path, write_json, write_text
+
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def cargo_evidence_facts(argv):
+    """从实际 argv 派生 Cargo 命令类别和锁定/离线事实。"""
+    if not argv or Path(str(argv[0])).name != "cargo":
+        return "non-cargo", False, False
+    args = [str(value) for value in argv[1:]]
+    locked, offline = "--locked" in args, "--offline" in args
+    if args and args[0] == "generate-lockfile":
+        kind = "initial-lock-generation"
+    elif "-V" in args or "--version" in args:
+        kind = "cargo-version"
+    elif locked and offline:
+        kind = "locked-check"
+    elif any(command in args for command in ("check", "clippy", "test", "tree", "metadata", "build")):
+        kind = "unlocked-check"
+    else:
+        kind = "cargo-command"
+    return kind, locked, offline
+
+
+def dependency_path(fixture, key):
+    """依赖写相对路径：Cargo 按清单目录解析，证据里不必出现本机绝对位置。"""
+    return os.path.relpath(ROOT / 'crates' / key, fixture.resolve())
+
+
+def work_root():
+    """夹具在仓库 target 下编译；输出目录在仓库外时清单也只含仓库内相对路径。"""
+    target = ROOT / 'target'
+    target.mkdir(parents=True, exist_ok=True)
+    return Path(tempfile.mkdtemp(prefix='public-api-', dir=target))
+
+
+def publish_fixture(fixture, evidence):
+    """把实际编译过的夹具源码复制为证据，不复制工作目录本身。"""
+    for relative in ('Cargo.toml', 'Cargo.lock', 'src/main.rs'):
+        source = fixture / relative
+        if source.is_file():
+            target = evidence / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            write_text(target, source.read_text())
 
 
 def execute(argv, directory, output, label, env):
     """保存真实 Cargo 命令、结果和环境，不安装工具或下载依赖。"""
     started = datetime.datetime.now(datetime.timezone.utc).isoformat()
     result = subprocess.run(argv, cwd=directory, env=env, text=True, capture_output=True)
-    (output / (label + '.stdout.log')).write_text(result.stdout)
-    (output / (label + '.stderr.log')).write_text(result.stderr)
+    write_text(output / (label + '.stdout.log'), result.stdout)
+    write_text(output / (label + '.stderr.log'), result.stderr)
+    evidence_kind, locked, offline = cargo_evidence_facts(argv)
     record = {'argv': argv, 'cwd': str(directory), 'started_utc': started,
               'finished_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'exit_code': result.returncode,
-              'env_overrides': {key: env[key] for key in ('CARGO_HOME', 'RUSTUP_TOOLCHAIN', 'CARGO_NET_OFFLINE', 'CARGO_TARGET_DIR')}}
-    (output / (label + '.command.json')).write_text(json.dumps(record, ensure_ascii=False, indent=2) + '\n')
+              'env_overrides': {key: env[key] for key in ('CARGO_HOME', 'RUSTUP_TOOLCHAIN', 'CARGO_NET_OFFLINE', 'CARGO_TARGET_DIR')},
+              'evidence_kind': evidence_kind, 'locked': locked, 'offline': offline}
+    write_json(output / (label + '.command.json'), record)
     return result
 
 
 def run(output):
     output.mkdir(parents=True, exist_ok=True)
     isolation = json.loads((ROOT / 'docs/validation/m0-engine-foundation/admission-2026-10-30/isolation.json').read_text())
-    env = dict(os.environ, CARGO_HOME=os.environ.get('CARGO_HOME') or isolation['cargo_home'],
+    isolated_home = resolve_path(isolation['cargo_home']) or isolation['cargo_home']
+    if not Path(isolated_home).is_dir():
+        raise ValueError('登记的隔离 Cargo 缓存不存在: ' + isolated_home)
+    env = dict(os.environ, CARGO_HOME=os.environ.get('CARGO_HOME') or isolated_home,
                RUSTUP_TOOLCHAIN='1.98.1', CARGO_NET_OFFLINE='true', CARGO_TARGET_DIR=str(output / 'cargo-target'))
     setup = '''
 let snapshot = aline_buffer::TextSnapshot::new(String::from("甲😀"), aline_buffer::TextBudget::new(64))?;
@@ -55,28 +104,36 @@ let _borrowed: &[(std::ops::Range<usize>, String)] = batch.patches();
         ('tuple-view-is-immutable', '', 'let batch = aline_buffer::CheckedBatch::new(&snapshot, vec![(0..0, String::new())], aline_buffer::PatchBudget::new(4, 64, 64))?; batch.patches()[0].1.push_str("!");', 101, ['E0596', 'cannot borrow']),
     ]
     records = []
-    for name, helper, body, expected, needles in cases:
-        fixture = output / 'fixtures' / name
-        (fixture / 'src').mkdir(parents=True, exist_ok=True)
-        dependencies = '\n'.join(key + ' = { path = ' + json.dumps(str(ROOT / 'crates' / key)) + ' }'
-                                 for key in ('aline-buffer', 'aline-markdown', 'aline-source'))
-        (fixture / 'Cargo.toml').write_text('[package]\nname="aline-m0-api-' + name + '"\nversion="0.0.0"\nedition="2024"\npublish=false\n[workspace]\n[dependencies]\n' + dependencies + '\n[lints.rust]\nunsafe_code="forbid"\n')
-        # 所有故意违规仅在隔离证据中，不进入正式 crate。
-        (fixture / 'src/main.rs').write_text('//! 公共边界隔离消费夹具。\n' + helper + '\nfn main() -> Result<(), Box<dyn std::error::Error>> {\n' + setup + body + '\nOk(())\n}\n')
-        generated = execute(['cargo', 'generate-lockfile', '--manifest-path', str(fixture / 'Cargo.toml'), '--offline'], fixture, output, name + '-lock', env)
-        if generated.returncode != 0:
-            records.append({'name': name, 'passed': False, 'reason': '隔离 lock 生成失败，未将其算作编译反例通过'})
-            continue
-        result = execute(['cargo', 'check', '--manifest-path', str(fixture / 'Cargo.toml'), '--locked', '--offline'], fixture, output, name + '-check', env)
-        actual = result.stdout + result.stderr
-        passed = result.returncode == expected and all(needle in actual for needle in needles)
-        records.append({'name': name, 'expected_exit_code': expected, 'actual_exit_code': result.returncode,
-                        'required_diagnostics': needles, 'passed': passed,
-                        'independent_expectation': 'Rust newtype/私有字段的语言边界与任务 3.2，非任意非零即通过'})
-        print(name, '符合预期' if passed else '失败', flush=True)
+    work = work_root()
+    try:
+        for name, helper, body, expected, needles in cases:
+            fixture = work / name
+            evidence = output / 'fixtures' / name
+            (fixture / 'src').mkdir(parents=True, exist_ok=True)
+            dependencies = '\n'.join(key + ' = { path = ' + json.dumps(dependency_path(fixture, key)) + ' }'
+                                     for key in ('aline-buffer', 'aline-markdown', 'aline-source'))
+            (fixture / 'Cargo.toml').write_text('[package]\nname="aline-m0-api-' + name + '"\nversion="0.0.0"\nedition="2024"\npublish=false\n[workspace]\n[dependencies]\n' + dependencies + '\n[lints.rust]\nunsafe_code="forbid"\n')
+            # 所有故意违规仅在隔离证据中，不进入正式 crate。
+            (fixture / 'src/main.rs').write_text('//! 公共边界隔离消费夹具。\n' + helper + '\nfn main() -> Result<(), Box<dyn std::error::Error>> {\n' + setup + body + '\nOk(())\n}\n')
+            generated = execute(['cargo', 'generate-lockfile', '--manifest-path', str(fixture / 'Cargo.toml'), '--offline'], fixture, output, name + '-lock', env)
+            if generated.returncode != 0:
+                publish_fixture(fixture, evidence)
+                records.append({'name': name, 'passed': False, 'reason': '隔离 lock 生成失败，未将其算作编译反例通过'})
+                continue
+            result = execute(['cargo', 'check', '--manifest-path', str(fixture / 'Cargo.toml'), '--locked', '--offline'], fixture, output, name + '-check', env)
+            publish_fixture(fixture, evidence)
+            actual = result.stdout + result.stderr
+            passed = result.returncode == expected and all(needle in actual for needle in needles)
+            records.append({'name': name, 'expected_exit_code': expected, 'actual_exit_code': result.returncode,
+                            'required_diagnostics': needles, 'passed': passed,
+                            'independent_expectation': 'Rust newtype/私有字段的语言边界与任务 3.2，非任意非零即通过'})
+            print(name, '符合预期' if passed else '失败', flush=True)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
     summary = {'passed': all(record['passed'] for record in records), 'cases': records,
+               'fixture_basis': '夹具在仓库 target 下编译，证据清单中的相对依赖路径以该工作目录为基准',
                'scope': '当前 macOS 工具链真实编译，未运行非法夹具，不声明其他平台或完整引擎业务'}
-    (output / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2) + '\n')
+    write_json(output / 'summary.json', summary)
     return 0 if summary['passed'] else 1
 
 

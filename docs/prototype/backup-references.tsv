@@ -108,7 +108,7 @@ docs/rust-style-guide.md	293	**S-15-01（准入，C-02/C-08）：**新增/升级
 docs/rust-style-guide.md	352	| [UI 规范](./ui-spec.md) / [Zed 笔记](../docs_bak/docs/zed-notes.md) | UI 规范已迁入并回写 UI-01～UI-06；具体组件/字体/焦点/GPUI 接线仍须按 PRD、锁定版本及 V-01/V-04/V-09 验证，不从 Zed 主线推定 API 可用 |
 docs/rust-style-guide.md	408	| [历史 Rust 规范](../docs_bak/docs/rust-style-guide.md) | 本轮逐章复核对象；原文保留，处置账本见第 22 节 |
 docs/rust-style-guide.md	409	| [历史引擎](../docs_bak/docs/engine-design.md) / [历史架构](../docs_bak/docs/v1-architecture.md) / [历史架构规范](../docs_bak/docs/architecture-guide.md) | Ely 映射/保真/补丁、crate 与依赖来历；实际约束以当前稿/铁律为准，不照抄“唯一算法”“已实测” |
-docs/rust-style-guide.md	410	| [Zed 笔记](../docs_bak/docs/zed-notes.md) §0/1/3 | 生命周期/输入/缓存/测试机制证据；本轮未重验外部源码行号。`/Users/xian/Project/book/zed` 为后续本地核对入口，不当 gpui-pre API 证明 |
+docs/rust-style-guide.md	410	| [Zed 笔记](../docs_bak/docs/zed-notes.md) §0/1/3 | 生命周期/输入/缓存/测试机制证据；本轮未重验外部源码行号。`<external>/zed` 为后续本地核对入口，不当 gpui-pre API 证明 |
 docs/rust-style-guide.md	411	| [WordCraft 调研](../docs_bak/docs/wordcraft-study.md) §2/4/5 | 敌意扫描/预算/原文透传/保真案例；不采用第二解析器、快照 undo 或“无 ZIP/无导出”旧前提 |
 docs/rust-style-guide.md	412	| [旧决定](../docs_bak/docs/decisions.md) / [旧架构规范 §11](../docs_bak/docs/architecture-guide.md#11-性能与反面实证) | 历史技术选择及 MarkFlow #458/#459/#460 热路径反例；不是 Aline 性能证据，旧版本表不重新冻结 |
 docs/rust-style-guide.md	423	对象为 [docs_bak/docs/rust-style-guide.md](../docs_bak/docs/rust-style-guide.md) v0.1，含导言、§1～18 与附录 A～C。**保留**长期有效约束；**修订**改变范围/术语/检查；**移出**在本文件只留 Rust 侧约束和详细职责链接，不表示本轮编辑了目标文档；**删除**撤销其当前规则效力，历史原文仍保留；**待验证**按 V 或无编号实验收口。同项可拆分处理。

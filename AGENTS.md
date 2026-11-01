@@ -45,20 +45,21 @@ Aline —— Typora 式 Markdown 编辑器（Rust + GPUI，无 WebView），macO
 
 ## 构建与检查
 
-当前仓库仅有文档。M0 建立 Cargo workspace 后，提交前必跑（规范出处：rust-style-guide §2）：
+当前仓库已有 8 成员 Cargo workspace：`app`、`crates/aline-app-core`、`crates/aline-source`、`crates/aline-buffer`、`crates/aline-markdown`、`crates/aline-edit`、`crates/aline-plugin`、`crates/aline-ui`。Rust 提交前必跑以下门禁（规范出处：rust-style-guide §2）：
 
 ```sh
 cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
 ```
 
 - 跑单个测试：`cargo test -p <crate> <test_name>`（测试命名 `被测行为_场景`，如 `edit_single_patch_creates_one_undo_step`）。
-- RS-01 已确认：默认 lint + 逐项启用铁律/高价值 lint，`pedantic` 按项引入，不整组开启；保留 `-D warnings`，不全局放行坐标转换。具体 lint 级别、作用范围、成员继承及正反样例在 M0 验证登记，当前尚无配置或 CI。
+- RS-01 已确认：默认 lint + 逐项启用铁律/高价值 lint，`pedantic` 按项引入，不整组开启；保留 `-D warnings`，不全局放行坐标转换。根 `Cargo.toml` 已配置 `[workspace.lints]`，8 个成员均继承；工程/lint/安全/公共 API 守卫入口及自测见 `scripts/check_engineering.py`、`scripts/check_lints.py`、`scripts/check_safety.py`、`scripts/check_public_api.py`。`.github/workflows/m0.yml` 已配置 `workflow_dispatch` 和推送 `main` 时运行；远端 Actions 实际运行状态未核实。此配置状态不表示 M0 总验收完成，进度见 `docs/validation/m0-engine-foundation/remediation/progress.md`。
 - gpui 锁死快照版本（`gpui-pre`），升级是显式动作；V1 不引入 notify / regex / tokio 等运行时与额外依赖。2026-10-30 已批准的例外仅为架构 §3.2 登记的 GPUI 0.3.9→regex 精确路径与非桌面 WASI p2 绑定路径；Aline 自有直接依赖、五引擎及其它路径继续禁止。按来源/版本/校验和/边/target/features 审计，不全包或前缀放行（当前准入见 engine-design §18.2 和 v1-architecture §3.2；历史依赖表不是预装许可）。
 
 ## 工作方式
 
 - **规范是实现约束（不改变上述权威分工）**：按 `openspec/CODE_STANDARDS.md` 和工程治理规格检查职责、依赖、唯一状态所有者及可测试边界；模块行数仅提示复核，不机械拆文件或 crate。相关 change 的 design 必须解释模式解决的问题、最简单可行方案、代价和验证；允许直接使用具体类型/函数，禁止无需求的模式包装。工程规则调整同步本文入口、OpenSpec 与相关现行文档，不能以局部 allow 或 design 绕过铁律。
+- **不写本机绝对路径**：文档、证据与脚本只写仓库内相对路径或 `<repo>`、`<tmp>`、`<home>` 等占位符，不记录本机用户目录、临时目录或仓库外磁盘位置；生成证据的脚本统一经 `scripts/evidence_paths.py` 归一化，读回时用 `resolve_path` 还原。shebang 的解释器行是唯一例外。
 - **按里程碑推进**（v1-architecture 第 13 章）：M0 引擎地基 → M1 单文档只读 → M2 可编辑核心（可日用）→ M3 命令与表格 → M4 插件与主题 → M5 应用壳 → M6 收尾。阶段可形成内部预览，验收按三平台分别取证；先 macOS 后 Windows/Linux 验证，正式 V1 三平台同发（PRD §9、V-01）。
 - 新增依赖先对照 engine-design §18.2 和 v1-architecture §3.2 的准入规则，同类功能不得引入第二个库。
-- 实现期对照：ElyMark 完整历史关键文件索引已保全于 `docs/archive/migration-evidence/engine-design.md`，当前入口见 engine-design §18.3；Zed 克隆在 `/Users/xian/Project/book/zed`（gpui 新架构与锁定的 gpui-pre 存在 API 代差，机制线索参考 docs/zed-notes.md §0及其完整历史证据，具体 API 及性能结论须重新取证）。Aline 全部自写实现，外部源码只作对照参考。
+- 实现期对照：ElyMark 完整历史关键文件索引已保全于 `docs/archive/migration-evidence/engine-design.md`，当前入口见 engine-design §18.3；Zed 克隆放在仓库外的参考目录，不随本仓库分发（gpui 新架构与锁定的 gpui-pre 存在 API 代差，机制线索参考 docs/zed-notes.md §0及其完整历史证据，具体 API 及性能结论须重新取证）。Aline 全部自写实现，外部源码只作对照参考。
 - 外观与交互参照 MarkFlow（[`MarkFlow`](https://github.com/zsxink/MarkFlow)）：设置模型、导出主题、图片粘贴、自动保存/外部修改检测等功能语义从它迁移（迁语义不迁代码）。其 2026-10-25 性能诊断（128KB 文档卡顿三病根，issue #458/#459/#460）已并入 architecture-guide §11 作为反面实证；方向研究报告全文在 MarkFlow 仓库 `docs/superpowers/specs/2026-10-26-aline-gpui-rebuild-design.md`。

@@ -15,6 +15,8 @@ import re
 import subprocess
 import sys
 
+from evidence_paths import resolve_path, write_json, write_text
+
 ROOT = Path(__file__).resolve().parent.parent
 MEMBERS = {
     "aline": "app",
@@ -675,7 +677,19 @@ def tables(path):
         raise CheckError("无法读取 TOML %s: %s" % (path, error))
     parser = _TomlParser(text, str(path))
     result = {}
-    _flatten_tables(parser.parse(), (), result, lines=parser.lines, source=str(path))
+    seen = {}
+    _flatten_tables(parser.parse(), (), result, seen=seen, lines=parser.lines, source=str(path))
+    # 策略表必须来自真实嵌套路径；孤立的引号点分键即使没有撞名，Cargo 也会忽略。
+    # 先完成通用撞名检查，保留原有冲突双方与后出现位置的诊断。
+    for policy_path in (("workspace", "lints", "rust"), ("workspace", "lints", "clippy")):
+        joined = ".".join(policy_path)
+        actual = seen.get(joined)
+        if actual is not None and actual[0] != policy_path:
+            actual_path, line = actual
+            raise CheckError(
+                "%s:%d: policy-table-path: 策略键 %r 必须使用真实表路径 %r，"
+                "实际表路径 %r（第 %d 行），Cargo 会忽略引号点分键"
+                % (path, line, joined, policy_path, actual_path, line))
     return result
 
 
@@ -718,19 +732,77 @@ def audit_member_manifest(name, manifest):
         raise CheckError("成员未完整继承 workspace lint: " + name)
 
 
-def record(argv, cwd, output, label, env_overrides):
+def cargo_evidence_facts(argv):
+    """从实际 argv 推导 Cargo 命令类别及 lock/offline 标志。"""
+    if not argv or argv[0] != "cargo":
+        return "non-cargo", False, False
+    args = argv[1:]
+    locked = "--locked" in args
+    offline = "--offline" in args
+    if args and args[0] == "generate-lockfile":
+        kind = "initial-lock-generation"
+    elif "-V" in args or "--version" in args:
+        kind = "cargo-version"
+    elif locked and offline:
+        kind = "locked-check"
+    elif any(command in args for command in ("check", "clippy", "test", "tree", "metadata", "build")):
+        kind = "unlocked-check"
+    else:
+        kind = "cargo-command"
+    return kind, locked, offline
+
+
+def fixture_lock_path(manifest, cwd):
+    """定位夹具 workspace 锁文件，不触碰仓库根或共享 target。"""
+    manifest = Path(manifest).resolve()
+    current = Path(cwd).resolve()
+    if (current / "Cargo.toml").is_file():
+        try:
+            if manifest.is_relative_to(current):
+                root_manifest = current / "Cargo.toml"
+                if "[workspace" in root_manifest.read_text(encoding="utf-8"):
+                    return current / "Cargo.lock"
+        except (OSError, ValueError):
+            pass
+    for directory in (manifest.parent, *manifest.parents):
+        root_manifest = directory / "Cargo.toml"
+        try:
+            if "[workspace" in root_manifest.read_text(encoding="utf-8"):
+                return directory / "Cargo.lock"
+        except OSError:
+            continue
+    return manifest.parent / "Cargo.lock"
+
+
+def record(argv, cwd, output, label, env_overrides, ensure_lock=True):
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ)
     env.update(env_overrides)
+    evidence_kind, locked, offline = cargo_evidence_facts(argv)
+    if ensure_lock and evidence_kind == "locked-check" and "--manifest-path" in argv:
+        manifest_index = argv.index("--manifest-path")
+        if manifest_index + 1 < len(argv):
+            manifest = Path(argv[manifest_index + 1])
+            lock_path = fixture_lock_path(manifest, cwd)
+            if not lock_path.exists():
+                generation_argv = [
+                    "cargo", "generate-lockfile", "--manifest-path", str(manifest), "--offline"
+                ]
+                generation_code, _generation_text, _generation_metadata = record(
+                    generation_argv, cwd, output, label + "-initial-lock-generation",
+                    env_overrides, ensure_lock=False)
+                if generation_code != 0 or not lock_path.exists():
+                    raise CheckError(
+                        "隔离夹具初始锁文件生成失败: " + str(lock_path))
     started = datetime.datetime.now(datetime.timezone.utc).isoformat()
     try:
         result = subprocess.run(argv, cwd=cwd, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         code, stdout, stderr = result.returncode, result.stdout, result.stderr
     except OSError as error:
         code, stdout, stderr = 127, "", str(error)
-    (output / (label + ".stdout.log")).write_text(stdout)
-    (output / (label + ".stderr.log")).write_text(stderr)
+    write_text(output / (label + ".stdout.log"), stdout)
+    write_text(output / (label + ".stderr.log"), stderr)
     metadata = {
         "argv": argv,
         "cwd": str(cwd),
@@ -738,8 +810,15 @@ def record(argv, cwd, output, label, env_overrides):
         "finished_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "exit_code": code,
         "env_overrides": env_overrides,
+        "env_effective": {
+            key: env.get(key) for key in ("CARGO_NET_OFFLINE", "RUSTUP_TOOLCHAIN")
+            if key in env
+        },
+        "evidence_kind": evidence_kind,
+        "locked": locked,
+        "offline": offline,
     }
-    (output / (label + ".command.json")).write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n")
+    write_json(output / (label + ".command.json"), metadata)
     return code, stdout + stderr, metadata
 
 
@@ -884,12 +963,12 @@ PARSER_CASES = [
      ".".join(["k"] * (MAX_NESTING_DEPTH + 1)) + " = 1\n", "error", "深度"),
 ]
 
-# 展平撞名用例：表头路径与引号点分键展平为同一键时必须 fail-closed。
+# 表路径用例：展平撞名或策略路径由引号点分键冒充时必须 fail-closed。
 # 期望值按 TOML/Cargo 语义手写，不以实现输出为准。
 #
 # 拒绝用例的 detail 是手写的报错要件，不是从实现输出抄来的：
-#   line  —— 报错行号必须等于**后出现**那处冲突所在的行（1 起计）；
-#   paths —— 两条冲突路径的元组拼写必须都出现在信息里（顺序无关）；
+#   line  —— 撞名报后出现处，孤立引号策略键报该键所在行（1 起计）；
+#   paths —— 真实/实际两条路径的完整元组拼写都出现在信息里（顺序无关）；
 #   key   —— 被展平成的同一个键。
 # 少了任一要件（行号写死、路径不打印）都应判为不符合预期，否则「行号可定位、
 # 两条路径可见」这条复核要求就没有断言保护。
@@ -898,6 +977,13 @@ TABLE_PATH_CASES = [
      '[package]\n"a.b" = 1\nmeta.x = { y = 2 }\n', "ok", "", None),
     ("accept-table-and-distinct-quoted-key",
      '[a.b]\nx = 1\n[a]\n"c.d" = { y = 2 }\n', "ok", "", None),
+    ("accept-real-policy-tables-with-unrelated-quoted-key",
+     '[workspace.lints.rust]\nunsafe_code = "forbid"\n'
+     '[workspace.lints.clippy]\nunwrap_used = "deny"\n'
+     '[package]\n"a.b" = { x = 1 }\n', "ok", "", None),
+    ("accept-real-nested-policy-values",
+     '[workspace]\nlints.rust = { unsafe_code = "forbid" }\n'
+     'lints.clippy = { unwrap_used = "deny" }\n', "ok", "", None),
     ("reject-table-then-quoted-dotted-key",
      '[workspace.lints.rust]\nunsafe_code = "warn"\n'
      '[workspace]\n"lints.rust" = { unsafe_code = "forbid" }\n',
@@ -912,6 +998,47 @@ TABLE_PATH_CASES = [
      {"line": 3,
       "paths": ("('workspace', 'lints.rust')", "('workspace', 'lints', 'rust')"),
       "key": "workspace.lints.rust"}),
+    ("reject-real-rust-quoted-clippy",
+     '[workspace.lints.rust]\nunsafe_code = "forbid"\n'
+     '[workspace]\n"lints.clippy" = { unwrap_used = "deny" }\n',
+     "error", "policy-table-path",
+     {"line": 4,
+      "paths": ("('workspace', 'lints', 'clippy')", "('workspace', 'lints.clippy')"),
+      "key": "workspace.lints.clippy"}),
+    ("reject-real-clippy-quoted-rust",
+     '[workspace.lints.clippy]\nunwrap_used = "deny"\n'
+     '[workspace]\n"lints.rust" = { unsafe_code = "forbid" }\n',
+     "error", "policy-table-path",
+     {"line": 4,
+      "paths": ("('workspace', 'lints', 'rust')", "('workspace', 'lints.rust')"),
+      "key": "workspace.lints.rust"}),
+    ("reject-quoted-clippy-before-real-rust",
+     '[workspace]\n"lints.clippy" = { unwrap_used = "deny" }\n'
+     '[workspace.lints.rust]\nunsafe_code = "forbid"\n',
+     "error", "policy-table-path",
+     {"line": 2,
+      "paths": ("('workspace', 'lints', 'clippy')", "('workspace', 'lints.clippy')"),
+      "key": "workspace.lints.clippy"}),
+    ("reject-quoted-rust-before-real-clippy",
+     '[workspace]\n"lints.rust" = { unsafe_code = "forbid" }\n'
+     '[workspace.lints.clippy]\nunwrap_used = "deny"\n',
+     "error", "policy-table-path",
+     {"line": 2,
+      "paths": ("('workspace', 'lints', 'rust')", "('workspace', 'lints.rust')"),
+      "key": "workspace.lints.rust"}),
+    ("reject-quoted-policy-without-real-tables",
+     '[workspace]\n"lints.rust" = { unsafe_code = "forbid" }\n'
+     '"lints.clippy" = { unwrap_used = "deny" }\n',
+     "error", "policy-table-path",
+     {"line": 2,
+      "paths": ("('workspace', 'lints', 'rust')", "('workspace', 'lints.rust')"),
+      "key": "workspace.lints.rust"}),
+    ("reject-quoted-root-policy-path",
+     '"workspace.lints.clippy" = { unwrap_used = "deny" }\n',
+     "error", "policy-table-path",
+     {"line": 1,
+      "paths": ("('workspace', 'lints', 'clippy')", "('workspace.lints.clippy',)"),
+      "key": "workspace.lints.clippy"}),
 ]
 
 # 成员 [lints] 的三类拒绝路径必须各有独立断言，使弱化 audit_member_manifest
@@ -964,26 +1091,25 @@ def run_parser_self_checks(directory):
     return len(PARSER_CASES)
 
 
-def _assert_rejection_detail(label, error, detail):
+def _assert_rejection_detail(label, error, detail, source):
     """校验拒绝信息里手写的要件：文件:行号在首段、行号精确、两条冲突路径与展平键都在。
 
     `detail` 为 None 表示该用例只要求拒绝本身成立（历史用例保持原强度）。
     """
     message = str(error)
-    head = message.split(" ", 1)[0].rstrip(":")
-    if ":" not in head:
+    location = re.match(re.escape(str(source)) + r":(\d+):(?: |$)", message)
+    if location is None:
         raise CheckError("表路径自检错误缺少文件:行号: %s (%s)" % (label, message))
     if not detail:
         return
-    if not head.rsplit(":", 1)[1].isdigit():
-        raise CheckError("表路径自检错误行号不是数字: %s (%s)" % (label, message))
-    line = int(head.rsplit(":", 1)[1])
+    line = int(location.group(1))
     if line != detail["line"]:
         raise CheckError(
             "表路径自检行号不符预期: %s 期望第 %d 行，实得第 %d 行 (%s)"
             % (label, detail["line"], line, message))
+    reported_paths = re.findall(r"\([^()\n]*\)", message[location.end():])
     for path_repr in detail["paths"]:
-        if path_repr not in message:
+        if path_repr not in reported_paths:
             raise CheckError(
                 "表路径自检信息未列出冲突路径 %s: %s (%s)" % (path_repr, label, message))
     if detail["key"] not in message:
@@ -992,7 +1118,7 @@ def _assert_rejection_detail(label, error, detail):
 
 
 def run_table_path_self_checks(directory):
-    """表头路径与引号点分键展平撞名：必须 fail-closed，且错误带文件:行号与两条路径。"""
+    """拒绝撞名和孤立引号策略键，且错误带准确文件:行号与两条完整路径。"""
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     for index, (label, text, expect, needle, detail) in enumerate(TABLE_PATH_CASES, 1):
@@ -1003,7 +1129,7 @@ def run_table_path_self_checks(directory):
         except CheckError as error:
             if expect != "error" or needle not in str(error):
                 raise CheckError("表路径自检不符合预期: %s (%s)" % (label, error))
-            _assert_rejection_detail(label, error, detail)
+            _assert_rejection_detail(label, error, detail, path)
             print("table-path %s: 拒绝符合预期 (%s)" % (label, error), flush=True)
         else:
             if expect != "ok":
@@ -1042,7 +1168,9 @@ def run_self_test(output):
     cargo_home = os.environ.get("CARGO_HOME")
     if not cargo_home:
         isolation = json.loads((ROOT / "docs/validation/m0-engine-foundation/admission-2026-10-30/isolation.json").read_text())
-        cargo_home = isolation["cargo_home"]
+        cargo_home = resolve_path(isolation["cargo_home"]) or isolation["cargo_home"]
+        if not Path(cargo_home).is_dir():
+            raise CheckError("登记的隔离 Cargo 缓存不存在: " + cargo_home)
     target_dir = str(output / "cargo-target")
     env = {"CARGO_HOME": cargo_home, "CARGO_TARGET_DIR": target_dir, "CARGO_NET_OFFLINE": "true", "RUSTUP_TOOLCHAIN": "1.98.1"}
 
@@ -1073,7 +1201,7 @@ def run_self_test(output):
         (member / "src/lib.rs").write_text(rust)
         manifests.append((name, manifest))
     for name, _ in manifests:
-        argv = ["cargo", "check", "--manifest-path", str(inherit_project / "Cargo.toml"), "--package", name, "--offline"]
+        argv = ["cargo", "check", "--manifest-path", str(inherit_project / "Cargo.toml"), "--package", name, "--locked", "--offline"]
         check_expected("inherit-unsafe-" + name, argv, inherit_project, output / "results", env, 101, "unsafe-code")
 
     # 每个目标单独建最小 workspace，使错误的目标源码只参与本次诊断。
@@ -1094,13 +1222,13 @@ def run_self_test(output):
         project = cases_dir / label
         manifest, _ = write_fixture(project, "lint-fixture", source, root_lints, target)
         for profile, profile_args in profiles.items():
-            argv = ["cargo", "clippy", "--manifest-path", str(manifest), "--offline", "--all-targets"] + profile_args + ["--", "-D", "warnings"]
+            argv = ["cargo", "clippy", "--manifest-path", str(manifest), "--locked", "--offline", "--all-targets"] + profile_args + ["--", "-D", "warnings"]
             check_expected(label + "-" + profile, argv, project, output / "results", env, expected, diagnostic)
 
     unsafe_source = "//! 隔离违规样例。\n#![allow(unsafe_code)]\n/// 故意尝试降低 forbid。\npub unsafe fn forbidden() {}\n"
     unsafe_project = cases_dir / "negative-unsafe-allow"
     unsafe_manifest, _ = write_fixture(unsafe_project, "lint-fixture", unsafe_source, root_lints)
-    check_expected("unsafe-forbid-cannot-be-lowered", ["cargo", "check", "--manifest-path", str(unsafe_manifest), "--offline"], unsafe_project, output / "results", env, 101, "forbid")
+    check_expected("unsafe-forbid-cannot-be-lowered", ["cargo", "check", "--manifest-path", str(unsafe_manifest), "--locked", "--offline"], unsafe_project, output / "results", env, 101, "forbid")
 
     missing_project = cases_dir / "negative-member-inheritance"
     missing_manifest, _ = write_fixture(missing_project, "aline-source", "//! 漏继承夹具。\npub fn ordinary() {}\n", root_lints, inherit=False)
@@ -1111,7 +1239,7 @@ def run_self_test(output):
         if "未完整继承" not in str(error):
             raise
     # 错误配置的 Cargo 负例明确编译无 lint 源码；该结果不冒充 lint 诊断。
-    code, text, _ = record(["cargo", "check", "--manifest-path", str(missing_manifest), "--offline"], missing_project, output / "results", "missing-inherit-cargo-control", env)
+    code, text, _ = record(["cargo", "check", "--manifest-path", str(missing_manifest), "--locked", "--offline"], missing_project, output / "results", "missing-inherit-cargo-control", env)
     if code != 0:
         raise CheckError("漏继承控制样例的普通源码没有通过 Cargo，无法隔离继承检查")
 

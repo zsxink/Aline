@@ -17,8 +17,8 @@ pub use budget::{CancelCheck, CancelToken, ParseBudget, ParseStats};
 pub use config::{ParseConfig, ParseFeatures};
 pub use diagnostic::{Diagnostic, DiagnosticKind};
 pub use mapping::{
-    DrawnOffset, DrawnRange, Mapped, MappingBudget, MappingError, MappingPrecision, MappingSegment,
-    Projection, ProjectionId, Utf16Offset, Utf16Range,
+    DrawnOffset, DrawnRange, GraphemeError, Mapped, MappingBudget, MappingError, MappingPrecision,
+    MappingSegment, Projection, ProjectionId, Utf16Offset, Utf16Range,
 };
 pub use mdast::{Block, BlockKind, Gap};
 pub use parse::{ParseError, Parsed, parse, parse_with_cancel};

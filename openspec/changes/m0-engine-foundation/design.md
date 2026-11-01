@@ -41,7 +41,8 @@
 | gpui-pre | crates.io =0.3.9，声明 Zed 93d745668805029476e6d7fbb19652116fed51de，包校验和/发布差异见第 1 组证据 | macOS aarch64 核心库消费方与 test-support 已编译检查；按现行架构 §3.2 的精确例外验完整图，未审 features、新路径或来源/身份漂移须重审。原生平台后端/真实 harness 事件未验证 |
 | pulldown-cmark | 单解析器候选版本，关闭默认 features 后显式选项 | 分清 Cargo features 与运行期 Options，以基础/GFM/产品语法金样固定可用组合；不添加第二解析器 |
 | TOML/rust-embed | catalog 所需版本候选 | 登记用途/归属/版本/许可/feature/传递图，双语解析与嵌入消费测试 |
-| entities/emojis、Unicode 分段、similar/proptest | 仅发现实际缺口才提出的候选 | 与现有能力对照，证明必要性及无重复库；无需求不引入，Unicode 字素金样不能省略 |
+| Unicode 字素分段 | **已批准的精确候选** `unicode-segmentation =1.13.3`，在 `aline-markdown` 增加唯一直接引擎边；该包提供 Unicode 17.0.0 数据，无运行时依赖/unsafe，锁定 SHA-256 `c6f5d3c3b1bf09027a88a6bc961fc00497d651009560b5463668dc81b0fa87a8` | 用户于 2026-11-01 批准 Unicode17 行为、Unicode18 GB9c 已知差异和查询预算方案，proposal/review 见 `docs/validation/m0-engine-foundation/remediation/R07/run-2/`；实现前仍须本 change 设计独立复核，不将 lockfile 中沿 GPUI 的传递可达当作既有准入 |
+| entities/emojis、similar/proptest | 仅发现实际缺口才提出的候选 | 与现有能力对照，证明必要性及无重复库；无需求不引入 |
 | ropey/资产/ZIP/导出后端 | 后续证据决定 | M0 不预装；禁 notify/regex/tokio/Wasmtime/WASI/动态宿主覆盖直接及传递所有路径，仅限现行架构 §3.2 已批准的精确例外 |
 
 候选取证在隔离临时目录执行，保留命令/来源/hash/输出与许可证证据，不污染仓库；正式依赖仅在步骤 1 准入后于步骤 2 配置。V-01 只登记 macOS（含 Intel）、Windows 10、Linux 的目标 CPU/最低系统候选/发行版显示环境、可用设备和缺口；真实验证先 macOS，后 Windows/Linux，不凭 metadata 推断平台能力。
@@ -72,7 +73,14 @@ WorkingVersion 的跨层承载采用低层自有的 revision/不透明代次值�
 
 从全量不可变快照开始：字面区识别→必要的映射改写→唯一解析器事件→带原文范围 mdast→展示/块/Gap/保护/导航→校验/Parsed。优先同一解析器识别字面区，必要时再次解析改写副本，不冻结“一次解析”口号。仅为锁定解析器无法直接表达的需求引入 pass；每 pass 复合来源关系，事件跨段保留子来源，synthetic 不伪装用户文本。
 
-映射用来源区间加 Exact/Aligned/Hidden/Synthetic 等精确性，原样段可紧凑记录，变换段明确来源；不用字符相等从尾部回搜。源序片段有序，目录/脚注副本分别记录文本来源与导航目标；不要求全树显示顺序单调。原样精确往返、规范锚点稳定、对齐幂等、UTF-16 代理对/字素/反向选区分别测试。字素分段若需依赖先准入。
+映射用来源区间加 Exact/Aligned/Hidden/Synthetic 等精确性，原样段可紧凑记录，变换段明确来源；不用字符相等从尾部回搜。源序片段有序，目录/脚注副本分别记录文本来源与导航目标；不要求全树显示顺序单调。原样精确往返、规范锚点稳定、对齐幂等、UTF-16 代理对/字素/反向选区分别测试。
+
+#### 字素边界适配（本 change 新增）
+
+- 唯一实现 home 为 `aline-markdown` mapping；不由 `aline-buffer` 持有分段规则，不把第三方 crate 类型泄漏到公开 API。输入/输出用绑定 `Projection` 身份的 `DrawnOffset`；Source 经 `Projection::identity`，Visual 经当前解析得到的展示投影；返回源码定位必须走现有 `source_at`/`drawn_at`。
+- 仅在已验证的完整投影文本上做前进、后退和边界查询，拒绝旧投影、非法 scalar 端点、非字素边界起点；不得截取孤立子串并假装拥有完整 RI/Indic 前文。此机制只给光标移动边界，不证明删除选区来源完整或绕过 protection。
+- 按每次查询最多 4096 UTF-8 字节、每块至多 256 字节约束游标供给。预算累计计算每次主动 chunk 及 `PreContext` 回扫实际交给库的字节，重复供给重复计费；达到预算仍未确定边界时返回类型化 `ScanBudgetExceeded`，不返回推测偏移。该数字是供给字节计费上限，不等同于库内部精确访存量、CPU 时间或发布性能保证。
+- 锁定 Unicode17 行为。U+094D U+0915 UTF-8 字节的预期边界为 `[0,3,6]`；Unicode18 / UAX #29 Rev.49 GB9c 变更后的预期为 `[0,6]`。若 V-07 最终要求 Unicode18/当前 UAX 行为，必须另行准入新数据版本并更新金样，不沿用本批准声称满足。长 RI 上下文、超长组合簇、Indic、双向移动、非字素起点和预算拒绝均需独立预期测试。
 
 有限 HTML 保留样式语义及 HTML 身份，注释仅隐藏显示；支持标签、引号内 >、交叉嵌套、空白来源、实体和过滤标签各有独立金样。未闭合不吞尾。MD-11 包括脚注引用子区间，不能锁死同段普通正文；HTML 原文可编辑而格式命令拒绝。
 

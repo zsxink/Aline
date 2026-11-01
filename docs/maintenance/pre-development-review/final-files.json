@@ -15,7 +15,7 @@
     {
       "path": "docs/maintenance/pre-development-review/baseline-files.json",
       "bytes": 31414,
-      "sha256": "b44b9a890d9bb625e321b45336f0a0d87c6f220881eaf3abbb0d2f25216bbe50"
+      "sha256": "27c7b865bf88176b4f4a6948c0027bf8960c2ddbf7c245b866843f964deb3f00"
     },
     {
       "path": "docs/maintenance/pre-development-review/changes.json",
@@ -25,7 +25,7 @@
     {
       "path": "docs/maintenance/pre-development-review/check-summary.json",
       "bytes": 574,
-      "sha256": "9120348584eaf239daa8cc945f51c59f50edaf759bf12f54987e65ba3d0c8c63"
+      "sha256": "969ade3b4f998ef20afc4ccf53a33555171b86e9fb012de459bfe16253387312"
     },
     {
       "path": "docs/maintenance/pre-development-review/coverage.md",

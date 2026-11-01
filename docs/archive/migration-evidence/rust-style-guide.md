@@ -129,9 +129,9 @@
 | [Google Rust Style Guide](https://google.github.io/rust-guide/) | 大厂实践：工具强制优先、克制的手写规则 |
 | [Chromium Rust Guidelines](https://chromium.googlesource.com/chromium/src/+/main/styleguide/rust/) | 大型项目引入 Rust 的边界管理（unsafe、依赖、互操作） |
 | [Zed](https://github.com/zed-industries/zed) | **GPUI 风格第一参考**：fluent builder（`div().flex().gap_2()`）、`SharedString`/`Entity` 用法、自定义 Element 范式、InputHandler 实现 |
-| `/Users/xian/Project/book/zed`（本地全量克隆）+ [zed-notes.md](./zed-notes.md) | Zed 源码逐机制实证（file:line 已对抗式复核），本文 §18 与 architecture-guide 的依据 |
-| `/Users/xian/Project/book/ElyOffice`、`/Users/xian/Project/book/Ely-GPUI-Components` + [engine-design.md](./engine-design.md) | Ely 逆向分析：选型依据（ADR-0041）、机制继承与架构教训的出处 |
-| `/Users/xian/Project/book/MarkFlow` | 旧项目：外观/交互参照与功能语义迁移来源；性能反面实证（issue #458/#459/#460，见 architecture-guide §11） |
+| `<external>/zed`（本地全量克隆）+ [zed-notes.md](./zed-notes.md) | Zed 源码逐机制实证（file:line 已对抗式复核），本文 §18 与 architecture-guide 的依据 |
+| `<external>/ElyOffice`、`<external>/Ely-GPUI-Components` + [engine-design.md](./engine-design.md) | Ely 逆向分析：选型依据（ADR-0041）、机制继承与架构教训的出处 |
+| `<external>/MarkFlow` | 旧项目：外观/交互参照与功能语义迁移来源；性能反面实证（issue #458/#459/#460，见 architecture-guide §11） |
 | [Helix](https://github.com/helix-editor/helix)、[rust-analyzer](https://github.com/rust-lang/rust-analyzer) | 编辑器/语言工具链的测试组织与增量架构 |
 | [ripgrep](https://github.com/BurntSushi/ripgrep) | 错误处理与性能敏感 CLI 的范本 |
 

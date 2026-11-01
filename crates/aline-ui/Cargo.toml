@@ -8,6 +8,7 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+aline-edit.workspace = true
 aline-buffer.workspace = true
 aline-markdown.workspace = true
 aline-source.workspace = true

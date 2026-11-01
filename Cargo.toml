@@ -26,6 +26,7 @@ aline-plugin = { path = "crates/aline-plugin" }
 aline-ui = { path = "crates/aline-ui" }
 gpui = { package = "gpui-pre", version = "=0.3.9", default-features = false }
 pulldown-cmark = { version = "=0.13.6", default-features = false }
+unicode-segmentation = "=1.13.3"
 toml = { version = "=1.1.8", default-features = false, features = ["std", "parse", "serde"] }
 rust-embed = { version = "=8.13.0", default-features = false, features = ["debug-embed"] }
 

@@ -41,8 +41,13 @@
 
 #### Scenario: 重复文字与字素
 
-- **WHEN** 处理重复空白、中文、组合附加符和 emoji ZWJ
-- **THEN** 依据构建来源定位，字素移动边界与标量边界分开验证，不用字符相等回搜猜来源
+- **WHEN** 在完整的 Source identity 投影或 Visual 解析投影上，按 Unicode17 查询前进/后退字素边界，输入含重复空白、中文、组合附加符、emoji ZWJ、区域指示符或 Indic 连字
+- **THEN** 查询使用绑定该 Projection 的受检 `DrawnOffset`；字素边界与 Unicode scalar/UTF-16 代理对边界分别验证，来源定位仍经 `source_at`/`drawn_at`，不使用字符相等回搜；无效起点、旧投影及超出每次查询 4096 UTF-8 字节供给预算时返回类型化错误，不猜测或返回偏移
+
+#### Scenario: 字素规则版本与上下文预算
+
+- **WHEN** 查询长 RI 上下文、超长组合簇，或 Unicode17/Unicode18 有差异的 `U+094D U+0915`
+- **THEN** 每块供给最多 256 字节，含 `PreContext` 回扫的累计供给字节超过 4096 时返回 `ScanBudgetExceeded` 且不返回边界；Unicode17 基线将该 Indic 样本的 UTF-8 字节边界报告为 `[0,3,6]`，并明确不同于 Unicode18 `[0,6]`
 
 ### Requirement: 保护语义独立于展示
 

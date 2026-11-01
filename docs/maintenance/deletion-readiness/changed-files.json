@@ -37,7 +37,7 @@
   {
     "path": "docs/archive/migration-evidence/architecture-guide.md",
     "before_sha256": "03ca492045092cb19b32b94b88b986cb35a90fdbae57189ae06d4288fd3686f9",
-    "after_sha256": "80e226622c2d43e80e0d639f08cea447187dbb1aaf995ff8caf39b1bc1422baf",
+    "after_sha256": "8ed61054d5d2cc8e9a517708060889afa91b9ce82e37e8785cc02fc0fd0e0eec",
     "original_bytes": 20404,
     "current_bytes": 21434
   },
@@ -51,7 +51,7 @@
   {
     "path": "docs/archive/migration-evidence/index.json",
     "before_sha256": "127ba917f8936292ce3136336e7cdbfc8eec8ff6cc964fea117c64c98c8ded1a",
-    "after_sha256": "12890b474b39fbc957cc82e2807d223c8adf3d03c9084fc577c2b48f48df0a1a",
+    "after_sha256": "b9a7479135fe29a347040f91e815ca2fc9b83118a631039e38e55ef39699e629",
     "original_bytes": 15581,
     "current_bytes": 16690
   },

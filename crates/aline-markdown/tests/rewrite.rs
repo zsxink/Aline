@@ -537,6 +537,73 @@ fn compose_zero_source_pieces_anchor_to_empty_points_only() -> Result<(), Box<dy
 }
 
 #[test]
+fn compose_synthetic_source_anchors_stay_empty_at_each_boundary() -> Result<(), Box<dyn Error>> {
+    // R02b 恢复核验：第一层合成 "xy" 的起点、内部和终点都锚定到原始源码点 1。
+    // 以下片段按两次插入的来源手写，包含终点由相邻 Exact 片段接管的边界。
+    let first = Rewrite::apply(
+        "ab",
+        &[edit(1..1, "xy", MappingPrecision::Synthetic)?],
+        ParseBudget::m0(),
+    )?;
+    assert_eq!(first.text(), "axyb");
+    assert_eq!(
+        segments_of(first.map()),
+        vec![
+            (0..1, 0..1, MappingPrecision::Exact),
+            (1..1, 1..3, MappingPrecision::Synthetic),
+            (1..2, 3..4, MappingPrecision::Exact),
+        ]
+    );
+    let cases = [
+        (
+            1,
+            vec![
+                (0..1, 0..1, MappingPrecision::Exact),
+                (1..1, 1..2, MappingPrecision::Synthetic),
+                (1..1, 2..4, MappingPrecision::Synthetic),
+                (1..2, 4..5, MappingPrecision::Exact),
+            ],
+        ),
+        (
+            2,
+            vec![
+                (0..1, 0..1, MappingPrecision::Exact),
+                (1..1, 1..2, MappingPrecision::Synthetic),
+                (1..1, 2..3, MappingPrecision::Synthetic),
+                (1..1, 3..4, MappingPrecision::Synthetic),
+                (1..2, 4..5, MappingPrecision::Exact),
+            ],
+        ),
+        (
+            3,
+            vec![
+                (0..1, 0..1, MappingPrecision::Exact),
+                (1..1, 1..3, MappingPrecision::Synthetic),
+                (1..1, 3..4, MappingPrecision::Synthetic),
+                (1..2, 4..5, MappingPrecision::Exact),
+            ],
+        ),
+    ];
+    for (rewritten_anchor, expected) in cases {
+        let second = Rewrite::apply(
+            first.text(),
+            &[edit(
+                rewritten_anchor..rewritten_anchor,
+                "!",
+                MappingPrecision::Synthetic,
+            )?],
+            ParseBudget::m0(),
+        )?;
+        let composed = first.map().compose(second.map())?;
+        assert_eq!(segments_of(&composed), expected);
+        let inserted = composed.to_source(rewritten_anchor..rewritten_anchor + 1)?;
+        assert_eq!(inserted.source_range(), 1..1);
+        assert_eq!(inserted.precision(), MappingPrecision::Synthetic);
+    }
+    Ok(())
+}
+
+#[test]
 fn control_bytes_do_not_collide_with_synthetic_markers() -> Result<(), Box<dyn Error>> {
     let source = "abc";
     let rewrite = Rewrite::apply(

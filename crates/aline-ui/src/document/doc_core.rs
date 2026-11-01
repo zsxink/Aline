@@ -13,9 +13,9 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use aline_buffer::{
-    ApplyOutcome, BufferError, CheckedBatch, DocumentRevision, LineIndexBudget, OperationSource,
-    PatchBudget, ReloadOutcome, SelectionSpec, StringBuffer, TYPING_MERGE_WINDOW_MILLIS,
-    TextBudget, TextSnapshot,
+    ApplyOutcome, BufferError, DocumentRevision, LineIndexBudget, OperationSource, PatchBudget,
+    ReloadOutcome, SelectionSpec, StringBuffer, TYPING_MERGE_WINDOW_MILLIS, TextBudget,
+    TextSnapshot,
 };
 
 use crate::document::composition::{CompositionState, CompositionView};
@@ -112,6 +112,8 @@ pub enum DocError {
     ResourceBudgetExceeded,
     /// 底层 Buffer 拒绝。
     Buffer(BufferError),
+    /// 编辑计划或发布前复验拒绝；草稿、组合与历史保持调用前状态。
+    Edit(aline_edit::EditRefusal),
     /// 工作版本推进被身份层拒绝。
     Identity(IdentityError),
 }
@@ -127,6 +129,7 @@ impl std::error::Error for DocError {
         match self {
             Self::Buffer(error) => Some(error),
             Self::Identity(error) => Some(error),
+            Self::Edit(error) => Some(error),
             _ => None,
         }
     }
@@ -464,7 +467,7 @@ impl DocCore {
     pub fn composition_commit(&mut self, now_millis: u64) -> Result<CommitOutcome, DocError> {
         self.ensure_ready()?;
         let next_version = self.version.next_draft().map_err(DocError::Identity)?;
-        let (range, candidate, after_selection) = {
+        let (range, candidate, before_selection, after_selection) = {
             let state = self
                 .open
                 .as_ref()
@@ -473,25 +476,17 @@ impl DocCore {
             (
                 state.range.clone(),
                 state.candidate.clone(),
+                state.before_selection,
                 state.selection,
             )
         };
-        let batch = CheckedBatch::new(
-            self.buffer.snapshot(),
-            vec![(range, candidate)],
-            self.patch_budget(),
-        )
-        .map_err(DocError::Buffer)?;
-        let outcome = self
-            .buffer
-            .apply(
-                &batch,
-                after_selection,
-                OperationSource::ImeCommit,
-                now_millis,
-                self.limits.text,
-            )
-            .map_err(DocError::Buffer)?;
+        let outcome = self.publish_input(
+            range,
+            candidate,
+            (before_selection, after_selection),
+            OperationSource::ImeCommit,
+            now_millis,
+        )?;
         match outcome {
             ApplyOutcome::Changed(applied) => {
                 let revision = applied.revision();
@@ -922,38 +917,9 @@ impl DocCore {
         let end = at.checked_add(text.len()).ok_or_else(overflow)?;
         let selection = SelectionSpec::new(end, end);
         if has_group {
-            let (range, old_draft, after_selection) = {
-                let block = self.open.as_ref().ok_or(DocError::NoOpenBlock)?;
-                let group = block.typing().ok_or(DocError::NoOpenBlock)?;
-                (group.range.clone(), group.draft.clone(), block.selection)
-            };
-            let batch = CheckedBatch::new(
-                self.buffer.snapshot(),
-                vec![(range, old_draft)],
-                self.patch_budget(),
-            )
-            .map_err(DocError::Buffer)?;
-            let outcome = self
-                .buffer
-                .apply(
-                    &batch,
-                    after_selection,
-                    OperationSource::Typing,
-                    now_millis,
-                    self.limits.text,
-                )
-                .map_err(DocError::Buffer)?;
-            let ApplyOutcome::Changed(applied) = outcome else {
-                return Err(DocError::Buffer(BufferError::InvalidBacking));
-            };
-            let revision = applied.revision();
-            self.buffer.seal_pending();
-            self.version = self
-                .version
-                .after_commit(revision)
-                .map_err(DocError::Identity)?
-                .next_draft()
-                .map_err(DocError::Identity)?;
+            self.commit_typing_group(now_millis)?;
+            self.version = self.version.next_draft().map_err(DocError::Identity)?;
+            let revision = self.buffer.revision();
             let block = self.open.as_mut().ok_or(DocError::NoOpenBlock)?;
             block.baseline_revision = revision;
             block.range = at..at;
@@ -987,33 +953,29 @@ impl DocCore {
     }
 
     fn commit_typing_group(&mut self, now_millis: u64) -> Result<CommitOutcome, DocError> {
-        let (range, draft, after_selection) = {
+        let (range, draft, before_selection, after_selection) = {
             let block = self.open.as_ref().ok_or(DocError::NoOpenBlock)?;
             let Some(group) = block.typing() else {
                 return Ok(CommitOutcome::Unchanged);
             };
-            (group.range.clone(), group.draft.clone(), block.selection)
+            (
+                group.range.clone(),
+                group.draft.clone(),
+                group.before_selection,
+                block.selection,
+            )
         };
         if draft.is_empty() {
             return Ok(CommitOutcome::Unchanged);
         }
         self.version.next_draft().map_err(DocError::Identity)?;
-        let batch = CheckedBatch::new(
-            self.buffer.snapshot(),
-            vec![(range, draft)],
-            self.patch_budget(),
-        )
-        .map_err(DocError::Buffer)?;
-        let outcome = self
-            .buffer
-            .apply(
-                &batch,
-                after_selection,
-                OperationSource::Typing,
-                now_millis,
-                self.limits.text,
-            )
-            .map_err(DocError::Buffer)?;
+        let outcome = self.publish_input(
+            range,
+            draft,
+            (before_selection, after_selection),
+            OperationSource::Typing,
+            now_millis,
+        )?;
         let ApplyOutcome::Changed(applied) = outcome else {
             return Err(DocError::Buffer(BufferError::InvalidBacking));
         };
@@ -1307,4 +1269,8 @@ fn selection_of(selection: &aline_buffer::SrcSelection) -> SelectionSpec {
     )
 }
 
+mod checked_commit;
 mod protocols;
+
+#[cfg(test)]
+mod checked_commit_tests;

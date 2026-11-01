@@ -159,6 +159,39 @@ fn node_budget_fallback_keeps_full_source_without_partial_tree() -> Result<(), B
 }
 
 #[test]
+fn dump_structure_checks_ignore_sensitive_words_in_drawn_text() -> Result<(), Box<dyn Error>> {
+    let budget_source = "Table CodeBlock diagnostic\n";
+    let budget_parsed = parse_with(budget_source, ParseBudget::m0().with_max_segments(0))?;
+    assert_whole_source_fallback(
+        &budget_parsed,
+        budget_source,
+        DiagnosticKind::BudgetExceeded,
+    )?;
+    let budget_dump = budget_parsed.dump_tree();
+    assert!(budget_dump.contains("drawn "));
+    assert!(budget_dump.contains("Table CodeBlock diagnostic"));
+    let budget_blocks = dump_lines_of(&budget_dump, "block ");
+    assert!(budget_blocks.contains("Raw"));
+    assert!(!budget_blocks.contains("Table"));
+    assert!(!budget_blocks.contains("CodeBlock"));
+    let budget_diagnostics = dump_lines_of(&budget_dump, "diagnostic ");
+    assert!(budget_diagnostics.contains("BudgetExceeded"));
+    assert!(!budget_diagnostics.contains("Table"));
+    assert!(!budget_diagnostics.contains("CodeBlock"));
+
+    let mermaid_source = "```mermaid\ndiagnostic\n```\n";
+    let mermaid_parsed = parse_with(mermaid_source, ParseBudget::m0())?;
+    assert_eq!(mermaid_parsed.projection().drawn_text(), "diagnostic\n");
+    let mermaid_dump = mermaid_parsed.dump_tree();
+    assert!(mermaid_dump.contains("diagnostic"));
+    let mermaid_blocks = dump_lines_of(&mermaid_dump, "block ");
+    assert!(mermaid_blocks.contains("CodeBlock"));
+    let mermaid_diagnostics = dump_lines_of(&mermaid_dump, "diagnostic ");
+    assert!(mermaid_diagnostics.is_empty());
+    Ok(())
+}
+
+#[test]
 fn synthetic_fence_maps_to_empty_source_anchor_not_real_source() -> Result<(), Box<dyn Error>> {
     let source = "x\n";
     let edit = RewriteEdit::new(0..0, "```\n".to_string(), MappingPrecision::Synthetic)?;

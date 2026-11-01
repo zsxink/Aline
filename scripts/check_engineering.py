@@ -16,6 +16,7 @@ import sys
 import tempfile
 
 from engineering_dependencies import Violation, load_json, validate
+from evidence_paths import resolve_path, write_json, write_text
 
 ROOT = Path(__file__).resolve().parent.parent
 POLICY = ROOT / "scripts/engineering_policy.json"
@@ -26,6 +27,25 @@ SCENARIOS = {"all": None, "macos-arm": "aarch64-apple-darwin", "macos-intel": "x
 
 def sha256(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def cargo_evidence_facts(argv):
+    """从实际 argv 派生 Cargo 证据类别和锁定/离线事实。"""
+    if not argv or Path(str(argv[0])).name != "cargo":
+        return "non-cargo", False, False
+    args = [str(value) for value in argv[1:]]
+    locked, offline = "--locked" in args, "--offline" in args
+    if args and args[0] == "generate-lockfile":
+        kind = "initial-lock-generation"
+    elif "-V" in args or "--version" in args:
+        kind = "cargo-version"
+    elif locked and offline:
+        kind = "locked-check"
+    elif any(command in args for command in ("check", "clippy", "test", "tree", "metadata", "build")):
+        kind = "unlocked-check"
+    else:
+        kind = "cargo-command"
+    return kind, locked, offline
 
 
 def record_command(argv, directory, label, cwd=ROOT):
@@ -39,15 +59,28 @@ def record_command(argv, directory, label, cwd=ROOT):
     except OSError as error:
         code, stdout, stderr = 127, "", str(error)
     out, err = directory / (label + ".stdout.log"), directory / (label + ".stderr.log")
-    out.write_text(stdout)
-    err.write_text(stderr)
+    write_text(out, stdout)
+    write_text(err, stderr)
+    evidence_kind, locked, offline = cargo_evidence_facts(argv)
     record = {"argv": argv, "cwd": str(cwd), "started_utc": started,
               "finished_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(), "exit_code": code,
               "stdout_sha256": sha256(out), "stderr_sha256": sha256(err),
-              "env_overrides": {key: os.environ[key] for key in ("CARGO_HOME", "RUSTUP_TOOLCHAIN") if key in os.environ}}
+              "env_overrides": {key: os.environ[key] for key in ("CARGO_HOME", "RUSTUP_TOOLCHAIN", "CARGO_NET_OFFLINE") if key in os.environ},
+              "env_effective": {key: os.environ.get(key) for key in ("CARGO_NET_OFFLINE", "RUSTUP_TOOLCHAIN")},
+              "evidence_kind": evidence_kind, "locked": locked, "offline": offline}
     command = directory / (label + ".command.json")
-    command.write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n")
+    write_json(command, record)
     return out, command
+
+
+def resolved_argv(command):
+    """记录中的 argv 已占位化；读回时还原成本机路径再比较参数。"""
+    argv = load_json(command).get("argv", [])
+    resolved = []
+    for item in argv:
+        value = resolve_path(item) if isinstance(item, str) else None
+        resolved.append(item if value is None else value)
+    return resolved
 
 
 def successful_acquisition(path, command, tool):
@@ -76,7 +109,8 @@ def check_inputs(metadata, tree, lock, policy, scenario, metadata_command, tree_
     successful_acquisition(metadata, metadata_command, "metadata")
     successful_acquisition(tree, tree_command, "tree")
     target = SCENARIOS[scenario]
-    meta_args, tree_args = load_json(metadata_command)["argv"], load_json(tree_command)["argv"]
+    meta_args = resolved_argv(metadata_command)
+    tree_args = resolved_argv(tree_command)
     if argument_value(meta_args, "--format-version") != "1":
         raise Violation("metadata 必须使用 format-version 1")
     # 分目标 metadata 会删除 host proc-macro/build 真正需要的 cfg 边，不能用作完整闭包。
@@ -87,14 +121,14 @@ def check_inputs(metadata, tree, lock, policy, scenario, metadata_command, tree_
     if argument_value(tree_args, "-e") != "normal,build,dev" or "--workspace" not in tree_args:
         raise Violation("tree 必须覆盖 workspace normal/build/dev")
     manifest = argument_value(meta_args, "--manifest-path")
-    if manifest != argument_value(tree_args, "--manifest-path") or not manifest or Path(manifest).parent / "Cargo.lock" != Path(lock):
+    if manifest != argument_value(tree_args, "--manifest-path") or not manifest or Path(manifest).parent.joinpath("Cargo.lock").resolve() != Path(lock).resolve():
         raise Violation("metadata/tree/lock 所属 manifest 不一致")
     data = load_json(metadata)
     if target:
         if not target_metadata or not target_metadata_command:
             raise Violation("分目标场景缺少 target-filter metadata 交叉证据")
         successful_acquisition(target_metadata, target_metadata_command, "metadata")
-        target_args = load_json(target_metadata_command)["argv"]
+        target_args = resolved_argv(target_metadata_command)
         if argument_value(target_args, "--filter-platform") != target or argument_value(target_args, "--format-version") != "1" or argument_value(target_args, "--manifest-path") != manifest or "--all-features" in target_args:
             raise Violation("target-filter metadata 参数与场景不符")
         filtered = load_json(target_metadata)

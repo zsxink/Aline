@@ -24,7 +24,7 @@
 
 ## 2. 调研对象、证据与限制
 
-旧稿自述对象为 `storytold/wordcraft @ 0.11.0`，2026-10-28 本地快照，根目录 `/Users/xian/Project/book/wordcraft`。旧稿未记录 commit，无法证明当时快照与本次 checkout 完全相同。
+旧稿自述对象为 `storytold/wordcraft @ 0.11.0`，2026-10-28 本地快照，检出位置在仓库外的参考目录（不随本仓库分发）。旧稿未记录 commit，无法证明当时快照与本次 checkout 完全相同。
 
 本轮 2026-10-29 只读复核：该 checkout 的 HEAD 为 `436d444ef0ee35c2e2b9fb44f87aa7d08d72641f`，工作树干净，根 Cargo.toml 第 7 行版本仍为 0.11.0。**这个 hash 是本次核对定位，不补作旧快照的 hash。** 未运行 WordCraft 测试、基准或 GUI，未核验远程 issue 和真实设备结果。
 

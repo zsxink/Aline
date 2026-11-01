@@ -11,7 +11,7 @@
 ~~~~~~~~markdown
 # Zed 架构与 GPUI 实践笔记
 
-> 源码：`/Users/xian/Project/book/zed`（完整克隆，2026-10-26）。
+> 源码：`<external>/zed`（完整克隆，2026-10-26）。
 > 定位：补充 [engine-design.md](./engine-design.md)（elymark 逆向）与 [v1-architecture.md](./v1-architecture.md)（实施蓝图）——Zed 是 GPUI 生态最完整的参考实现，本文按领域整理其架构与实践，每条标 **照搬 / 改造 / 不采用**，供各里程碑查阅。
 > 本文档全部 file:line 与语义断言已于 2026-10-26 用四个独立代理对照源码对抗式复核（44 组断言），修正了 height=None 语义、action 命名规则、spawn 签名及若干路径/行号后定稿。
 

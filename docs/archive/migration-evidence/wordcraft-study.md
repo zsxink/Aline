@@ -11,7 +11,7 @@
 ~~~~~~~~markdown
 # WordCraft 调研：Markdown 解析、性能与保真 —— 及 Aline 改进方案
 
-> 调研对象：`storytold/wordcraft` @ 0.11.0（2026-10-28 本地快照，`/Users/xian/Project/book/wordcraft`，下文引用均为该快照的 `文件:行号`）。
+> 调研对象：`storytold/wordcraft` @ 0.11.0（2026-10-28 本地快照，`<external>/wordcraft`，下文引用均为该快照的 `文件:行号`）。
 > 定位：**分析报告 + 候选提案清单**。按 [architecture-guide.md](./architecture-guide.md) §18.2，参考项目的新结论**不自动**改变规范——本文第 5 部分每条提案标注【落点】【验收】【决策需求】，采纳一条落一条：`decisions.md` 记一条，回写管辖文档。
 > 配套阅读：[engine-design.md](./engine-design.md)（机制之"为什么"）、[v1-architecture.md](./v1-architecture.md)（怎么建）、[architecture-guide.md](./architecture-guide.md)（边界纪律）。
 

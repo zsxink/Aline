@@ -25,5 +25,9 @@
 
 # 工程守卫生成的 Python 缓存与隔离 Cargo 构建产物。
 __pycache__/
+*.pyc
 **/cargo-target/
 **/target/
+
+# docs/validation/** 下的 JSON、日志与夹具是门禁证据，报告会逐条引用；
+# 只忽略其中的构建缓存（见上），不要整体忽略证据文件。

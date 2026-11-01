@@ -1,6 +1,6 @@
 # Aline 代码与架构执行规范
 
-生效日期：2026-10-30。状态：后续实现与评审必须遵循的工程基线；当前尚无 Cargo workspace，自动化工程门禁须在 M0 建立并验证，V-01～V-09 状态不变。
+生效日期：2026-10-30。状态：后续实现与评审必须遵循的工程基线；M0 已建立 Cargo workspace 和本地工程门禁，当前统一离线复核仍有未核实项，M0 出口未闭合；V-01～V-09 状态不变。
 
 ## 1. 适用范围与规范关系
 
@@ -150,8 +150,8 @@ cargo test --workspace
 | 要求 | 验证手段/交付证据 | 当前状态与接入时点 |
 |---|---|---|
 | 工程规格格式 | `openspec validate --all --strict --no-interactive`；核对本文与 docs 引用 | 本次初始化可执行；仅验证规格结构 |
-| 依赖边与 GPUI 隔离 | Cargo metadata 检查真实包名/别名/传递及 target/feature/dev/build 边；违规反例须失败 | M0 建立，当前未启用 |
-| lint/unsafe/panic 策略 | 成员继承及生产/测试作用域检查；最小违规样例验证诊断 | M0 建立，当前未启用 |
+| 依赖边与 GPUI 隔离 | Cargo metadata 检查真实包名/别名/传递及 target/feature/dev/build 边；违规反例须失败 | 已由 `scripts/check_engineering.py` 接入并提供 `--self-test`；覆盖与本轮验证见 M0 整改记录，未宣称完整出口通过 |
+| lint/unsafe/panic 策略 | 成员继承及生产/测试作用域检查；最小违规样例验证诊断 | 已由 `scripts/check_lints.py` 接入并提供 `--self-test`；覆盖与本轮验证见 M0 整改记录，未宣称完整出口通过 |
 | 保真/映射/补丁/拒绝 | 独立金样、非法端点/输入、拒绝前后状态与历史检查 | M0 起随机制建立；接 UI 前先有无头证据 |
 | i18n | key 集、插值一致性及用户文案来源检查 | M0 catalog 接线起建立 |
 | 模块/模式/所有者 | 评审核对本文件 §2～4；记录真实调用路径与适用/不适用理由 | 即日起人工执行；行数不代替判断 |
@@ -174,4 +174,4 @@ cargo test --workspace
 | [Rust Style Guide](https://doc.rust-lang.org/style-guide/) / [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/checklist.html) | rustfmt、惯用命名、转换与类型安全、公开 API 文档 | 具体 lint/工具链沿用 RS-01 与 M0 取证 |
 | [Cargo workspace lints](https://doc.rust-lang.org/cargo/reference/workspaces.html#the-lints-table) | 根 lint 定义需成员显式继承 | M0 用正反例核实实际配置，不将文档当门禁 |
 
-本地 Echo 参考范围：`/Users/xian/Project/music/Echo/openspec/CODE_STANDARDS.md`、`openspec/config.yaml`、`openspec/specs/engineering-governance/spec.md`。借鉴“规范 → change 设计 → 可验收场景 → 有效门禁”的组织；其音乐库/SQLite/Tauri/Flutter、tokio、500/1000 行和覆盖率政策不适用于本项目，也不将 Echo 的实现状态当 Aline 的验证证据。规范执行不依赖 Echo 路径可用。
+本地 Echo 参考范围：仓库外的 Echo 参考克隆中的 `openspec/CODE_STANDARDS.md`、`openspec/config.yaml`、`openspec/specs/engineering-governance/spec.md`（克隆不随本仓库分发）。借鉴“规范 → change 设计 → 可验收场景 → 有效门禁”的组织；其音乐库/SQLite/Tauri/Flutter、tokio、500/1000 行和覆盖率政策不适用于本项目，也不将 Echo 的实现状态当 Aline 的验证证据。规范执行不依赖 Echo 路径可用。

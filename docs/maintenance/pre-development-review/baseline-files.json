@@ -99,7 +99,7 @@
     "path": "docs/archive/migration-evidence/architecture-guide.md",
     "bytes": 21434,
     "lines": 203,
-    "sha256": "80e226622c2d43e80e0d639f08cea447187dbb1aaf995ff8caf39b1bc1422baf"
+    "sha256": "8ed61054d5d2cc8e9a517708060889afa91b9ce82e37e8785cc02fc0fd0e0eec"
   },
   {
     "path": "docs/archive/migration-evidence/decisions.md",
@@ -117,7 +117,7 @@
     "path": "docs/archive/migration-evidence/index.json",
     "bytes": 16690,
     "lines": 424,
-    "sha256": "12890b474b39fbc957cc82e2807d223c8adf3d03c9084fc577c2b48f48df0a1a"
+    "sha256": "b9a7479135fe29a347040f91e815ca2fc9b83118a631039e38e55ef39699e629"
   },
   {
     "path": "docs/archive/migration-evidence/plugin-system.md",
@@ -129,7 +129,7 @@
     "path": "docs/archive/migration-evidence/rust-style-guide.md",
     "bytes": 14749,
     "lines": 240,
-    "sha256": "e9923bda98f37741e03862d961d7693e45258440b6763dc5f779e28a43588539"
+    "sha256": "8e0ed8f3525dc9a725f992f14c23bbfcd634972662319394fd8056ea67118e46"
   },
   {
     "path": "docs/archive/migration-evidence/theme-package-spec.md",
@@ -147,25 +147,25 @@
     "path": "docs/archive/migration-evidence/v1-architecture.md",
     "bytes": 12131,
     "lines": 166,
-    "sha256": "ae85a0aadf18d1bd0a7a6809d367f7eba7c8bd2503cd305d9bed7eacbf00f759"
+    "sha256": "5f37e236deb02abe18b57c90b95baee5cbd339d03beab4706d65a98f7b0aebe3"
   },
   {
     "path": "docs/archive/migration-evidence/v1-features.md",
     "bytes": 13634,
     "lines": 223,
-    "sha256": "31ee06890a87108f80c97c299c02f1da74fb84600808ff9926af660ec657c6a0"
+    "sha256": "353226c161d450273d8e8546571bb98f80214ebfb73d9133a0f78e643927bb2b"
   },
   {
     "path": "docs/archive/migration-evidence/wordcraft-study.md",
     "bytes": 38137,
     "lines": 379,
-    "sha256": "ec9a8b5c937e55fb982c1975c777a263c9342a8f12f5987ffb0abf82cdd8db63"
+    "sha256": "32e0dd14a0158c45263023f099f2b303eae4b3eca06160ad77acd6f84eaaec35"
   },
   {
     "path": "docs/archive/migration-evidence/zed-notes.md",
     "bytes": 27019,
     "lines": 252,
-    "sha256": "63153eb9adb3444a7398856ae3eee2d420aea12bdcdcc8b4982570453116b634"
+    "sha256": "fb06d4e539b710e796b26b75bc9dd25bfa5c4668aa9b80ecc77c6cc0cd45a44c"
   },
   {
     "path": "docs/assets/README.md",
@@ -345,13 +345,13 @@
     "path": "docs/maintenance/deletion-readiness/baseline-inventory.json",
     "bytes": 62357,
     "lines": 2163,
-    "sha256": "cada2fefa562a421ace33d390111bb83761394d147b95dd24e280d111834a0f1"
+    "sha256": "3701c0bc9e49e2c49f99f92e2a84cce59b051be9ccf5be4267f46c9be930757d"
   },
   {
     "path": "docs/maintenance/deletion-readiness/changed-files.json",
     "bytes": 5429,
     "lines": 135,
-    "sha256": "2b78c2b85b60c6a7acc08b26b641ba07b77a863a604ceca107800b1ef02fb2a4"
+    "sha256": "2eaed6eebcd58412912ccf629b69507009f6a5407fc8b9ebbc249fcd518bf921"
   },
   {
     "path": "docs/maintenance/deletion-readiness/check-A.json",
@@ -435,7 +435,7 @@
     "path": "docs/maintenance/deletion-readiness/inventory.csv",
     "bytes": 42537,
     "lines": 224,
-    "sha256": "75aa7438180b834765ca5370c50e5129ee1ba6b502ef87537f16cca361552801"
+    "sha256": "a2689ecc672b06d861be926d11c73cd6cfadd1f7a2dbe70e4a2fe93415a18a34"
   },
   {
     "path": "docs/maintenance/deletion-readiness/link-rewrites.json",
@@ -453,7 +453,7 @@
     "path": "docs/maintenance/deletion-readiness/migration-topics.csv",
     "bytes": 192209,
     "lines": 420,
-    "sha256": "61aac4e015be383f0b56158daa65f7e420c5b89ab3ccae48198f2c5cc19944fc"
+    "sha256": "22f46a17f0188355d77d38a01efb2f51a855e178e1c4927cc903bacea5650c16"
   },
   {
     "path": "docs/maintenance/deletion-readiness/pre-deletion-check.json",
@@ -525,7 +525,7 @@
     "path": "docs/maintenance/deletion-readiness/prior-evidence/manifest.json",
     "bytes": 4870,
     "lines": 96,
-    "sha256": "71ba32c942aaa8544cf75876a09c1da4380722553f7dde51ae1fe564727196ea"
+    "sha256": "7de2ba3560d8e7ff2e854a8a7913440a011942853436e288a0ab89a5fa1e5c01"
   },
   {
     "path": "docs/maintenance/deletion-readiness/prior-evidence/old-to-new.json",
@@ -543,7 +543,7 @@
     "path": "docs/maintenance/deletion-readiness/prior-evidence/scan-history.json",
     "bytes": 1174215,
     "lines": 27955,
-    "sha256": "5b5a96d032c2177d2c68d11d0bd8b59d30e0a230579e7c24fc261be687ce390e"
+    "sha256": "53403a004a8b8f4ec35c889e70da2f0c4d6ebc166b94b9ac8beaaa4caa6884ee"
   },
   {
     "path": "docs/maintenance/deletion-readiness/prototype-check.json",
@@ -645,7 +645,7 @@
     "path": "docs/prototype/backup-references.tsv",
     "bytes": 35191,
     "lines": 139,
-    "sha256": "fa97735311e323d765e154439ef9fb11d77e55b71ddc1f94082471db07c3cb4d"
+    "sha256": "f1140d0ca3a4c650a30a139b576115c33d3922a3abb5fe3852ed73f716a33ef4"
   },
   {
     "path": "docs/prototype/inventory.json",
@@ -993,12 +993,12 @@
     "path": "docs/wordcraft-study.md",
     "bytes": 40176,
     "lines": 253,
-    "sha256": "b7e17ad46af7506bcb34a73893477c3915f4075da68090b8b011f3eafe49ea0f"
+    "sha256": "7b53d97e0662625973fa35e5c086791d490c478cd81c18a349035a3136e570b5"
   },
   {
     "path": "docs/zed-notes.md",
     "bytes": 9681,
     "lines": 62,
-    "sha256": "63f1b140005c3a920d8d9f0aa8d5012db508f8592db4383cd253cb4575d34652"
+    "sha256": "d2b12776dd30c54751bdce0af900cc9e8354f56858b6061c20f5ec1bb8dff3d7"
   }
 ]

@@ -10,3 +10,4 @@ workspace = true
 [dependencies]
 aline-buffer.workspace = true
 pulldown-cmark.workspace = true
+unicode-segmentation.workspace = true

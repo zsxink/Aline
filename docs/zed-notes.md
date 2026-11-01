@@ -4,7 +4,7 @@
 
 ## 0. 证据与版本边界
 
-旧稿自述研究对象为 `/Users/xian/Project/book/zed`、2026-10-26快照，并自述四个代理复核44组断言；未记录足以复原该研究快照的精确commit。本次保全没有重跑这44组断言，没有将当前checkout或gpui-pre来源rev倒补为当时Zed研究commit。
+旧稿自述研究对象为仓库外的 Zed 参考克隆、2026-10-26快照，并自述四个代理复核44组断言；未记录足以复原该研究快照的精确commit。本次保全没有重跑这44组断言，没有将当前checkout或gpui-pre来源rev倒补为当时Zed研究commit。
 
 旧稿针对Zed主线新架构：Window/App分参、平台crate拆分等。Aline固定gpui-pre单一来源、精确锁快照；具体工具链/edition/版本、补丁和API须M0登记、V-01验证。旧`spawn/background_spawn/weak.update`、`handle_input`、`add_fonts`、`on_open_urls`、`set_menus`和测试harness均是检索线索，不是已可编译的Aline接口。
 

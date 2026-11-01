@@ -59,7 +59,7 @@
       "source_bytes": 42050,
       "source_sha256": "21b33172947617380ae639ea374b15561a99a639b9a7aa827c7326c2f8e095b3",
       "target": "docs/archive/migration-evidence/architecture-guide.md",
-      "target_sha256": "80e226622c2d43e80e0d639f08cea447187dbb1aaf995ff8caf39b1bc1422baf",
+      "target_sha256": "8ed61054d5d2cc8e9a517708060889afa91b9ce82e37e8785cc02fc0fd0e0eec",
       "excerpts": [
         {
           "start_line": 1,
@@ -104,7 +104,7 @@
       "source_bytes": 28041,
       "source_sha256": "417c8d1d68d45c367a0d3cac4868f60250e0dd8c420dc9b0c7a15c75efbb3383",
       "target": "docs/archive/migration-evidence/rust-style-guide.md",
-      "target_sha256": "e9923bda98f37741e03862d961d7693e45258440b6763dc5f779e28a43588539",
+      "target_sha256": "8e0ed8f3525dc9a725f992f14c23bbfcd634972662319394fd8056ea67118e46",
       "excerpts": [
         {
           "start_line": 1,
@@ -143,7 +143,7 @@
       "source_bytes": 59552,
       "source_sha256": "8af1cb1e1d854d0c897271402e51b98f0026dbba7656fda29a56680091aee30b",
       "target": "docs/archive/migration-evidence/v1-architecture.md",
-      "target_sha256": "ae85a0aadf18d1bd0a7a6809d367f7eba7c8bd2503cd305d9bed7eacbf00f759",
+      "target_sha256": "5f37e236deb02abe18b57c90b95baee5cbd339d03beab4706d65a98f7b0aebe3",
       "excerpts": [
         {
           "start_line": 1,
@@ -170,7 +170,7 @@
       "source_bytes": 37209,
       "source_sha256": "9bc8058419c77cff4f48083bc3725be6225c06d5757e55d40644f59ff0a56b9a",
       "target": "docs/archive/migration-evidence/wordcraft-study.md",
-      "target_sha256": "ec9a8b5c937e55fb982c1975c777a263c9342a8f12f5987ffb0abf82cdd8db63",
+      "target_sha256": "32e0dd14a0158c45263023f099f2b303eae4b3eca06160ad77acd6f84eaaec35",
       "excerpts": [
         {
           "start_line": 1,
@@ -185,7 +185,7 @@
       "source_bytes": 26117,
       "source_sha256": "ed4ba2ffe05b5232a55aceedd57218b1ca173f43e58fa91052c4a37491222713",
       "target": "docs/archive/migration-evidence/zed-notes.md",
-      "target_sha256": "63153eb9adb3444a7398856ae3eee2d420aea12bdcdcc8b4982570453116b634",
+      "target_sha256": "fb06d4e539b710e796b26b75bc9dd25bfa5c4668aa9b80ecc77c6cc0cd45a44c",
       "excerpts": [
         {
           "start_line": 1,
@@ -302,7 +302,7 @@
       "source_bytes": 9453,
       "source_sha256": "68adf84b25c2a7950bee96c525c5e953c7f4ef1c4794306ccb86a867f2d9c310",
       "target": "docs/archive/migration-evidence/v1-features.md",
-      "target_sha256": "31ee06890a87108f80c97c299c02f1da74fb84600808ff9926af660ec657c6a0",
+      "target_sha256": "353226c161d450273d8e8546571bb98f80214ebfb73d9133a0f78e643927bb2b",
       "excerpts": [
         {
           "start_line": 1,

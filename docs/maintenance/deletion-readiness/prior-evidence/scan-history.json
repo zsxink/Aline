@@ -11239,7 +11239,7 @@
           {
             "path": "docs/prototype/backup-references.tsv",
             "bytes": 35191,
-            "sha256": "fa97735311e323d765e154439ef9fb11d77e55b71ddc1f94082471db07c3cb4d",
+            "sha256": "f1140d0ca3a4c650a30a139b576115c33d3922a3abb5fe3852ed73f716a33ef4",
             "ignored": false
           },
           {
@@ -18158,7 +18158,7 @@
     "80cec8cd42eb48cd135801f0db13f104a71a174da91e01f6cf7470b9dfe50ede": {
       "source": "docs/rust-style-guide.md",
       "line": 410,
-      "text": "| [Zed 笔记](../docs_bak/docs/zed-notes.md) §0/1/3 | 生命周期/输入/缓存/测试机制证据；本轮未重验外部源码行号。`/Users/xian/Project/book/zed` 为后续本地核对入口，不当 gpui-pre API 证明 |"
+      "text": "| [Zed 笔记](../docs_bak/docs/zed-notes.md) §0/1/3 | 生命周期/输入/缓存/测试机制证据；本轮未重验外部源码行号。`<external>/zed` 为后续本地核对入口，不当 gpui-pre API 证明 |"
     },
     "9124f66ed9cbbc68908da9c4f40d7df0e6382958ab57742d5281fa8c9d3437aa": {
       "source": "docs/rust-style-guide.md",
@@ -19078,7 +19078,7 @@
     "b65f561e7b01e55a342a70917f84db15884ccdd9665a26dbb72be3c50e9bb0aa": {
       "source": "docs/prototype/backup-references.tsv",
       "line": 111,
-      "text": "docs/rust-style-guide.md\t410\t| [Zed 笔记](../docs_bak/docs/zed-notes.md) §0/1/3 | 生命周期/输入/缓存/测试机制证据；本轮未重验外部源码行号。`/Users/xian/Project/book/zed` 为后续本地核对入口，不当 gpui-pre API 证明 |"
+      "text": "docs/rust-style-guide.md\t410\t| [Zed 笔记](../docs_bak/docs/zed-notes.md) §0/1/3 | 生命周期/输入/缓存/测试机制证据；本轮未重验外部源码行号。`<external>/zed` 为后续本地核对入口，不当 gpui-pre API 证明 |"
     },
     "da45ce3dc71c02102eba2025d5c94b5138570daeb2c9583fe90c8ef37c6e7990": {
       "source": "docs/prototype/backup-references.tsv",
@@ -20773,7 +20773,7 @@
           {
             "path": "docs/prototype/backup-references.tsv",
             "bytes": 35191,
-            "sha256": "fa97735311e323d765e154439ef9fb11d77e55b71ddc1f94082471db07c3cb4d",
+            "sha256": "f1140d0ca3a4c650a30a139b576115c33d3922a3abb5fe3852ed73f716a33ef4",
             "ignored": false
           },
           {
@@ -21662,7 +21662,7 @@
     "700edf09b95b10dd1d917ed84fa99632d2fe6c17773960bcfb0923da2a21f57b": {
       "source": "AGENTS.md",
       "line": 59,
-      "text": "- 实现期对照：ElyMark 完整历史关键文件索引仍在 `docs_bak/docs/engine-design.md` 附录，当前入口见 engine-design §18.3；Zed 克隆在 `/Users/xian/Project/book/zed`（gpui 新架构与锁定的 gpui-pre 存在 API 代差，机制线索参考历史 Zed 笔记 §0，具体 API 及性能结论须重新取证）。Aline 全部自写实现，外部源码只作对照参考。"
+      "text": "- 实现期对照：ElyMark 完整历史关键文件索引仍在 `docs_bak/docs/engine-design.md` 附录，当前入口见 engine-design §18.3；Zed 克隆在 `<external>/zed`（gpui 新架构与锁定的 gpui-pre 存在 API 代差，机制线索参考历史 Zed 笔记 §0，具体 API 及性能结论须重新取证）。Aline 全部自写实现，外部源码只作对照参考。"
     },
     "12b771cd0237a0534b0ab0ecca577847fa856350a61d8c8e68ffd83c3fc0a1a3": {
       "source": "docs/README.md",
@@ -22214,7 +22214,7 @@
           {
             "path": "docs/archive/migration-evidence/rust-style-guide.md",
             "bytes": 14749,
-            "sha256": "e9923bda98f37741e03862d961d7693e45258440b6763dc5f779e28a43588539",
+            "sha256": "8e0ed8f3525dc9a725f992f14c23bbfcd634972662319394fd8056ea67118e46",
             "ignored": false
           },
           {
@@ -22232,25 +22232,25 @@
           {
             "path": "docs/archive/migration-evidence/v1-architecture.md",
             "bytes": 12131,
-            "sha256": "ae85a0aadf18d1bd0a7a6809d367f7eba7c8bd2503cd305d9bed7eacbf00f759",
+            "sha256": "5f37e236deb02abe18b57c90b95baee5cbd339d03beab4706d65a98f7b0aebe3",
             "ignored": false
           },
           {
             "path": "docs/archive/migration-evidence/v1-features.md",
             "bytes": 13634,
-            "sha256": "31ee06890a87108f80c97c299c02f1da74fb84600808ff9926af660ec657c6a0",
+            "sha256": "353226c161d450273d8e8546571bb98f80214ebfb73d9133a0f78e643927bb2b",
             "ignored": false
           },
           {
             "path": "docs/archive/migration-evidence/wordcraft-study.md",
             "bytes": 38137,
-            "sha256": "ec9a8b5c937e55fb982c1975c777a263c9342a8f12f5987ffb0abf82cdd8db63",
+            "sha256": "32e0dd14a0158c45263023f099f2b303eae4b3eca06160ad77acd6f84eaaec35",
             "ignored": false
           },
           {
             "path": "docs/archive/migration-evidence/zed-notes.md",
             "bytes": 27019,
-            "sha256": "63153eb9adb3444a7398856ae3eee2d420aea12bdcdcc8b4982570453116b634",
+            "sha256": "fb06d4e539b710e796b26b75bc9dd25bfa5c4668aa9b80ecc77c6cc0cd45a44c",
             "ignored": false
           },
           {
@@ -22310,7 +22310,7 @@
           {
             "path": "docs/prototype/backup-references.tsv",
             "bytes": 35191,
-            "sha256": "fa97735311e323d765e154439ef9fb11d77e55b71ddc1f94082471db07c3cb4d",
+            "sha256": "f1140d0ca3a4c650a30a139b576115c33d3922a3abb5fe3852ed73f716a33ef4",
             "ignored": false
           },
           {
@@ -22658,13 +22658,13 @@
           {
             "path": "docs/wordcraft-study.md",
             "bytes": 40176,
-            "sha256": "b7e17ad46af7506bcb34a73893477c3915f4075da68090b8b011f3eafe49ea0f",
+            "sha256": "7b53d97e0662625973fa35e5c086791d490c478cd81c18a349035a3136e570b5",
             "ignored": false
           },
           {
             "path": "docs/zed-notes.md",
             "bytes": 9681,
-            "sha256": "63f1b140005c3a920d8d9f0aa8d5012db508f8592db4383cd253cb4575d34652",
+            "sha256": "d2b12776dd30c54751bdce0af900cc9e8354f56858b6061c20f5ec1bb8dff3d7",
             "ignored": false
           }
         ],
@@ -26824,7 +26824,7 @@
       "308442e7e4221cc1e27f127d6276da8e926d6e5d8a2633ab0b36c80323fe94cc": {
         "path": "docs/prototype/backup-references.tsv",
         "size": 35191,
-        "sha256": "fa97735311e323d765e154439ef9fb11d77e55b71ddc1f94082471db07c3cb4d",
+        "sha256": "f1140d0ca3a4c650a30a139b576115c33d3922a3abb5fe3852ed73f716a33ef4",
         "ignored": false
       },
       "6f5bd6532ef4c7b0e150d282273a0c25471d3e26e8a9d99469f4bb4033c00a45": {
@@ -27574,7 +27574,7 @@
       },
       "6fe3e4da34728e078bdbb4f3a04090ef221cda68f4c896f387204ae866de2a79": {
         "path": "docs/prototype/backup-references.tsv",
-        "sha256": "fa97735311e323d765e154439ef9fb11d77e55b71ddc1f94082471db07c3cb4d",
+        "sha256": "f1140d0ca3a4c650a30a139b576115c33d3922a3abb5fe3852ed73f716a33ef4",
         "bytes": 35191
       },
       "511f0477f04301a7b00d27a484c293b090d5918d5769ba16c1ff450746a9d2d6": {

@@ -18,6 +18,7 @@ import sys
 import tempfile
 
 from safety_lex import tokenize, test_tokens, closing
+from evidence_paths import write_json, write_text
 
 ROOT = Path(__file__).resolve().parent.parent
 ENGINES = {'aline-source', 'aline-buffer', 'aline-markdown', 'aline-edit', 'aline-app-core'}
@@ -357,8 +358,8 @@ def self_test(output):
         start = datetime.datetime.now(datetime.timezone.utc).isoformat()
         result = subprocess.run(argv, cwd=str(ROOT), text=True, capture_output=True,
                                 env=dict(os.environ, PYTHONDONTWRITEBYTECODE='1'))
-        (output / (name + '.stdout.json')).write_text(result.stdout)
-        (output / (name + '.stderr.log')).write_text(result.stderr)
+        write_text(output / (name + '.stdout.json'), result.stdout)
+        write_text(output / (name + '.stderr.log'), result.stderr)
         actual = json.loads(result.stdout)
         rules = sorted({item['rule'] for item in actual['failures']})
         failures = len(actual['failures'])
@@ -531,7 +532,7 @@ def self_test(output):
     restored = workspace_scan(ROOT)
     summary = {'cases': records, 'workspace_after_fixtures': restored, 'fixture_root': str(work),
                'passed': all(row['passed'] for row in records) and not restored['failures']}
-    (output / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2) + '\n')
+    write_json(output / 'summary.json', summary)
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     return 0 if summary['passed'] else 1
 

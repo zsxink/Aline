@@ -229,6 +229,7 @@ pulldown 一个事件可能跨多片段，必须保留子段来源，不能仅�
 | `map_selection`（统称） | anchor/head 分别映射、保留方向；同时计算选中内容的完整来源覆盖及精确性；点击锚点不能代替删除范围 |
 | 局部/全文适配 | 块或草稿局部字节 ↔ 当前全文源码，含草稿长度变化和插入点 affinity；恒等路径也走接口，禁止 UI 写 `src_off - range.start` |
 | UTF-16 适配 | 在同一个输入投影上 UTF-16 ↔ UTF-8，再经来源关系到 src_off；拒绝代理对中间、越界或不匹配版本，不把 code unit 当字符 |
+| 字素查询 | 完整当前投影上的 Unicode17 scalar 端点 → 边界/相邻边界；绑定 ProjectionId，最多累计供给4096 UTF-8字节、单chunk 256字节，重复上下文供给计费，超限拒绝；源码仍经 `source_at` |
 | 锚点变换 | buffer 根据补丁批次变换 before 源码锚点到 after；被替换区内依据 affinity 给结果/失效，不能让 UI 用 delta 猜 |
 
 必须测试：所有成功结果在范围内且为 UTF-8 边界；原样段精确往返；对齐操作在相同版本/affinity 下幂等；源序有序的文字片段映射不倒退；每个可见字符来源已知或显式 Synthetic；同一来源可见锚点多次往返稳定。导航产生的脚注/目录副本要分清“文本来源”和“跳转目标”，不以重排显示顺序断言全树映射单调。
@@ -243,7 +244,7 @@ UI 对相应版本的文本布局命中，取得 drawn_off 和方向偏好，交
 
 拖选分别映射端点，文档级源码选区可跨多个块，不同时打开多个块。复制/删除/粘贴以该源码范围及能力检查为准；跨 MD-11 拒绝并提供 Source 定位。命中隐藏注释/链接目标的搜索走源码 reveal，不强迫创建不存在的可见文字选区。
 
-键盘移动和 Backspace/Delete 不能拆坏 UTF-8、UTF-16 代理对、组合字符或 emoji ZWJ 序列；用户字符移动边界与标量边界分开。建议映射服务提供字素边界适配，Unicode 分段依赖准入及金样由 V-07 收口。正文源码输入允许用户逐步改写 Markdown 标记、实体和 HTML，不强制保持语法闭合；不得把旧 C 阶段“自动 unwrap 隐藏标记”规则带入 V1 低对比度标记输入。
+键盘移动和 Backspace/Delete 不能拆坏 UTF-8、UTF-16 代理对、组合字符或 emoji ZWJ 序列；用户字符移动边界与标量边界分开。`aline-markdown` 的投影字素 API 使用锁定的 Unicode 17 扩展字素规则：仅完整当前投影可查询，端点必须先通过 UTF-8/scalar 校验，移动起点必须是字素边界；局部/旧投影拒绝。扫描每次查询最多向 `GraphemeCursor` 供给 4096 字节，每块不超过 256 字节，重复回扫也计费，超限在供给前拒绝，不猜边界。结果为带投影身份的绘制坐标，源码定位仍经 `source_at`。正文源码输入允许用户逐步改写 Markdown 标记、实体和 HTML，不强制保持语法闭合；不得把旧 C 阶段“自动 unwrap 隐藏标记”规则带入 V1 低对比度标记输入。
 
 **实现与回归建议：**分别测试阅读态的点击插入锚点、选区来源覆盖、跨段 Gap 和整体来源图元，不能用同一个“最近源码位置”处理全部操作。尤其在粗体末尾、链接显示文字/目标之间、实体两侧和空段落，先验证阅读投影命中，再验证开块后的源码选区；开块后的普通输入不继承富文本自动转义或空容器自动清理。源码换行、绘制硬换行和布局软折行分别建样本；纯导航到已有表格单元格不附带整理源码，末格新增行及显式整理另按命令规划补丁。问题来源与不兼容反例见 [Splat §4](./splat-study.md#4-可视化编辑的实际机制)，这些样本细化现行契约，不增加全时隐藏标记编辑模式。
 
@@ -369,6 +370,8 @@ V1 打开的块显示源码（仅样式淡化标记），输入投影与块源�
 ### 10.2 Unicode 与测试边界
 
 UTF-8 字节合法不等于用户字符合法。UTF-16 转换不得截半代理对；普通移动/删除不能拆开 `e + 组合重音`、带肤色 emoji、区域旗帜或家庭 ZWJ 序列。组合替换范围来自平台，必须映射并校验，不能先按字素扩张后无声替换用户未选内容。无法可靠对应时明确失败并保留当前输入。
+
+`aline-markdown` 提供独立于 UTF-8 scalar/UTF-16 端点转换的 Unicode 17 字素边界、下一边界和上一边界查询。它们只接受当前完整 Source identity 或完整 Visual 投影；查询预算按本次实际供给的 UTF-8 字节累计，含 `PreContext` 的重复供给，最多 4096 字节且单块最多 256 字节，预算不足返回错误而不截断/猜测。依赖 `unicode-segmentation = 1.13.3` 只由 `aline-markdown` 直接使用，第三方类型不进入公共 API。该版本采用 Unicode 17 数据；例如 U+094D U+0915 的边界为 `[0, 3, 6]`，不同于 Unicode 18 的 `[0, 6]`，这是本次已确认的版本语义，不宣称匹配更新的系统字素实现。查询为纯映射机制，不证明真实键盘导航、删除行为、IME、布局或平台一致性；这些仍需 V-01/V-07 验证。
 
 在中文标点、`\*`、`&amp;`、反引号及 HTML 标签附近，源码编辑允许未闭合语法的中间状态；不因为每键重新呈现而吞字符、跳光标或自动补全标签。阅读投影产生的非精确删除选区先按来源/保护规则处理，必要时进入源码，不删除半个解码实体对应的未知范围。
 
@@ -657,7 +660,7 @@ RS-01～RS-05 同轮按 A 确认，具体 Rust 政策见[现行 Rust 规范](./r
 
 仅 pulldown-cmark 的单解析器路线及 GPUI 精确锁快照是当前约束；具体版本以 M0 实际登记/lockfile 为准。`entities`/`emojis` 是 HTML 实体/短代码的历史候选，`similar` 是 diff 候选，`proptest` 是测试候选；引入时核用途、归属、版本/许可证和同类库，不因旧清单出现就全部添加。
 
-第 1 组隔离消费者已实际解析 `pulldown-cmark 0.13.6` 的事件，并验证 toml/rust-embed 的当前 catalog 依赖组合，归属/精确 features/源码来源和纯候选闭包见[纯引擎候选审计](./validation/m0-engine-foundation/pure-candidates-2026-10-30/report.md)及架构 §3.2。此处只登记依赖可消费性，GFM/产品语法的运行期 Options 与映射/HTML 金样仍须第 6 组验证；不能将单一事件计数探针当作语法或保真验收。当前未准入实体/emoji/分段/随机/diff 等额外候选。
+第 1 组隔离消费者已实际解析 `pulldown-cmark 0.13.6` 的事件，并验证 toml/rust-embed 的当前 catalog 依赖组合，归属/精确 features/源码来源和纯候选闭包见[纯引擎候选审计](./validation/m0-engine-foundation/pure-candidates-2026-10-30/report.md)及架构 §3.2。此处只登记依赖可消费性，GFM/产品语法的运行期 Options 与映射/HTML 金样仍须第 6 组验证；不能将单一事件计数探针当作语法或保真验收。Unicode 分段现已按准入方案仅加入 `aline-markdown` 的直接依赖 `unicode-segmentation = "=1.13.3"`；M0 当前锁文件解析/依赖树记录确认该唯一新直接边及传递闭包，五引擎无 GPUI/禁用路径约束仍按正式工程守卫验证。版本采用 Unicode 17，U+094D U+0915 与 Unicode 18 的边界差异已接受。证据见 `validation/m0-engine-foundation/remediation/R07/run-3/`。其他实体/emoji/随机/diff 候选仍未准入。
 
 ratex/ratex-svg、mermaid-rs-renderer、usvg、syntect/two-face 属插件/资产候选，不让纯引擎为展示而直接依赖 GPUI。ropey 只在性能证据要求时评估；V1 禁 notify/regex/tokio/Wasmtime/WASI/动态宿主，与架构 §3.2 一致。2026-10-30 批准的 GPUI 0.3.9 精确例外仅适用 app/ui/plugin：regex 既有路径及 all-target 图中的非桌面 WASI p2 绑定，完整身份、边、target 与变更复审要求以架构 §3.2 为准；五引擎完整闭包继续无 GPUI、无禁用依赖。见[实际审计](./validation/m0-engine-foundation/admission-2026-10-30/report.md)，不能以单条合法路径掩盖其它入边，也不能把 metadata 过近似包视为实际启用或忽略解析失败。主题 ZIP/导出及 Unicode 分段等新增依赖按专项验证准入，不猜定后端或冻结旧版本。
 
@@ -677,4 +680,4 @@ ratex/ratex-svg、mermaid-rs-renderer、usvg、syntect/two-face 属插件/资产
 | [WordCraft 调研](./wordcraft-study.md) §4～6 | 反退化、预算、原文透传/测试棘轮；不照搬手写 Markdown 解析器、无 ZIP/无导出假设或旧限额 |
 | [Zed 调研](./archive/migration-evidence/zed-notes.md) §0/1.5/3 | UTF-16/IME、事务与增量失效机制；不继承 CRDT、300ms 分组或未锁定 API |
 
-Ely 索引中的 `document/{edit,parse,apart,format,block,tables}.rs`、`markdown/{flow,tex,front,build}.rs`、`tree/{sources,html,html_block,stack}.rs` 是机制导航，`ely-editor/ime.rs`/`ely-core/forms/text` 是平台输入参考；没有本地路径或版本复验时不写成可点击的“已验证源码”。Zed 本地参考在 `/Users/xian/Project/book/zed`，只供后续按锁定 GPUI 核对。Aline 必须自写实现，技术借鉴不扩大产品范围。
+Ely 索引中的 `document/{edit,parse,apart,format,block,tables}.rs`、`markdown/{flow,tex,front,build}.rs`、`tree/{sources,html,html_block,stack}.rs` 是机制导航，`ely-editor/ime.rs`/`ely-core/forms/text` 是平台输入参考；没有本地路径或版本复验时不写成可点击的“已验证源码”。Zed 参考放在仓库外的参考目录，不随本仓库分发，只供后续按锁定 GPUI 核对。Aline 必须自写实现，技术借鉴不扩大产品范围。

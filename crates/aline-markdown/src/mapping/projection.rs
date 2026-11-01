@@ -138,7 +138,6 @@ impl MappingSegment {
     pub fn source_range(&self) -> &SrcRange {
         &self.source
     }
-
     /// 返回片段精确性。
     pub const fn precision(&self) -> MappingPrecision {
         self.precision
@@ -340,6 +339,12 @@ impl Projection {
     pub fn source_range(&self) -> &SrcRange {
         &self.source
     }
+
+    /// 字素算法需要完整上下文；局部投影不能假定切口是字素边界。
+    pub(super) fn has_full_source_context(&self) -> bool {
+        self.source.byte_range() == (0..self.snapshot.len_bytes())
+    }
+
     /// 返回绘制文本；它是只读投影，不是文档真源。
     pub fn drawn_text(&self) -> &str {
         &self.drawn

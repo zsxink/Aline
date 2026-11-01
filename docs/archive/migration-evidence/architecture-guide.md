@@ -147,7 +147,7 @@ ElyMark 也发作过同一种病：16MiB 全选字数统计在 UI 线程 1.8s，
 ~~~~~~~~markdown
 ## 附录 A：Ely 证据索引
 
-分析基于 2026-10-26 的两个仓库快照。`ely-*` 省略了 `/Users/xian/Project/book/Ely-GPUI-Components/crates/` 前缀；`ElyOffice/` 与 `Ely-GPUI-Components/` 为完整路径。
+分析基于 2026-10-26 的两个仓库快照。`ely-*` 省略了 `<external>/Ely-GPUI-Components/crates/` 前缀；`ElyOffice/` 与 `Ely-GPUI-Components/` 为完整路径。
 
 | 主题 | 关键位置 |
 |---|---|

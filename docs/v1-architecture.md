@@ -46,6 +46,7 @@
 |---|---|---|
 | Rust / GPUI | Rust，`gpui-pre` 单一来源且精确锁版；禁止为方便改用另一代 GPUI | M0 记录工具链、edition、锁定版本与补丁；旧 `=0.3.9` 是历史快照证据，须核对锁定源码，不宣称平台能力通过 |
 | 解析 | pulldown-cmark + 自建带区间的中间树/展示树；默认 features 关闭后显式选择语法选项 | M0 用 PRD 语法夹具固定选项与输出 |
+| 字素查询 | 仅 `aline-markdown` 直接依赖 `unicode-segmentation = "=1.13.3"`；采用 Unicode 17 数据，最多 4096 字节/查询、256 字节/供给块；公共接口不暴露第三方类型 | M0 纯边界与拒绝测试；Unicode 18/系统行为差异与真实导航由 V-01/V-07 验证，不由依赖准入推定通过 |
 | 文本缓冲 | 建议从 StringBuffer + 行索引 + 补丁历史开始；保留 Buffer 接口 | V-05 决定行索引增量维护等优化；不预装 ropey，也不能靠调小阈值缩减契约 |
 | 公式/图表/高亮 | 历史候选 ratex（及 SVG 输出）、mermaid-rs-renderer、usvg、syntect；two-face 为可选语法集 | V-03/V-06 验证覆盖率、资源预算；这些是候选后端，失败回退不等于需求已完成 |
 | 配置与打包资源 | 主题包为静态 JSON；文案为 TOML + rust-embed；设置序列化格式为内部实现细节 | schema 1 与字段/继承规则已按 TH-01～05 确认，数值/资源限额和平台能力仍验 V-04；不能用旧 TOML 替代 JSON |
@@ -67,7 +68,7 @@
 
 已实际验证 Rust/Cargo 1.98.1、edition 2024、rustfmt 1.9.0、Clippy 0.1.98 下的 macOS aarch64 GPUI 核心库消费方构建/检查；未声明 MSRV，未构建原生平台后端。`metal` 工具缺失、Intel Mac/Windows/Linux 构建、真实窗口/输入及五引擎正式闭包继续留待对应任务取证，不能据此宣称 V-01 或 M0 出口通过。
 
-第 1 组纯引擎拟用依赖另以五个 `*-probe` 隔离消费方取证：[候选账本](./validation/m0-engine-foundation/pure-candidates-2026-10-30/report.md)。`aline-markdown` 使用 `pulldown-cmark =0.13.6`（关闭默认 features）；`aline-app-core` 使用 `toml =1.1.8`（lock 实体为 `1.1.8+spec-1.1.0`，关闭默认 features，启用 std/parse/serde）与 `rust-embed =8.13.0`（关闭默认 features，启用 debug-embed，避免开发配置运行期读取 catalog 文件）。source/buffer/edit 当前无需第三方依赖。完整候选图及 normal/dev/build/target 边见机器账本，尚无 GPUI/禁用包；这不是正式五引擎的构建或测试通过声明。实体、emoji、Unicode 分段、随机/diff 及资产后端等未消费候选尚未准入，后续如实际需要须先补同等审计；第 2 组仍须核验真实 workspace 图，不能从临时探针推断实际接线合规。
+第 1 组纯引擎拟用依赖另以五个 `*-probe` 隔离消费方取证：[候选账本](./validation/m0-engine-foundation/pure-candidates-2026-10-30/report.md)。`aline-markdown` 使用 `pulldown-cmark =0.13.6`（关闭默认 features）；`aline-app-core` 使用 `toml =1.1.8`（lock 实体为 `1.1.8+spec-1.1.0`，关闭默认 features，启用 std/parse/serde）与 `rust-embed =8.13.0`（关闭默认 features，启用 debug-embed，避免开发配置运行期读取 catalog 文件）。source/buffer/edit 当前无需第三方依赖。完整候选图及 normal/dev/build/target 边见机器账本，尚无 GPUI/禁用包；这不是正式五引擎的构建或测试通过声明。实体、emoji、随机/diff 及资产后端等未消费候选尚未准入，后续如实际需要须先补同等审计；第 2 组仍须核验真实 workspace 图，不能从临时探针推断实际接线合规。**R07 准入回填（2026-11-01）：** `unicode-segmentation = "=1.13.3"` 仅作为 `aline-markdown` 直接依赖，使用 Unicode 17；本次 `scripts/check_engineering.py` 的当前 metadata/tree 与 all-target graph 检查在预热本机 Cargo 缓存后通过，实际 `aline-markdown → unicode-segmentation 1.13.3` 边见[新依赖证据](./validation/m0-engine-foundation/remediation/R07/run-3/dependency-check-rerun/all-tree.stdout.log)，缓存偏差见该批报告。这条边不扩大其他 crate 的依赖许可，也不证明冷缓存离线复现、跨平台原生构建或系统 Unicode 行为。
 
 ## 4. crate 图、职责与公开边界
 

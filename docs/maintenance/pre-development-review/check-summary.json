@@ -1,8 +1,8 @@
 [
   {
     "command": [
-      "/Library/Developer/CommandLineTools/usr/bin/python3",
-      "/Users/xian/Project/editor/Aline/docs/maintenance/deletion-readiness/check.py"
+      "python3",
+      "<repo>/docs/maintenance/deletion-readiness/check.py"
     ],
     "exit_code": 0,
     "errors": [],
@@ -10,8 +10,8 @@
   },
   {
     "command": [
-      "/Library/Developer/CommandLineTools/usr/bin/python3",
-      "/Users/xian/Project/editor/Aline/docs/prototype/tools/verify-reference.py"
+      "python3",
+      "<repo>/docs/prototype/tools/verify-reference.py"
     ],
     "exit_code": 0,
     "errors": [],

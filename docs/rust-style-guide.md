@@ -4,7 +4,7 @@
 
 更新日期：2026-10-29
 
-状态：**RS-01～RS-05 与 ED-01 已由用户确认采用方案 A 并完成回写，当前无待确认问题；V-01～V-09 及 M0 工具配置实验仍未执行。仓库尚无 Cargo workspace、Rust 配置或 CI，不表示实现、检查或平台验收已经完成。**
+状态：**RS-01～RS-05 与 ED-01 已由用户确认采用方案 A 并完成回写，当前无待确认问题。仓库已建立 8 成员 Cargo workspace 和 lint 配置，M0 工程守卫已有脚本及 self-test 证据；`.github/workflows/m0.yml` 已配置，但远端实际运行状态未核实。V-01～V-09 与 M0 总体出口仍未完成；具体进度见[整改记录](./validation/m0-engine-foundation/remediation/progress.md)。**
 
 基线：[AGENTS.md](../AGENTS.md) · [PRD 0.9](./v1-prd.md) · [架构指引 0.8](./v1-architecture.md) · [引擎指引 0.2](./engine-design.md) · [架构规范 0.4](./architecture-guide.md) · [验证计划](./v1-validation-plan.md)
 
@@ -427,7 +427,7 @@ RS-05 已确认有限真实 scope：纯文档用 `docs`，workspace 工程配置
 |---|---|
 | [历史 Rust 规范](./archive/migration-evidence/rust-style-guide.md) | 本轮逐章复核对象；原文保留，处置账本见第 22 节 |
 | [历史引擎](./archive/migration-evidence/engine-design.md) / [历史架构](./archive/migration-evidence/v1-architecture.md) / [历史架构规范](./archive/migration-evidence/architecture-guide.md) | Ely 映射/保真/补丁、crate 与依赖来历；实际约束以当前稿/铁律为准，不照抄“唯一算法”“已实测” |
-| [Zed 笔记](./archive/migration-evidence/zed-notes.md) §0/1/3 | 生命周期/输入/缓存/测试机制证据；本轮未重验外部源码行号。`/Users/xian/Project/book/zed` 为后续本地核对入口，不当 gpui-pre API 证明 |
+| [Zed 笔记](./archive/migration-evidence/zed-notes.md) §0/1/3 | 生命周期/输入/缓存/测试机制证据；本轮未重验外部源码行号。仓库外的 Zed 参考克隆为后续本地核对入口，不当 gpui-pre API 证明 |
 | [WordCraft 调研](./wordcraft-study.md) §4～6 | 敌意扫描/预算/原文透传/保真案例；不采用第二解析器、快照 undo 或“无 ZIP/无导出”旧前提 |
 | [决定原文与逐条复核](./decisions.md#4-历史时间线与逐条复核) / [旧架构规范 §11](./archive/migration-evidence/architecture-guide.md) | 历史技术选择及 MarkFlow #458/#459/#460 热路径反例；不是 Aline 性能证据，旧版本表不重新冻结 |
 | [产品批阅归档](./archive/2026-10-28-v1-open-questions.md) | Q-19 UTF-8/行尾与 Q-20 灰色只读等已回写决定；历史“未确认”不重开 |

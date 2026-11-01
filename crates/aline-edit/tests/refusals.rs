@@ -564,75 +564,101 @@ fn reread_failure_refusal_keeps_buffer_state() -> TestResult {
 
 #[test]
 fn protected_range_refusal_keeps_buffer_state() -> TestResult {
-    let mut buffer = make_buffer("before [^1] after\n\n[^1]: note\n", 0, 6)?;
-    seed_redo_branch(&mut buffer, SelectionSpec::new(0, 6))?;
-    assert_eq!(buffer.redo_depth(), 1);
-    let parsed = parse_buffer(&buffer)?;
-    let selection = buffer.selection().clone();
-    let context = EditContext::new(EditMode::Visual);
-    let before = capture(&buffer)?;
-    let result = plan_change(
-        buffer.snapshot(),
-        &parsed,
-        &selection,
-        &context,
-        &replace(0..11, "before [^1]", "BEFORE"),
-        budget(),
-    );
-    match result {
-        Err(EditRefusal::ProtectedRange { kind, range }) => {
-            assert_eq!(kind.as_str(), "FootnoteReference");
-            assert_eq!(range, 7..11);
+    // 手算的受保护子区间为 7..11；分别模拟退格删除与粘贴替换意图。
+    let cases = [
+        ("删除脚注引用", 7..11, "[^1]", ""),
+        ("粘贴替换脚注引用", 0..11, "before [^1]", "BEFORE pasted"),
+    ];
+    for (name, range, expected, replacement) in cases {
+        let mut buffer = make_buffer("before [^1] after\n\n[^1]: note\n", 0, 6)?;
+        seed_redo_branch(&mut buffer, SelectionSpec::new(0, 6))?;
+        assert_eq!(buffer.redo_depth(), 1, "{name}");
+        let parsed = parse_buffer(&buffer)?;
+        let selection = buffer.selection().clone();
+        let context = EditContext::new(EditMode::Visual);
+        let before = capture(&buffer)?;
+        let result = plan_change(
+            buffer.snapshot(),
+            &parsed,
+            &selection,
+            &context,
+            &replace(range, expected, replacement),
+            budget(),
+        );
+        match result {
+            Err(EditRefusal::ProtectedRange { kind, range }) => {
+                assert_eq!(kind.as_str(), "FootnoteReference", "{name}");
+                assert_eq!(range, 7..11, "{name}");
+            }
+            Ok(_) => {
+                return Err(invalid(format!(
+                    "{name}: expected ProtectedRange, got success"
+                )));
+            }
+            Err(other) => {
+                return Err(invalid(format!(
+                    "{name}: expected ProtectedRange, got {}",
+                    other.as_str()
+                )));
+            }
         }
-        Ok(_) => return Err(invalid("expected ProtectedRange, got success")),
-        Err(other) => {
-            return Err(invalid(format!(
-                "expected ProtectedRange, got {}",
-                other.as_str()
-            )));
-        }
+        assert_eq!(capture(&buffer)?, before, "{name}");
+        buffer.redo(TextBudget::new(TEXT_LIMIT))?;
+        assert_eq!(
+            text_of(&buffer)?.as_str(),
+            "before [^1] after\n\n[^1]: note\nQ",
+            "{name}"
+        );
+        assert_eq!(buffer.redo_depth(), 0, "{name}");
     }
-    assert_eq!(capture(&buffer)?, before);
-    buffer.redo(TextBudget::new(TEXT_LIMIT))?;
-    assert_eq!(
-        text_of(&buffer)?.as_str(),
-        "before [^1] after\n\n[^1]: note\nQ"
-    );
-    assert_eq!(buffer.redo_depth(), 0);
     Ok(())
 }
 
 #[test]
 fn html_boundary_refusal_keeps_buffer_state() -> TestResult {
-    let mut buffer = make_buffer("a <b>x</b> c\n", 5, 6)?;
-    seed_redo_branch(&mut buffer, SelectionSpec::new(5, 6))?;
-    assert_eq!(buffer.redo_depth(), 1);
-    let parsed = parse_buffer(&buffer)?;
-    let selection = buffer.selection().clone();
-    let context = EditContext::new(EditMode::Visual);
-    let before = capture(&buffer)?;
-    let result = plan_change(
-        buffer.snapshot(),
-        &parsed,
-        &selection,
-        &context,
-        &EditCommand::toggle_inline_format(5..6, InlineFormat::Strong),
-        budget(),
-    );
-    match result {
-        Err(EditRefusal::HtmlBoundary { range }) => assert_eq!(range, 2..5),
-        Ok(_) => return Err(invalid("expected HtmlBoundary, got success")),
-        Err(other) => {
-            return Err(invalid(format!(
-                "expected HtmlBoundary, got {}",
-                other.as_str()
-            )));
+    // <b> 为 2..5、</b> 为 6..10；格式选区右端越过关闭标签起点，
+    // 以及选区同时包住元素两端，均须按手算的首个 HTML 子区间拒绝。
+    let cases = [
+        ("格式右端切入关闭标签", 6..7, 6..10),
+        ("格式选区跨越整个元素", 1..11, 2..5),
+    ];
+    for (name, range, expected_html_range) in cases {
+        let mut buffer = make_buffer("a <b>x</b> c\n", range.start, range.end)?;
+        seed_redo_branch(&mut buffer, SelectionSpec::new(range.start, range.end))?;
+        assert_eq!(buffer.redo_depth(), 1, "{name}");
+        let parsed = parse_buffer(&buffer)?;
+        let selection = buffer.selection().clone();
+        let context = EditContext::new(EditMode::Visual);
+        let before = capture(&buffer)?;
+        let result = plan_change(
+            buffer.snapshot(),
+            &parsed,
+            &selection,
+            &context,
+            &EditCommand::toggle_inline_format(range, InlineFormat::Strong),
+            budget(),
+        );
+        match result {
+            Err(EditRefusal::HtmlBoundary { range }) => {
+                assert_eq!(range, expected_html_range, "{name}");
+            }
+            Ok(_) => {
+                return Err(invalid(format!(
+                    "{name}: expected HtmlBoundary, got success"
+                )));
+            }
+            Err(other) => {
+                return Err(invalid(format!(
+                    "{name}: expected HtmlBoundary, got {}",
+                    other.as_str()
+                )));
+            }
         }
+        assert_eq!(capture(&buffer)?, before, "{name}");
+        buffer.redo(TextBudget::new(TEXT_LIMIT))?;
+        assert_eq!(text_of(&buffer)?.as_str(), "a <b>x</b> c\nQ", "{name}");
+        assert_eq!(buffer.redo_depth(), 0, "{name}");
     }
-    assert_eq!(capture(&buffer)?, before);
-    buffer.redo(TextBudget::new(TEXT_LIMIT))?;
-    assert_eq!(text_of(&buffer)?.as_str(), "a <b>x</b> c\nQ");
-    assert_eq!(buffer.redo_depth(), 0);
     Ok(())
 }
 

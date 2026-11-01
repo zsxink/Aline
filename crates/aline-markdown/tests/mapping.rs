@@ -835,7 +835,7 @@ const CLUSTER_CASES: &[ClusterCase] = &[
         scalar: &[0, 1, 2, 3, 4],
         grapheme: &[0, 1, 2, 3, 4],
         diff: &[],
-        rule: "GB999 任意：UAX #29 不在空格之间断开，重复空白与标量边界相同（对照组）",
+        rule: "GB999：普通空格之间允许字素断开，每个空格自成一簇；此例字素边界与标量边界相同（对照组）",
     },
     ClusterCase {
         name: "crlf-normalized-by-mapping",

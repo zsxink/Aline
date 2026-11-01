@@ -2,11 +2,13 @@
 
 import copy
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
 
 from engineering_dependencies import MEMBERS, load_json
+from evidence_paths import display_path, write_json
 from check_engineering import ROOT, POLICY, SCENARIOS, record_command, sha256
 
 
@@ -43,8 +45,10 @@ def run(output=None):
     for name in ("gpui-pre", "gpui", "notify", "regex", "tokio", "wasmtime", "wasi", "comrak"):
         package(packages / name, name, workspace=True)
 
-    def edge(name, path, table="dependencies", optional=False):
-        return '[' + table + ']\nhidden_alias = { package = "' + name + '", path = "' + str(path) + '"' + (', optional = true' if optional else '') + ' }\n' + ('[features]\nviolation = ["dep:hidden_alias"]\n' if optional else '')
+    def edge(name, path, table="dependencies", optional=False, manifest_dir=None):
+        """依赖 path 相对清单目录书写，夹具文件因此不含本机绝对位置。"""
+        target = os.path.relpath(path, manifest_dir) if manifest_dir is not None else str(path)
+        return '[' + table + ']\nhidden_alias = { package = "' + name + '", path = "' + target + '"' + (', optional = true' if optional else '') + ' }\n' + ('[features]\nviolation = ["dep:hidden_alias"]\n' if optional else '')
 
     cases = [("positive-clean", None, None, "", "", None, 0, ""),
              ("positive-downward", None, None, "", "", None, 0, ""),
@@ -68,23 +72,27 @@ def run(output=None):
             child_path = project / child if child in MEMBERS else packages / child
             if mode == "bridge":
                 helper = packages / (label + "-helper")
-                package(helper, "fixture-helper", edge(child, child_path), workspace=True)
-                extras[parent] = edge("fixture-helper", helper, table)
+                package(helper, "fixture-helper", edge(child, child_path, manifest_dir=helper), workspace=True)
+                extras[parent] = edge("fixture-helper", helper, table, manifest_dir=project / parent)
             else:
-                extras[parent] = edge(child, child_path, table, mode == "feature")
+                extras[parent] = edge(child, child_path, table, mode == "feature",
+                                      manifest_dir=project / parent)
         if label == "positive-downward":
             chain = ["aline", "aline-ui", "aline-plugin", "aline-edit", "aline-markdown", "aline-buffer"]
             for a,b in zip(chain,chain[1:]):
-                extras[a] = edge(b, project / b)
-            extras["aline-ui"] += '[dependencies.aline-source]\npath = "' + str(project / "aline-source") + '"\n'
+                extras[a] = edge(b, project / b, manifest_dir=project / a)
+            extras["aline-ui"] += '[dependencies.aline-source]\npath = "' + os.path.relpath(project / "aline-source", project / "aline-ui") + '"\n'
         for name in MEMBERS:
             package(project / name, name, extras[name])
         scenario = feature or "all"
-        common = ["--manifest-path", str(project / "Cargo.toml"), "--offline"]
+        lock_generation = ["cargo", "generate-lockfile", "--manifest-path", str(project / "Cargo.toml"), "--offline"]
+        command(label + "-initial-lock-generation", lock_generation,
+                expectation="新 fixture 的首次锁文件生成例外；随后所有检查都使用 --locked")
+        common = ["--manifest-path", str(project / "Cargo.toml"), "--locked", "--offline"]
         feature_args = ["--all-features"] if feature else []
         metadata, mr = command(label + "-metadata", ["cargo", "metadata"] + common + ["--format-version", "1"] + feature_args,
                                expectation="实际 Cargo 解析本地隔离 fixture 应成功；后续守卫判断违规")
-        tree, tr = command(label + "-tree", ["cargo", "tree"] + common + ["--locked", "--workspace", "--target", "all", "-e", "normal,build,dev", "--prefix", "none", "--format", "{p}"] + feature_args,
+        tree, tr = command(label + "-tree", ["cargo", "tree"] + common + ["--workspace", "--target", "all", "-e", "normal,build,dev", "--prefix", "none", "--format", "{p}"] + feature_args,
                            expectation="实际 Cargo tree 保留真实包名/alias/kind/target；未执行构建")
         invoke(label, project, metadata, tree, mr, tr, scenario, expected, diagnostic)
 
@@ -105,9 +113,9 @@ def run(output=None):
             argv=["cargo",kind,"--manifest-path",str(project / "Cargo.toml")]
             argv += ["--format-version","1"] if kind=="metadata" else ["--workspace","--target","all","-e","normal,build,dev"]
             record=project/(kind+".synthetic-command.json")
-            record.write_text(json.dumps({"evidence_kind":"明确合成变异，不是实际Cargo命令输出", "argv":argv,"exit_code":0,"stdout_sha256":sha256(path)}))
+            write_json(record, {"evidence_kind":"明确合成变异，不是实际Cargo命令输出", "argv":argv,"exit_code":0,"stdout_sha256":sha256(path)})
             records.append(record)
-        (project / "fixture.json").write_text(json.dumps({"kind":"明确的图/lock变异", "base":str(baseline),"transformation":label,"independent_expectation":"现行架构§3.2精确身份/边/target/features；任务2.2"},ensure_ascii=False,indent=2))
+        write_json(project / "fixture.json", {"kind":"明确的图/lock变异", "base":str(baseline),"transformation":label,"independent_expectation":"现行架构§3.2精确身份/边/target/features；任务2.2"})
         invoke(label,project,metadata,tree_path,*records,expected=expected,diagnostic=diagnostic)
     def node(data,name):
         identity=next(p["id"] for p in data["packages"] if p["name"]==name)
@@ -165,9 +173,9 @@ def run(output=None):
         modify(m,t);mp=project/"metadata.command.json";tp=project/"tree.command.json";mp.write_text(json.dumps(m));tp.write_text(json.dumps(t))
         invoke(label,ROOT,baseline/"all-metadata.stdout.log",baseline/"all-tree.stdout.log",mp,tp,diagnostic=diagnostic)
     # 确认失败Cargo本身不会转成通过，保留真实失败原输出。
-    failed,fr=command("negative-real-cargo-acquisition",["cargo","metadata","--offline","--format-version","1","--manifest-path",str(fixtures/"missing/Cargo.toml")],101,"does not exist",expectation="不存在清单应由Cargo报错；不是合规图")
+    failed,fr=command("negative-real-cargo-acquisition",["cargo","metadata","--locked","--offline","--format-version","1","--manifest-path",str(fixtures/"missing/Cargo.toml")],101,"does not exist",expectation="不存在清单应由Cargo报错；不是合规图")
     invoke("negative-real-cargo-error-not-pass",ROOT,failed,baseline/"all-tree.stdout.log",fr,baseline/"all-tree.command.json",diagnostic="Cargo 采集失败")
     summary={"passed":all(r["passed"] for r in results),"records":results,"limits":"本机host为aarch64 macOS；桌面target仅依赖解析。局部合成包均0.0.0，图漂移明确标记synthetic；未构建任何违规库或宣称平台支持。"}
-    (output/"summary.json").write_text(json.dumps(summary,ensure_ascii=False,indent=2)+"\n")
+    write_json(output/"summary.json", summary)
     print(json.dumps({"passed":summary["passed"],"commands":len(results),"summary":str(output/"summary.json")},ensure_ascii=False))
     return 0 if summary["passed"] else 1

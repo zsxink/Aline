@@ -14,6 +14,8 @@ import subprocess
 import sys
 import tempfile
 
+from evidence_paths import resolve_path, write_json, write_text
+
 ROOT = Path(__file__).resolve().parent.parent
 TOOLCHAIN = '1.98.1'
 
@@ -26,14 +28,14 @@ def invoke(argv, output, label, env):
         code, stdout, stderr = result.returncode, result.stdout, result.stderr
     except OSError as error:
         code, stdout, stderr = 127, '', str(error)
-    (output / (label + '.stdout.log')).write_text(stdout)
-    (output / (label + '.stderr.log')).write_text(stderr)
+    write_text(output / (label + '.stdout.log'), stdout)
+    write_text(output / (label + '.stderr.log'), stderr)
     row = {'argv': argv, 'cwd': str(ROOT), 'started_utc': started,
            'finished_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(),
            'exit_code': code, 'toolchain_bin': env.get('ALINE_M0_TOOLCHAIN_BIN'),
            'env_overrides': {key: env[key] for key in
                ('CARGO_HOME', 'CARGO_NET_OFFLINE', 'RUSTUP_TOOLCHAIN', 'PYTHONDONTWRITEBYTECODE') if key in env}}
-    (output / (label + '.command.json')).write_text(json.dumps(row, ensure_ascii=False, indent=2) + '\n')
+    write_json(output / (label + '.command.json'), row)
     print(label + ': exit=' + str(code), flush=True)
     return row, stdout
 
@@ -47,7 +49,8 @@ def run(args):
     if not home and not os.environ.get('CI'):
         isolation = ROOT / 'docs/validation/m0-engine-foundation/admission-2026-10-30/isolation.json'
         if isolation.is_file():
-            home = json.loads(isolation.read_text()).get('cargo_home')
+            registered = json.loads(isolation.read_text()).get('cargo_home')
+            home = resolve_path(registered) if registered else None
     if not home or not Path(home).is_dir():
         raise ValueError('必须提供已有的隔离 Cargo 缓存；不自动下载或使用未登记的全局配置')
     env['CARGO_HOME'] = str(Path(home).resolve())
@@ -92,7 +95,7 @@ def run(args):
     summary = {'passed': passed, 'scope': '当前 macOS 主机；目标图解析不等于跨平台构建；CI 是否执行另行记录',
                'catalog': 'cargo test --workspace 实际发现 app-core 正反例与 UI 消费测试',
                'results': records}
-    (output / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2) + '\n')
+    write_json(output / 'summary.json', summary)
     print('证据：' + str(output), flush=True)
     return 0 if passed else 1
 

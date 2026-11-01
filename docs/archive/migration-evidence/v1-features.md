@@ -14,7 +14,7 @@
 > V1 界面与交互的具体验收规范（MarkFlow 覆盖范围、Aline 品牌、浅色主题、代码块控件和 Markdown 展示夹具）见 [ui-spec.md](./ui-spec.md)。
 
 > 供审阅。技术依据见 [engine-design.md](./engine-design.md)。
-> 外观与交互参照 MarkFlow（`/Users/xian/Project/book/MarkFlow`）；设置模型、导出主题、图片粘贴、自动保存/外部修改检测等功能语义从它迁移（迁语义不迁代码）。
+> 外观与交互参照 MarkFlow（`<external>/MarkFlow`）；设置模型、导出主题、图片粘贴、自动保存/外部修改检测等功能语义从它迁移（迁语义不迁代码）。
 > **V1 明确不做**：PlantUML、front matter（仅保留防渲染错乱的最小识别，见 v1-architecture §4.2）、纯文本导出、远程图片、协作、运行时动态加载第三方插件、只读/Preview 模式（可视化模式即可读）、Split 分屏。PDF/Word/HTML 导出与 Mermaid 专属主题导入、自定义属于 V1，见 [plugin-system.md](./plugin-system.md)。
 > **待定**：markdown formatter——用户 2026-10-25 的第一版必须清单含此项，但本文既未收录也未列入不做。ElyMark 完全没有 formatter，Aline 需自研；它与保真原则不冲突（格式化是显式用户动作、作用于全文，与"编辑不重排"分工明确），是否进 V1 待补决策。架构位已预留（2026-10-26 复核）：若立项，实现为 aline-edit 的一条全文 `Command`，复用 apart/undo/拒绝协议；决策截止 M3（命令框架冻结前）。
 > **HTML（V1 进范围，2026-10-26 裁决 D-13）**：对齐 ElyMark 语义——行内标签映射样式（非浏览器渲染）；HTML 块做浏览器式文本提取（标签消费、文字保留、行内样式生效、注释丢弃、过滤标签的标签本身按字面文本显示），点击显示源码编辑。完整方案见 [engine-design.md](./engine-design.md) §1.10（机制）+ §2.17（落点与里程碑）。
