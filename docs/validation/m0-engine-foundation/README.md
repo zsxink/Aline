@@ -95,3 +95,29 @@ GPUI 候选检查（只读本地检查）：
 - 第 2 组被阻塞。推荐先经用户确认修改本 change 的候选准入范围：只允许经逐版本审查的 GPUI 自身传递 `regex` 出现在 `app/aline-ui/aline-plugin` 闭包；Aline 自有直接依赖仍禁止 `regex`，五引擎闭包仍必须无 GPUI 且无禁用依赖。此改动会放宽当前 delta 的全闭包禁令，必须先更新 proposal/specs/design/tasks 并取得确认。若维持严格全闭包禁令，则继续寻找无该路径的精确 GPUI 候选；找不到合规候选时停止第 2 组接线。
 
 V-01～V-09 均未标记通过。本记录所列实测只覆盖当前 macOS 主机环境；Windows/Linux、Intel Mac、GPUI 候选构建和完整工程门禁均未验证。
+
+## 勘误与新证据（2026-11-01 追加，不改上文原文）
+
+M0 整改 R11 补采了当前可保全的证据，见
+[remediation/R11/run-1/report.md](./remediation/R11/run-1/report.md)、
+[legacy-gaps.md](./remediation/R11/run-1/legacy-gaps.md)、
+[unverified.md](./remediation/R11/run-1/unverified.md)。
+
+上文「实际观察」与「命令与结果」两表保留为**当时快照**，与当前观察存在四项差异：
+
+1. OS：当时 macOS 27.0.1 (26A434)、Darwin 27.0.0；现为 **macOS 27.2 (26B123)、Darwin 27.2.0**。
+2. 活动工具链：当时记录 `stable-aarch64-apple-darwin` 为活动；现为 **`1.98.1-aarch64-apple-darwin`**
+   （`RUSTUP_TOOLCHAIN=1.98.1` 覆盖所致）。
+3. target 集合：上文列出的四项属于 **stable** 工具链；当前活动工具链 1.98.1 的已装 target 为
+   `aarch64-apple-darwin`、`x86_64-apple-darwin`、`x86_64-pc-windows-gnu`、`x86_64-unknown-linux-gnu`。
+   上文未标明 target 所属工具链，属表述缺口。
+4. 显示：当时记录一台外接显示器 4096×2304（2048×1152@75Hz）；本轮采集时**外接未接入**，
+   仅有内建 Liquid Retina XDR 3024×1964。
+
+旧 `*.command.json` 的缺字段情况（14 份缺 cwd/时点、环境命令无 cwd 与时点、设备观察无原始输出
+与时点）已登记为历史事实，**未回填、未补造**，也不因本轮新证据视为已修复。
+
+另：上文「命令与结果」表的 `uname -a` 行含当时的主机名（其中带账号名）。按 R11 的打码策略，
+本轮新采集已将该主机名打码为 `[REDACTED]`；该历史行按「证据只追加」规则**未改写**，
+但它是已知的敏感标识残留，须在 R14 统一裁决是否就地打码。
+

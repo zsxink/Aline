@@ -1,0 +1,19 @@
+{
+ "id": "R11-toolchain-1.98.1-targets-installed",
+ "argv": [
+  "rustup",
+  "target",
+  "list",
+  "--installed",
+  "--toolchain",
+  "1.98.1-aarch64-apple-darwin"
+ ],
+ "cwd": "/Users/xian/Project/editor/Aline",
+ "env_overrides": {
+  "CARGO_NET_OFFLINE": "true",
+  "RUSTUP_TOOLCHAIN": "1.98.1"
+ },
+ "started_utc": "2026-11-01T04:39:25+00:00",
+ "finished_utc": "2026-11-01T04:39:25+00:00",
+ "exit_code": 0
+}

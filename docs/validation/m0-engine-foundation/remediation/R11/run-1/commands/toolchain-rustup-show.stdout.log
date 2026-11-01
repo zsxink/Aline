@@ -1,0 +1,17 @@
+Default host: aarch64-apple-darwin
+rustup home:  /Users/xian/.rustup
+
+installed toolchains
+--------------------
+stable-aarch64-apple-darwin (default)
+1.98.1-aarch64-apple-darwin (active)
+
+active toolchain
+----------------
+name: 1.98.1-aarch64-apple-darwin
+active because: overridden by environment variable RUSTUP_TOOLCHAIN
+installed targets:
+  aarch64-apple-darwin
+  x86_64-apple-darwin
+  x86_64-pc-windows-gnu
+  x86_64-unknown-linux-gnu
