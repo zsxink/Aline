@@ -20,7 +20,7 @@ use aline_markdown::{ParseBudget, ParseConfig, Parsed, parse};
 
 const GOLDENS: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../docs/validation/m0-engine-foundation/group-7/step-7.1/goldens/edit-goldens.tsv"
+    "/tests/fixtures/edit-goldens.tsv"
 );
 const TEXT_LIMIT: usize = 1 << 20;
 const PATCH_LIMIT: usize = 64;

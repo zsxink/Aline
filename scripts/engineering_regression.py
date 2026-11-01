@@ -8,7 +8,7 @@ import sys
 from engineering_dependencies import Violation, check_structure, model, parse_lock
 
 ROOT = Path(__file__).resolve().parent.parent
-BASE = ROOT / "docs/validation/m0-engine-foundation/group-2/engineering-dependency-baseline/all-metadata.stdout.json"
+BASE = ROOT / "scripts/fixtures/engineering/dependency-baseline/all-metadata.json"
 
 
 def main():

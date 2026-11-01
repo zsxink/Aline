@@ -97,9 +97,9 @@ def run(output=None):
         invoke(label, project, metadata, tree, mr, tr, scenario, expected, diagnostic)
 
     # 全部漂移样例基于正式实际图，但明确是合成变异，不当作 Cargo 原输出。
-    baseline = ROOT / "docs/validation/m0-engine-foundation/group-2/engineering-live-graphs"
-    base = load_json(baseline / "all-metadata.stdout.log")
-    base_tree = (baseline / "all-tree.stdout.log").read_text()
+    baseline = ROOT / "scripts/fixtures/engineering/live-graphs"
+    base = load_json(baseline / "all-metadata.json")
+    base_tree = (baseline / "all-tree.txt").read_text()
     base_lock = (ROOT / "Cargo.lock").read_text()
     def mutation(label, mutate, diagnostic, expected=1):
         project = fixtures / label
@@ -171,10 +171,10 @@ def run(output=None):
         m=load_json(baseline/"all-metadata.command.json");t=load_json(baseline/"all-tree.command.json")
         # 使用正式文件和锁，不需要伪造内容。
         modify(m,t);mp=project/"metadata.command.json";tp=project/"tree.command.json";mp.write_text(json.dumps(m));tp.write_text(json.dumps(t))
-        invoke(label,ROOT,baseline/"all-metadata.stdout.log",baseline/"all-tree.stdout.log",mp,tp,diagnostic=diagnostic)
+        invoke(label,ROOT,baseline/"all-metadata.json",baseline/"all-tree.txt",mp,tp,diagnostic=diagnostic)
     # 确认失败Cargo本身不会转成通过，保留真实失败原输出。
     failed,fr=command("negative-real-cargo-acquisition",["cargo","metadata","--locked","--offline","--format-version","1","--manifest-path",str(fixtures/"missing/Cargo.toml")],101,"does not exist",expectation="不存在清单应由Cargo报错；不是合规图")
-    invoke("negative-real-cargo-error-not-pass",ROOT,failed,baseline/"all-tree.stdout.log",fr,baseline/"all-tree.command.json",diagnostic="Cargo 采集失败")
+    invoke("negative-real-cargo-error-not-pass",ROOT,failed,baseline/"all-tree.txt",fr,baseline/"all-tree.command.json",diagnostic="Cargo 采集失败")
     summary={"passed":all(r["passed"] for r in results),"records":results,"limits":"本机host为aarch64 macOS；桌面target仅依赖解析。局部合成包均0.0.0，图漂移明确标记synthetic；未构建任何违规库或宣称平台支持。"}
     write_json(output/"summary.json", summary)
     print(json.dumps({"passed":summary["passed"],"commands":len(results),"summary":str(output/"summary.json")},ensure_ascii=False))

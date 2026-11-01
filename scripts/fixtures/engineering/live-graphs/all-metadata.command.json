@@ -1,0 +1,22 @@
+{
+  "argv": [
+    "cargo",
+    "metadata",
+    "--manifest-path",
+    "<repo>/Cargo.toml",
+    "--locked",
+    "--offline",
+    "--format-version",
+    "1"
+  ],
+  "cwd": "<repo>",
+  "started_utc": "2026-10-30T17:33:46.200357+00:00",
+  "finished_utc": "2026-10-30T17:33:46.306123+00:00",
+  "exit_code": 0,
+  "stdout_sha256": "1535648616a01854f6b37390c8da300802bc1114528f109644bc765edb2b0324",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "env_overrides": {
+    "CARGO_HOME": "<tmp>/aline-m0-admission-k4_p5j6a/cargo-home",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  }
+}

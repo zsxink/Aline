@@ -12,8 +12,7 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 
-const GOLDEN_RELATIVE: &str =
-    "../../docs/validation/m0-engine-foundation/group-4/step-4.1/decode-golden.v1.txt";
+const GOLDEN_RELATIVE: &str = "tests/fixtures/decode-golden.v1.txt";
 const EXPECTED_CASE_COUNT: usize = 32;
 
 #[derive(Debug)]

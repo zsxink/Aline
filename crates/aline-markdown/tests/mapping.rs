@@ -449,9 +449,7 @@ fn parse_mapping_goldens(tsv: &str) -> Result<BTreeMap<String, GoldenCase>, Box<
 
 #[test]
 fn mapping_goldens_tsv_matches_parser_output() -> Result<(), Box<dyn Error>> {
-    let tsv = include_str!(
-        "../../../docs/validation/m0-engine-foundation/group-6/step-6.4/goldens/mapping-goldens.tsv"
-    );
+    let tsv = include_str!("fixtures/mapping-goldens.tsv");
     let cases = parse_mapping_goldens(tsv)?;
     assert_eq!(cases.len(), 6);
     for (name, case) in &cases {

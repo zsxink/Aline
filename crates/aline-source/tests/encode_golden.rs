@@ -12,8 +12,7 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 
-const GOLDEN_RELATIVE: &str =
-    "../../docs/validation/m0-engine-foundation/group-4/step-4.2/encode-golden.v1.txt";
+const GOLDEN_RELATIVE: &str = "tests/fixtures/encode-golden.v1.txt";
 const EXPECTED_OK_COUNT: usize = 34;
 const EXPECTED_ERR_COUNT: usize = 4;
 const BOM: &[u8] = &[0xef, 0xbb, 0xbf];

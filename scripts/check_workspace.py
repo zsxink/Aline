@@ -47,7 +47,7 @@ def run(args):
                PYTHONDONTWRITEBYTECODE='1')
     home = args.cargo_home or os.environ.get('CARGO_HOME')
     if not home and not os.environ.get('CI'):
-        isolation = ROOT / 'docs/validation/m0-engine-foundation/admission-2026-10-30/isolation.json'
+        isolation = ROOT / 'scripts/fixtures/isolation.json'
         if isolation.is_file():
             registered = json.loads(isolation.read_text()).get('cargo_home')
             home = resolve_path(registered) if registered else None

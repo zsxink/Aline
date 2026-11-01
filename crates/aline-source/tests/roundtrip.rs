@@ -53,9 +53,7 @@ fn replace(source: &str, src_range: Range<usize>, replacement: &str) -> TestResu
 #[test]
 fn roundtrip_golden_preserves_bytes_and_local_patch_with_exact_inverse() -> TestResult {
     // 金样在测试实现前手写；冻结文本、待写 bytes、重开源码分别是独立显式预期。
-    let golden = include_str!(
-        "../../../docs/validation/m0-engine-foundation/group-4/step-4.3/roundtrip-golden.v1.txt"
-    );
+    let golden = include_str!("fixtures/roundtrip-golden.v1.txt");
     let mut names = HashSet::new();
     for line in golden
         .lines()

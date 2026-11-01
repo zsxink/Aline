@@ -1167,7 +1167,7 @@ def run_self_test(output):
     root_lints = {"rust": root_tables["workspace.lints.rust"], "clippy": root_tables["workspace.lints.clippy"]}
     cargo_home = os.environ.get("CARGO_HOME")
     if not cargo_home:
-        isolation = json.loads((ROOT / "docs/validation/m0-engine-foundation/admission-2026-10-30/isolation.json").read_text())
+        isolation = json.loads((ROOT / "scripts/fixtures/isolation.json").read_text())
         cargo_home = resolve_path(isolation["cargo_home"]) or isolation["cargo_home"]
         if not Path(cargo_home).is_dir():
             raise CheckError("登记的隔离 Cargo 缓存不存在: " + cargo_home)
@@ -1281,7 +1281,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--root", type=Path, default=ROOT, help="待审 Cargo workspace 根目录")
-    parser.add_argument("--output-dir", type=Path, default=ROOT / "docs/validation/m0-engine-foundation/group-2/lint-self-test")
+    parser.add_argument("--output-dir", type=Path, default=ROOT / "logs/validation/lint-self-test")
     args = parser.parse_args()
     try:
         if args.self_test:

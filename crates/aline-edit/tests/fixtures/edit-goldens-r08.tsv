@@ -1,0 +1,15 @@
+# id	kind	mode	source	selection_anchor	selection_head	command	range	expected	replacement	format	outcome	refusal	protection	refusal_range	patch_range	patch_replacement	target_anchor	target_head	reason	after_text
+del_body	delete	Visual	"alpha beta gamma\n"	6	11	Replace	6..11	"beta "	""	-	Changed	-	-	-	6..11	""	6	6	VisibleReplace	"alpha gamma\n"
+del_cross_one_byte	delete	Visual	"before [^1] after\n\n[^1]: note\n"	8	6	Replace	6..8	" ["	""	-	Refused	ProtectedRange	FootnoteReference	7..11	-	-	-	-	-	-
+del_footnote_visual	delete	Visual	"before [^1] after\n\n[^1]: note\n"	11	7	Replace	7..11	"[^1]"	""	-	Refused	ProtectedRange	FootnoteReference	7..11	-	-	-	-	-	-
+del_footnote_source	delete	Source	"before [^1] after\n\n[^1]: note\n"	11	7	Replace	7..11	"[^1]"	""	-	Changed	-	-	7..11	7..11	""	7	7	SourceReplace	"before  after\n\n[^1]: note\n"
+del_zero_empty	delete	Visual	"abc\n"	1	1	Replace	1..1	""	""	-	Unchanged	-	-	-	-	-	-	-	ReplacementIdentical	"abc\n"
+paste_left_boundary	paste	Visual	"before [^1] after\n\n[^1]: note\n"	7	7	Replace	7..7	""	"P"	-	Refused	ProtectedRange	FootnoteReference	7..11	-	-	-	-	-	-
+paste_left	paste	Visual	"before [^1] after\n\n[^1]: note\n"	6	6	Replace	6..6	""	"P"	-	Changed	-	-	7..11	6..6	"P"	7	7	VisibleReplace	"beforeP [^1] after\n\n[^1]: note\n"
+paste_cover	paste	Visual	"before [^1] after\n\n[^1]: note\n"	7	11	Replace	7..11	"[^1]"	"pasted"	-	Refused	ProtectedRange	FootnoteReference	7..11	-	-	-	-	-	-
+paste_source	paste	Source	"before [^1] after\n\n[^1]: note\n"	11	11	Replace	11..11	""	"P"	-	Changed	-	-	7..11	11..11	"P"	12	12	SourceReplace	"before [^1]P after\n\n[^1]: note\n"
+paste_multiline	paste	Visual	"ab cd\n"	2	2	Replace	2..2	""	"X\nY"	-	Changed	-	-	-	2..2	"X\nY"	5	5	VisibleReplace	"abX\nY cd\n"
+html_right	html	Visual	"a <b>x</b> c\n"	6	7	ToggleInlineFormat	6..7	-	-	Strong	Refused	HtmlBoundary	-	6..10	-	-	-	-	-	-
+html_whole	html	Visual	"a <b>x</b> c\n"	1	11	ToggleInlineFormat	1..11	-	-	Strong	Refused	HtmlBoundary	-	2..5	-	-	-	-	-	-
+html_tag_inner	html	Visual	"a <b>x</b> c\n"	3	4	Replace	3..4	"b"	"i"	-	Refused	HtmlBoundary	-	2..5	-	-	-	-	-	-
+paste_right	paste	Visual	"before [^1] after\n\n[^1]: note\n"	11	11	Replace	11..11	""	"P"	-	Refused	ProtectedRange	FootnoteReference	7..11	-	-	-	-	-	-

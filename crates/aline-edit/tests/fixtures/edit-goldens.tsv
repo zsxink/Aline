@@ -1,0 +1,461 @@
+# Aline 组 7 编辑计划独立金样（实现前手工按 UTF-8 字节计算）
+#
+# 格式：case <TAB> field <TAB> value
+# 字符串值使用反斜杠转义：\n 换行、\t 制表、\\ 反斜杠、\" 双引号。
+# 范围一律是半开源码字节范围 start..end，起点/终点按字节数人工数出。
+# 本文件在 crates/aline-edit 实现之前建立；实现与测试只能读取，不能回填修改。
+#
+# 覆盖：
+# - 普通源码替换、源码多补丁批次、行内格式 toggle
+# - 无变化（内容相同、已加粗）
+# - 计划期拒绝：片段错、越界、反向、非字符边界、各类预算、隐藏链接目标丢失、
+#   可见文本预期错、HTML 边界、脚注保护、模式错、空选区、待定输入、组合输入
+# - 校验期拒绝：工作版本错、投影错、选区错、变更后复用旧范围
+# - Source 模式允许改脚注/HTML 原文，Visual 模式允许普通正文
+
+# ---- 1. 普通源码替换：alpha beta\n ----
+# a0 l1 p2 h3 a4 ' '5 b6 e7 t8 a9 \n10；len 11
+# 6..10 是 beta；gamma 5 字节；结果 alpha gamma\n len 12；光标在 6+5=11
+source_replace_single	scenario	plan
+source_replace_single	command	Replace
+source_replace_single	mode	Source
+source_replace_single	source	"alpha beta\n"
+source_replace_single	selection_anchor	6
+source_replace_single	selection_head	10
+source_replace_single	edit.0.range	6..10
+source_replace_single	edit.0.expected	"beta"
+source_replace_single	edit.0.replacement	"gamma"
+source_replace_single	outcome	Changed
+source_replace_single	reason	SourceReplace
+source_replace_single	patch.0.range	6..10
+source_replace_single	patch.0.replacement	"gamma"
+source_replace_single	target_anchor	11
+source_replace_single	target_head	11
+source_replace_single	preview	"alpha gamma"
+
+# ---- 2. 源码多补丁批次：alpha beta gamma\n ----
+# alpha 0..5，beta 6..10，gamma 11..16，\n16；len 17
+# 三个补丁 -> one(3) two(3) three(5)；结果 one two three\n len 14
+# 最后补丁 after 起点 = 11 + (3+3) - (5+4) = 8；after 终点 = 8+5 = 13
+source_batch_three	scenario	plan
+source_batch_three	command	Replace
+source_batch_three	mode	Source
+source_batch_three	source	"alpha beta gamma\n"
+source_batch_three	selection_anchor	16
+source_batch_three	selection_head	16
+source_batch_three	edit.0.range	0..5
+source_batch_three	edit.0.expected	"alpha"
+source_batch_three	edit.0.replacement	"one"
+source_batch_three	edit.1.range	6..10
+source_batch_three	edit.1.expected	"beta"
+source_batch_three	edit.1.replacement	"two"
+source_batch_three	edit.2.range	11..16
+source_batch_three	edit.2.expected	"gamma"
+source_batch_three	edit.2.replacement	"three"
+source_batch_three	outcome	Changed
+source_batch_three	reason	BulkReplace
+source_batch_three	patch.0.range	0..5
+source_batch_three	patch.0.replacement	"one"
+source_batch_three	patch.1.range	6..10
+source_batch_three	patch.1.replacement	"two"
+source_batch_three	patch.2.range	11..16
+source_batch_three	patch.2.replacement	"three"
+source_batch_three	target_anchor	13
+source_batch_three	target_head	13
+source_batch_three	preview	"one two three"
+
+# ---- 3. 内容相同的源码替换：无变化，不产生空历史步 ----
+source_identity_replace	scenario	plan
+source_identity_replace	command	Replace
+source_identity_replace	mode	Source
+source_identity_replace	source	"alpha beta\n"
+source_identity_replace	selection_anchor	6
+source_identity_replace	selection_head	10
+source_identity_replace	edit.0.range	6..10
+source_identity_replace	edit.0.expected	"beta"
+source_identity_replace	edit.0.replacement	"beta"
+source_identity_replace	outcome	Unchanged
+source_identity_replace	reason	ReplacementIdentical
+
+# ---- 4. Strong toggle：alpha beta\n 选中 beta ----
+# 6..10 beta；插入 ** 于 6 和 10 -> alpha **beta**\n len 15
+# 选区内 beta 在 after 8..12
+format_strong_toggle	scenario	plan
+format_strong_toggle	command	ToggleInlineFormat
+format_strong_toggle	mode	Visual
+format_strong_toggle	source	"alpha beta\n"
+format_strong_toggle	selection_anchor	6
+format_strong_toggle	selection_head	10
+format_strong_toggle	range	6..10
+format_strong_toggle	format	Strong
+format_strong_toggle	outcome	Changed
+format_strong_toggle	reason	InlineFormatStrong
+format_strong_toggle	patch.0.range	6..6
+format_strong_toggle	patch.0.replacement	"**"
+format_strong_toggle	patch.1.range	10..10
+format_strong_toggle	patch.1.replacement	"**"
+format_strong_toggle	target_anchor	8
+format_strong_toggle	target_head	12
+format_strong_toggle	preview	"alpha beta"
+
+# ---- 5. Strike toggle：同样的字节关系，标记 ~~ ----
+format_strike_toggle	scenario	plan
+format_strike_toggle	command	ToggleInlineFormat
+format_strike_toggle	mode	Visual
+format_strike_toggle	source	"alpha beta\n"
+format_strike_toggle	selection_anchor	6
+format_strike_toggle	selection_head	10
+format_strike_toggle	range	6..10
+format_strike_toggle	format	Strike
+format_strike_toggle	outcome	Changed
+format_strike_toggle	reason	InlineFormatStrike
+format_strike_toggle	patch.0.range	6..6
+format_strike_toggle	patch.0.replacement	"~~"
+format_strike_toggle	patch.1.range	10..10
+format_strike_toggle	patch.1.replacement	"~~"
+format_strike_toggle	target_anchor	8
+format_strike_toggle	target_head	12
+format_strike_toggle	preview	"alpha beta"
+
+# ---- 6. 已加粗：alpha **beta**\n，选中 8..12 ----
+# alpha 0..5，空格5，**6..8，beta 8..12，**12..14，\n14；len 15
+format_strong_already	scenario	plan
+format_strong_already	command	ToggleInlineFormat
+format_strong_already	mode	Visual
+format_strong_already	source	"alpha **beta**\n"
+format_strong_already	selection_anchor	8
+format_strong_already	selection_head	12
+format_strong_already	range	8..12
+format_strong_already	format	Strong
+format_strong_already	outcome	Unchanged
+format_strong_already	reason	AlreadyFormatted
+
+# ---- 7. 计划期拒绝：期望片段不符 ----
+refuse_expected_fragment	scenario	plan
+refuse_expected_fragment	command	Replace
+refuse_expected_fragment	mode	Source
+refuse_expected_fragment	source	"alpha beta\n"
+refuse_expected_fragment	selection_anchor	0
+refuse_expected_fragment	selection_head	0
+refuse_expected_fragment	edit.0.range	0..5
+refuse_expected_fragment	edit.0.expected	"wrong"
+refuse_expected_fragment	edit.0.replacement	"x"
+refuse_expected_fragment	outcome	Refused
+refuse_expected_fragment	refusal	ExpectedFragmentMismatch
+refuse_expected_fragment	refusal_range	0..5
+
+# ---- 8. Visual 替换同样校验期望片段 ----
+refuse_visual_expected_fragment	scenario	plan
+refuse_visual_expected_fragment	command	Replace
+refuse_visual_expected_fragment	mode	Visual
+refuse_visual_expected_fragment	source	"alpha beta\n"
+refuse_visual_expected_fragment	selection_anchor	0
+refuse_visual_expected_fragment	selection_head	5
+refuse_visual_expected_fragment	edit.0.range	0..5
+refuse_visual_expected_fragment	edit.0.expected	"wrong"
+refuse_visual_expected_fragment	edit.0.replacement	"x"
+refuse_visual_expected_fragment	outcome	Refused
+refuse_visual_expected_fragment	refusal	ExpectedFragmentMismatch
+refuse_visual_expected_fragment	refusal_range	0..5
+
+# ---- 9. 计划期拒绝：越界 ----
+refuse_out_of_bounds	scenario	plan
+refuse_out_of_bounds	command	Replace
+refuse_out_of_bounds	mode	Source
+refuse_out_of_bounds	source	"alpha beta\n"
+refuse_out_of_bounds	selection_anchor	0
+refuse_out_of_bounds	selection_head	0
+refuse_out_of_bounds	edit.0.range	6..99
+refuse_out_of_bounds	edit.0.expected	"beta"
+refuse_out_of_bounds	edit.0.replacement	"x"
+refuse_out_of_bounds	outcome	Refused
+refuse_out_of_bounds	refusal	OutOfBounds
+
+# ---- 10. 计划期拒绝：反向范围 ----
+refuse_reversed_range	scenario	plan
+refuse_reversed_range	command	Replace
+refuse_reversed_range	mode	Source
+refuse_reversed_range	source	"alpha beta\n"
+refuse_reversed_range	selection_anchor	0
+refuse_reversed_range	selection_head	0
+refuse_reversed_range	edit.0.range	10..6
+refuse_reversed_range	edit.0.expected	"beta"
+refuse_reversed_range	edit.0.replacement	"x"
+refuse_reversed_range	outcome	Refused
+refuse_reversed_range	refusal	ReversedRange
+
+# ---- 11. 计划期拒绝：非 UTF-8 字符边界 ----
+# a0，😀 占 1..5，b5，\n6；端点 2 落在 😀 内部
+refuse_not_char_boundary	scenario	plan
+refuse_not_char_boundary	command	Replace
+refuse_not_char_boundary	mode	Source
+refuse_not_char_boundary	source	"a😀b\n"
+refuse_not_char_boundary	selection_anchor	0
+refuse_not_char_boundary	selection_head	0
+refuse_not_char_boundary	edit.0.range	0..2
+refuse_not_char_boundary	edit.0.expected	"a"
+refuse_not_char_boundary	edit.0.replacement	"x"
+refuse_not_char_boundary	outcome	Refused
+refuse_not_char_boundary	refusal	NotCharBoundary
+
+# ---- 12. 计划期拒绝：补丁数量预算 ----
+refuse_budget_patch	scenario	plan
+refuse_budget_patch	command	Replace
+refuse_budget_patch	mode	Source
+refuse_budget_patch	source	"alpha beta\n"
+refuse_budget_patch	selection_anchor	0
+refuse_budget_patch	selection_head	0
+refuse_budget_patch	edit.0.range	6..10
+refuse_budget_patch	edit.0.expected	"beta"
+refuse_budget_patch	edit.0.replacement	"gamma"
+refuse_budget_patch	budget.patches	0
+refuse_budget_patch	outcome	Refused
+refuse_budget_patch	refusal	BudgetExceeded
+refuse_budget_patch	budget_kind	PatchCount
+
+# ---- 13. 计划期拒绝：源码读取字节预算 ----
+# beta 4 字节 > text budget 1
+refuse_budget_text	scenario	plan
+refuse_budget_text	command	Replace
+refuse_budget_text	mode	Source
+refuse_budget_text	source	"alpha beta\n"
+refuse_budget_text	selection_anchor	0
+refuse_budget_text	selection_head	0
+refuse_budget_text	edit.0.range	6..10
+refuse_budget_text	edit.0.expected	"beta"
+refuse_budget_text	edit.0.replacement	"gamma"
+refuse_budget_text	budget.text	1
+refuse_budget_text	outcome	Refused
+refuse_budget_text	refusal	BudgetExceeded
+refuse_budget_text	budget_kind	SourceBytes
+
+# ---- 14. 计划期拒绝：候选解复读预算 ----
+# parse.max_source_bytes=0 使候选解析在读取源码前失败
+refuse_budget_parse	scenario	plan
+refuse_budget_parse	command	Replace
+refuse_budget_parse	mode	Source
+refuse_budget_parse	source	"alpha beta\n"
+refuse_budget_parse	selection_anchor	0
+refuse_budget_parse	selection_head	0
+refuse_budget_parse	edit.0.range	6..10
+refuse_budget_parse	edit.0.expected	"beta"
+refuse_budget_parse	edit.0.replacement	"gamma"
+refuse_budget_parse	budget.parse_source	0
+refuse_budget_parse	outcome	Refused
+refuse_budget_parse	refusal	BudgetExceeded
+refuse_budget_parse	budget_kind	Parse
+
+# ---- 15. 最小反例：可见文字仍为 x，但隐藏链接目标丢失 ----
+# "[x](https://e)\n" len 15：隐藏 "[" 0..1，Exact x 1..2，隐藏 "](https://e)\n" 2..15
+# Visual 替换 0..14 为 "[x]" -> "[x]\n"；候选可见仍为 x，但隐藏语义从
+# ["[", "](https://e)"] 变为 ["[", "]"]，必须先于可见文本比较拒绝。
+refuse_hidden_link_target_lost	scenario	plan
+refuse_hidden_link_target_lost	command	Replace
+refuse_hidden_link_target_lost	mode	Visual
+refuse_hidden_link_target_lost	source	"[x](https://e)\n"
+refuse_hidden_link_target_lost	selection_anchor	15
+refuse_hidden_link_target_lost	selection_head	15
+refuse_hidden_link_target_lost	edit.0.range	0..14
+refuse_hidden_link_target_lost	edit.0.expected	"[x](https://e)"
+refuse_hidden_link_target_lost	edit.0.replacement	"[x]"
+refuse_hidden_link_target_lost	outcome	Refused
+refuse_hidden_link_target_lost	refusal	RereadFailed
+refuse_hidden_link_target_lost	reread_failure	HiddenSourceChanged
+
+# ---- 16. 命令预期可见文本不符：&amp; 渲染为 & ----
+# alpha\n len 6，0..5 替换为 &amp;；候选可见 &，命令预期字面 &amp;
+refuse_visible_text_changed	scenario	plan
+refuse_visible_text_changed	command	Replace
+refuse_visible_text_changed	mode	Visual
+refuse_visible_text_changed	source	"alpha\n"
+refuse_visible_text_changed	selection_anchor	0
+refuse_visible_text_changed	selection_head	5
+refuse_visible_text_changed	edit.0.range	0..5
+refuse_visible_text_changed	edit.0.expected	"alpha"
+refuse_visible_text_changed	edit.0.replacement	"&amp;"
+refuse_visible_text_changed	outcome	Refused
+refuse_visible_text_changed	refusal	RereadFailed
+refuse_visible_text_changed	reread_failure	VisibleTextChanged
+
+# ---- 17. 行内格式触及 HTML 边界拒绝 ----
+# a0 ' '1 <2 b3 >4 x5 <6 /7 b8 >9 ' '10 c11 \n12；len 13
+# HTML 保护 2..5 与 6..10，x 5..6 有 HTML 样式；选区/格式范围 5..6 触及 2..5 的右端
+refuse_format_html	scenario	plan
+refuse_format_html	command	ToggleInlineFormat
+refuse_format_html	mode	Visual
+refuse_format_html	source	"a <b>x</b> c\n"
+refuse_format_html	selection_anchor	5
+refuse_format_html	selection_head	6
+refuse_format_html	range	5..6
+refuse_format_html	format	Strong
+refuse_format_html	outcome	Refused
+refuse_format_html	refusal	HtmlBoundary
+
+# ---- 18. Visual 修改脚注引用拒绝 ----
+# text 0..4，[^1] 4..8，' '8，more 9..13，\n13，空行 14，[^1]: note 15..25，\n25；len 26
+refuse_visual_footnote	scenario	plan
+refuse_visual_footnote	command	Replace
+refuse_visual_footnote	mode	Visual
+refuse_visual_footnote	source	"text[^1] more\n\n[^1]: note\n"
+refuse_visual_footnote	selection_anchor	4
+refuse_visual_footnote	selection_head	8
+refuse_visual_footnote	edit.0.range	4..8
+refuse_visual_footnote	edit.0.expected	"[^1]"
+refuse_visual_footnote	edit.0.replacement	"X"
+refuse_visual_footnote	outcome	Refused
+refuse_visual_footnote	refusal	ProtectedRange
+refuse_visual_footnote	protection	FootnoteReference
+
+# ---- 19. Source 模式允许改脚注原文 ----
+allow_source_footnote	scenario	plan
+allow_source_footnote	command	Replace
+allow_source_footnote	mode	Source
+allow_source_footnote	source	"text[^1] more\n\n[^1]: note\n"
+allow_source_footnote	selection_anchor	4
+allow_source_footnote	selection_head	8
+allow_source_footnote	edit.0.range	4..8
+allow_source_footnote	edit.0.expected	"[^1]"
+allow_source_footnote	edit.0.replacement	"[^2]"
+allow_source_footnote	outcome	Changed
+allow_source_footnote	reason	SourceReplace
+allow_source_footnote	patch.0.range	4..8
+allow_source_footnote	patch.0.replacement	"[^2]"
+allow_source_footnote	target_anchor	7
+allow_source_footnote	target_head	7
+allow_source_footnote	preview	"text[^2] morenote"
+
+# ---- 20. Source 模式允许改 HTML 原文 ----
+allow_source_html_raw	scenario	plan
+allow_source_html_raw	command	Replace
+allow_source_html_raw	mode	Source
+allow_source_html_raw	source	"a <b>x</b> c\n"
+allow_source_html_raw	selection_anchor	5
+allow_source_html_raw	selection_head	6
+allow_source_html_raw	edit.0.range	5..6
+allow_source_html_raw	edit.0.expected	"x"
+allow_source_html_raw	edit.0.replacement	"y"
+allow_source_html_raw	outcome	Changed
+allow_source_html_raw	reason	SourceReplace
+allow_source_html_raw	patch.0.range	5..6
+allow_source_html_raw	patch.0.replacement	"y"
+allow_source_html_raw	target_anchor	6
+allow_source_html_raw	target_head	6
+allow_source_html_raw	preview	"a y c"
+
+# ---- 21. Visual 模式允许修改脚注旁普通正文 ----
+# before 0..6，"before " 0..7，[^1] 7..11，... 定义 19..29；len 30
+# 0..6 只覆盖 before，不触及 7..11 保护；隐藏语义均为空白/定义前缀，候选不变
+allow_visual_body_beside_footnote	scenario	plan
+allow_visual_body_beside_footnote	command	Replace
+allow_visual_body_beside_footnote	mode	Visual
+allow_visual_body_beside_footnote	source	"before [^1] after\n\n[^1]: note\n"
+allow_visual_body_beside_footnote	selection_anchor	0
+allow_visual_body_beside_footnote	selection_head	6
+allow_visual_body_beside_footnote	edit.0.range	0..6
+allow_visual_body_beside_footnote	edit.0.expected	"before"
+allow_visual_body_beside_footnote	edit.0.replacement	"BEFORE"
+allow_visual_body_beside_footnote	outcome	Changed
+allow_visual_body_beside_footnote	reason	VisibleReplace
+allow_visual_body_beside_footnote	patch.0.range	0..6
+allow_visual_body_beside_footnote	patch.0.replacement	"BEFORE"
+allow_visual_body_beside_footnote	target_anchor	6
+allow_visual_body_beside_footnote	target_head	6
+allow_visual_body_beside_footnote	preview	"BEFORE [^1] afternote"
+
+# ---- 22. 跨块格式被重新解析拒绝 ----
+# a\n\nb\n：a0 \n1 \n2 b3 \n4；范围 0..4 跨两个段落
+# 候选 **a\n\nb**\n 未形成强调，可见绘制变为 **ab**，与预期 ab 不符
+refuse_format_across_blocks	scenario	plan
+refuse_format_across_blocks	command	ToggleInlineFormat
+refuse_format_across_blocks	mode	Visual
+refuse_format_across_blocks	source	"a\n\nb\n"
+refuse_format_across_blocks	selection_anchor	0
+refuse_format_across_blocks	selection_head	4
+refuse_format_across_blocks	range	0..4
+refuse_format_across_blocks	format	Strong
+refuse_format_across_blocks	outcome	Refused
+refuse_format_across_blocks	refusal	RereadFailed
+refuse_format_across_blocks	reread_failure	VisibleTextChanged
+
+# ---- 23. Source 模式不允许格式命令 ----
+refuse_format_from_source	scenario	plan
+refuse_format_from_source	command	ToggleInlineFormat
+refuse_format_from_source	mode	Source
+refuse_format_from_source	source	"alpha beta\n"
+refuse_format_from_source	selection_anchor	6
+refuse_format_from_source	selection_head	10
+refuse_format_from_source	range	6..10
+refuse_format_from_source	format	Strong
+refuse_format_from_source	outcome	Refused
+refuse_format_from_source	refusal	WrongMode
+
+# ---- 24. 空选区格式拒绝 ----
+refuse_empty_selection	scenario	plan
+refuse_empty_selection	command	ToggleInlineFormat
+refuse_empty_selection	mode	Visual
+refuse_empty_selection	source	"alpha beta\n"
+refuse_empty_selection	selection_anchor	6
+refuse_empty_selection	selection_head	6
+refuse_empty_selection	range	6..6
+refuse_empty_selection	format	Strong
+refuse_empty_selection	outcome	Refused
+refuse_empty_selection	refusal	EmptySelection
+
+# ---- 25. 待定输入 / 组合输入：预检不得结束分组或清空状态 ----
+refuse_pending_input	scenario	plan
+refuse_pending_input	command	Replace
+refuse_pending_input	mode	Source
+refuse_pending_input	source	"alpha beta\n"
+refuse_pending_input	selection_anchor	0
+refuse_pending_input	selection_head	0
+refuse_pending_input	edit.0.range	6..10
+refuse_pending_input	edit.0.expected	"beta"
+refuse_pending_input	edit.0.replacement	"gamma"
+refuse_pending_input	pending	true
+refuse_pending_input	outcome	Refused
+refuse_pending_input	refusal	PendingInput
+
+refuse_composition	scenario	plan
+refuse_composition	command	Replace
+refuse_composition	mode	Source
+refuse_composition	source	"alpha beta\n"
+refuse_composition	selection_anchor	0
+refuse_composition	selection_head	0
+refuse_composition	edit.0.range	6..10
+refuse_composition	edit.0.expected	"beta"
+refuse_composition	edit.0.replacement	"gamma"
+refuse_composition	composition	true
+refuse_composition	outcome	Refused
+refuse_composition	refusal	CompositionActive
+
+# ---- 26. 校验期拒绝：计划生成后工作版本已变化 ----
+# 计划按 alpha beta\n revision 0 生成；随后在 0 处插入 X -> revision 1
+# 旧计划必须返回 WrongVersion，不能把旧 6..10 范围套到新文本
+refuse_wrong_version	scenario	validate_after_change
+refuse_wrong_version	base_case	source_replace_single
+refuse_wrong_version	change_range	0..0
+refuse_wrong_version	change_replacement	"X"
+refuse_wrong_version	outcome	Refused
+refuse_wrong_version	refusal	WrongVersion
+
+# ---- 27. 校验期拒绝：同一快照重新解析得到新投影 ----
+refuse_wrong_projection	scenario	validate_reparsed
+refuse_wrong_projection	base_case	source_replace_single
+refuse_wrong_projection	outcome	Refused
+refuse_wrong_projection	refusal	ProjectionMismatch
+
+# ---- 28. 校验期拒绝：计划绑定选区已变化 ----
+refuse_wrong_selection	scenario	validate_changed_selection
+refuse_wrong_selection	base_case	source_replace_single
+refuse_wrong_selection	new_selection_anchor	0
+refuse_wrong_selection	new_selection_head	0
+refuse_wrong_selection	outcome	Refused
+refuse_wrong_selection	refusal	SelectionMismatch
+
+# ---- 29. 实例消费：Changed 计划交回 StringBuffer 只产生 1 个历史节点 ----
+# 三补丁批次必须作为单个 OperationSource::Command 原子发布；undo 一次恢复原文
+consume_batch_single_history_step	scenario	consume_plan
+consume_batch_single_history_step	base_case	source_batch_three
+consume_batch_single_history_step	expected_history_nodes	1
+consume_batch_single_history_step	expected_undo_depth	1
+consume_batch_single_history_step	expected_text	"one two three\n"

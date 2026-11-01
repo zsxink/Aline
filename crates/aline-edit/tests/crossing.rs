@@ -236,7 +236,7 @@ fn crossing_golden_cases() -> TestResult {
     let mut count = 0usize;
     for (line_number, line) in include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../docs/validation/m0-engine-foundation/remediation/R08/run-1/goldens/edit-goldens.tsv"
+        "/tests/fixtures/edit-goldens-r08.tsv"
     ))
     .lines()
     .enumerate()

@@ -74,7 +74,7 @@ def execute(argv, directory, output, label, env):
 
 def run(output):
     output.mkdir(parents=True, exist_ok=True)
-    isolation = json.loads((ROOT / 'docs/validation/m0-engine-foundation/admission-2026-10-30/isolation.json').read_text())
+    isolation = json.loads((ROOT / 'scripts/fixtures/isolation.json').read_text())
     isolated_home = resolve_path(isolation['cargo_home']) or isolation['cargo_home']
     if not Path(isolated_home).is_dir():
         raise ValueError('登记的隔离 Cargo 缓存不存在: ' + isolated_home)

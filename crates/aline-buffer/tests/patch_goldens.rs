@@ -8,12 +8,8 @@ use aline_buffer::{
     OperationSource, PatchBudget, SelectionSpec, StringBuffer, TextBudget,
 };
 
-const FORWARD_GOLDENS: &str = include_str!(
-    "../../../docs/validation/m0-engine-foundation/group-5/step-5.1/goldens/forward-inverse.tsv"
-);
-const LINE_GOLDENS: &str = include_str!(
-    "../../../docs/validation/m0-engine-foundation/group-5/step-5.1/goldens/line-index.tsv"
-);
+const FORWARD_GOLDENS: &str = include_str!("fixtures/forward-inverse.tsv");
+const LINE_GOLDENS: &str = include_str!("fixtures/line-index.tsv");
 
 const TEXT_BUDGET: usize = 4096;
 const PATCH_BUDGET: usize = 64;

@@ -115,9 +115,7 @@ fn assert_invalid(failure: &AtomicFailure, expected: InvalidInput) -> TestResult
 
 #[test]
 fn atomic_golden_publish_new_and_existing_target_match_independent_expectation() -> TestResult {
-    let golden = include_str!(
-        "../../../docs/validation/m0-engine-foundation/group-4/step-4.4/atomic-golden.v1.txt"
-    );
+    let golden = include_str!("fixtures/atomic-golden.v1.txt");
     let mut cases = 0usize;
     for line in golden
         .lines()

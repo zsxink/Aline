@@ -1,6 +1,6 @@
 //! 组 6.3 / 9.3：E3 同夹具可审查 dump —— 绘制文字、逐片段来源、精确性与源码身份。
 //!
-//! 期望来源：`docs/validation/m0-engine-foundation/remediation/R09/run-1/basic.dump.expected.txt`
+//! 期望来源：`tests/fixtures/m0/basic.dump.expected.txt`（推导过程见同目录 `derivation.md`）
 //! 与本文下方的常量表，均由 `tests/fixtures/m0/basic.md` 的原始字节、pulldown-cmark
 //! 的 offset 事件区间与 M0 映射规则**手写推导**得到（推导过程见同目录 `derivation.md`），
 //! 不是把实现输出复制成期望。手写推导与实现不符时先判缺陷归属，不得改实现掩盖。
@@ -14,9 +14,7 @@ use aline_markdown::{MappingPrecision, ParseBudget, ParseConfig, Parsed, parse};
 const BUDGET: usize = 1024 * 1024;
 
 /// 手写推导的完整期望 dump（逐行、逐片段）。
-const EXPECTED_DUMP: &str = include_str!(
-    "../../../docs/validation/m0-engine-foundation/remediation/R09/run-1/basic.dump.expected.txt"
-);
+const EXPECTED_DUMP: &str = include_str!("fixtures/m0/basic.dump.expected.txt");
 
 /// 手写推导的绘制文字：源标记隐藏后剩下的可见文字，表格单元格之间以 tab 分隔。
 const EXPECTED_DRAWN: &str = "标题段落 粗体 与 斜体、code、链接、删除。引用项目fn main() { let x = \"字面 **不解析**\"; }\n列\t值\t甲\t1脚注引用[^1]。脚注内容$$\nE = mc^2\n$$:smile: 末尾无换行";

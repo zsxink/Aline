@@ -348,7 +348,7 @@ def self_test(output):
 
     期望先于实现手写；夹具只写受控临时目录，不写入仓库受跟踪路径。
     """
-    fixtures = ROOT / 'docs/validation/m0-engine-foundation/group-2/safety-fixtures'
+    fixtures = ROOT / 'scripts/fixtures/safety'
     cases = json.loads((fixtures / 'cases.json').read_text())
     output.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix='aline-safety-self-test-'))
@@ -543,7 +543,7 @@ def main():
     parser.add_argument('--file', type=Path)
     parser.add_argument('--kind', choices=['engine-production', 'engine-test', 'ui', 'ui-production', 'ui-test'], default='engine-production')
     parser.add_argument('--self-test', action='store_true')
-    parser.add_argument('--output-dir', type=Path, default=ROOT / 'docs/validation/m0-engine-foundation/group-2/safety-results')
+    parser.add_argument('--output-dir', type=Path, default=ROOT / 'logs/validation/safety-results')
     args = parser.parse_args()
     try:
         if args.self_test:
