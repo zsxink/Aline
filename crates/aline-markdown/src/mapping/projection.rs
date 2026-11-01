@@ -74,6 +74,18 @@ pub enum MappingPrecision {
     Synthetic,
 }
 
+impl MappingPrecision {
+    /// 返回稳定 dump 名称；只用于无头审查输出，不构成映射语义。
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Exact => "Exact",
+            Self::Aligned => "Aligned",
+            Self::Hidden => "Hidden",
+            Self::Synthetic => "Synthetic",
+        }
+    }
+}
+
 /// 一个绘制片段到源码片段的受检关系；片段可精确、对齐、隐藏或合成。
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MappingSegment {

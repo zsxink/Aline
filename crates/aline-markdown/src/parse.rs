@@ -137,6 +137,28 @@ impl Parsed {
     pub fn dump_tree(&self) -> String {
         format!("{self}")
     }
+
+    /// 返回源码原始字节的 FNV-1a 64 摘要，供 dump 标识「这一份源码」。
+    ///
+    /// 算法是手写的 Fowler–Noll–Vo 1a：以 `0xcbf29ce484222325` 为初值，逐字节
+    /// `hash ^= byte` 后乘以素数 `0x100000001b3`（64 位环绕）。它**不是密码学哈希**，
+    /// 只用于把「来源映射错误但块范围与总长度相同」的情况在 dump 里区分开；碰撞可能
+    /// 存在，不得用于安全判定或去重裁决。
+    ///
+    /// 读取走 `iter_chunks()`，不物化全文、不注入新预算；底层表示异常时返回 `None`，
+    /// dump 打印 `unavailable` 而不是静默给一个假摘要。
+    fn source_identity(&self) -> Option<u64> {
+        const OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
+        const PRIME: u64 = 0x0000_0100_0000_01b3;
+        let mut hash = OFFSET_BASIS;
+        for chunk in self.snapshot.iter_chunks().ok()? {
+            for byte in chunk.as_bytes() {
+                hash ^= u64::from(*byte);
+                hash = hash.wrapping_mul(PRIME);
+            }
+        }
+        Some(hash)
+    }
 }
 
 impl fmt::Display for Parsed {
@@ -147,8 +169,42 @@ impl fmt::Display for Parsed {
             self.config.version(),
             self.config.features().bits()
         )?;
-        writeln!(formatter, "source {}", self.snapshot.len_bytes())?;
-        writeln!(formatter, "drawn {}", self.projection.drawn_text().len())?;
+        // 既有前缀 `source <len>` / `drawn <len>` 保持不变（外部测试按前缀匹配），
+        // 其后追加身份与绘制文字本体，使「范围/长度相同但来源不同」可被人工审查发现。
+        match self.source_identity() {
+            Some(hash) => writeln!(
+                formatter,
+                "source {} identity fnv1a64 0x{hash:016x} revision {}",
+                self.snapshot.len_bytes(),
+                self.snapshot.revision().value()
+            )?,
+            None => writeln!(
+                formatter,
+                "source {} identity fnv1a64 unavailable revision {}",
+                self.snapshot.len_bytes(),
+                self.snapshot.revision().value()
+            )?,
+        }
+        writeln!(
+            formatter,
+            "drawn {} text {:?}",
+            self.projection.drawn_text().len(),
+            self.projection.drawn_text()
+        )?;
+        // 逐片段行按绘制起点升序，覆盖 `projection().segments()` 全部片段，不省略、不合并。
+        for segment in self.projection.segments() {
+            let drawn = segment.drawn_range();
+            let source = segment.source_range().byte_range();
+            writeln!(
+                formatter,
+                "segment {}..{} -> {}..{} {}",
+                drawn.start,
+                drawn.end,
+                source.start,
+                source.end,
+                segment.precision().as_str()
+            )?;
+        }
         let mut entries: Vec<(usize, String)> = Vec::new();
         for block in &self.blocks {
             let range = block.range().byte_range();
