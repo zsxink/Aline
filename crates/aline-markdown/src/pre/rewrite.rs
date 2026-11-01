@@ -183,24 +183,143 @@ impl RewriteMap {
     }
 
     /// 组合两层映射：next 把第二副本映射到第一副本，self 把第一副本映射回源码。
+    ///
+    /// 复合按两层片段边界求交，保留第一层每一片（含空区间锚点）的来源，不再对整段
+    /// 调用会并集化的 [`RewriteMap::to_source`]。空区间配对规则显式如下：
+    ///
+    /// - 第一层 `rewritten` 为空的隐藏片段：其锚点落在第二层哪个片段，就随该片段
+    ///   投影到第二副本的对应点；未被第二层覆盖则丢弃。
+    /// - 第二层 `source` 为空的合成片段：锚定到第一层片段在源码中的对应点，
+    ///   合成内容不伪造非空来源。
+    /// - 第二层片段非 `Exact` 且 `rewritten` 非空时，第二层无法表达逐字节对应，
+    ///   该片段内部的交集合并为一片：来源取并集，精确性取较强者。
+    /// - 第二层 `rewritten` 为空（隐藏片段）时，逐片保留第一层来源，不合并。
     pub fn compose(&self, next: &RewriteMap) -> Result<RewriteMap, RewriteError> {
         let mut segments = Vec::new();
         segments
-            .try_reserve(next.segments.len())
+            .try_reserve(next.segments.len().saturating_add(self.segments.len()))
             .map_err(RewriteError::Allocation)?;
-        for segment in &next.segments {
-            let mapped = self.to_source(segment.source.clone())?;
-            let precision = combine_precision(mapped.precision, segment.precision);
-            segments.push(RewriteSegment {
-                source: mapped.source,
-                rewritten: segment.rewritten.clone(),
-                precision,
-            });
+        for (index, next_segment) in next.segments.iter().enumerate() {
+            let middle = next_segment.source.clone();
+            if middle.start > middle.end || middle.end > self.rewritten_len {
+                return Err(RewriteError::InvalidRange);
+            }
+            if middle.is_empty() {
+                let (source, precision) = self.middle_anchor(middle.start)?;
+                segments.push(RewriteSegment {
+                    source,
+                    rewritten: next_segment.rewritten.clone(),
+                    precision: combine_precision(precision, next_segment.precision),
+                });
+                continue;
+            }
+            // 每片携带排序键：重写起点、锚点/内容次序、第一层边界点。
+            let mut pieces: Vec<(usize, u8, usize, RewriteSegment)> = Vec::new();
+            pieces
+                .try_reserve(self.segments.len().saturating_add(1))
+                .map_err(RewriteError::Allocation)?;
+            // 非 Exact 第二层片段的合并结果：源码起点、源码终点、精确性、重写起点。
+            let mut merged: Option<(usize, usize, MappingPrecision, usize)> = None;
+            let mut intersected = false;
+            for segment in &self.segments {
+                if segment.rewritten.is_empty() {
+                    let point = segment.rewritten.start;
+                    if middle_owner(&next.segments, point) == Some(index) {
+                        let rewritten = rewritten_point(next_segment, &middle, point)?;
+                        pieces.push((
+                            rewritten,
+                            0,
+                            point,
+                            RewriteSegment {
+                                source: segment.source.clone(),
+                                rewritten: rewritten..rewritten,
+                                precision: combine_precision(
+                                    segment.precision,
+                                    next_segment.precision,
+                                ),
+                            },
+                        ));
+                    }
+                    continue;
+                }
+                let start = segment.rewritten.start.max(middle.start);
+                let end = segment.rewritten.end.min(middle.end);
+                if start >= end {
+                    continue;
+                }
+                intersected = true;
+                let source = project_source(segment, start, end)?;
+                let precision = combine_precision(segment.precision, next_segment.precision);
+                if next_segment.precision == MappingPrecision::Exact
+                    || next_segment.rewritten.is_empty()
+                {
+                    let rewritten = project_rewritten(next_segment, start, end)?;
+                    pieces.push((
+                        rewritten.start,
+                        1,
+                        start,
+                        RewriteSegment {
+                            source,
+                            rewritten,
+                            precision,
+                        },
+                    ));
+                } else {
+                    // 非 Exact 的第二层片段无法表达逐字节对应，合并为一片。
+                    let rewritten = project_rewritten(next_segment, start, end)?;
+                    merged = Some(match merged {
+                        Some((merged_start, merged_end, merged_precision, merged_rewritten)) => (
+                            merged_start.min(source.start),
+                            merged_end.max(source.end),
+                            combine_precision(merged_precision, precision),
+                            merged_rewritten.min(rewritten.start),
+                        ),
+                        None => (source.start, source.end, precision, rewritten.start),
+                    });
+                }
+            }
+            if !intersected {
+                return Err(RewriteError::Unmapped);
+            }
+            if let Some((start, end, precision, rewritten_start)) = merged {
+                pieces.push((
+                    rewritten_start,
+                    1,
+                    middle.start,
+                    RewriteSegment {
+                        source: start..end,
+                        rewritten: next_segment.rewritten.clone(),
+                        precision,
+                    },
+                ));
+            }
+            pieces.sort_by_key(|(rewritten, rank, point, _)| (*rewritten, *rank, *point));
+            segments.extend(pieces.into_iter().map(|(_, _, _, segment)| segment));
         }
         Ok(RewriteMap {
             segments,
             rewritten_len: next.rewritten_len,
         })
+    }
+
+    /// 空来源片段锚定到第一层片段；优先取包含该点的片段，否则取在其结束点的片段。
+    fn middle_anchor(
+        &self,
+        point: usize,
+    ) -> Result<(Range<usize>, MappingPrecision), RewriteError> {
+        let mut fallback: Option<&RewriteSegment> = None;
+        for segment in &self.segments {
+            if segment.rewritten.start <= point && point < segment.rewritten.end {
+                return Ok((source_point(segment, point)?, segment.precision));
+            }
+            if segment.rewritten.end == point {
+                fallback = Some(segment);
+            }
+        }
+        match fallback {
+            Some(segment) => Ok((source_point(segment, point)?, segment.precision)),
+            None => Err(RewriteError::Unmapped),
+        }
     }
 
     fn anchor_to_source(&self, offset: usize) -> Result<RewriteSource, RewriteError> {
@@ -453,6 +572,139 @@ pub fn rewrite_front_matter_with_cancel(
     rewrite.front_matter = detected;
     rewrite.stripped_bom = bom;
     Ok(rewrite)
+}
+
+/// 返回第一副本偏移点所属的第二层片段序号；`Exact` 片段按平移取内部点。
+///
+/// 第二层片段来源区间按顺序不重叠，因此点归属唯一：优先取包含该点的非空来源片段，
+/// 否则取在该点结束的片段。
+fn middle_owner(segments: &[RewriteSegment], point: usize) -> Option<usize> {
+    let mut fallback = None;
+    for (index, segment) in segments.iter().enumerate() {
+        let source = &segment.source;
+        if source.start <= point && point < source.end {
+            return Some(index);
+        }
+        if source.end == point {
+            fallback = Some(index);
+        }
+    }
+    fallback
+}
+
+/// 把第一副本的某个源码点投影到第二副本。
+///
+/// `Exact` 片段逐字节平移；非 `Exact` 片段只能取端点：点位于片段起点时取
+/// `rewritten.start`（锚点在前），否则取 `rewritten.end`（锚点在后），保持
+/// 隐藏来源与相邻内容的先后关系。
+fn rewritten_point(
+    segment: &RewriteSegment,
+    middle: &Range<usize>,
+    point: usize,
+) -> Result<usize, RewriteError> {
+    match segment.precision {
+        MappingPrecision::Exact => {
+            let delta = point
+                .checked_sub(segment.source.start)
+                .ok_or(RewriteError::LengthOverflow)?;
+            segment
+                .rewritten
+                .start
+                .checked_add(delta)
+                .ok_or(RewriteError::LengthOverflow)
+        }
+        MappingPrecision::Aligned | MappingPrecision::Hidden | MappingPrecision::Synthetic => {
+            if point == middle.start {
+                Ok(segment.rewritten.start)
+            } else {
+                Ok(segment.rewritten.end)
+            }
+        }
+    }
+}
+
+/// 把第一副本的源码点投影回源码锚点；`Exact` 平移，其余取片段来源区间。
+fn source_point(segment: &RewriteSegment, point: usize) -> Result<Range<usize>, RewriteError> {
+    match segment.precision {
+        MappingPrecision::Exact => {
+            let delta = point
+                .checked_sub(segment.rewritten.start)
+                .ok_or(RewriteError::LengthOverflow)?;
+            let start = segment
+                .source
+                .start
+                .checked_add(delta)
+                .ok_or(RewriteError::LengthOverflow)?;
+            Ok(start..start)
+        }
+        MappingPrecision::Aligned | MappingPrecision::Hidden | MappingPrecision::Synthetic => {
+            Ok(segment.source.clone())
+        }
+    }
+}
+
+/// 取第一层片段与交集的源码范围；`Exact` 逐字节平移，其余取整段来源。
+fn project_source(
+    segment: &RewriteSegment,
+    start: usize,
+    end: usize,
+) -> Result<Range<usize>, RewriteError> {
+    match segment.precision {
+        MappingPrecision::Exact => {
+            let delta_start = start
+                .checked_sub(segment.rewritten.start)
+                .ok_or(RewriteError::LengthOverflow)?;
+            let delta_end = end
+                .checked_sub(segment.rewritten.start)
+                .ok_or(RewriteError::LengthOverflow)?;
+            let source_start = segment
+                .source
+                .start
+                .checked_add(delta_start)
+                .ok_or(RewriteError::LengthOverflow)?;
+            let source_end = segment
+                .source
+                .start
+                .checked_add(delta_end)
+                .ok_or(RewriteError::LengthOverflow)?;
+            Ok(source_start..source_end)
+        }
+        MappingPrecision::Aligned | MappingPrecision::Hidden | MappingPrecision::Synthetic => {
+            Ok(segment.source.clone())
+        }
+    }
+}
+
+/// 取第二层片段与交集的重写范围；`Exact` 逐字节平移，其余整段无法细分。
+fn project_rewritten(
+    segment: &RewriteSegment,
+    start: usize,
+    end: usize,
+) -> Result<Range<usize>, RewriteError> {
+    match segment.precision {
+        MappingPrecision::Exact => {
+            let delta_start = start
+                .checked_sub(segment.source.start)
+                .ok_or(RewriteError::LengthOverflow)?;
+            let delta_end = end
+                .checked_sub(segment.source.start)
+                .ok_or(RewriteError::LengthOverflow)?;
+            let rewritten_start = segment
+                .rewritten
+                .start
+                .checked_add(delta_start)
+                .ok_or(RewriteError::LengthOverflow)?;
+            let rewritten_end = segment
+                .rewritten
+                .start
+                .checked_add(delta_end)
+                .ok_or(RewriteError::LengthOverflow)?;
+            Ok(rewritten_start..rewritten_end)
+        }
+        MappingPrecision::Aligned | MappingPrecision::Hidden | MappingPrecision::Synthetic => {
+            Ok(segment.rewritten.clone())
+        }
+    }
 }
 
 fn combine_precision(left: MappingPrecision, right: MappingPrecision) -> MappingPrecision {
