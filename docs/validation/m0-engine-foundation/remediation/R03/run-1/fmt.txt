@@ -1,0 +1,56 @@
+Diff in /Users/xian/Project/editor/Aline/crates/aline-markdown/src/reuse.rs:148:
+         let delta = old_byte
+             .checked_sub(old_bytes.start)
+             .ok_or(ReuseTranslateError::OutsideOldBlock)?;
+[31m-        let new_byte = self
+(B[m[31m-            .new_range
+(B[m[31m-            .byte_range()
+(B[m[31m-            .start
+(B[m[31m-            .checked_add(delta)
+(B[m[31m-            .ok_or(ReuseTranslateError::InvalidNewOffset(
+(B[m[31m-                BufferError::LengthOverflow,
+(B[m[31m-            ))?;
+(B[m[32m+        let new_byte = self.new_range.byte_range().start.checked_add(delta).ok_or(
+(B[m[32m+            ReuseTranslateError::InvalidNewOffset(BufferError::LengthOverflow),
+(B[m[32m+        )?;
+(B[m         new_snapshot
+             .src_offset(new_byte)
+             .map_err(ReuseTranslateError::InvalidNewOffset)
+Diff in /Users/xian/Project/editor/Aline/crates/aline-markdown/tests/reuse.rs:41:
+     // 块起点必须是合法正例，说明配对本身可用。
+     let start = old.src_offset(pair.old_range().byte_range().start)?;
+     let translated = pair.translate(&new, &start)?;
+[31m-    assert_eq!(translated.byte_offset(), pair.new_range().byte_range().start);
+(B[m[32m+    assert_eq!(
+(B[m[32m+        translated.byte_offset(),
+(B[m[32m+        pair.new_range().byte_range().start
+(B[m[32m+    );
+(B[m     // 旧 API 会把端点 1 静默算成新端点 4；受检入口没有这个通道：
+     // 端点 1 根本无法作为 SrcOffset 存在，因此不存在可传入的非法端点。
+     assert!(
+Diff in /Users/xian/Project/editor/Aline/crates/aline-markdown/tests/reuse.rs:71:
+     let ok = pair.translate(new.snapshot(), &old_start(old.snapshot(), pair)?)?;
+     assert_eq!(ok.byte_offset(), pair.new_range().byte_range().start);
+     // 用另一快照的同值端点喂进去，必须报错旧快照。
+[31m-    let foreign = other.snapshot().src_offset(pair.old_range().byte_range().start)?;
+(B[m[32m+    let foreign = other
+(B[m[32m+        .snapshot()
+(B[m[32m+        .src_offset(pair.old_range().byte_range().start)?;
+(B[m     assert!(matches!(
+         pair.translate(new.snapshot(), &foreign),
+         Err(ReuseTranslateError::WrongOldSnapshot)
+Diff in /Users/xian/Project/editor/Aline/crates/aline-markdown/tests/reuse.rs:650:
+             pair.old_index(),
+             pair.new_index()
+         );
+[31m-        let old_start = old.snapshot().src_offset(pair.old_range().byte_range().start)?;
+(B[m[31m-        let old_end = old.snapshot().src_offset(pair.old_range().byte_range().end)?;
+(B[m[32m+        let old_start = old
+(B[m[32m+            .snapshot()
+(B[m[32m+            .src_offset(pair.old_range().byte_range().start)?;
+(B[m[32m+        let old_end = old
+(B[m[32m+            .snapshot()
+(B[m[32m+            .src_offset(pair.old_range().byte_range().end)?;
+(B[m         assert_eq!(
+             pair.translate(new.snapshot(), &old_start)?.byte_offset(),
+             pair.new_range().byte_range().start

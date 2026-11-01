@@ -1,0 +1,40 @@
+argv: cargo test -p aline-markdown --locked --offline
+cwd: /Users/xian/Project/editor/Aline
+started_utc: 2026-11-01T05:02:22Z
+finished_utc: 2026-11-01T05:02:29Z
+exit_code: 0
+argv: cargo clippy -p aline-markdown --all-targets --locked --offline -- -D warnings
+cwd: /Users/xian/Project/editor/Aline
+started_utc: 2026-11-01T05:02:34Z
+finished_utc: 2026-11-01T05:02:35Z
+exit_code: 0
+argv: cargo fmt -p aline-markdown --check
+cwd: /Users/xian/Project/editor/Aline
+started_utc: 2026-11-01T05:02:39Z
+finished_utc: 2026-11-01T05:02:40Z
+exit_code: 1
+argv: cargo fmt -p aline-markdown
+cwd: /Users/xian/Project/editor/Aline
+started_utc: 2026-11-01T05:02:46Z
+finished_utc: 2026-11-01T05:02:46Z
+exit_code: 0
+argv: cargo fmt -p aline-markdown --check
+cwd: /Users/xian/Project/editor/Aline
+started_utc: 2026-11-01T05:02:46Z
+finished_utc: 2026-11-01T05:02:46Z
+exit_code: 0
+argv: cargo test -p aline-markdown --locked --offline
+cwd: /Users/xian/Project/editor/Aline
+started_utc: 2026-11-01T05:02:51Z
+finished_utc: 2026-11-01T05:02:58Z
+exit_code: 0
+argv: cargo clippy -p aline-markdown --all-targets --locked --offline -- -D warnings
+cwd: /Users/xian/Project/editor/Aline
+started_utc: 2026-11-01T05:03:04Z
+finished_utc: 2026-11-01T05:03:05Z
+exit_code: 0
+argv: python3 scripts/check_public_api.py --output-dir docs/validation/m0-engine-foundation/remediation/R03/run-1/public-api-check
+cwd: /Users/xian/Project/editor/Aline
+started_utc: 2026-11-01T05:03:18Z
+finished_utc: 2026-11-01T05:03:18Z
+exit_code: 1

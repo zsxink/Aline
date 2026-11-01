@@ -1,0 +1,23 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.03s
+     Running tests/reuse.rs (target/debug/deps/reuse-3c12cac10955b4ac)
+
+running 1 test
+test f04_translate_must_reject_half_char_old_offset ... FAILED
+
+failures:
+
+---- f04_translate_must_reject_half_char_old_offset stdout ----
+
+thread 'f04_translate_must_reject_half_char_old_offset' (2912042) panicked at crates/aline-markdown/tests/reuse.rs:39:5:
+assertion `left == right` failed: 旧 API 不得接受本快照非法端点 1
+  left: Some(4)
+ right: None
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    f04_translate_must_reject_half_char_old_offset
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 18 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p aline-markdown --test reuse`

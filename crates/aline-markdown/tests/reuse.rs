@@ -3,10 +3,10 @@
 use std::error::Error;
 use std::ops::Range;
 
-use aline_buffer::{Affinity, BufferError, TextBudget, TextSnapshot};
+use aline_buffer::{Affinity, BufferError, SrcOffset, TextBudget, TextSnapshot};
 use aline_markdown::{
     BlockKind, MappingPrecision, ParseBudget, ParseConfig, Parsed, ProtectionKind, ReuseOutcome,
-    ReuseRefusal, ReusedBlock, TextStyle, parse, reuse,
+    ReuseRefusal, ReuseTranslateError, ReusedBlock, TextStyle, parse, reuse,
 };
 
 const BUDGET: usize = 1024 * 1024;
@@ -22,6 +22,132 @@ fn parse_with(
 
 fn parse_text(text: &str) -> Result<Parsed, Box<dyn Error>> {
     parse_with(text, ParseConfig::m0(), ParseBudget::m0())
+}
+
+#[test]
+fn f04_translate_must_reject_half_char_old_offset() -> Result<(), Box<dyn Error>> {
+    let old = TextSnapshot::new("😀\n".to_string(), TextBudget::new(BUDGET))?;
+    let new = TextSnapshot::new("x\n\n😀\n".to_string(), TextBudget::new(BUDGET))?;
+    let a = parse(&old, ParseConfig::m0(), ParseBudget::m0())?;
+    let b = parse(&new, ParseConfig::m0(), ParseBudget::m0())?;
+    let outcome = reuse(&a, &b);
+    let pair = outcome.reused().first().ok_or("missing reused pair")?;
+    assert!(matches!(
+        old.src_offset(1),
+        Err(BufferError::NotCharBoundary { offset: 1 })
+    ));
+    // 旧端点在旧快照里就是半字符，旧快照本身已拒绝构造它。
+    assert!(old.src_offset(1).is_err(), "端点 1 在旧快照不可构造");
+    // 块起点必须是合法正例，说明配对本身可用。
+    let start = old.src_offset(pair.old_range().byte_range().start)?;
+    let translated = pair.translate(&new, &start)?;
+    assert_eq!(
+        translated.byte_offset(),
+        pair.new_range().byte_range().start
+    );
+    // 旧 API 会把端点 1 静默算成新端点 4；受检入口没有这个通道：
+    // 端点 1 根本无法作为 SrcOffset 存在，因此不存在可传入的非法端点。
+    assert!(
+        old.src_offset(1).is_err(),
+        "受检入口不得存在接受半字符端点的路径"
+    );
+    assert!(matches!(
+        new.src_offset(4),
+        Err(BufferError::NotCharBoundary { offset: 4 })
+    ));
+    Ok(())
+}
+
+/// 用旧快照的块起点构造端点；`src_offset` 越界或半字符会返回错误。
+fn old_start(snapshot: &TextSnapshot, pair: &ReusedBlock) -> Result<SrcOffset, Box<dyn Error>> {
+    Ok(snapshot.src_offset(pair.old_range().byte_range().start)?)
+}
+
+#[test]
+fn translate_rejects_wrong_old_snapshot() -> Result<(), Box<dyn Error>> {
+    let old = parse_text("A\n\nB\n\nC\n")?;
+    let new = parse_text("X\n\nA\n\nB\n\nC\n")?;
+    let other = parse_text("Z\n\nY\n")?;
+    let outcome = reuse(&old, &new);
+    let pair = outcome.reused().first().ok_or("missing pair")?;
+    // 合法正例先确认，确保拒绝来自快照身份而非端点数值。
+    let ok = pair.translate(new.snapshot(), &old_start(old.snapshot(), pair)?)?;
+    assert_eq!(ok.byte_offset(), pair.new_range().byte_range().start);
+    // 用另一快照的同值端点喂进去，必须报错旧快照。
+    let foreign = other
+        .snapshot()
+        .src_offset(pair.old_range().byte_range().start)?;
+    assert!(matches!(
+        pair.translate(new.snapshot(), &foreign),
+        Err(ReuseTranslateError::WrongOldSnapshot)
+    ));
+    Ok(())
+}
+
+#[test]
+fn translate_rejects_wrong_new_snapshot() -> Result<(), Box<dyn Error>> {
+    let old = parse_text("A\n\nB\n\nC\n")?;
+    let new = parse_text("X\n\nA\n\nB\n\nC\n")?;
+    let other = parse_text("Z\n\nY\n")?;
+    let outcome = reuse(&old, &new);
+    let pair = outcome.reused().first().ok_or("missing pair")?;
+    let start = old_start(old.snapshot(), pair)?;
+    assert!(matches!(
+        pair.translate(other.snapshot(), &start),
+        Err(ReuseTranslateError::WrongNewSnapshot)
+    ));
+    Ok(())
+}
+
+#[test]
+fn translate_rejects_outside_old_block() -> Result<(), Box<dyn Error>> {
+    let old = parse_text("A\n\nB\n\nC\n")?;
+    let new = parse_text("X\n\nA\n\nB\n\nC\n")?;
+    let outcome = reuse(&old, &new);
+    let pair = outcome.reused().first().ok_or("missing pair")?;
+    let bytes = pair.old_range().byte_range();
+    // 块起点 0，故没有 start - 1 可测；右端点 +1 与 usize::MAX 都必须被拒。
+    if let Some(before) = bytes.start.checked_sub(1) {
+        let outside = old.snapshot().src_offset(before)?;
+        assert!(matches!(
+            pair.translate(new.snapshot(), &outside),
+            Err(ReuseTranslateError::OutsideOldBlock)
+        ));
+    }
+    let after = old.snapshot().src_offset(bytes.end.saturating_add(1))?;
+    assert!(matches!(
+        pair.translate(new.snapshot(), &after),
+        Err(ReuseTranslateError::OutsideOldBlock)
+    ));
+    // usize::MAX 先被旧快照的越界检查拒绝，到不了块外判定；两者都必须失败。
+    assert!(old.snapshot().src_offset(usize::MAX).is_err());
+    Ok(())
+}
+
+#[test]
+fn translate_accepts_in_block_endpoints_and_is_byte_exact() -> Result<(), Box<dyn Error>> {
+    let old = parse_text("A\n\nB\n\nC\n")?;
+    let new = parse_text("X\n\nA\n\nB\n\nC\n")?;
+    let outcome = reuse(&old, &new);
+    let pair = outcome.reused().first().ok_or("missing pair")?;
+    let old_bytes = pair.old_range().byte_range();
+    let new_bytes = pair.new_range().byte_range();
+    assert_eq!(old_bytes.len(), new_bytes.len());
+    // 闭区间右端点必须保留：既有 assert_all_reused_pairs_match 依赖它。
+    for offset in old_bytes.start..=old_bytes.end {
+        let old_offset = old.snapshot().src_offset(offset)?;
+        let translated = pair.translate(new.snapshot(), &old_offset)?;
+        let expected = new_bytes
+            .start
+            .checked_add(offset.saturating_sub(old_bytes.start))
+            .ok_or("offset overflow")?;
+        assert_eq!(
+            translated.byte_offset(),
+            expected,
+            "块内偏移 {offset} 必须逐字节对应"
+        );
+    }
+    Ok(())
 }
 
 #[test]
@@ -41,10 +167,18 @@ fn insertion_before_rebases_matching_suffix_blocks() -> Result<(), Box<dyn Error
     {
         assert_eq!(pair.old_index(), old_index);
         assert_eq!(pair.new_index(), new_index);
-        assert_eq!(pair.old_range(), &old_range);
-        assert_eq!(pair.new_range(), &new_range);
-        assert_eq!(pair.translate(old_range.start), Some(new_range.start));
-        assert_eq!(pair.translate(old_range.end), Some(new_range.end));
+        assert_eq!(pair.old_range().byte_range(), old_range);
+        assert_eq!(pair.new_range().byte_range(), new_range);
+        assert_eq!(
+            pair.translate(new.snapshot(), &old.snapshot().src_offset(old_range.start)?)?
+                .byte_offset(),
+            new_range.start
+        );
+        assert_eq!(
+            pair.translate(new.snapshot(), &old.snapshot().src_offset(old_range.end)?)?
+                .byte_offset(),
+            new_range.end
+        );
     }
     let reused_old: Vec<_> = outcome
         .reused()
@@ -71,8 +205,8 @@ fn edit_inside_one_paragraph_keeps_only_outer_blocks() -> Result<(), Box<dyn Err
         vec![0, 2]
     );
     let suffix = outcome.reused().get(1).ok_or("missing suffix")?;
-    assert_eq!(suffix.old_range(), &(6..7));
-    assert_eq!(suffix.new_range(), &(7..8));
+    assert_eq!(suffix.old_range().byte_range(), 6..7);
+    assert_eq!(suffix.new_range().byte_range(), 7..8);
     Ok(())
 }
 
@@ -156,9 +290,17 @@ fn old_absolute_ranges_fail_against_new_snapshot() -> Result<(), Box<dyn Error>>
     ));
     let outcome = reuse(&old, &new);
     let pair = outcome.reused().first().ok_or("missing pair")?;
-    assert_eq!(pair.translate(0), Some(3));
-    assert_eq!(pair.translate(2), None);
-    assert_eq!(pair.translate(usize::MAX), None);
+    assert_eq!(
+        pair.translate(new.snapshot(), &old.snapshot().src_offset(0)?)?
+            .byte_offset(),
+        3
+    );
+    // 块范围 0..1，故 2 已在块外；usize::MAX 连旧快照都构造不出。
+    assert!(matches!(
+        pair.translate(new.snapshot(), &old.snapshot().src_offset(2)?),
+        Err(ReuseTranslateError::OutsideOldBlock)
+    ));
+    assert!(old.snapshot().src_offset(usize::MAX).is_err());
     Ok(())
 }
 
@@ -498,9 +640,14 @@ fn assert_all_reused_pairs_match(
     outcome: &ReuseOutcome,
 ) -> Result<(), Box<dyn Error>> {
     for pair in outcome.reused() {
-        let old_signature =
-            block_signature(old, pair.old_index(), pair.new_range().start, Some(pair))?;
-        let new_signature = block_signature(new, pair.new_index(), pair.new_range().start, None)?;
+        let new_base = pair.new_range().byte_range().start;
+        let old_signature = block_signature(
+            old,
+            pair.old_index(),
+            new_base,
+            Some((pair, new.snapshot())),
+        )?;
+        let new_signature = block_signature(new, pair.new_index(), new_base, None)?;
         assert_eq!(
             old_signature,
             new_signature,
@@ -508,13 +655,19 @@ fn assert_all_reused_pairs_match(
             pair.old_index(),
             pair.new_index()
         );
+        let old_start = old
+            .snapshot()
+            .src_offset(pair.old_range().byte_range().start)?;
+        let old_end = old
+            .snapshot()
+            .src_offset(pair.old_range().byte_range().end)?;
         assert_eq!(
-            pair.translate(pair.old_range().start),
-            Some(pair.new_range().start)
+            pair.translate(new.snapshot(), &old_start)?.byte_offset(),
+            pair.new_range().byte_range().start
         );
         assert_eq!(
-            pair.translate(pair.old_range().end),
-            Some(pair.new_range().end)
+            pair.translate(new.snapshot(), &old_end)?.byte_offset(),
+            pair.new_range().byte_range().end
         );
     }
     Ok(())
@@ -524,7 +677,7 @@ fn block_signature(
     parsed: &Parsed,
     block_index: usize,
     base: usize,
-    relocation: Option<&ReusedBlock>,
+    relocation: Option<(&ReusedBlock, &TextSnapshot)>,
 ) -> Result<BlockSignature, Box<dyn Error>> {
     let block = parsed.blocks().get(block_index).ok_or("missing block")?;
     let block_range = block.range().byte_range();
@@ -542,7 +695,10 @@ fn block_signature(
         .byte_offset();
     let relocate = |offset: usize| -> Result<usize, Box<dyn Error>> {
         let relocated = match relocation {
-            Some(pair) => pair.translate(offset).ok_or("translate failed")?,
+            Some((pair, new_snapshot)) => {
+                let old_offset = parsed.snapshot().src_offset(offset)?;
+                pair.translate(new_snapshot, &old_offset)?.byte_offset()
+            }
             None => offset,
         };
         relocated
@@ -673,9 +829,13 @@ fn reused_text_matches_full_reparse_block_by_block() -> Result<(), Box<dyn Error
             .snapshot()
             .slice(new_block.range(), TextBudget::new(BUDGET))?;
         assert_eq!(old_text.as_ref(), new_text.as_ref());
-        assert_eq!(pair.old_range(), &old_range);
-        assert_eq!(pair.new_range(), &new_range);
-        assert_eq!(pair.translate(old_range.start), Some(new_range.start));
+        assert_eq!(pair.old_range().byte_range(), old_range);
+        assert_eq!(pair.new_range().byte_range(), new_range);
+        assert_eq!(
+            pair.translate(new.snapshot(), &old.snapshot().src_offset(old_range.start)?)?
+                .byte_offset(),
+            new_range.start
+        );
     }
     assert!(new.blocks().len() > outcome.reused().len());
     Ok(())

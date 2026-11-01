@@ -27,5 +27,5 @@ pub use pre::{
     RewriteSource, detect_front_matter, rewrite_front_matter, rewrite_front_matter_with_cancel,
 };
 pub use protection::{ProtectedRange, ProtectionKind};
-pub use reuse::{ReuseOutcome, ReuseRefusal, ReusedBlock, reuse};
+pub use reuse::{ReuseOutcome, ReuseRefusal, ReuseTranslateError, ReusedBlock, reuse};
 pub use style::{StyledRange, TextStyle};

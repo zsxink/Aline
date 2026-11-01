@@ -5,9 +5,9 @@
 //! 可能影响远处块，因此一律拒绝复用。
 
 use std::borrow::Cow;
-use std::ops::Range;
+use std::fmt;
 
-use aline_buffer::TextBudget;
+use aline_buffer::{BufferError, SrcOffset, SrcRange, TextBudget, TextSnapshot};
 
 use crate::mdast::{Block, BlockKind};
 use crate::parse::Parsed;
@@ -53,13 +53,49 @@ impl ReuseRefusal {
     }
 }
 
+/// 复用重定位被拒绝的原因；每种都显式命名，不做 clamp 或静默修正。
+///
+/// `InvalidNewOffset` 直接携带 `aline_buffer::BufferError`，保留「越界 / 半字符 /
+/// 长度溢出」的原始区分。`BufferError` 不实现 `PartialEq`/`Copy`（其
+/// `Allocation` 变体持有 `TryReserveError`），因此本枚举只派生 `Debug`；
+/// 调用方与测试用 `matches!` 按变体判定，不需要相等比较。
+#[derive(Debug)]
+pub enum ReuseTranslateError {
+    /// 请求的旧端点不属于本配对绑定的旧快照。
+    WrongOldSnapshot,
+    /// 调用方传入的新快照与本配对的新范围身份不符。
+    WrongNewSnapshot,
+    /// 请求的旧端点落在本块旧范围之外（右端点按闭区间允许）。
+    OutsideOldBlock,
+    /// 新端点无法在新快照中构造（越界、半字符或长度溢出）。
+    InvalidNewOffset(BufferError),
+}
+
+impl fmt::Display for ReuseTranslateError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(self, formatter)
+    }
+}
+
+impl std::error::Error for ReuseTranslateError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::InvalidNewOffset(error) => Some(error),
+            Self::WrongOldSnapshot | Self::WrongNewSnapshot | Self::OutsideOldBlock => None,
+        }
+    }
+}
+
 /// 一个被承认复用的旧块到新块配对。
+///
+/// 两端范围都携带各自快照身份，重定位只在受检坐标上进行，不暴露裸 `Range<usize>`
+/// 或裸 `usize` 转换入口。
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ReusedBlock {
     old_index: usize,
     new_index: usize,
-    old_range: Range<usize>,
-    new_range: Range<usize>,
+    old_range: SrcRange,
+    new_range: SrcRange,
     kind: BlockKind,
 }
 
@@ -72,25 +108,52 @@ impl ReusedBlock {
     pub const fn new_index(&self) -> usize {
         self.new_index
     }
-    /// 返回旧快照中的块范围。
-    pub fn old_range(&self) -> &Range<usize> {
+    /// 返回旧快照中的块范围，携带旧快照身份。
+    pub fn old_range(&self) -> &SrcRange {
         &self.old_range
     }
-    /// 返回新快照中的块范围。
-    pub fn new_range(&self) -> &Range<usize> {
+    /// 返回新快照中的块范围，携带新快照身份。
+    pub fn new_range(&self) -> &SrcRange {
         &self.new_range
     }
     /// 返回块种类。
     pub const fn kind(&self) -> BlockKind {
         self.kind
     }
-    /// 把旧块内偏移重定位到新快照；块外偏移返回 None，不做 clamp。
-    pub fn translate(&self, old_offset: usize) -> Option<usize> {
-        if old_offset < self.old_range.start || old_offset > self.old_range.end {
-            return None;
+    /// 把绑定旧快照的端点重定位到新快照，返回绑定新快照的端点。
+    ///
+    /// 校验顺序固定，且每一步都有独立错误：
+    /// 1. 旧端点必须属于本配对的旧快照（`WrongOldSnapshot`）；
+    /// 2. 旧端点必须落在本块旧范围内，右端点按闭区间允许（`OutsideOldBlock`）；
+    /// 3. 传入的新快照必须与本配对的新范围同一身份（`WrongNewSnapshot`）；
+    /// 4. 用新快照构造并校验新端点，含 UTF-8 边界与长度（`InvalidNewOffset`）。
+    ///
+    /// 任一步失败都返回错误，不做 clamp、不回退到最近合法位置。
+    pub fn translate(
+        &self,
+        new_snapshot: &TextSnapshot,
+        old: &SrcOffset,
+    ) -> Result<SrcOffset, ReuseTranslateError> {
+        if *old.snapshot_id() != *self.old_range.snapshot_id() {
+            return Err(ReuseTranslateError::WrongOldSnapshot);
         }
-        let delta = old_offset.checked_sub(self.old_range.start)?;
-        self.new_range.start.checked_add(delta)
+        let old_bytes = self.old_range.byte_range();
+        let old_byte = old.byte_offset();
+        if old_byte < old_bytes.start || old_byte > old_bytes.end {
+            return Err(ReuseTranslateError::OutsideOldBlock);
+        }
+        if *new_snapshot.id() != *self.new_range.snapshot_id() {
+            return Err(ReuseTranslateError::WrongNewSnapshot);
+        }
+        let delta = old_byte
+            .checked_sub(old_bytes.start)
+            .ok_or(ReuseTranslateError::OutsideOldBlock)?;
+        let new_byte = self.new_range.byte_range().start.checked_add(delta).ok_or(
+            ReuseTranslateError::InvalidNewOffset(BufferError::LengthOverflow),
+        )?;
+        new_snapshot
+            .src_offset(new_byte)
+            .map_err(ReuseTranslateError::InvalidNewOffset)
     }
 }
 
@@ -174,8 +237,8 @@ fn pair(old_block: &Block, new_block: &Block, old_index: usize, new_index: usize
     ReusedBlock {
         old_index,
         new_index,
-        old_range: old_block.range().byte_range(),
-        new_range: new_block.range().byte_range(),
+        old_range: old_block.range().clone(),
+        new_range: new_block.range().clone(),
         kind: old_block.kind(),
     }
 }
