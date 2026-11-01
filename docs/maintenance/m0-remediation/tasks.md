@@ -10,11 +10,11 @@
 
 | 运行状态 | 当前值 |
 |---|---|
-| 当前批次 | R02 已完成（`0820e8e`）、R05 已完成（`e4a6af0`）、R11 已完成（`ac2baaa`），三者待独立复核；R03 已解锁（R02 已结束，同 crate 串行） |
-| 下一可执行批次 | R03（F-04，R02 已结束，可开工）、R06（与 R05 无文件重叠）。R05/R06 的原复核夹具本轮已确认仍在 `/tmp/aline-m0-independent-review.pTFf8u/D/` |
-| 已完成批次 | R00、文档保全提交 `c7232ed`（任务表 + R00 证据 + R01–R14 契约，未触碰源码）；R01（`79c3b54`）；R02（`0820e8e`）；R05（`e4a6af0`）；R11（`ac2baaa`，只读取证，未改代码） |
-| 活跃写入 Agent / 文件所有权 | 无活跃写入。R02 已收束（`crates/aline-markdown/src/pre/rewrite.rs`、`crates/aline-markdown/tests/rewrite.rs`）；R05 已收束（`scripts/check_lints.py`）。R06 将独占 `scripts/check_safety.py` |
-| 最近验证与审查 | R01 独立复核返回 APPROVE_WITH_CONCERNS（无阻断）：在 `79c3b54` 干净检出复跑 30/8 目标/45 ok/0 failed、clippy exit 0、fmt exit 0；BASE 探针复现 F-01/F-05。其 4 项 finding 我逐条复核均成立，第 1 项（「workspace 62 ok」实为整份文件合计，该段实为 45）已按 §5 追加勘误到 `report.md`/`commands.txt`/`handoff.md`，原文保留。记录见 `R01/run-1/review.md`。R02/R05 已由主 Agent 独立复核（指纹比对 + 自跑测试/自检），详见各自 `report.md`；两批次的独立 reviewer 尚未派发。R11 由主 Agent 直接执行并复核：独立复算旧缺口为 105 份 / 14 缺字段，与报告一致；17 条新命令均含 argv/cwd/起止 UTC/exit/原始输出；敏感标识已打码，全目录扫描无残留 |
+| 当前批次 | R03 已完成（`128954e`）待独立复核；R02 独立复核返回 APPROVE_WITH_CONCERNS（发现既有 F-01 残留，登记 R02b）；R05 独立复核返回 REQUEST_CHANGES（2 项严重），已退回修复 |
+| 下一可执行批次 | R05b（修复复核发现的 2 项严重）、R06（与 R05b 无文件重叠）。R05/R06 的原复核夹具本轮已确认仍在 `/tmp/aline-m0-independent-review.pTFf8u/D/` |
+| 已完成批次 | R00、文档保全提交 `c7232ed`（任务表 + R00 证据 + R01–R14 契约，未触碰源码）；R01（`79c3b54`）；R02（`0820e8e`）；R03（`128954e`）；R05（`e4a6af0`，复核退回待修复）；R11（`ac2baaa`，只读取证，未改代码） |
+| 活跃写入 Agent / 文件所有权 | 无活跃写入。R02 已收束（`crates/aline-markdown/src/pre/rewrite.rs`、`crates/aline-markdown/tests/rewrite.rs`）；R03 已收束（`crates/aline-markdown/src/{reuse.rs,lib.rs}`、`tests/reuse.rs`）；R05 已收束（`scripts/check_lints.py`）。R06 将独占 `scripts/check_safety.py`；R05b 独占 `scripts/check_lints.py` |
+| 最近验证与审查 | R01 独立复核 APPROVE_WITH_CONCERNS（无阻断）；其 4 项 finding 逐条复核均成立，第 1 项已按 §5 追加勘误。R02 独立复核 **APPROVE_WITH_CONCERNS**：目标达成，但发现**既有 F-01 残留**（第二层空来源片锚定到 Aligned/Hidden 时返回非空 source），主 Agent 已独立复现并存探针输出，登记为 R02b；另有提交信息计数错误（称 3 条实为 4 条）与 2 条新用例缺修复前记录，已追加勘误。R05 独立复核 **REQUEST_CHANGES**：2 项严重（引号点分键与真实嵌套表撞名导致守卫 exit 0 而 Cargo 报 `unused manifest key`；键集/类型/值三条拒绝路径无 self-test 断言，弱化实现仍 exit 0），主 Agent 均已独立复现（`/tmp/r05f4`、`/tmp/weakrepo`），退回 R05b。R03 由主 Agent 实现并自验（23 条用例、全 crate exit 0、clippy/fmt 0），**待独立复核**；`check_public_api.py` 在隔离空缓存下不可用、换真实 `CARGO_HOME` 后 8/8 通过，已记录归属。R11 由主 Agent 直接执行并复核：17 条新命令均含 argv/cwd/起止 UTC/exit/原始输出；敏感标识已打码，全目录扫描无残留 |
 | 契约就绪 | R01–R14 共 14 份 `run-1/brief.md` 已全部落盘（R00 已完成无 brief）；R13/R14 契约本轮新写，分别覆盖 F-12/F-17/F-18 与全量门禁+出口独立裁决 |
 | 待裁决事项 | T-8-17（undo 后新草稿时 Buffer redo 分支与草稿 redo 的失效时序）已按「受检拒绝」实现，仍待独立复核确认；R04 契约另含 tasks.md「redo 存在时拒绝」与 design.md:87/§9.3「实际新编辑才截 redo」的契约冲突，须带引文裁决并登记 |
 
@@ -46,10 +46,10 @@
 |---|---|---|---|---|---|---|
 | R00 | 恢复基线、建立运行与所有权记录 | 无 | 主 Agent；定位不清时 scout | 本表、当前工作树、当前 change 状态 | 记录实际 HEAD/改动；识别已有整改；建立证据目录；不把原任务全勾选当通过 | 完成 → `docs/validation/m0-engine-foundation/remediation/R00/run-1/handoff.md` |
 | R01 | F-01/F-05：待定组 Redo 输入保全与方向选区 | R00 | complex_worker → reviewer | UI document 的 doc_core/open_block、typing 测试 | 两种独立失败回归修复；不吞草稿，恢复对应 anchor/head，分支与分组符合现行契约 | 完成 → 实现 `79c3b54`；证据 `docs/validation/m0-engine-foundation/remediation/R01/run-1/`；复核 `review.md`（APPROVE_WITH_CONCERNS）；T-8-17 待裁决 |
-| R02 | F-03：RewriteMap 多阶段来源复合 | R00 | complex_worker → reviewer | markdown pre/rewrite、rewrite 测试 | 恒等复合保留每片；Exact/Aligned/Hidden/Synthetic 与跨片段来源/锚点正确 | 完成 → 实现 `0820e8e`；证据 `docs/validation/m0-engine-foundation/remediation/R02/run-1/`；待独立复核（含源码端片段重叠应然性裁决） |
-| R03 | F-04：复用重定位的受检坐标边界 | R00 | complex_worker → reviewer | markdown reuse、公开导出及消费者/编译测试 | 旧/新快照身份与 UTF-8 边界受检；无裸公共坐标捷径；旧消费者和替代路径清理 | 待开始 |
+| R02 | F-03：RewriteMap 多阶段来源复合 | R00 | complex_worker → reviewer | markdown pre/rewrite、rewrite 测试 | 恒等复合保留每片；Exact/Aligned/Hidden/Synthetic 与跨片段来源/锚点正确 | 完成 → 实现 `0820e8e`；证据 `docs/validation/m0-engine-foundation/remediation/R02/run-1/`；复核 `review.md`（APPROVE_WITH_CONCERNS，疑点 C 已裁决：不存在片段互不重叠不变式）；**R02b 待办**：既有 F-01 残留（合成片获非空 source），须在 R04/R10 前处理 |
+| R03 | F-04：复用重定位的受检坐标边界 | R00 | complex_worker → reviewer | markdown reuse、公开导出及消费者/编译测试 | 旧/新快照身份与 UTF-8 边界受检；无裸公共坐标捷径；旧消费者和替代路径清理 | 完成 → 实现 `128954e`；证据 `docs/validation/m0-engine-foundation/remediation/R03/run-1/`；**待独立复核**（本批由主 Agent 实现） |
 | R04 | F-02：edit→DocCore 消费与 Visual 权限 | R01/R02/R03 | 必要时先 deep_thinker 形成最小方案，再 complex_worker → reviewer | UI document、edit 计划/验证及必要内部依赖、宿主集成测试 | 实际受检消费链；普通/组合输入保护一致；Source 合法路径保留；拒绝完整状态不变；每键不全文解析 | 待开始 |
-| R05 | F-08：lint 继承真实解析 | R00 | complex_worker 或范围明确后的 simple_worker → reviewer | check_lints 及对应隔离夹具 | 多行字符串假继承被拒；真实继承通过；Cargo 实际诊断与声明检查一致 | 完成 → 实现 `e4a6af0`；证据 `docs/validation/m0-engine-foundation/remediation/R05/run-1/`；待独立复核 |
+| R05 | F-08：lint 继承真实解析 | R00 | complex_worker 或范围明确后的 simple_worker → reviewer | check_lints 及对应隔离夹具 | 多行字符串假继承被拒；真实继承通过；Cargo 实际诊断与声明检查一致 | 复核退回（`review.md` REQUEST_CHANGES，2 严重已由主 Agent 复现）→ **R05b 修复中**：点分键/表头撞名须 fail-closed；补 3 条 self-test 反例；RecursionError 纳入异常元组 |
 | R06 | F-09/F-15：安全扫描范围有效 | R00 | complex_worker → reviewer | check_safety、必要 safety_lex 与夹具 | 目录外实际 Cargo target 受审或被明确拒绝；空根/缺成员非零；正常范围恢复通过 | 待开始 |
 | R07 | F-10：字素边界独立验收 | R03 | complex_worker → reviewer | 映射/字素纯边界及测试；依赖如需新增先准入 | 独立字素移动边界与标量/代理对分开验收；不以字符串含 ZWJ 冒充覆盖，不静默下放 scenario | 待开始 |
 | R08 | F-11：删除/粘贴/HTML 跨界负例 | R04 | simple_worker 或 complex_worker → reviewer | edit protection/refusal 与必要 DocCore 集成测试 | 空删除、替换、粘贴意图及左右/整段 HTML 跨界金样；比较真实完整状态 | 待开始 |
