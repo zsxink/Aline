@@ -1,0 +1,90 @@
+# R06 命令记录（argv / cwd / 起止时间 / exit code）
+
+工作目录（除特别注明）：`/Users/xian/Project/editor/Aline`
+环境：`CARGO_NET_OFFLINE=true`、`RUSTUP_TOOLCHAIN=1.98.1`；所有 Cargo 调用带 `--locked --offline`。
+版本：python3 3.9.6（系统 `/Library/Developer/CommandLineTools/usr/bin/python3`）、cargo 1.98.1 (797e8a9bc 2026-08-05)、rustc 1.98.1 (48a229cea 2026-09-01)。
+HEAD：`340152c`（本 worker 不改提交；工作树中 `scripts/check_safety.py` 为本次改动，`scripts/check_lints.py` 的改动属他人）。
+时间戳为 UTC（`datetime.now(timezone.utc)`，秒精度）。
+
+## 0) CARGO_HOME 探测
+
+隔离 `CARGO_HOME`：`/var/folders/rx/.../aline-m0-admission-k4_p5j6a/cargo-home`（只含空 `registry/`）。
+
+- argv: `CARGO_HOME=<隔离目录> CARGO_NET_OFFLINE=true RUSTUP_TOOLCHAIN=1.98.1 python3 scripts/check_safety.py`
+- cwd: `/Users/xian/Project/editor/Aline`
+- start: 2026-11-01T06:43:19+00:00  end: 2026-11-01T06:43:21+00:00  exit: 0
+- 结果：`failures=0`、`scanned=89`、`member_reads=[('workspace-metadata', 0)]`
+- 结论：`cargo metadata --no-deps --locked --offline` 在空 registry 缓存下仍可成功（`--no-deps` 不解析依赖）。
+  故**未**设置 `CARGO_HOME=$HOME/.cargo` 覆盖；若未来 `--no-deps` 被移除，此命令会退化为 `workspace-metadata-failure`（fail-closed），属产品行为而非环境噪声。
+
+## 1) 修复后（当前工作树）
+
+### A1 目录外 `[lib] path` target（原复核夹具）
+- argv: `python3 scripts/check_safety.py --root /tmp/aline-m0-independent-review.pTFf8u/D/safety-external-target`
+- cwd: `/Users/xian/Project/editor/Aline`
+- start: 2026-11-01T06:41:49+00:00  end: 2026-11-01T06:41:49+00:00  exit: 1
+- 规则: `external-target-path`，`scanned=8`，`member_reads=1`
+- detail: `lib .../crates/aline-buffer/../../outside.rs`
+
+### A2 目录外 build script
+- argv: `python3 scripts/check_safety.py --root /tmp/r06-prefix-build.5kxpnH`
+- cwd: `/Users/xian/Project/editor/Aline`
+- start: 2026-11-01T06:41:49+00:00  end: 2026-11-01T06:41:49+00:00  exit: 1
+- 规则: `external-target-path`，`scanned=8`，`member_reads=1`
+- detail: `custom-build .../crates/aline-buffer/../../outside-build.rs`
+
+### A3 根不存在
+- argv: `python3 scripts/check_safety.py --root /tmp/aline-r06-does-not-exist`
+- cwd: `/Users/xian/Project/editor/Aline`
+- start: 2026-11-01T06:41:49+00:00  end: 2026-11-01T06:41:49+00:00  exit: 1
+- 规则: `root-missing`，`scanned=0`，`member_reads=0`
+
+### A4 根是目录但无 `Cargo.toml`
+- argv: `python3 scripts/check_safety.py --root /tmp/r06-emptyroot2.2IsV1W`
+- cwd: `/Users/xian/Project/editor/Aline`
+- start: 2026-11-01T06:41:49+00:00  end: 2026-11-01T06:41:49+00:00  exit: 1
+- 规则: `root-not-workspace`，`scanned=0`，`member_reads=0`
+
+### A5 正常仓库
+- argv: `python3 scripts/check_safety.py`
+- cwd: `/Users/xian/Project/editor/Aline`
+- start: 2026-11-01T06:41:49+00:00  end: 2026-11-01T06:41:51+00:00  exit: 0
+- 结果: `failures=0`，`scanned=89`，覆盖 `app/src` + 七个 `crates/*`，`member_reads=[('workspace-metadata', 0)]`
+
+### A6 自测
+- argv: `python3 scripts/check_safety.py --self-test --output-dir /tmp/r06-final-selftest`
+- cwd: `/Users/xian/Project/editor/Aline`
+- start: 2026-11-01T06:41:51+00:00  end: 2026-11-01T06:41:55+00:00  exit: 0
+- 结果: `passed=true`、`cases=60`（既有 53 + 新增 7）、`workspace_after_fixtures failures=0 scanned=89`
+- 输出目录含 121 个文件（60 组 `*.stdout.json` + `*.stderr.log` + `summary.json`），不写仓库受跟踪路径。
+
+## 2) 修复前复现（HEAD 版本的脚本副本）
+
+脚本副本：`/tmp/r06-old/scripts/{check_safety.py,safety_lex.py}`，由 `git show HEAD:scripts/check_safety.py` 导出，
+已核对与 `HEAD` 一致，且 `128954e..HEAD` 未改动（`git diff --quiet 128954e:... HEAD:...` 通过）。
+
+### B1 目录外 target（旧脚本）
+- argv: `python3 /tmp/r06-old/scripts/check_safety.py --root /tmp/aline-m0-independent-review.pTFf8u/D/safety-external-target`
+- cwd: `/Users/xian/Project/editor/Aline`
+- start: 2026-11-01T06:41:55+00:00  end: 2026-11-01T06:41:55+00:00  exit: 0
+- 结果: `failures=0`、`scanned=8`、`member_reads=8`（`read-manifest` 已见 custom-build，但未扫描）
+
+### B2 根不存在（旧脚本）
+- argv: `python3 /tmp/r06-old/scripts/check_safety.py --root /tmp/aline-r06-does-not-exist`
+- cwd: `/Users/xian/Project/editor/Aline`
+- start: 2026-11-01T06:41:55+00:00  end: 2026-11-01T06:41:55+00:00  exit: 0
+- 结果: `failures=0`、`scanned=0`、`member_reads=0`
+
+### B3 新旧脚本扫描集合对照（正常仓库）
+- 旧脚本 `scanned=89`、新脚本 `scanned=89`；`(file, kind)` 集合差集为空（无增无减、kind 未变）。
+
+## 3) 语法检查
+
+- argv: `python3 -m py_compile scripts/check_safety.py`
+- cwd: `/Users/xian/Project/editor/Aline`
+- exit: 0
+
+## 4) 夹具说明
+
+- A1/A2 使用既有临时夹具（目录外 `[lib] path`、目录外 `build.rs`），均为八成员副本，非仓库受跟踪路径。
+- 自测全部夹具由脚本在 `tempfile.mkdtemp(prefix='aline-safety-self-test-')` 下生成，`--output-dir` 指向 `/tmp/r06-final-selftest`。
