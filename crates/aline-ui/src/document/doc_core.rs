@@ -92,6 +92,8 @@ pub enum DocError {
     DraftBaselineConflict,
     /// 组合候选活动时不允许该操作。
     CompositionActive,
+    /// 存在待定普通输入组；Redo 不得越过当前输入。
+    PendingInput,
     /// 没有活动的组合候选。
     NoComposition,
     /// 同一文档已有未结束的发布等待。
@@ -654,13 +656,13 @@ impl DocCore {
         let next_version = self.version.next_draft().map_err(DocError::Identity)?;
         let pending = self.open.as_ref().and_then(OpenBlock::typing).is_some();
         if pending {
+            // 撤销时刻的块选区就是重做应恢复的 after-selection；先捕获再覆盖。
             let (group, range, before_selection) = {
-                let group = self
-                    .open
-                    .as_ref()
-                    .and_then(OpenBlock::typing)
-                    .ok_or(DocError::NoOpenBlock)?;
-                (group.clone(), group.range.clone(), group.before_selection)
+                let block = self.open.as_ref().ok_or(DocError::NoOpenBlock)?;
+                let group = block.typing().ok_or(DocError::NoOpenBlock)?;
+                let mut captured = group.clone();
+                captured.after_selection = block.selection;
+                (captured, group.range.clone(), group.before_selection)
             };
             let fragment = slice_buffer(&self.buffer, range.clone(), self.limits.text)?;
             let block = self.open.as_mut().ok_or(DocError::NoOpenBlock)?;
@@ -687,6 +689,9 @@ impl DocCore {
     }
 
     /// 重做：优先重做被撤销的草稿组，否则重做历史节点。
+    ///
+    /// 当前存在待定输入组时拒绝：Redo 不得越过尚未结算的输入去重做旧节点，
+    /// 否则待定草稿会被 `sync_block_after_buffer_change` 清空。拒绝不改变任何状态。
     pub fn redo(&mut self) -> Result<(), DocError> {
         if self.open.is_some() {
             self.ensure_ready()?;
@@ -694,19 +699,27 @@ impl DocCore {
         if self.is_composition_active() {
             return Err(DocError::CompositionActive);
         }
+        if self.open.as_ref().and_then(OpenBlock::typing).is_some() {
+            return Err(DocError::PendingInput);
+        }
         let next_version = self.version.next_draft().map_err(DocError::Identity)?;
         let undone = self
             .open
             .as_ref()
             .and_then(|block| block.undone_typing.clone());
         if let Some(group) = undone {
-            let end = group
-                .range
-                .start
-                .checked_add(group.draft.len())
-                .ok_or_else(overflow)?;
-            let selection = SelectionSpec::new(end, end);
+            let selection = group.after_selection;
             let range = group.range.clone();
+            // 受检恢复：先在探针块上校验选区两端，通过后才改动真实状态。
+            let probe = {
+                let block = self.open.as_ref().ok_or(DocError::NoOpenBlock)?;
+                let mut probe = block.clone();
+                probe.draft = DraftSlot::Typing(group.clone());
+                probe.range = range.clone();
+                probe.baseline_fragment.clear();
+                probe
+            };
+            self.validate_selection(&probe, selection)?;
             let block = self.open.as_mut().ok_or(DocError::NoOpenBlock)?;
             block.draft = DraftSlot::Typing(group);
             block.range = range;
@@ -872,6 +885,7 @@ impl DocCore {
         let group = block.typing_mut().ok_or(DocError::NoOpenBlock)?;
         group.draft = draft;
         group.last_input_at = now_millis;
+        group.after_selection = selection;
         block.selection = selection;
         block.undone_typing = None;
         self.version = next_version;
@@ -949,6 +963,7 @@ impl DocCore {
                 range: at..at,
                 draft,
                 before_selection: SelectionSpec::new(at, at),
+                after_selection: selection,
                 last_input_at: now_millis,
             });
             block.undone_typing = None;
@@ -962,6 +977,7 @@ impl DocCore {
                 range: at..at,
                 draft,
                 before_selection: SelectionSpec::new(at, at),
+                after_selection: selection,
                 last_input_at: now_millis,
             });
             block.undone_typing = None;

@@ -1,0 +1,114 @@
+# R01 pre-fix regression evidence
+# cwd: /Users/xian/Project/editor/Aline
+# rustc: rustc 1.98.1 (48a229cea 2026-09-01)
+# cargo: cargo 1.98.1 (797e8a9bc 2026-08-05)
+# env: CARGO_NET_OFFLINE=true
+# argv: cargo test -p aline-ui --test document_typing --locked --offline redo_must_not_discard_pending_input
+# start: 2026-11-01T03:02:08Z
+   Compiling aline-ui v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-ui)
+error[E0599]: no variant, associated function, or constant named `PendingInput` found for enum `DocError` in the current scope
+   --> crates/aline-ui/tests/document_typing.rs:541:43
+    |
+541 |         |error| matches!(error, DocError::PendingInput),
+    |                                           ^^^^^^^^^^^^ variant, associated function, or constant not found in `DocError`
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `aline-ui` (test "document_typing") due to 1 previous error
+# exit: 101
+# end: 2026-11-01T03:02:11Z
+# duration_seconds: 3
+
+================================================================
+# argv: cargo test -p aline-ui --test document_typing --locked --offline pending_redo_restores
+# start: 2026-11-01T03:02:17Z
+   Compiling aline-ui v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-ui)
+error[E0599]: no variant, associated function, or constant named `PendingInput` found for enum `DocError` in the current scope
+   --> crates/aline-ui/tests/document_typing.rs:541:43
+    |
+541 |         |error| matches!(error, DocError::PendingInput),
+    |                                           ^^^^^^^^^^^^ variant, associated function, or constant not found in `DocError`
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `aline-ui` (test "document_typing") due to 1 previous error
+# exit: 101
+# end: 2026-11-01T03:02:17Z
+# duration_seconds: 0
+
+================================================================
+# 说明：修复前 DocError 尚无 PendingInput 变体，此轮回归先用行为断言
+#       「Redo 必须被拒绝且零副作用」证明失败；修复后再固定拒绝原因。
+# argv: cargo test -p aline-ui --test document_typing --locked --offline redo_must_not_discard_pending_input
+# start: 2026-11-01T03:03:07Z
+   Compiling aline-ui v0.1.0 (/Users/xian/Project/editor/Aline/crates/aline-ui)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.42s
+     Running tests/document_typing.rs (target/debug/deps/document_typing-fd4bd04b713c6f52)
+
+running 1 test
+test redo_must_not_discard_pending_input ... FAILED
+
+failures:
+
+---- redo_must_not_discard_pending_input stdout ----
+
+thread 'redo_must_not_discard_pending_input' (2177727) panicked at crates/aline-ui/tests/common/mod.rs:287:5:
+assertion failed: error.is_err()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    redo_must_not_discard_pending_input
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 28 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p aline-ui --test document_typing`
+# exit: 101
+# end: 2026-11-01T03:03:09Z
+# duration_seconds: 2
+
+================================================================
+# argv: cargo test -p aline-ui --test document_typing --locked --offline pending_redo_restores
+# start: 2026-11-01T03:03:14Z
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s
+     Running tests/document_typing.rs (target/debug/deps/document_typing-fd4bd04b713c6f52)
+
+running 3 tests
+test pending_redo_restores_collapsed_selection ... FAILED
+test pending_redo_restores_directional_selection ... FAILED
+test pending_redo_restores_forward_selection ... FAILED
+
+failures:
+
+---- pending_redo_restores_collapsed_selection stdout ----
+
+thread 'pending_redo_restores_collapsed_selection' (2178152) panicked at crates/aline-ui/tests/document_typing.rs:612:5:
+assertion `left == right` failed
+  left: SelectionSpec { anchor: 4, head: 4 }
+ right: SelectionSpec { anchor: 3, head: 3 }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- pending_redo_restores_directional_selection stdout ----
+
+thread 'pending_redo_restores_directional_selection' (2178153) panicked at crates/aline-ui/tests/document_typing.rs:572:5:
+assertion `left == right` failed
+  left: SelectionSpec { anchor: 4, head: 4 }
+ right: SelectionSpec { anchor: 4, head: 2 }
+
+---- pending_redo_restores_forward_selection stdout ----
+
+thread 'pending_redo_restores_forward_selection' (2178154) panicked at crates/aline-ui/tests/document_typing.rs:593:5:
+assertion `left == right` failed
+  left: SelectionSpec { anchor: 4, head: 4 }
+ right: SelectionSpec { anchor: 2, head: 4 }
+
+
+failures:
+    pending_redo_restores_collapsed_selection
+    pending_redo_restores_directional_selection
+    pending_redo_restores_forward_selection
+
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p aline-ui --test document_typing`
+# exit: 101
+# end: 2026-11-01T03:03:14Z
+# duration_seconds: 0

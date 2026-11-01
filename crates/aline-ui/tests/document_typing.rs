@@ -5,7 +5,8 @@
 
 mod common;
 
-use aline_ui::{CommitOutcome, DocCore, DocError};
+use aline_buffer::{HistoryBudget, LineIndexBudget, SelectionSpec, TextBudget};
+use aline_ui::{CommitOutcome, DocCore, DocError, DocLimits};
 use common::{
     assert_buffer, assert_closed, assert_committed, assert_history, assert_new_snapshot,
     assert_open, assert_rejected_without_change, assert_same_snapshot, assert_snapshot,
@@ -510,6 +511,149 @@ fn input_group_case_8_2_25_post_ime_input_commits_as_one_step()
     assert_version(&doc, 2, 4);
     assert_history(&doc, 2, 0, 2);
     assert_open(&doc, 2, None, 5, 5);
+    common::assert_idle(&doc);
+    Ok(())
+}
+
+// ---- R01 回归：F-01 待定输入被 Redo 吞掉 / F-05 方向选区丢失 ----
+
+/// R01 契约注入的预算；与原复核测试源保持一致。
+fn limits() -> DocLimits {
+    DocLimits::new(
+        TextBudget::new(4096),
+        LineIndexBudget::new(512),
+        HistoryBudget::new(512, 4096),
+    )
+}
+
+#[test]
+fn redo_must_not_discard_pending_input() -> Result<(), Box<dyn std::error::Error>> {
+    // R01 F-01：Undo 后新输入 b 是待定组，Redo 不得越过它重做旧节点。
+    // 期望：拒绝且零副作用——文本/草稿/版本/历史/快照全部不变。
+    let mut doc = DocCore::new("x", SelectionSpec::new(1, 1), limits())?;
+    doc.type_text(1, "a", 0)?;
+    doc.commit_open_block(1)?;
+    doc.undo()?;
+    doc.type_text(1, "b", 2)?;
+    let state = common::assert_rejected_without_change(
+        &mut doc,
+        |doc| doc.redo(),
+        |error| matches!(error, DocError::PendingInput),
+    )?;
+    assert_eq!(state.buffer_text, "x");
+    assert_eq!(state.snapshot_text.as_deref(), Some("xb"));
+    assert_eq!(
+        state.open.as_ref().and_then(|open| open.draft.as_deref()),
+        Some("b")
+    );
+    assert_eq!((state.revision, state.draft_generation), (2, 4));
+    assert_eq!((state.undo, state.redo, state.nodes), (0, 1, 1));
+    let current = doc
+        .current_snapshot(TextBudget::new(4096))?
+        .full_text(TextBudget::new(4096))?;
+    assert!(
+        current.contains('b'),
+        "pending b disappeared, actual={current:?}"
+    );
+    // 快照只读：重复取快照身份相同，不封口、不追加历史。
+    let first = snapshot_id(&mut doc)?;
+    let second = snapshot_id(&mut doc)?;
+    assert_same_snapshot(&first, &second);
+    assert_history(&doc, 0, 1, 1);
+    assert_open(&doc, 2, Some("b"), 2, 2);
+    common::assert_idle(&doc);
+    Ok(())
+}
+
+#[test]
+fn pending_redo_restores_directional_selection() -> Result<(), Box<dyn std::error::Error>> {
+    // R01 F-05：反向非折叠选区 4:2 在 Undo/Redo 后必须原样恢复。
+    let mut doc = DocCore::new("x", SelectionSpec::new(1, 1), limits())?;
+    doc.type_text(1, "abc", 0)?;
+    doc.set_selection(SelectionSpec::new(4, 2))?;
+    doc.undo()?;
+    assert_eq!(doc.current_selection(), SelectionSpec::new(1, 1));
+    let before = snapshot_id(&mut doc)?;
+    doc.redo()?;
+    assert_eq!(doc.current_selection(), SelectionSpec::new(4, 2));
+    assert_buffer(&doc, "x")?;
+    assert_snapshot(&mut doc, "xabc")?;
+    assert_version(&doc, 0, 3);
+    assert_history(&doc, 0, 0, 0);
+    assert_open(&doc, 0, Some("abc"), 4, 2);
+    let after = snapshot_id(&mut doc)?;
+    assert_new_snapshot(&before, &after);
+    common::assert_idle(&doc);
+    Ok(())
+}
+
+#[test]
+fn pending_redo_restores_forward_selection() -> Result<(), Box<dyn std::error::Error>> {
+    // R01 覆盖：正向非折叠选区 2:4 同样按组恢复，不退化为折叠端。
+    let mut doc = DocCore::new("x", SelectionSpec::new(1, 1), limits())?;
+    doc.type_text(1, "abc", 0)?;
+    doc.set_selection(SelectionSpec::new(2, 4))?;
+    doc.undo()?;
+    assert_eq!(doc.current_selection(), SelectionSpec::new(1, 1));
+    doc.redo()?;
+    assert_eq!(doc.current_selection(), SelectionSpec::new(2, 4));
+    assert_buffer(&doc, "x")?;
+    assert_snapshot(&mut doc, "xabc")?;
+    assert_version(&doc, 0, 3);
+    assert_history(&doc, 0, 0, 0);
+    assert_open(&doc, 0, Some("abc"), 2, 4);
+    common::assert_idle(&doc);
+    Ok(())
+}
+
+#[test]
+fn pending_redo_restores_collapsed_selection() -> Result<(), Box<dyn std::error::Error>> {
+    // R01 覆盖：折叠选区 3:3 恢复后仍为折叠，且不产生空历史步。
+    let mut doc = DocCore::new("x", SelectionSpec::new(1, 1), limits())?;
+    doc.type_text(1, "abc", 0)?;
+    doc.set_selection(SelectionSpec::new(3, 3))?;
+    doc.undo()?;
+    assert_eq!(doc.current_selection(), SelectionSpec::new(1, 1));
+    doc.redo()?;
+    assert_eq!(doc.current_selection(), SelectionSpec::new(3, 3));
+    assert_buffer(&doc, "x")?;
+    assert_snapshot(&mut doc, "xabc")?;
+    assert_version(&doc, 0, 3);
+    assert_history(&doc, 0, 0, 0);
+    assert_open(&doc, 0, Some("abc"), 3, 3);
+    common::assert_idle(&doc);
+    Ok(())
+}
+
+#[test]
+fn pending_input_commit_invalidates_redo_branch_without_empty_step()
+-> Result<(), Box<dyn std::error::Error>> {
+    // R01 F-01 分支结算：待定组提交是「新增实际编辑」，按 §9.3 使原 redo 分支
+    // 失效；提交本身只加 1 步，Redo 随后以 NothingToRedo 拒绝且零副作用。
+    let mut doc = DocCore::new("x", SelectionSpec::new(1, 1), limits())?;
+    doc.type_text(1, "a", 0)?;
+    doc.commit_open_block(1)?;
+    doc.undo()?;
+    doc.type_text(1, "b", 2)?;
+    let outcome = doc.commit_open_block(3)?;
+    assert_committed(outcome, 3);
+    assert_buffer(&doc, "xb")?;
+    assert_snapshot(&mut doc, "xb")?;
+    assert_version(&doc, 3, 5);
+    // 新提交截断 redo 分支：节点总数仍为 1（旧节点被替换，不产生空步）。
+    assert_history(&doc, 1, 0, 1);
+    assert_open(&doc, 3, None, 2, 2);
+    common::assert_rejected_without_change(
+        &mut doc,
+        |doc| doc.redo(),
+        |error| {
+            matches!(
+                error,
+                DocError::Buffer(aline_buffer::BufferError::NothingToRedo)
+            )
+        },
+    )?;
+    assert_history(&doc, 1, 0, 1);
     common::assert_idle(&doc);
     Ok(())
 }

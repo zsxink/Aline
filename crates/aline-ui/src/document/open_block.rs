@@ -15,7 +15,10 @@ use crate::document::composition::CompositionState;
 pub(crate) struct TypingGroup {
     pub(crate) range: Range<usize>,
     pub(crate) draft: String,
+    /// 组开始时的逻辑选区；撤销恢复该值。
     pub(crate) before_selection: SelectionSpec,
+    /// 撤销时刻的逻辑选区；重做恢复该值（可反向、可非折叠）。
+    pub(crate) after_selection: SelectionSpec,
     pub(crate) last_input_at: u64,
 }
 
