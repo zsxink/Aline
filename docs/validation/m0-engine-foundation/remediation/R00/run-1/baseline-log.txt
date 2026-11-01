@@ -1,0 +1,3 @@
+2f1dcea feat(aline-ui): 实现组 8 裁决后的资源引用与派生请求身份协议
+16f8e30 docs(workspace): 按 round-4 独立复判勾选任务 6.8 与 7.4
+4e11a3f docs(workspace): 补齐组 6/7 round-4 复核与组 8 首轮复核记录
