@@ -46,7 +46,7 @@ OpenSpec 使用仓库根目录 `openspec/` 下的 `spec-driven` schema，所有�
 - [x] 初始化 OpenSpec `spec-driven`，工件语言 zh-CN，配置 Codex 工作流技能。
 - [x] 初始化代码与架构执行规范及工程治理主规格，接入 AGENTS、OpenSpec 工件规则与 apply/archive 指引；本地自动工程门禁已建立，完整出口仍待复核。
 - [x] 初始化 CodeGraph，建立文档/原型现状的初始索引；代码开始后增量同步。
-- [ ] 完成 M0 出口：已有八 crate、门禁与 catalog；按[原任务表](../openspec/changes/m0-engine-foundation/tasks.md)继续复核，不能以实现勾选替代验收。实施依赖顺序为工具/准入 → workspace/守卫/catalog → 坐标/身份 → source保真 → buffer补丁/历史 → 解析/映射 → edit拒绝/事务 → DocCore输入组 → 全量出口，不重新执行已核实工作。
+- [ ] 完成 M0 出口：已有八 crate、门禁与 catalog；按[原任务表（已归档）](../openspec/changes/archive/2026-11-02-m0-engine-foundation/tasks.md)继续复核，不能以实现勾选替代验收。实施依赖顺序为工具/准入 → workspace/守卫/catalog → 坐标/身份 → source保真 → buffer补丁/历史 → 解析/映射 → edit拒绝/事务 → DocCore输入组 → 全量出口，不重新执行已核实工作。
 - [ ] 证实 M0 门禁、引擎核心与基础样例后，逐项更新验证计划和架构 M0 出口。
 - [ ] M1 前完成原生 macOS 首轮验证；Windows/Linux 按验证计划后续取证，不以 macOS 结果代替。
 
