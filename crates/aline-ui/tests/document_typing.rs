@@ -528,7 +528,7 @@ fn limits() -> DocLimits {
 
 #[test]
 fn redo_must_not_discard_pending_input() -> Result<(), Box<dyn std::error::Error>> {
-    // R01 F-01：Undo 后新输入 b 是待定组，Redo 不得越过它重做旧节点。
+    // R01 F-01：Undo 后新输入 b 立即分叉旧 redo；待定草稿期间 Redo 仍须安全拒绝。
     // 期望：拒绝且零副作用——文本/草稿/版本/历史/快照全部不变。
     let mut doc = DocCore::new("x", SelectionSpec::new(1, 1), limits())?;
     doc.type_text(1, "a", 0)?;
@@ -547,7 +547,7 @@ fn redo_must_not_discard_pending_input() -> Result<(), Box<dyn std::error::Error
         Some("b")
     );
     assert_eq!((state.revision, state.draft_generation), (2, 4));
-    assert_eq!((state.undo, state.redo, state.nodes), (0, 1, 1));
+    assert_eq!((state.undo, state.redo, state.nodes), (0, 0, 0));
     let current = doc
         .current_snapshot(TextBudget::new(4096))?
         .full_text(TextBudget::new(4096))?;
@@ -559,8 +559,79 @@ fn redo_must_not_discard_pending_input() -> Result<(), Box<dyn std::error::Error
     let first = snapshot_id(&mut doc)?;
     let second = snapshot_id(&mut doc)?;
     assert_same_snapshot(&first, &second);
-    assert_history(&doc, 0, 1, 1);
+    assert_history(&doc, 0, 0, 0);
     assert_open(&doc, 2, Some("b"), 2, 2);
+    common::assert_idle(&doc);
+    Ok(())
+}
+
+#[test]
+fn new_typing_draft_invalidates_redo_before_commit() -> Result<(), Box<dyn std::error::Error>> {
+    let mut doc = DocCore::new("x", SelectionSpec::new(1, 1), limits())?;
+    doc.type_text(1, "a", 0)?;
+    doc.commit_open_block(1)?;
+    doc.undo()?;
+    assert_history(&doc, 0, 1, 1);
+
+    doc.type_text(1, "b", 2)?;
+    assert_buffer(&doc, "x")?;
+    assert_snapshot(&mut doc, "xb")?;
+    assert_history(&doc, 0, 0, 0);
+
+    doc.undo()?;
+    assert_buffer(&doc, "x")?;
+    assert_snapshot(&mut doc, "x")?;
+    doc.leave_block(3)?;
+    assert_closed(&doc);
+    common::assert_rejected_without_change(
+        &mut doc,
+        |doc| doc.redo(),
+        |error| {
+            matches!(
+                error,
+                DocError::Buffer(aline_buffer::BufferError::NothingToRedo)
+            )
+        },
+    )?;
+    assert_buffer(&doc, "x")?;
+    assert_history(&doc, 0, 0, 0);
+    common::assert_idle(&doc);
+    Ok(())
+}
+
+#[test]
+fn rejected_new_typing_draft_keeps_redo_branch() -> Result<(), Box<dyn std::error::Error>> {
+    let mut doc = DocCore::new("x", SelectionSpec::new(1, 1), limits())?;
+    doc.type_text(1, "a", 0)?;
+    doc.commit_open_block(1)?;
+    doc.undo()?;
+    assert_history(&doc, 0, 1, 1);
+
+    doc.type_text(1, "", 2)?;
+    assert_buffer(&doc, "x")?;
+    assert_snapshot(&mut doc, "x")?;
+    assert_history(&doc, 0, 1, 1);
+
+    assert!(matches!(
+        doc.type_text(2, "b", 3),
+        Err(DocError::Buffer(
+            aline_buffer::BufferError::OutOfBounds { .. }
+        ))
+    ));
+    assert_buffer(&doc, "x")?;
+    assert_snapshot(&mut doc, "x")?;
+    assert_history(&doc, 0, 1, 1);
+
+    let too_large = "b".repeat(4097);
+    assert!(matches!(
+        doc.type_text(1, &too_large, 4),
+        Err(DocError::Buffer(
+            aline_buffer::BufferError::BudgetExceeded { .. }
+        ))
+    ));
+    assert_buffer(&doc, "x")?;
+    assert_snapshot(&mut doc, "x")?;
+    assert_history(&doc, 0, 1, 1);
     common::assert_idle(&doc);
     Ok(())
 }

@@ -596,7 +596,7 @@ TH-01～TH-10 不再阻塞格式/管理行为选择。字段表和固有类型/�
 
 ## 15. 旧稿与原型逐项处置账本
 
-2026-10-30收尾补记：PROTO-06已确认A，必要原始例证/完整源码索引已保全于[历史证据索引](./archive/migration-evidence/README.md)，Zed已有[现行复核](./zed-notes.md)。下表“移出/压缩/旧稿保留”等为首轮处置语境，不表示仍依赖docs_bak加载证据；具体本轮去向见[331主题收尾账本](maintenance/deletion-readiness/prior-evidence/closure-topic-mapping.md)。
+2026-10-30收尾补记：PROTO-06已确认A，必要原始例证/完整源码索引已保全于[历史证据索引](./archive/migration-evidence/README.md)，Zed已有[现行复核](./zed-notes.md)。下表“移出/压缩/旧稿保留”等为首轮处置语境，不表示仍依赖docs_bak加载证据；具体本轮去向见[331主题收尾账本（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/maintenance/deletion-readiness/prior-evidence/closure-topic-mapping.md)。
 
 保留/修订/移出/删除/待验证均指现行规则效力，**不删除或改写历史文件**。来源为[旧主题包规范](./archive/migration-evidence/theme-package-spec.md)及[原型主题目录](./prototype/legacy/themes/)。
 

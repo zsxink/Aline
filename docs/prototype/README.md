@@ -38,7 +38,7 @@ docs/prototype/
     └── tools/generate-theme-previews.py      # 历史生成器，禁止在归档内重跑
 ```
 
-`legacy/` 初次保存45个文件的原始字节；本次按用户要求删除旧品牌 PNG，`index.html` 仅三处图标 src 改为共享新 PNG，现存44文件，其中43个仍与初次清单逐字节一致。有限例外及旧/新哈希见 `inventory.json` 的 `authorized_updates`；除此之外不整合页面、不修复历史交互。最新涉及旧原型的仓库提交为 `28254bb214da4e9a77967a0a4604a9fcbb9a8935`（2026-10-28）；逐文件哈希记录本轮实际文件，不能用该提交号替代内容核对。原 `docs_bak/`、`reports/` 已经用户授权删除，见[删除执行记录](../maintenance/deletion-readiness/deletion-execution.md)；本目录的只读历史副本及独立证据继续保留，运行不需要原目录。
+`legacy/` 初次保存45个文件的原始字节；本次按用户要求删除旧品牌 PNG，`index.html` 仅三处图标 src 改为共享新 PNG，现存44文件，其中43个仍与初次清单逐字节一致。有限例外及旧/新哈希见 `inventory.json` 的 `authorized_updates`；除此之外不整合页面、不修复历史交互。最新涉及旧原型的仓库提交为 `28254bb214da4e9a77967a0a4604a9fcbb9a8935`（2026-10-28）；逐文件哈希记录本轮实际文件，不能用该提交号替代内容核对。原 `docs_bak/`、`reports/` 已经用户授权删除，见[删除执行记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/maintenance/deletion-readiness/deletion-execution.md)；本目录的只读历史副本及独立证据继续保留，运行不需要原目录。
 
 维护只处理来源说明、入口和迁移完整性。历史浏览器逻辑不追随 PRD 改造；发现差异记入账本，未来若制作新参考应建独立版本并注明与原件关系。不要把 `legacy/` 拷贝到应用 `src/` 或 `resources/themes/`，不要从它反推新功能、键位、默认值或运行时主题格式。
 

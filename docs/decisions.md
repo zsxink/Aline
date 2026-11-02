@@ -514,7 +514,7 @@
 
 - 决策调整产品范围/行为时，先取得明确裁决，再同步 PRD 需求/AC 和阶段；涉及分层/源码/事务则同步架构、引擎和工程规范；涉及 UI/插件/主题同步专项及追踪矩阵。验证改变方法、样本或证据时回填原 V，不能将实验结果静默当缩减需求的决定。
 - 每次新增/替代记录都保留日期、确认来源、理由/影响、旧新关联、回写文件和验证状态。完成回写要核对正文；确认已关闭不等于 V 已完成。版本升级、资源限额或平台例外使用相同纪律，不凭文档日期覆盖上位契约。
-- 当前决定的规范承载均已可定位，未发现需要本轮新增产品回写的缺失决定。**首轮记录的入口差异：**当时 AGENTS.md 仍列不存在的 v1-features/zed-notes 及旧章节号；2026-10-30 全量审计已改为 PRD/验证计划、现行 WordCraft 和明确标为历史的 Zed 入口，见[迁移审计](maintenance/deletion-readiness/prior-evidence/initial-audit.md)。架构 §12/架构规范 §18/插件 §14 等仍将旧 decisions.md 链接作历史证据。历史引用本身合法，不宜批量替换；可后续在这些位置追加现行 decisions.md 追踪入口，并区分当时版本与当前效力。本轮修改范围仅本文与 README，不改写这些文件或归档。
+- 当前决定的规范承载均已可定位，未发现需要本轮新增产品回写的缺失决定。**首轮记录的入口差异：**当时 AGENTS.md 仍列不存在的 v1-features/zed-notes 及旧章节号；2026-10-30 全量审计已改为 PRD/验证计划、现行 WordCraft 和明确标为历史的 Zed 入口，见[迁移审计（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/maintenance/deletion-readiness/prior-evidence/initial-audit.md)。架构 §12/架构规范 §18/插件 §14 等仍将旧 decisions.md 链接作历史证据。历史引用本身合法，不宜批量替换；可后续在这些位置追加现行 decisions.md 追踪入口，并区分当时版本与当前效力。本轮修改范围仅本文与 README，不改写这些文件或归档。
 - 本轮检查覆盖 21 个原 D 条目、4 个常设决定和卫生修复原文；Q-01～21、TA/PA/RS/ED/UI/PL/TH 均有来源与回写追踪；替代关系按子结论列明。本文与 README 的 221 处本地文件/锚点引用全部通过检查，21/21 原 D 条目逐字保留；独立审查未发现实质问题。历史引文内旧章节号只作当时语境，当前承载另有链接。
 - 文档检查不替代代码/平台实验。仓库尚无 Cargo workspace，本轮不运行 Cargo、不新增代码、不更改 docs_bak、PRD 或专项规范。未解决的技术证据影响对应 M0～M6 实现/发布出口，**没有新增待用户裁决的决定阻塞**。
 
@@ -522,7 +522,7 @@
 
 用户答复“待确认的清单采纳你的建议”，13题推荐均为A；[原话/完整问题/决定与回写](./archive/2026-10-30-migration-decisions.md)。WC-01新增有归属/版本/容量/生命周期、按类去重的会话内存降级汇总（PRD APP-06），由UI呈现、不持久化敏感内容；WC-02不新增通用命令catch，WC-03不以签名拒收有效UTF8，WC-04只在明确不支持且临时文件/替换访问语义已证明安全时允许权限复制失败后继续，WC-05仅逐文档恢复/丢弃，WC-06无设默认按钮/自动改默认，WC-07保留三项缺项占位。
 
-PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02山丘仅随原型，PROTO-04长期保留只读历史副本，PROTO-05旧视觉值仅候选，PROTO-06按逐篇复核/必要证据保全/引用核对实施。完整Zed调研已迁入，历史来源见[证据索引](./archive/migration-evidence/README.md)。策略已确认不等于许可已证明或V实验已执行；[收尾结论](maintenance/deletion-readiness/prior-evidence/closure-report.md)不授权删除旧目录。
+PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02山丘仅随原型，PROTO-04长期保留只读历史副本，PROTO-05旧视觉值仅候选，PROTO-06按逐篇复核/必要证据保全/引用核对实施。完整Zed调研已迁入，历史来源见[证据索引](./archive/migration-evidence/README.md)。策略已确认不等于许可已证明或V实验已执行；[收尾结论（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/maintenance/deletion-readiness/prior-evidence/closure-report.md)不授权删除旧目录。
 
 ## 12. 2026-10-30 应用图标采用与旧图删除
 
@@ -544,7 +544,7 @@ PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02
 
 效力与验证：工程基线自本次初始化起约束后续开发；现行产品和专项契约继续按职责负责，拟议 change 不能自动覆盖已确认决定。M0 仍需实际建立并以正反例证明依赖闭包、成员 lint 等自动守卫；OpenSpec 格式检查不代替 Cargo、平台或 V 验证。未创建应用代码、Cargo workspace、CI 或新的依赖，V-01～V-09 与阶段出口状态保持不变。
 
-文档版本标签：本批改动未引入新的产品或专项确认，故 `docs/` 各稿首部的 版本/日期 保留原确认语境，与[开发前终审维护记录](./maintenance/pre-development-review/report.md)“版本/日期保留原专项确认语境……不以改版本标签伪装新确认”一致；Splat 非规范回写与本次 OpenSpec 回写的差异分别由[调研 §10](./splat-study.md#10-文档回写与验证边界)和本节及[文档入口](./README.md)追踪，`AGENTS.md` 首段据此明确 OpenSpec 不改变权威分工（只说“同时必读”，不说“高于”）。
+文档版本标签：本批改动未引入新的产品或专项确认，故 `docs/` 各稿首部的 版本/日期 保留原确认语境，与[开发前终审维护记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/maintenance/pre-development-review/report.md)“版本/日期保留原专项确认语境……不以改版本标签伪装新确认”一致；Splat 非规范回写与本次 OpenSpec 回写的差异分别由[调研 §10](./splat-study.md#10-文档回写与验证边界)和本节及[文档入口](./README.md)追踪，`AGENTS.md` 首段据此明确 OpenSpec 不改变权威分工（只说“同时必读”，不说“高于”）。
 
 本次检查：OpenSpec CLI 1.13.2 执行 `openspec validate --all --strict --no-interactive`，工程治理主规格 1/1 通过（12 项要求）；PyYAML 解析配置及字段类型通过；在临时项目验证 proposal/specs/design/tasks 的 context/rules 和 apply/archive 的 guidance 均被 CLI 实际加载，临时项目已移除；所涉八份 Markdown 的 395 处本地目标/锚点引用通过，`git diff --check` 通过。独立审查提出的热路径措辞和 S 规则索引问题已修正并复核关闭，无剩余审查阻塞项。上述为文档和配置证据，未运行 Cargo 或平台实验。
 
@@ -552,4 +552,36 @@ PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02
 
 来源：4.3 前发现 PRD 多数派统一文字与 4.2 保留孤立 CR 的编码守卫未明确对齐；向用户列出最小处置方案后，用户指示“继续处理掉”。据此保留现有守卫，并明确 LF 策略下紧跟在孤立 CR 之后的 CRLF 单元保留，以免重新解码时吞掉孤立 CR；输出可以仍含混合行尾。普通 CRLF 和未配对 LF、精确源码身份、保护性 BOM 及保存成功/失败的既定规则不变。
 
-回写 PRD SAFE-03、引擎 §5.2、架构 §5.1 及 M0 change 的 design/source delta。既有 4.2 金样与实现证据见 [4.2 报告](./validation/m0-engine-foundation/group-4/step-4.2/report.md)；该澄清不表示完整 V-01～V-09 或 M0 出口已通过。
+回写 PRD SAFE-03、引擎 §5.2、架构 §5.1 及 M0 change 的 design/source delta。既有 4.2 金样与实现证据见 [4.2 报告（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-4/step-4.2/report.md)；该澄清不表示完整 V-01～V-09 或 M0 出口已通过。
+
+## 15. 2026-10-31 原始行尾表示与存储等价确认
+
+用户在收到表示方案的独立复核后答复“采用”。编辑源码分离头部 BOM、保留原始 CR/LF；CRLF 对及未配对 LF 是编码行尾单元，包含合法编辑新形成的 CRLF，按基线多数派输出，平票 LF；孤立 CR 及其余字符保留。存储往返只要求限定行尾表示等价；补丁、逆补丁、选区、历史与无变化判断仍使用源码精确身份。孤立 CR 邻接 CRLF 的保护继续按第14节。
+
+已回写[引擎 §5](./engine-design.md)、[架构 §5.1](./v1-architecture.md#51-状态所有权)及 M0 change 的 source delta/design；实际回归入口是 `crates/aline-source/tests/`。确认不表示文件替换/平台或 V 验证通过。原确认与独立分析位于清理前 Git 提交的 `docs/validation/m0-engine-foundation/source-representation-{decision,review}.md`。
+
+## 16. 2026-11-01 Unicode17 字素查询的精确准入
+
+用户批准 `aline-markdown → unicode-segmentation =1.13.3` 的唯一直接引擎边，锁定 Unicode17 行为与 Unicode18 GB9c 已知差异；每次查询累计供给最多4096 UTF-8字节、每chunk最多256字节，重复 PreContext 供给重复计费，超限受检拒绝。此批准不自动授权升级、第二分段库或依赖扩张。
+
+已回写[引擎 §7/18.2](./engine-design.md)、[架构 §3.2](./v1-architecture.md#32-栈与依赖的状态)、[V-07](./v1-validation-plan.md)与 M0 change；版本身份以 Cargo.lock 和现行准入表为准，回归见 `crates/aline-markdown/tests/grapheme.rs`。这只是纯逻辑边界，不证明系统字素、真实 IME 或三平台行为通过。原准入/独立复核在清理前 Git 的 `docs/validation/m0-engine-foundation/remediation/R07/`。
+
+## 17. 2026-10-31 正式 GPUI 子图指纹批准
+
+独立 reviewer `guard_review` 对完整图模型及七场景运行 `check_inputs` 后，主 Agent核对实际输出并批准 `scripts/engineering_policy.json` 的具体指纹，置 `reviewed = true`。正式完整子图相对历史基线无新增包身份、版本、来源、校验和或边；已准入 app-core TOML 引入的 `toml_datetime` serde feature变化已核对。regex三包与WASI p2绑定的身份、合法入边及target约束未扩展，精确例外仍以[架构 §3.2](./v1-architecture.md#32-栈与依赖的状态)为准。
+
+采用完整 all-target metadata保留host宏/构建边，以实际target tree核选包，filtered metadata只作交叉证据；Windows图中的libc来自rust-embed的host宏链，不删除该包或新增libc豁免。本批准只限登记的七场景指纹，**禁止自动刷新以追随漂移**；新子图或组合须重新审计。图解析不等于平台构建/窗口能力，也不单独证明E1或V通过。原审查位于清理前 Git 的 `docs/validation/m0-engine-foundation/group-2/engineering-baseline-review.md`，门禁和独立反例保留在 `scripts/`。
+
+## 18. 2026-11-01 仓库过程产物收敛
+
+用户要求删除无须保留的Agent产物和验证输出，整理必要资产，将进行中工作汇总成一个不追踪的临时交接；随后明确验证输出统一放 `logs/`，临时交接放 `tmp/`。据此删除 `docs/validation/`、`docs/maintenance/` 的逐轮报告、重复交接、旧审计清单及专用一次性审计脚本；保留代码、正式测试/夹具、可复现脚本、当前规范与OpenSpec工件，Buffer金样说明迁入实际fixture目录。
+
+执行边界见[开发流程 §5](./development-process.md#5-仓库产物与提交边界)。必要批准摘要见第15～17节；M0未闭合及验证缺口留[验证计划](./v1-validation-plan.md)，进行中细节只保存在本地临时交接，不作为分发依赖。不重写Git历史；旧过程材料按需以 `git show 59d601242775db5e08f53d03a5d2b5c46154eaf0:<原路径>` 查阅，不恢复整套目录。历史报告与当前状态分开，缺失原始证据不补造、互相冲突的旧计数待下一任务重核。清理不表示M0或V验收完成。
+
+## 19. 2026-11-02 普通输入草稿开始时分叉历史
+
+用户裁决 T-8-17：Undo 后存在旧 redo 分支时，有效、非空的普通输入一旦建立新草稿，立即丢弃旧分支；不等到输入组提交。即使该新草稿随后被 Undo 或随关闭块丢弃，也不恢复旧分支。待定输入期间 Redo 仍拒绝，保留草稿；空输入、非法位置/字符、预算或版本拒绝都不改变分支。IME 组合是临时候选，取消仍恢复前态且保留旧 redo；确认后作为实际编辑分叉。
+
+依据：现有 F-01 回归只证明 Redo 不丢待定输入，未覆盖 Undo 新草稿后离块再 Redo 的时序。独立 probe 观察到“提交 a → Undo → 输入 b → Undo b → 离块 → Redo”会恢复旧 a。用户确认“开始 b 时立即失效”后，DocCore 在新普通输入草稿发布前截断 Buffer redo；Buffer 仅改历史分支与其保存点节点关联，不改源码、选区或 revision。
+
+回写：[引擎 §9.3](./engine-design.md#93-历史保存点及重载)、[架构规范 R-5-05](./architecture-guide.md#5-命令输入组与编辑事务)、M0 OpenSpec design/spec/tasks 与 `crates/aline-ui/tests/document_typing.rs` / `document_composition.rs`。验证为有效新草稿立即分支、输入拒绝保留分支、Redo 待定组拒绝及 IME 取消保留分支；不代表 E1/E2/E4/E5/E7 或 V-01～V-09 闭合。

@@ -415,6 +415,17 @@ impl History {
         self.cursor = self.cursor.saturating_add(1);
     }
 
+    pub(crate) fn discard_redo_branch(&mut self) {
+        self.nodes.truncate(self.cursor);
+        if let Some(point) = &mut self.saved
+            && point
+                .node_index
+                .is_some_and(|index| index >= self.nodes.len())
+        {
+            point.node_index = None;
+        }
+    }
+
     pub(crate) fn seal_pending(&mut self) {
         if let Some(node) = self.nodes.get_mut(self.cursor.saturating_sub(1)) {
             node.pending = false;

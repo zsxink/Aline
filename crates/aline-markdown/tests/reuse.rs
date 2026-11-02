@@ -17,11 +17,70 @@ fn parse_with(
     budget: ParseBudget,
 ) -> Result<Parsed, Box<dyn Error>> {
     let snapshot = TextSnapshot::new(text.to_string(), TextBudget::new(BUDGET))?;
-    Ok(parse(&snapshot, config, budget)?)
+    let parsed = parse(&snapshot, config, budget)?;
+    assert_tree_partition(&parsed)?;
+    Ok(parsed)
 }
 
 fn parse_text(text: &str) -> Result<Parsed, Box<dyn Error>> {
     parse_with(text, ParseConfig::m0(), ParseBudget::m0())
+}
+
+fn assert_reuse_refused(old: &Parsed, new: &Parsed, expected: ReuseRefusal, label: &str) {
+    let outcome = reuse(old, new);
+    assert_eq!(outcome.refusal(), Some(expected), "{label}");
+    assert!(
+        outcome.is_empty(),
+        "{label}: refusal must carry no reuse candidates"
+    );
+}
+
+fn assert_protected_projection_diff(
+    old: &Parsed,
+    new: &Parsed,
+    expected: &[(Range<usize>, ProtectionKind)],
+) -> Result<(), Box<dyn Error>> {
+    let protected = |parsed: &Parsed| {
+        parsed
+            .protected_ranges()
+            .iter()
+            .map(|range| (range.range().byte_range(), range.kind()))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(protected(old), expected);
+    assert_eq!(protected(new), expected);
+    let mapping = |parsed: &Parsed| -> Vec<(Range<usize>, Range<usize>, MappingPrecision)> {
+        parsed
+            .projection()
+            .segments()
+            .iter()
+            .map(|segment| {
+                (
+                    segment.source_range().byte_range(),
+                    segment.drawn_range(),
+                    segment.precision(),
+                )
+            })
+            .collect()
+    };
+    assert_eq!(old.projection().drawn_text(), "a[^1]b[^2]conetwo");
+    assert_eq!(new.projection().drawn_text(), "a[^1]b[^2]cunotwo");
+    assert_eq!(
+        mapping(old),
+        mapping(new),
+        "fallback full-parse mapping ranges"
+    );
+    assert_eq!(
+        old.projection().drawn_text().get(11..14),
+        Some("one"),
+        "old protected definition maps its original text"
+    );
+    assert_eq!(
+        new.projection().drawn_text().get(11..14),
+        Some("uno"),
+        "changed protected definition maps its updated text"
+    );
+    Ok(())
 }
 
 #[test]
@@ -154,6 +213,20 @@ fn translate_accepts_in_block_endpoints_and_is_byte_exact() -> Result<(), Box<dy
 fn insertion_before_rebases_matching_suffix_blocks() -> Result<(), Box<dyn Error>> {
     let old = parse_text("A\n\nB\n\nC\n")?;
     let new = parse_text("X\n\nA\n\nB\n\nC\n")?;
+    assert_tree_partition(&old)?;
+    assert_tree_partition(&new)?;
+    let old_gaps: Vec<_> = old
+        .gaps()
+        .iter()
+        .map(|gap| gap.range().byte_range())
+        .collect();
+    let new_gaps: Vec<_> = new
+        .gaps()
+        .iter()
+        .map(|gap| gap.range().byte_range())
+        .collect();
+    assert_eq!(old_gaps, vec![1..3, 4..6, 7..8]);
+    assert_eq!(new_gaps, vec![1..3, 4..6, 7..9, 10..11]);
     let outcome = reuse(&old, &new);
     assert_eq!(outcome.refusal(), None);
     assert_eq!(outcome.reused().len(), 3, "suffix blocks must be reused");
@@ -233,19 +306,30 @@ fn global_dependencies_refuse_reuse() -> Result<(), Box<dyn Error>> {
     ];
     for (source, expected) in cases {
         let changed = parse_text(source)?;
-        assert_eq!(
-            reuse(&plain, &changed).refusal(),
-            Some(expected),
-            "source {source}"
-        );
-        assert_eq!(
-            reuse(&changed, &plain).refusal(),
-            Some(expected),
-            "reversed source {source}"
-        );
+        assert_reuse_refused(&plain, &changed, expected, source);
+        assert_reuse_refused(&changed, &plain, expected, "reversed source");
     }
     let html = parse_text("<div>x</div>\n")?;
-    assert_eq!(reuse(&plain, &html).refusal(), Some(ReuseRefusal::Html));
+    assert_reuse_refused(&plain, &html, ReuseRefusal::Html, "HTML dependency");
+
+    let footnote_before = parse_text("a[^1]b[^2]c\n\n[^1]: one\n[^2]: two\n")?;
+    let footnote_after = parse_text("a[^1]b[^2]c\n\n[^1]: uno\n[^2]: two\n")?;
+    assert_reuse_refused(
+        &footnote_before,
+        &footnote_after,
+        ReuseRefusal::Footnote,
+        "footnote definition changed",
+    );
+    assert_protected_projection_diff(
+        &footnote_before,
+        &footnote_after,
+        &[
+            (1..5, ProtectionKind::FootnoteReference),
+            (6..10, ProtectionKind::FootnoteReference),
+            (13..22, ProtectionKind::FootnoteDefinition),
+            (23..32, ProtectionKind::FootnoteDefinition),
+        ],
+    )?;
     Ok(())
 }
 
@@ -257,22 +341,23 @@ fn config_change_and_raw_fallback_refuse_reuse() -> Result<(), Box<dyn Error>> {
         ParseConfig::new(2, aline_markdown::ParseFeatures::M0),
         ParseBudget::m0(),
     )?;
-    assert_eq!(
-        reuse(&old, &changed).refusal(),
-        Some(ReuseRefusal::ConfigChanged)
+    assert_reuse_refused(
+        &old,
+        &changed,
+        ReuseRefusal::ConfigChanged,
+        "config changed",
     );
     let fallback = parse_with(
         "A\n\nB\n",
         ParseConfig::m0(),
         ParseBudget::m0().with_max_segments(0),
     )?;
-    assert_eq!(
-        reuse(&old, &fallback).refusal(),
-        Some(ReuseRefusal::RawFallback)
-    );
-    assert_eq!(
-        reuse(&fallback, &old).refusal(),
-        Some(ReuseRefusal::RawFallback)
+    assert_reuse_refused(&old, &fallback, ReuseRefusal::RawFallback, "raw fallback");
+    assert_reuse_refused(
+        &fallback,
+        &old,
+        ReuseRefusal::RawFallback,
+        "raw fallback reversed",
     );
     Ok(())
 }
@@ -332,15 +417,11 @@ fn block_quote_reference_definition_changes_refuse_reuse() -> Result<(), Box<dyn
             (&replaced, &old, "definition block replaced reversed"),
         ];
         for (left, right, label) in cases {
-            let outcome = reuse(left, right);
-            assert_eq!(
-                outcome.refusal(),
-                Some(ReuseRefusal::ReferenceDefinition),
-                "{label} for {source:?}"
-            );
-            assert!(
-                outcome.is_empty(),
-                "{label} for {source:?} must not silently reuse blocks"
+            assert_reuse_refused(
+                left,
+                right,
+                ReuseRefusal::ReferenceDefinition,
+                &format!("{label} for {source:?}"),
             );
         }
     }
@@ -493,16 +574,8 @@ fn block_quote_fence_changes_refuse_reuse() -> Result<(), Box<dyn Error>> {
     for (old_text, new_text, label) in cases {
         let old = parse_text(old_text)?;
         let new = parse_text(new_text)?;
-        assert_eq!(
-            reuse(&old, &new).refusal(),
-            Some(ReuseRefusal::Fence),
-            "{label}"
-        );
-        assert_eq!(
-            reuse(&new, &old).refusal(),
-            Some(ReuseRefusal::Fence),
-            "{label} reversed"
-        );
+        assert_reuse_refused(&old, &new, ReuseRefusal::Fence, label);
+        assert_reuse_refused(&new, &old, ReuseRefusal::Fence, "fence reversed");
     }
     Ok(())
 }
@@ -631,6 +704,7 @@ struct BlockSignature {
 struct SegmentSignature {
     source: Range<usize>,
     drawn: Range<usize>,
+    text: String,
     precision: MappingPrecision,
 }
 
@@ -668,6 +742,84 @@ fn assert_all_reused_pairs_match(
         assert_eq!(
             pair.translate(new.snapshot(), &old_end)?.byte_offset(),
             pair.new_range().byte_range().end
+        );
+    }
+    Ok(())
+}
+
+fn assert_tree_partition(parsed: &Parsed) -> Result<(), Box<dyn Error>> {
+    let mut ranges: Vec<_> = parsed
+        .blocks()
+        .iter()
+        .map(|block| block.range().byte_range())
+        .chain(parsed.gaps().iter().map(|gap| gap.range().byte_range()))
+        .collect();
+    ranges.sort_by_key(|range| (range.start, range.end));
+    let mut covered_until = 0usize;
+    for range in ranges {
+        assert_eq!(
+            range.start, covered_until,
+            "block/Gap must not leave holes or overlap"
+        );
+        assert!(range.end >= range.start, "ranges must be ordered");
+        covered_until = range.end;
+    }
+    assert_eq!(
+        covered_until,
+        parsed.snapshot().len_bytes(),
+        "tree must cover source bytes"
+    );
+    Ok(())
+}
+
+/// M0 尚无独立导航索引；此处只验证 heading block 作为源码跳转锚点的文本/端点迁移。
+fn assert_heading_source_anchors_match(
+    old: &Parsed,
+    new: &Parsed,
+    outcome: &ReuseOutcome,
+) -> Result<(), Box<dyn Error>> {
+    for pair in outcome.reused() {
+        let old_block = old
+            .blocks()
+            .get(pair.old_index())
+            .ok_or("missing old block")?;
+        if old_block.kind() != BlockKind::Heading {
+            continue;
+        }
+        let new_block = new
+            .blocks()
+            .get(pair.new_index())
+            .ok_or("missing new block")?;
+        assert_eq!(new_block.kind(), BlockKind::Heading);
+        assert_eq!(
+            pair.old_range().byte_range().len(),
+            pair.new_range().byte_range().len()
+        );
+        let old_heading = old
+            .snapshot()
+            .slice(old_block.range(), TextBudget::new(BUDGET))?;
+        let new_heading = new
+            .snapshot()
+            .slice(new_block.range(), TextBudget::new(BUDGET))?;
+        assert_eq!(
+            old_heading.as_ref(),
+            new_heading.as_ref(),
+            "heading source anchor text"
+        );
+        let old_start = old
+            .snapshot()
+            .src_offset(pair.old_range().byte_range().start)?;
+        let old_end = old
+            .snapshot()
+            .src_offset(pair.old_range().byte_range().end)?;
+        let new_range = new_block.range().byte_range();
+        assert_eq!(
+            pair.translate(new.snapshot(), &old_start)?.byte_offset(),
+            new_range.start
+        );
+        assert_eq!(
+            pair.translate(new.snapshot(), &old_end)?.byte_offset(),
+            new_range.end
         );
     }
     Ok(())
@@ -740,6 +892,11 @@ fn block_signature(
                 drawn
             }
         };
+        let drawn_text = parsed
+            .projection()
+            .drawn_text()
+            .get(clipped_drawn.clone())
+            .ok_or("clipped drawn range is not a valid UTF-8 slice")?;
         segments.push(SegmentSignature {
             source: relocate(start)?..relocate(end)?,
             drawn: clipped_drawn
@@ -750,6 +907,7 @@ fn block_signature(
                     .end
                     .checked_sub(drawn_base)
                     .ok_or("drawn end before block")?,
+            text: drawn_text.to_string(),
             precision: segment.precision(),
         });
     }
@@ -780,8 +938,8 @@ fn block_signature(
 }
 
 #[test]
-fn reused_blocks_match_full_reparse_mapping_protection_and_navigation() -> Result<(), Box<dyn Error>>
-{
+fn reused_blocks_match_full_reparse_mapping_protection_and_heading_anchor()
+-> Result<(), Box<dyn Error>> {
     let cases: [(&str, &str, usize); 4] = [
         ("# H\n\nA\n\nB\n\nC\n", "X\n\n# H\n\nA\n\nB\n\nC\n", 4),
         ("# H\n\nA\n\nB\n\nC\n", "# H\n\nA2\n\nB\n\nC\n", 3),
@@ -791,6 +949,8 @@ fn reused_blocks_match_full_reparse_mapping_protection_and_navigation() -> Resul
     for (old_text, new_text, expected) in cases {
         let old = parse_text(old_text)?;
         let new = parse_text(new_text)?;
+        assert_tree_partition(&old)?;
+        assert_tree_partition(&new)?;
         let outcome = reuse(&old, &new);
         assert_eq!(outcome.refusal(), None, "old {old_text:?} new {new_text:?}");
         assert_eq!(
@@ -799,6 +959,7 @@ fn reused_blocks_match_full_reparse_mapping_protection_and_navigation() -> Resul
             "old {old_text:?} new {new_text:?}"
         );
         assert_all_reused_pairs_match(&old, &new, &outcome)?;
+        assert_heading_source_anchors_match(&old, &new, &outcome)?;
     }
     Ok(())
 }

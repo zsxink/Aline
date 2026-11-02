@@ -16,6 +16,7 @@ import subprocess
 import sys
 
 from evidence_paths import resolve_path, write_json, write_text
+from validation_output import output_directory
 
 ROOT = Path(__file__).resolve().parent.parent
 MEMBERS = {
@@ -1159,8 +1160,7 @@ def run_member_self_checks(directory):
 
 
 def run_self_test(output):
-    output = Path(output)
-    output.mkdir(parents=True, exist_ok=True)
+    output = output_directory('lint-self-test', output)
     actual_members = audit_manifests()
     print("八个正式成员均声明 workspace lint 继承", flush=True)
     root_tables = tables(ROOT / "Cargo.toml")
@@ -1281,13 +1281,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--root", type=Path, default=ROOT, help="待审 Cargo workspace 根目录")
-    parser.add_argument("--output-dir", type=Path, default=ROOT / "logs/validation/lint-self-test")
+    parser.add_argument("--output-dir", type=Path)
     args = parser.parse_args()
     try:
         if args.self_test:
             return run_self_test(args.output_dir)
+        output = output_directory('lint', args.output_dir)
         members = audit_manifests(args.root.resolve())
-        print(json.dumps({"status": "workspace lint 声明有效", "members": members}, ensure_ascii=False, indent=2))
+        summary = {"status": "workspace lint 声明有效", "members": members}
+        write_json(output / 'summary.json', summary)
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
         return 0
     except (CheckError, OSError, ValueError, KeyError, RecursionError) as error:
         print("lint 检查拒绝: " + str(error), file=sys.stderr)

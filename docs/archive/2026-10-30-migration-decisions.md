@@ -32,7 +32,7 @@
 
 13项方案选择已关闭，不再等待重复确认；PROTO-01/03的来源/权利记录仍有事实缺口，不能由本次答复补造作者或许可证。现有身份参考保留，正式发布前仍需可核对证据。V-01～09均未执行，WC-04只有在平台证明满足条件后才能开放对应分支，不能把“采用条件策略”记作NAS/权限能力已通过。
 
-前七份Q/TA/PA/RS/ED/UI/PL/TH确认归档保持原字节。原审计报告和13题清单是当时交付快照，后续状态以本归档及[收尾报告](../maintenance/deletion-readiness/prior-evidence/closure-report.md)为准。当前规范继续负责产品/实现要求，历史证据和研究不升为规范。
+前七份Q/TA/PA/RS/ED/UI/PL/TH确认归档保持原字节。原审计报告和13题清单是当时交付快照，后续状态以本归档及[收尾报告（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/maintenance/deletion-readiness/prior-evidence/closure-report.md)为准。当前规范继续负责产品/实现要求，历史证据和研究不升为规范。
 
 ## 4. 原始13题清单（确认前原文）
 

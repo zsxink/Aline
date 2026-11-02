@@ -537,7 +537,7 @@ V-09 至少覆盖拟定最小尺寸、常用尺寸、放大/缩小与多显示�
 
 ## 19. 旧规范与原型逐项处置账本
 
-2026-10-30收尾补记：PROTO-06已确认A，必要原始例证/完整源码索引已保全于[历史证据索引](./archive/migration-evidence/README.md)，Zed已有[现行复核](./zed-notes.md)。下表“移出/压缩/旧稿保留”等为首轮处置语境，不表示仍依赖docs_bak加载证据；具体本轮去向见[331主题收尾账本](maintenance/deletion-readiness/prior-evidence/closure-topic-mapping.md)。
+2026-10-30收尾补记：PROTO-06已确认A，必要原始例证/完整源码索引已保全于[历史证据索引](./archive/migration-evidence/README.md)，Zed已有[现行复核](./zed-notes.md)。下表“移出/压缩/旧稿保留”等为首轮处置语境，不表示仍依赖docs_bak加载证据；具体本轮去向见[331主题收尾账本（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/maintenance/deletion-readiness/prior-evidence/closure-topic-mapping.md)。
 
 ### 19.1 旧 UI 稿逐章处置
 

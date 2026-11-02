@@ -1,7 +1,7 @@
 {
   "format": 1,
   "reviewed": true,
-  "review_evidence": "docs/validation/m0-engine-foundation/group-2/engineering-baseline-review.md",
+  "review_evidence": "docs/decisions.md#17-2026-10-31-正式-gpui-子图指纹批准",
   "purpose": "正式八成员 workspace 的 GPUI 精确子图；不准许自动更新指纹",
   "workspace_features": {
     "aline": {},

@@ -295,6 +295,37 @@ fn history_redo_branch_is_discarded_by_new_edit() -> Result<(), Box<dyn Error>> 
 }
 
 #[test]
+fn history_explicit_redo_branch_discard_keeps_current_snapshot_and_savepoint()
+-> Result<(), Box<dyn Error>> {
+    let mut buffer = make_buffer("a", 1, 1, 16)?;
+    apply_patch(
+        &mut buffer,
+        vec![(1..1, String::from("X"))],
+        (2, 2),
+        OperationSource::Command,
+        1000,
+    )?;
+    buffer.mark_saved();
+    let saved_revision = buffer.saved_revision();
+    buffer.undo(TextBudget::new(TEXT_BUDGET))?;
+    let current_revision = buffer.revision();
+    let current_text = text(&buffer)?;
+    let current_selection = buffer.selection().clone();
+    assert_eq!(buffer.redo_depth(), 1);
+
+    buffer.discard_redo_branch();
+
+    assert_eq!(text(&buffer)?, current_text);
+    assert_eq!(buffer.revision(), current_revision);
+    assert_eq!(buffer.selection(), &current_selection);
+    assert_eq!(buffer.redo_depth(), 0);
+    assert_eq!(buffer.history_node_count(), 0);
+    assert!(!buffer.is_at_save_point());
+    assert_eq!(buffer.saved_revision(), saved_revision);
+    Ok(())
+}
+
+#[test]
 fn history_trimming_protects_save_point_and_current_node() -> Result<(), Box<dyn Error>> {
     let mut trimmed = make_buffer("a", 1, 1, 3)?;
     for step in 1..=5usize {

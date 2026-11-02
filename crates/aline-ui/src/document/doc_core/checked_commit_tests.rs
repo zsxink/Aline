@@ -459,16 +459,21 @@ fn no_change_or_cancelled_composition_preserves_redo_and_history_steps() -> Test
 }
 
 #[test]
-fn legal_input_publish_clears_redo_only_when_committed() -> TestResult {
+fn ordinary_input_and_ime_clear_redo_at_their_contract_boundaries() -> TestResult {
     for ime in [false, true] {
         let mut doc = with_redo()?;
         if ime {
             doc.composition_start("Q", 4)?;
+            // IME 仍是临时候选；取消必须保留旧 redo 分支。
+            assert_eq!(doc.redo_depth(), 1);
+            doc.composition_cancel(5)?;
+            assert_eq!(doc.redo_depth(), 1);
+            doc.composition_start("Q", 6)?;
         } else {
             doc.type_text(2, "Q", 4)?;
+            // 普通输入成为有效待定草稿时立即截断旧分支。
+            assert_eq!(doc.redo_depth(), 0);
         }
-        // 只确认既有实现不在草稿阶段截分支；不把它提升为 T-8-17 的产品裁决。
-        assert_eq!(doc.redo_depth(), 1);
         if ime {
             doc.composition_commit(5)?;
         } else {

@@ -4,12 +4,13 @@ context: |
   Language: zh-CN
   All artifacts must be written in zh-CN.
   Keep OpenSpec structural headings and SHALL/MUST keywords in English.
-  Aline is a Rust + GPUI Markdown editor. The repository currently starts at M0 and has no Cargo workspace or application implementation.
+  Aline is a Rust + GPUI Markdown editor. An eight-member Cargo workspace, headless engine foundations and engineering guards exist; the M0 exit remains open and no usable native UI is available.
   Authoritative product scope: docs/v1-prd.md. Architecture and implementation constraints: AGENTS.md and the current docs linked from docs/README.md. Validation evidence: docs/v1-validation-plan.md.
   OpenSpec records proposed changes and implementation plans; it does not supersede confirmed repository docs. Cite relevant sections and do not turn unverified plans into claims of completed validation.
   Follow docs/development-process.md and docs/v1-architecture.md §13 for M0–M6 sequencing and phase exits.
   Mandatory engineering baseline: openspec/CODE_STANDARDS.md and openspec/specs/engineering-governance/spec.md. Read them and the affected current docs before coding or reviewing. They supplement implementation governance; existing product and confirmed architecture contracts retain their responsibilities.
   Divide modules by responsibility, state ownership, lifecycle and testable boundaries; line counts are review signals rather than automatic split thresholds. Use design patterns only for real boundaries, variation or testing needs, and prefer the simplest sufficient concrete implementation.
+  Artifact retention follows docs/development-process.md section 5: commit code, reproducible tests/scripts and independent fixtures; keep raw outputs and per-run Agent reports under ignored logs/. Maintain one untracked resume document under tmp/; update existing specs and validation plans for durable decisions and phase results.
 
 rules:
   proposal:
@@ -29,7 +30,7 @@ rules:
     - Explain module split/retention decisions using cohesion, lifecycle, API size and testability, not hard line-count or trait-method limits. Record compatibility and migration impact where relevant.
   tasks:
     - Sequence pure engine mechanisms before UI integration where applicable.
-    - Include documentation/validation-plan updates and concrete verification evidence.
+    - Include existing documentation/validation-plan updates and concrete verification evidence; raw outputs and per-run reports stay local, not in new tracked report trees.
     - Trace task groups to requirements/scenarios and applicable engineering rules. For refactors include obsolete implementation/export/dependency/fake cleanup and reference checks.
     - Include positive and minimal violating examples when adding or changing automated guards; verify every workspace member actually inherits the intended lint policy.
 

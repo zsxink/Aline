@@ -26,4 +26,4 @@ jobs:
           set-safe-directory: false
           clean: false
       - name: 检查 workspace 和守卫正反例
-        run: python3 scripts/check_workspace.py --output-dir "$RUNNER_TEMP/aline-m0-evidence"
+        run: python3 scripts/check_workspace.py

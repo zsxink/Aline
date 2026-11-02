@@ -41,6 +41,6 @@
 
 已确认A并实施：逐篇形成现行Zed复核与必要证据保全，已建立独立历史证据索引并更新当前引用。只允许重新做删除准备评估，不是删除授权；本轮原件全保留。
 
-- **证据/后续：**[原始证据索引](../archive/migration-evidence/README.md)和[收尾报告](../maintenance/deletion-readiness/prior-evidence/closure-report.md)。
+- **证据/后续：**[原始证据索引](../archive/migration-evidence/README.md)和[收尾报告（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/maintenance/deletion-readiness/prior-evidence/closure-report.md)。
 - **是否阻塞删除旧目录：**本项策略已确认；字节/语义/引用检查完成后均不再依赖旧目录，最终整体结论以收尾报告为准。未删除原件。
 

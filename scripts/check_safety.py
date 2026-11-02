@@ -19,6 +19,7 @@ import tempfile
 
 from safety_lex import tokenize, test_tokens, closing
 from evidence_paths import write_json, write_text
+from validation_output import output_directory
 
 ROOT = Path(__file__).resolve().parent.parent
 ENGINES = {'aline-source', 'aline-buffer', 'aline-markdown', 'aline-edit', 'aline-app-core'}
@@ -162,7 +163,11 @@ def member_scan(root, relative, package, scanned):
     manifest = directory / 'Cargo.toml'
     engine = directory.name in ENGINES
     target_files, rejected_external = set(), set()
-    for target in package.get('targets') or []:
+    targets = package.get('targets')
+    if not targets:
+        failures.append({'file': str(manifest), 'line': 1, 'rule': 'empty-target-list',
+                         'detail': 'Cargo metadata package has no targets'})
+    for target in targets or []:
         kinds = target.get('kind') or []
         source = target.get('src_path')
         if not source:
@@ -350,11 +355,12 @@ def self_test(output):
     """
     fixtures = ROOT / 'scripts/fixtures/safety'
     cases = json.loads((fixtures / 'cases.json').read_text())
-    output.mkdir(parents=True, exist_ok=True)
-    work = Path(tempfile.mkdtemp(prefix='aline-safety-self-test-'))
+    output = output_directory('safety-self-test', output)
+    work = Path(tempfile.mkdtemp(prefix='work-', dir=output))
     records = []
 
     def run_case(name, argv, expected, expectation, count=None):
+        argv = argv + ['--output-dir', str(output / 'checks' / name)]
         start = datetime.datetime.now(datetime.timezone.utc).isoformat()
         result = subprocess.run(argv, cwd=str(ROOT), text=True, capture_output=True,
                                 env=dict(os.environ, PYTHONDONTWRITEBYTECODE='1'))
@@ -512,6 +518,20 @@ def self_test(output):
         '[package]\nname = "aline-buffer"\nversion = "0.0.0"\nedition = "2024"\n\n[lib]\npath = "src/dangling.rs"\n')
     run_case('dangling-target-symlink', [sys.executable, str(Path(__file__).resolve()), '--root', str(dangling_root)],
              ['target-path-missing'], '悬空符号链接必须拒绝，且同一落点只报一条', count=1)
+    empty_targets_root = work / 'workspace-fixtures' / 'empty-package-targets'
+    build_workspace(empty_targets_root)
+    empty_scan: list[dict] = []
+    empty_failures = member_scan(
+        empty_targets_root, 'crates/aline-buffer', {'targets': []}, empty_scan)
+    empty_rules = sorted({failure['rule'] for failure in empty_failures})
+    empty_passed = empty_rules == ['empty-target-list'] and bool(empty_scan)
+    records.append({'name': 'empty-package-targets', 'execution': 'direct-function-contract',
+                    'function': 'member_scan', 'input': {'package.targets': []},
+                    'cwd': '<controlled-fixture>', 'exit_code': None,
+                    'expected_rules': ['empty-target-list'], 'actual_rules': empty_rules,
+                    'expected_failures': None, 'actual_failures': len(empty_failures),
+                    'passed': empty_passed,
+                    'independent_expectation': '合成 metadata 空 target 列表须显式失败，同时成员源码仍被扫描'})
     run_case('root-missing', [sys.executable, str(Path(__file__).resolve()), '--root',
                               str(work / 'workspace-fixtures' / 'absent-root')], ['root-missing'],
              '不存在的根必须非零退出并给出 root-missing；空扫描不等于通过')
@@ -543,12 +563,14 @@ def main():
     parser.add_argument('--file', type=Path)
     parser.add_argument('--kind', choices=['engine-production', 'engine-test', 'ui', 'ui-production', 'ui-test'], default='engine-production')
     parser.add_argument('--self-test', action='store_true')
-    parser.add_argument('--output-dir', type=Path, default=ROOT / 'logs/validation/safety-results')
+    parser.add_argument('--output-dir', type=Path)
     args = parser.parse_args()
     try:
         if args.self_test:
             return self_test(args.output_dir)
+        output = output_directory('safety', args.output_dir)
         result = {'failures': scan(args.file.read_text(), args.file, args.kind)[0]} if args.file else workspace_scan(args.root.resolve())
+        write_json(output / 'summary.json', result)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 1 if result['failures'] else 0
     except (OSError, ValueError, KeyError) as error:

@@ -361,7 +361,7 @@ PL-01～PL-03 的产品决定阻塞均已解除，相关分支可按已采纳结
 
 ## 13. 旧稿逐章处置账本
 
-2026-10-30收尾补记：PROTO-06已确认A，必要原始例证/完整源码索引已保全于[历史证据索引](./archive/migration-evidence/README.md)，Zed已有[现行复核](./zed-notes.md)。下表“移出/压缩/旧稿保留”等为首轮处置语境，不表示仍依赖docs_bak加载证据；具体本轮去向见[331主题收尾账本](maintenance/deletion-readiness/prior-evidence/closure-topic-mapping.md)。
+2026-10-30收尾补记：PROTO-06已确认A，必要原始例证/完整源码索引已保全于[历史证据索引](./archive/migration-evidence/README.md)，Zed已有[现行复核](./zed-notes.md)。下表“移出/压缩/旧稿保留”等为首轮处置语境，不表示仍依赖docs_bak加载证据；具体本轮去向见[331主题收尾账本（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/maintenance/deletion-readiness/prior-evidence/closure-topic-mapping.md)。
 
 对象为不改写的[旧 plugin-system.md](./archive/migration-evidence/plugin-system.md)。**保留**指约束继续适用；**修订**更新职责/范围/行为；**移出**表示详细责任交给现行专项或未来专项，本轮不修改该文件；**删除**表示不再作为 V1 要求，历史原文仍保留；**待验证**按 V 收口。同章可拆分处置。
 

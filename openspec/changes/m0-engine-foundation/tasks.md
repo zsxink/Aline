@@ -2,16 +2,16 @@
 
 本 change 已由用户授权启动 apply，实际状态以任务勾选及证据为准；M0 全程不创建窗口。每组是审查关口，组内任务可分次完成；前置失败暂停依赖任务。2026-10-30 用户在隔离审计和草案交付后指示完成第 1 组，批准现行架构 §3.2 的两项 GPUI 精确例外及相关规范同步；没有其它禁令豁免。E1～E7 对应 proposal 出口表，requirement/scenario 名对应本 change 的 delta。
 
-证据统一记录：提交/工具版本、OS/CPU/设备、输入夹具路径与独立预期来源、完整命令/退出码/关键输出、实际/人工/未执行分类、反例失败原因及恢复后结果、未覆盖平台和链接。拟存放 `docs/validation/m0-engine-foundation/`（apply 时按实际证据创建），并从既有验证计划相应分项链接；这不是新增规范或 V 编号。共享 fixtures 必须由具体 crate 测试调用并出现在测试发现清单中。下列测试过滤名和守卫文件名是拟建入口，实施时记录实际名称，不将不存在的入口当已运行。每组 Rust 变更提交前执行第 2 组列出的完整三条门禁，不以局部测试替代。
+证据统一记录：提交/工具版本、OS/CPU/设备、输入夹具路径与独立预期来源、完整命令/退出码/关键输出、实际/人工/未执行分类、反例失败原因及恢复后结果、未覆盖平台和链接。运行输出统一存放 `logs/validation/m0-engine-foundation/<运行编号>/`，必要阶段摘要回填既有验证计划，换会话只维护 `tmp/m0-resume.md`（不追踪）；不再创建入库报告树，也不新增规范或 V 编号。共享 fixtures 必须由具体 crate 测试调用并出现在测试发现清单中。下列测试过滤名和守卫文件名是拟建入口，实施时记录实际名称，不将不存在的入口当已运行。每组 Rust 变更提交前执行第 2 组列出的完整三条门禁，不以局部测试替代。
 
 ## 1. 兼容目标与工具链及依赖候选登记
 
 范围：全八 crate，重点 GPUI 闭包；前置：用户批准本方案并启动 apply。关联 workspace/engineering-gates「候选与闭包准入」，E1/E6；R-1、S-2-02/13-06/15，K-01/K-08，RS-01/04/05。
 
 - [x] 1.1 建 V-01 兼容目标/设备表：登记 macOS（含 Intel）、Windows 10、Linux CPU/系统候选/显示环境和取证设备缺口；人工核对验证顺序为先 macOS 后 Windows/Linux，表中无“已支持”推断。
-- [x] 1.2 在隔离候选目录验证 Rust/Cargo/edition/rustfmt/Clippy/gpui-pre 组合，保存 rustc -Vv、cargo -V、cargo fmt --version、cargo clippy --version、候选构建日志及源码/补丁身份；MSRV 若声明单独测试最低版本，正例可复现，最小不兼容配置须有诊断，不把旧版本或 edition 候选写成锁定事实。
-- [x] 1.3 建逐依赖准入账本：用途/所属 crate/候选精确版本/来源/许可证/features/target/dev/build/同类替代；用 cargo metadata --format-version 1 及 cargo tree --target all -e all 保留真实包/别名/传递路径，再分别解析实际目标与 feature 组合，不能以一次 all-features 并集掩盖互斥组合；按架构 §3.2 核对 GPUI 精确例外及全部引入路径，正例合规组合通过，反例经别名或目标路径引入未获例外的 notify/regex/tokio/Wasmtime/WASI、第二解析器，以及同包旁路/版本或校验和/target 漂移必须失败；解析失败记阻塞而非通过。
-- [x] 1.4 人工审查准入证据和五引擎闭包；第 1 组审查隔离候选闭包及拟用依赖归属，第 2 组仍须复核实际五引擎闭包，不能把尚未创建的成员写成已验证。无合规 GPUI 候选时列精确路径、最小替代和待裁决影响，暂停步骤 2 依赖接线。回填架构 §3.2、引擎 §18.2、Rust §2/13/19 与 V-01 目标栏，并同步本次已批准例外涉及的 AGENTS、架构规范 R-1-05、Rust §15、CODE_STANDARDS/工程治理及 change 工件，只记录实际分项，不标 V-01 通过；核对提交 scope 遵守 RS-05。
+- [x] 1.2 在隔离候选目录验证 Rust/Cargo/edition/rustfmt/Clippy/gpui-pre 组合，保存 rustc -Vv、cargo -V、cargo fmt --version、cargo clippy --version、候选构建日志及源码/补丁身份；MSRV 若声明单独测试最低版本，正例可复现，最小不兼容配置须有诊断，不把旧版本或 edition 候选写成锁定事实。2026-11-02 复核：新建 GPUI 0.3.9 / edition 2024 隔离候选在登记 Rust/Cargo 1.98.1、macOS 27.2 arm64、离线 cache 上完成 metadata/check/build/fmt/Clippy；不支持版本产生 Cargo 解析拒绝诊断。rustc/cargo/rustfmt/Clippy 版本、真实 cwd 映射及资产身份见 `logs/validation/m0-resume/run-20261102-09/gpui-candidate/summary-final.json`。workspace 与候选均未声明 `rust-version`，因此不声称 MSRV；只核实当前 macOS arm64 组合，不外推 Intel/Windows/Linux。该勾选不表示 1.3/1.4 或 V-01 完成。
+- [ ] 1.3 建逐依赖准入账本：用途/所属 crate/候选精确版本/来源/许可证/features/target/dev/build/同类替代；用 cargo metadata --format-version 1 及 cargo tree --target all -e all 保留真实包/别名/传递路径，再分别解析实际目标与 feature 组合，不能以一次 all-features 并集掩盖互斥组合；按架构 §3.2 核对 GPUI 精确例外及全部引入路径，正例合规组合通过，反例经别名或目标路径引入未获例外的 notify/regex/tokio/Wasmtime/WASI、第二解析器，以及同包旁路/版本或校验和/target 漂移必须失败；解析失败记阻塞而非通过。
+- [ ] 1.4 人工审查准入证据和五引擎闭包；第 1 组审查隔离候选闭包及拟用依赖归属，第 2 组仍须复核实际五引擎闭包，不能把尚未创建的成员写成已验证。无合规 GPUI 候选时列精确路径、最小替代和待裁决影响，暂停步骤 2 依赖接线。回填架构 §3.2、引擎 §18.2、Rust §2/13/19 与 V-01 目标栏，并同步本次已批准例外涉及的 AGENTS、架构规范 R-1-05、Rust §15、CODE_STANDARDS/工程治理及 change 工件，只记录实际分项，不标 V-01 通过；核对提交 scope 遵守 RS-05。当前已有 GPUI 新候选闭包与五引擎依赖闭包复核，但逐依赖用途/许可证/features/target/dev/build/替代账本仍未完整审查，不能把子集审查冒充本项全部完成；其缺口见 `logs/validation/m0-resume/run-20261102-11/review/final-coverage-addendum.md`。
 
 ## 2. 八 crate 骨架、工程门禁与 catalog
 
@@ -49,7 +49,7 @@
 - [x] 5.1 先写手工正逆补丁金样，再建 StringBuffer/行索引与原子批次；以 abcXYZ→aQQc! 金样验证 after 逆坐标，随机合法批次/固定 seed 往返 bytes/选区，`cargo test -p aline-buffer patch` 记录最小失败样本（随机库先准入）。
 - [x] 5.2 检查末项非法、重叠、逆序、同点歧义插入、半字符、旧基线、after 选区非法与容量溢出；反例均比较文本/行索引/选区/revision/undo/redo 零变化，合法空插入和无变化替换分别验证；预检完成前不得发布局部修改。
 - [x] 5.3 建锚点 affinity 变换、正逆选区、操作来源和单调 revision，用 `cargo test -p aline-buffer anchors` 与 history 用例验证替换内锚点/前文变长、Undo/Redo 不退 revision；低层不解析或写盘，人工审查唯一持有关系。
-- [x] 5.4 建历史节点/待定组/独立重载边界及预算入口，测保存 A→Undo→B 同栈深、历史裁剪、回基线相等证据待定、redo 分叉、逆补丁预算耗尽；重载 Undo/Redo 只改内存不退磁盘基线，资源可达接口不提前释放历史引用，不每键做全文哈希。用 history 过滤测试及全 crate 测试留证。
+- [x] 5.4 建历史节点/待定组/独立重载边界及预算入口，测保存 A→Undo→B 同栈深、历史裁剪、回基线相等证据待定、redo 分叉、逆补丁预算耗尽；重载 Undo/Redo 只改内存不退磁盘基线，资源可达接口不提前释放历史引用，不每键做全文哈希。用户于 2026-11-02 裁决：有效非空普通输入草稿开始时立即丢弃旧 redo 分支；普通输入拒绝不清分支，IME 组合取消不清分支。`new_typing_draft_invalidates_redo_before_commit`、`rejected_new_typing_draft_keeps_redo_branch` 与 buffer 历史用例覆盖该语义。
 - [x] 5.5 回填引擎 §9、架构 §5.4、Rust §12、AC-01～04 基础贡献及 V-07 分项，注明 TA-02 真实自动保存暂停/外改提示尚属 M2，不能把历史原语测试当闭环完成。
 
 ## 6. aline-markdown 解析、块/Gap、映射与保护
@@ -62,9 +62,9 @@
 - [x] 6.4 建 source_at/drawn_at/aligned、局部/全文和 UTF-16 统一映射；`cargo test -p aline-markdown mapping` 验转义、实体/多字符实体、中文/emoji/ZWJ/组合字符、隐藏/合成、重复文字/空白、SoftBreak/HardBreak/br 来源、选区方向；原样精确往返、规范锚点稳定/对齐幂等。最小非法半字符/代理对/旧投影失败，不能要求全源码双射或靠 clamp/backscan 修补。
 - [x] 6.5 建有限 HTML 与保护子区间金样：支持标签、无 href、引号内 >、交叉嵌套、注释/空白、实体、过滤标签、不完整尾部；`cargo test -p aline-markdown html` 与 protection 过滤验证来源/文字/语义/精确性/保护；脚注引用与普通正文相邻时仅保护子区间，HTML 原文语义不因展示成段落消失。
 - [x] 6.6 建扫描步数/嵌套/节点/改写/映射预算与取消检查；敌意深栈、重复未闭合 HTML/引号、巨段/巨表及超限反例在分配/循环中终止，保持源快照、不截断；`cargo test -p aline-markdown hostile` 记录注入预算/实际步数和第三方长调用限额盲区，数值不是 V-06 发布限额。
-- [x] 6.7 建全量路径与最小头尾配对/重定位差分用例：前文插入、引用定义/脚注/围栏/配置变化，比较树/Gap/范围/映射/保护/导航；用 reuse 过滤测试记录实际复用命中与安全回退，旧绝对范围反例须失败，不以所有样例全回退冒充优化证明。
+- [ ] 6.7 建全量路径与最小头尾配对/重定位差分用例：前文插入、引用定义/脚注/围栏/配置变化，比较树/Gap/范围/映射/保护/导航；用 reuse 过滤测试记录实际复用命中与安全回退，旧绝对范围反例须失败，不以所有样例全回退冒充优化证明。
 - [x] 6.8 回填引擎 §6/7/11/12、解析配置及 V-06/V-07 基础夹具；将 SoftBreak、有限 HTML 尚未固化金样逐项列实验结果/缺口，不变更 MD 口径或宣称公式图表能力/AC-09 完成。
-- [x] 6.9 （R07/F-10）按用户批准的 `unicode-segmentation =1.13.3` / Unicode17 基线，在 `aline-markdown` mapping 实现绑定投影身份的前进/后退/边界查询；每次最多供给4096 UTF-8字节、chunk最多256字节，含重复 `PreContext` 供给计费，超限类型化拒绝。先建独立期望测试：Indic U+094D U+0915 17/18版本差异、短/长RI回扫、长组合簇、正反移动、非字素起点/旧投影；映回源码只经映射层。依赖闭包守卫须登记唯一新边，外部API不泄漏第三方类型。实施后回填 `engine-design §7.2/7.3/10.2/18.2`、架构依赖表与 V-07 子项；不宣称系统字素、IME、UI 或跨平台验收通过。实现与独立复核见 `docs/validation/m0-engine-foundation/remediation/R07/run-3/`、`run-4/review.md`。注意 `run-3/report.md` 披露曾误执行联网 `cargo fetch --locked`；后续离线守卫基于预热缓存，不代表 cold-cache offline 验证。
+- [x] 6.9 （R07/F-10）按用户批准的 `unicode-segmentation =1.13.3` / Unicode17 基线，在 `aline-markdown` mapping 实现绑定投影身份的前进/后退/边界查询；每次最多供给4096 UTF-8字节、chunk最多256字节，含重复 `PreContext` 供给计费，超限类型化拒绝。先建独立期望测试：Indic U+094D U+0915 17/18版本差异、短/长RI回扫、长组合簇、正反移动、非字素起点/旧投影；映回源码只经映射层。依赖闭包守卫须登记唯一新边，外部API不泄漏第三方类型。实施后回填 `engine-design §7.2/7.3/10.2/18.2`、架构依赖表与 V-07 子项；不宣称系统字素、IME、UI 或跨平台验收通过。准入摘要见 `docs/decisions.md` §16，回归见 `crates/aline-markdown/tests/grapheme.rs`。历史曾误执行联网 `cargo fetch --locked`，后续离线守卫基于预热缓存，不代表 cold-cache offline 验证。
 
 ## 7. aline-edit Change、拒绝与最小编辑协议
 
@@ -90,7 +90,7 @@
 范围：全 workspace 集成证据；前置：1～8 分项证据及失败已处理。关联 workspace/engineering-gates「逐项出口交接」、proposal E1～E7；R-17/18、S-2/12/19，K-01～03/K-06/K-08，K-04/05/07 完整实验保留后续。
 
 - [x] 9.1 完整重跑 `cargo fmt --all --check`、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo test --workspace`，另运行实际依赖/安全/catalog 守卫与正反例，保存每条退出码、环境/feature/目标及日志；此前组已验证的领域测试不重复扩量，新增集成失败先修并重跑受影响检查。纯文档规划阶段这些命令均未执行。
-- [x] 9.2 建 E1 证据包：八成员 metadata/lockfile/候选准入与真实版本、依赖方向/GPUI/禁库反例、成员 lint 继承/unsafe/panic 作用域、catalog 键/插值、完整 Cargo 结果；人工审查闭包及文案来源，缺任一证据不判 E1 通过。
+- [ ] 9.2 建 E1 证据包：八成员 metadata/lockfile/候选准入与真实版本、依赖方向/GPUI/禁库反例、成员 lint 继承/unsafe/panic 作用域、catalog 键/插值、完整 Cargo 结果；人工审查闭包及文案来源，缺任一证据不判 E1 通过。当前候选组合、cargo 门禁和守卫正反例均有本轮证据，但 E1 仍受逐依赖归属/准入账本未完整审查阻断，不能判通过；登记隔离缓存、warm cache 与离线播种登记 cache 的分开结果见 `logs/validation/m0-resume/run-20261102-11/review/final-coverage-addendum.md`。
 - [x] 9.3 建 E2/E3/E5 证据包：四核心公共 API 无头测试发现清单、预算/取消与非法输入结果、展示树原始范围 dump、块+Gap 覆盖、来源/精确性与对齐映射金样；独立复核 dump 与源字节，声明实际覆盖平台及预算仍待测限额。
 - [x] 9.4 建 E4/E7 证据包：AC-01 原 bytes、AC-02 局部补丁/模式意图、AC-03 Unicode 与组合模拟/选区、AC-04 输入组/代表命令/拒绝全状态；TA-01 开块多组、快照不封口和 TA-02/ED-01 纯协议，逐条列未覆盖真实 UI/IME/完整结构命令，不修改 AC 原口径。
 - [x] 9.5 建 E6 及 M1 交接：回填 V-01 目标、V-06/V-07 基础分项与 M0 工具实验；V-01～09 不整项通过。M1 排入原生 macOS 冒烟、V-04 中文字体回退、V-05 基准、真实语法夹具；Windows/Linux 后续取证且 Win10/Intel 不丢；M2 前 V-08 身份/事务方案及最小安全闭环保留独立出口。

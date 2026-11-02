@@ -2,7 +2,7 @@
 
 日期：2026-10-30。按 [PROTO-06 已确认方案 A](../2026-10-30-migration-decisions.md)逐篇保全必要原始证据。**本目录是非权威历史材料；原稿的“强制/定稿/照搬/已验证”和旧代码、配置、数字均不能作为开发指令。** 当前要求见 [PRD](../../v1-prd.md)、[架构](../../v1-architecture.md)、[引擎](../../engine-design.md)和[验证计划](../../v1-validation-plan.md)。
 
-不是将旧目录整套提升为新规范：两份完整研究原稿保留以免丢失论证/索引，其余九份按用途摘录；已改写的规范正文和过时配置不再另建第二套现行规则。每个摘录标原文件 SHA-256、原始行范围、片段 SHA-256，原文置于代码围栏隔离效力，保留图例/表/示例/源码的原始字节。可检验数据见 [index.json](./index.json)，确认后的60文件/331主题去向见[收尾报告](../../maintenance/deletion-readiness/prior-evidence/closure-report.md)。
+不是将旧目录整套提升为新规范：两份完整研究原稿保留以免丢失论证/索引，其余九份按用途摘录；已改写的规范正文和过时配置不再另建第二套现行规则。每个摘录标原文件 SHA-256、原始行范围、片段 SHA-256，原文置于代码围栏隔离效力，保留图例/表/示例/源码的原始字节。可检验数据见 [index.json](./index.json)，确认后的60文件/331主题去向见[收尾报告（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/maintenance/deletion-readiness/prior-evidence/closure-report.md)。
 
 ## 各旧文件的证据与当前承接
 
@@ -18,7 +18,7 @@
 | [旧主题格式证据](./theme-package-spec.md) | 旧目录/字段/数值/继承/资源、ZIP/发现/schema3/字体代差说明 | 当前schema1/PNG/封闭字段与TH确认替代；四份旧JSON示例是被替代字段示例，不作为另套规范维护；旧真实样本均在prototype/legacy |
 | [旧插件范围证据](./plugin-system.md) | 旧五插件/启停背景、解析扩展/未来AI提案/验收边界原文 | 当前插件§2～14/PA/PL保留系统扩展与宿主边界；各提供者职责已改写为六卡，旧正文不重复维护 |
 | [旧决定背景/常设](./decisions.md) | 旧权威政策、技术复核背景、四条常设原话 | 21个D的完整当时记录已逐条保存在当前[decisions §4](../../decisions.md#4-历史时间线与逐条复核)，卫生修复亦在§4；不再重复整文件。旧“较新日期优先”已失效 |
-| [旧功能条目原文](./v1-features.md) | 导言/非目标/全部九组标题及67条原始复选项 | 当前PRD是唯一产品基线；[67项逐条对照](../../maintenance/deletion-readiness/prior-evidence/features-review.md)及新收尾账本记录改写/替代/可选，不恢复独立功能规范 |
+| [旧功能条目原文](./v1-features.md) | 导言/非目标/全部九组标题及67条原始复选项 | 当前PRD是唯一产品基线；[67项逐条对照（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/maintenance/deletion-readiness/prior-evidence/features-review.md)及新收尾账本记录改写/替代/可选，不恢复独立功能规范 |
 
 未摘录的规范性段落按上表及原331主题账本已有现行承接或明确取代关系，不表示删除某项当前需求。本轮不移除原件；未来删除评估须同时检查本目录证据、现行规范、逐项映射与原型闭包。
 
@@ -26,6 +26,6 @@
 
 - 原文里的本地参考仓库路径、file:line、OS最新版本、性能/复杂度和许可自述均属于当时记录；本次保全未重跑外部实验或核实创作权利。
 - 源路径与哈希是溯源元数据，不是加载路径；本目录可在旧目录不存在时独立阅读。围栏内相对链接只是原文字符，不作为有效文档链接执行。
-- [独立复查工具](../../maintenance/deletion-readiness/check.py)核对归档整文件与围栏内各片段的哈希；原件可见时额外比对原始行范围，并检查两个原目录未改。缺少原件时仍可核对归档字节。旧收尾检查器已由本工具替代，运行方法和能力边界见[维护审计入口](../../maintenance/deletion-readiness/README.md)。
+- [独立复查工具（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/maintenance/deletion-readiness/check.py)核对归档整文件与围栏内各片段的哈希；原件可见时额外比对原始行范围，并检查两个原目录未改。缺少原件时仍可核对归档字节。旧收尾检查器已由本工具替代，运行方法和能力边界见[维护审计入口（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/maintenance/deletion-readiness/README.md)。
 - 原型/品牌/主题视觉值按PROTO-01～05保留内部历史参考；来源/权利事实尚待补证，不能由用户同意保留方案推导出许可。
 - V-01～V-09仍未执行。完成证据迁移和引用检查不等于能力实现、发布门禁通过或删除授权。

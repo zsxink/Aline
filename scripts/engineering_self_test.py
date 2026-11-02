@@ -5,16 +5,15 @@ import json
 import os
 from pathlib import Path
 import sys
-import tempfile
 
 from engineering_dependencies import MEMBERS, load_json
 from evidence_paths import display_path, write_json
+from validation_output import output_directory
 from check_engineering import ROOT, POLICY, SCENARIOS, record_command, sha256
 
 
 def run(output=None):
-    output = Path(output or tempfile.mkdtemp(prefix="aline-engineering-tests-"))
-    output.mkdir(parents=True, exist_ok=True)
+    output = output_directory('engineering-self-test', output)
     fixtures = output / "fixtures"
     fixtures.mkdir(exist_ok=True)
     results = []
@@ -33,7 +32,8 @@ def run(output=None):
 
     def invoke(label, project, metadata, tree, meta_record, tree_record, scenario="all", expected=1, diagnostic=""):
         argv = [sys.executable, str(ROOT / "scripts/check_engineering.py"), "--metadata", str(metadata), "--tree", str(tree),
-                "--lock", str(project / "Cargo.lock"), "--scenario", scenario, "--metadata-command", str(meta_record), "--tree-command", str(tree_record)]
+                "--lock", str(project / "Cargo.lock"), "--scenario", scenario, "--metadata-command", str(meta_record), "--tree-command", str(tree_record),
+                "--output-dir", str(output / "checks" / label)]
         return command(label, argv, expected, diagnostic)
 
     # 所有同名禁库均为0.0.0本地合成包；不会安装真实发布物。

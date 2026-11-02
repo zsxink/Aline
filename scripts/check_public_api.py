@@ -12,6 +12,7 @@ import sys
 import tempfile
 
 from evidence_paths import resolve_path, write_json, write_text
+from validation_output import output_directory
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -40,11 +41,9 @@ def dependency_path(fixture, key):
     return os.path.relpath(ROOT / 'crates' / key, fixture.resolve())
 
 
-def work_root():
-    """夹具在仓库 target 下编译；输出目录在仓库外时清单也只含仓库内相对路径。"""
-    target = ROOT / 'target'
-    target.mkdir(parents=True, exist_ok=True)
-    return Path(tempfile.mkdtemp(prefix='public-api-', dir=target))
+def work_root(output):
+    """隔离夹具工作区也属于本次运行输出，不写正式测试目录。"""
+    return Path(tempfile.mkdtemp(prefix='work-', dir=output))
 
 
 def publish_fixture(fixture, evidence):
@@ -73,7 +72,7 @@ def execute(argv, directory, output, label, env):
 
 
 def run(output):
-    output.mkdir(parents=True, exist_ok=True)
+    output = output_directory('public-api', output)
     isolation = json.loads((ROOT / 'scripts/fixtures/isolation.json').read_text())
     isolated_home = resolve_path(isolation['cargo_home']) or isolation['cargo_home']
     if not Path(isolated_home).is_dir():
@@ -104,7 +103,7 @@ let _borrowed: &[(std::ops::Range<usize>, String)] = batch.patches();
         ('tuple-view-is-immutable', '', 'let batch = aline_buffer::CheckedBatch::new(&snapshot, vec![(0..0, String::new())], aline_buffer::PatchBudget::new(4, 64, 64))?; batch.patches()[0].1.push_str("!");', 101, ['E0596', 'cannot borrow']),
     ]
     records = []
-    work = work_root()
+    work = work_root(output)
     try:
         for name, helper, body, expected, needles in cases:
             fixture = work / name
@@ -131,7 +130,7 @@ let _borrowed: &[(std::ops::Range<usize>, String)] = batch.patches();
     finally:
         shutil.rmtree(work, ignore_errors=True)
     summary = {'passed': all(record['passed'] for record in records), 'cases': records,
-               'fixture_basis': '夹具在仓库 target 下编译，证据清单中的相对依赖路径以该工作目录为基准',
+               'fixture_basis': '夹具在本次 logs/validation 输出内编译，证据清单中的相对依赖路径以该工作目录为基准',
                'scope': '当前 macOS 工具链真实编译，未运行非法夹具，不声明其他平台或完整引擎业务'}
     write_json(output / 'summary.json', summary)
     return 0 if summary['passed'] else 1
@@ -143,7 +142,7 @@ def main():
     parser.add_argument('--output-dir', type=Path)
     args = parser.parse_args()
     try:
-        return run(args.output_dir.resolve() if args.output_dir else Path(tempfile.mkdtemp(prefix='aline-public-api-')))
+        return run(args.output_dir)
     except (OSError, ValueError, KeyError) as error:
         print('公共边界检查拒绝：' + str(error), file=sys.stderr)
         return 1

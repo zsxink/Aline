@@ -73,11 +73,11 @@ Rust edition 2024，工具链锁定见 `rust-toolchain.toml`。UI 层依赖 `gpu
 
 Aline 是独立开发的项目，规格、门禁与验收口径由人定义，实现过程有 AI 编码代理参与（见 `AGENTS.md` 与 `CLAUDE.md`）。
 
-公开它的主要目的是留下工程实践的完整痕迹：规格驱动开发、可执行的质量门禁、以及每一条门禁的可复现方法。原始日志、命令记录与临时夹具不入库；仓库只保留门禁脚本、可复现的夹具/金样和 `.md` 报告，复跑方式见报告本身与 `docs/validation/m0-engine-foundation/README.md`。
+仓库保留代码、规格、可执行门禁、可复现测试及独立夹具/金样。运行输出统一放不追踪的 `logs/validation/`，临时交接放不追踪的 `tmp/`；不提交 Agent 逐轮报告。复跑入口见 `scripts/`、各 crate 测试和[验证计划](docs/v1-validation-plan.md)，提交边界见[开发流程 §5](docs/development-process.md#5-仓库产物与提交边界)。
 
 ## 状态与边界
 
-- M0 尚未完成，V-01～V-09 技术验证均未执行，见 `docs/v1-validation-plan.md`
+- M0 出口未闭合，V-01～V-09 均未整项通过；工程与无头基础分项不能替代完整验收，见 `docs/v1-validation-plan.md`
 - 无可用界面、无发布产物、无插件运行时
 - CI 见 `.github/workflows/m0.yml`，与 `scripts/` 本地门禁同源
 

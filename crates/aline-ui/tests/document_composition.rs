@@ -188,6 +188,29 @@ fn case_8_3_06_cancel_restores_pre_composition_state() -> Result<(), Box<dyn std
 }
 
 #[test]
+fn cancelled_composition_preserves_redo_branch_after_undo() -> Result<(), Box<dyn std::error::Error>>
+{
+    let mut doc = f1()?;
+    doc.type_text(1, "a", 0)?;
+    doc.commit_open_block(1)?;
+    doc.undo()?;
+    assert_history(&doc, 0, 1, 1);
+
+    doc.composition_update("候选", 2)?;
+    assert_history(&doc, 0, 1, 1);
+    doc.composition_cancel(3)?;
+    assert_buffer(&doc, "x\n")?;
+    assert_snapshot(&mut doc, "x\n")?;
+    assert_history(&doc, 0, 1, 1);
+
+    doc.redo()?;
+    assert_buffer(&doc, "xa\n")?;
+    assert_snapshot(&mut doc, "xa\n")?;
+    assert_history(&doc, 1, 0, 1);
+    Ok(())
+}
+
+#[test]
 fn case_8_3_07_cancelled_composition_identity_is_stale() -> Result<(), Box<dyn std::error::Error>> {
     // TSV 8.3-07：取消后旧候选身份的 SnapshotId/WorkingVersion 不得复活。
     let mut doc = c1_composition_zhong()?;

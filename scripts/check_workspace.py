@@ -12,9 +12,9 @@ import os
 from pathlib import Path
 import subprocess
 import sys
-import tempfile
 
 from evidence_paths import resolve_path, write_json, write_text
+from validation_output import output_directory
 
 ROOT = Path(__file__).resolve().parent.parent
 TOOLCHAIN = '1.98.1'
@@ -41,8 +41,7 @@ def invoke(argv, output, label, env):
 
 
 def run(args):
-    output = args.output_dir.resolve() if args.output_dir else Path(tempfile.mkdtemp(prefix='aline-m0-gates-'))
-    output.mkdir(parents=True, exist_ok=True)
+    output = output_directory('workspace', args.output_dir)
     env = dict(os.environ, CARGO_NET_OFFLINE='true', RUSTUP_TOOLCHAIN=TOOLCHAIN,
                PYTHONDONTWRITEBYTECODE='1')
     home = args.cargo_home or os.environ.get('CARGO_HOME')
@@ -72,6 +71,7 @@ def run(args):
             env['PATH'] = toolchain_bin + os.pathsep + env.get('PATH', '')
             env['ALINE_M0_TOOLCHAIN_BIN'] = toolchain_bin
     checks = [
+        ('output-paths', [sys.executable, str(ROOT / 'scripts/check_validation_output.py'), '--output-dir', str(output / 'output-paths')]),
         ('rustc-version', ['rustc', '-Vv']),
         ('cargo-version', ['cargo', '-V']),
         ('fmt-version', ['cargo', 'fmt', '--version']),
@@ -82,9 +82,9 @@ def run(args):
         ('test', ['cargo', 'test', '--workspace', '--locked', '--offline']),
         ('dependency', [sys.executable, str(ROOT / 'scripts/check_engineering.py'), '--output-dir', str(output / 'dependency-graphs')]),
         ('dependency-self-test', [sys.executable, str(ROOT / 'scripts/check_engineering.py'), '--self-test', '--output-dir', str(output / 'dependency-fixtures')]),
-        ('lint', [sys.executable, str(ROOT / 'scripts/check_lints.py')]),
+        ('lint', [sys.executable, str(ROOT / 'scripts/check_lints.py'), '--output-dir', str(output / 'lint')]),
         ('lint-self-test', [sys.executable, str(ROOT / 'scripts/check_lints.py'), '--self-test', '--output-dir', str(output / 'lint-fixtures')]),
-        ('safety', [sys.executable, str(ROOT / 'scripts/check_safety.py')]),
+        ('safety', [sys.executable, str(ROOT / 'scripts/check_safety.py'), '--output-dir', str(output / 'safety')]),
         ('safety-self-test', [sys.executable, str(ROOT / 'scripts/check_safety.py'), '--self-test', '--output-dir', str(output / 'safety-fixtures')]),
         ('public-api', [sys.executable, str(ROOT / 'scripts/check_public_api.py'), '--self-test', '--output-dir', str(output / 'public-api')]),
     ]

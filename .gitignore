@@ -33,6 +33,9 @@ __pycache__/
 # 可复现输入（golden/夹具/基线）在 crates/*/tests/fixtures 与 scripts/fixtures。
 /logs/
 *.log
-docs/validation/**/*.command.json
-docs/validation/**/*.stdout.json
-docs/validation/**/*.stderr.json
+
+# 已清理的过程报告目录不得重新生成入库；交接统一放 tmp/。
+/docs/validation/
+/docs/maintenance/
+/reports/
+/tmp/

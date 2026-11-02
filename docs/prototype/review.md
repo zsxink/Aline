@@ -1,6 +1,6 @@
 # 旧版原型与素材首轮整理结果
 
-后续状态（2026-10-30）：PROTO-01～06已确认A，见[确认归档](../archive/2026-10-30-migration-decisions.md)与[迁移收尾报告](../maintenance/deletion-readiness/prior-evidence/closure-report.md)。以下为首轮整理快照，其中“待裁决/历史docs未迁”的措辞属于确认前状态；原字节/运行资源检查事实不因确认改变。
+后续状态（2026-10-30）：PROTO-01～06已确认A，见[确认归档](../archive/2026-10-30-migration-decisions.md)与[迁移收尾报告（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/maintenance/deletion-readiness/prior-evidence/closure-report.md)。以下为首轮整理快照，其中“待裁决/历史docs未迁”的措辞属于确认前状态；原字节/运行资源检查事实不因确认改变。
 
 日期：2026-10-30。状态：**已完成首轮盘点、安全复制和路径检查，PROTO-01～PROTO-06 待用户裁决。本轮不删除旧目录，不新增功能，不重做产品界面。**
 

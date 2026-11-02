@@ -4,7 +4,7 @@
 
 更新日期：2026-10-29
 
-状态：**RS-01～RS-05 与 ED-01 已由用户确认采用方案 A 并完成回写，当前无待确认问题。仓库已建立 8 成员 Cargo workspace 和 lint 配置，M0 工程守卫已有脚本及 self-test 证据；`.github/workflows/m0.yml` 已配置，但远端实际运行状态未核实。V-01～V-09 与 M0 总体出口仍未完成；具体进度见[整改记录](./validation/m0-engine-foundation/remediation/progress.md)。**
+状态：**RS-01～RS-05 与 ED-01 已由用户确认采用方案 A 并完成回写，当前无待确认问题。仓库已建立 8 成员 Cargo workspace 和 lint 配置，M0 工程守卫已有脚本及 self-test 证据；`.github/workflows/m0.yml` 已配置，但远端实际运行状态未核实。V-01～V-09 与 M0 总体出口仍未完成；具体进度见[当前 M0 状态](v1-validation-plan.md#当前-m0-状态与复跑入口)。**
 
 基线：[AGENTS.md](../AGENTS.md) · [PRD 0.9](./v1-prd.md) · [架构指引 0.8](./v1-architecture.md) · [引擎指引 0.2](./engine-design.md) · [架构规范 0.4](./architecture-guide.md) · [验证计划](./v1-validation-plan.md)
 
@@ -47,11 +47,11 @@ cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 
 旧“最新 stable 自动跟进”“edition 2024”“rust-version 1.85”不作为已冻结基线。**建议**以满足锁定 GPUI 和平台要求的 stable 工具链为候选，edition 2024 作为候选；具体组合在 M0 构建中确定，不在本稿猜一个版本号。不能为导入排序单独引入另一套 nightly 格式化器。
 
-2026-10-30 第 1 组实际取证：Rust/Cargo 1.98.1、edition 2024、rustfmt 1.9.0、Clippy 0.1.98 的 GPUI 0.3.9 核心库消费方在 macOS aarch64 构建、fmt/Clippy 与 test-support 编译检查通过；最小 edition 2015+async 反例被 E0670 拒绝。见[候选审计](./validation/m0-engine-foundation/admission-2026-10-30/report.md)。未声明或验证 MSRV；原生后端、正式八成员 lint/CI 和其它平台未验证。工具组合供第 2 组显式登记，不把候选消费方检查当作正式 workspace 门禁。
+2026-10-30 第 1 组实际取证：Rust/Cargo 1.98.1、edition 2024、rustfmt 1.9.0、Clippy 0.1.98 的 GPUI 0.3.9 核心库消费方在 macOS aarch64 构建、fmt/Clippy 与 test-support 编译检查通过；最小 edition 2015+async 反例被 E0670 拒绝。见[候选审计（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/admission-2026-10-30/report.md)。未声明或验证 MSRV；原生后端、正式八成员 lint/CI 和其它平台未验证。工具组合供第 2 组显式登记，不把候选消费方检查当作正式 workspace 门禁。
 
 ### 2.2 配置的落地边界
 
-2026-10-31 第 2 组已在正式八成员落地：Rust/Cargo 1.98.1、edition 2024；Rust `unsafe_code=forbid`、`missing_docs=warn`，Clippy 逐项 deny `unwrap_used`、`expect_used`、`panic`、`unreachable`、`cast_possible_truncation`、`cast_sign_loss`、`dbg_macro`、`todo`、`unimplemented`。八成员实际 clippy-driver 调用（含 test）均携带这 11 项参数；隔离正反例及 debug/release 诊断见[lint 与安全复核](./validation/m0-engine-foundation/group-2/lint-safety-summary.md)。没有全组 pedantic、全局转换 allow 或 unsafe 例外。`rustfmt --print-config current` 实际读取 `max_width=100`、`edition=2024`，无忽略选项警告；未声明 MSRV。
+2026-10-31 第 2 组已在正式八成员落地：Rust/Cargo 1.98.1、edition 2024；Rust `unsafe_code=forbid`、`missing_docs=warn`，Clippy 逐项 deny `unwrap_used`、`expect_used`、`panic`、`unreachable`、`cast_possible_truncation`、`cast_sign_loss`、`dbg_macro`、`todo`、`unimplemented`。八成员实际 clippy-driver 调用（含 test）均携带这 11 项参数；隔离正反例及 debug/release 诊断见[lint 与安全复核（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-2/lint-safety-summary.md)。没有全组 pedantic、全局转换 allow 或 unsafe 例外。`rustfmt --print-config current` 实际读取 `max_width=100`、`edition=2024`，无忽略选项警告；未声明 MSRV。
 
 | 编号 | 强制要求及例外 | 检查 |
 |---|---|---|
@@ -67,7 +67,7 @@ RS-01 已确认逐项配置策略；当前实际级别与正反例已按本节 2
 
 **S-2-06（CI 与出口证据，C-01～C-08）：**M0 接入 CI 时至少执行 S-2-01，并逐步接入实际建立的依赖/GPUI 闭包、禁用依赖、引擎安全和 catalog 检查。相关实现的保真、映射、拒绝与状态机回归必须有可执行入口；失败不能仅靠更新金样消掉。尚无自动化的规则保留具体人工记录，不宣称已受 CI 拦截。
 
-2026-10-31 已建立 `python3 scripts/check_workspace.py --output-dir <证据目录>`：分别执行三条 Cargo 门禁、实际依赖图与其正反例、lint 及安全守卫正反例；每条保存完整命令、退出码、环境和日志，任一失败整体非零。入口只使用已安装工具链与预热隔离 Cargo 缓存，不安装或下载，不修改全局配置。无缓存最小反例实际退出 1；完整本地入口实际退出 0，见[第 2 组记录](./validation/m0-engine-foundation/group-2/report.md)。
+2026-10-31 已建立 `python3 scripts/check_workspace.py --output-dir <证据目录>`：分别执行三条 Cargo 门禁、实际依赖图与其正反例、lint 及安全守卫正反例；每条保存完整命令、退出码、环境和日志，任一失败整体非零。入口只使用已安装工具链与预热隔离 Cargo 缓存，不安装或下载，不修改全局配置。无缓存最小反例实际退出 1；完整本地入口实际退出 0，见[第 2 组记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-2/report.md)。
 
 `.github/workflows/m0.yml` 仅接线 self-hosted macOS ARM64 runner，须预装登记组件并设置 `ALINE_M0_CARGO_HOME`；官方 checkout 使用经只读核对的精确 SHA，不自动安装工具。远端 CI 未执行、runner 未验证，不能将本地结果写成 CI 通过。旧附录 C 的浮动 `macos-latest` 与 action 标签未沿用；macOS 作业不能代表 Windows/Linux。按 V-01 先 macOS、后 Windows/Linux，正式 V1 三平台门禁均须通过。
 
@@ -133,7 +133,7 @@ AGENTS.md 规定的补丁存储形状 `Vec<(Range<usize>, String)>` 保持不变
 
 字符列/字素边界/像素是不同量；引擎中的纯 LineMap 或映射服务可持有行信息，不能照搬旧“行列号绝不进入任何引擎 API”的禁令。显示列按 V-07 的用户字符口径，不用 src_off 冒充。具体来源关系和合法锚点见[引擎 §7](./engine-design.md#7-源码绘制文本与其他坐标)。
 
-**2026-10-31 M0 接口基础记录（任务 3.3）：** 已落地 `SrcOffset`/`SrcRange`/`SrcSelection`、`DrawnOffset`/`DrawnRange`/`Utf16Offset`/`Utf16Range`、`StorageRange` 等受检 newtype，以及 `TextSnapshot`、恒等 `Projection`、`InputIdentity` 的身份校验；恒等映射的源码/绘制/UTF-16 转换全部走映射模块；当前仓库扫描未发现正式生产代码中的映射外调用点或自建 UTF-16 表，但公开坐标访问器仍可绕过扫描。`decode`/`encode`、完整 `parse`、edit 层 `plan_change`/`validate_change`、`apply_change` 与 `snapshot_current` 内容快照仍仅契约未验证。该记录不改变 S-5-01～06，也不表示 V-07 或 M0 出口通过。详见[任务 3.3 记录](./validation/m0-engine-foundation/group-3/step-3.3/report.md)。
+**2026-10-31 M0 接口基础记录（任务 3.3）：** 已落地 `SrcOffset`/`SrcRange`/`SrcSelection`、`DrawnOffset`/`DrawnRange`/`Utf16Offset`/`Utf16Range`、`StorageRange` 等受检 newtype，以及 `TextSnapshot`、恒等 `Projection`、`InputIdentity` 的身份校验；恒等映射的源码/绘制/UTF-16 转换全部走映射模块；当前仓库扫描未发现正式生产代码中的映射外调用点或自建 UTF-16 表，但公开坐标访问器仍可绕过扫描。`decode`/`encode`、完整 `parse`、edit 层 `plan_change`/`validate_change`、`apply_change` 与 `snapshot_current` 内容快照仍仅契约未验证。该记录不改变 S-5-01～06，也不表示 V-07 或 M0 出口通过。详见[任务 3.3 记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-3/step-3.3/report.md)。
 
 ## 6. 格式、表达与代码组织
 
@@ -270,7 +270,7 @@ WC-01已确认宿主维护有会话/文档/版本归属、去重/容量/生命�
 
 **建议：**属性测试保存最小失败样例/可重现 seed；proptest 是历史候选，不要求每个 crate 为形式引入它。快照适合复杂结构回归，更新须人工审查语义差异；insta 尚未准入，`cargo insta review` 不是当前命令。基准可在 `benches/`，criterion 只是候选。GPUI `TestAppContext` 须先核锁定版本/feature，纯状态机模拟、GPUI 交互与真实系统输入法验证分别报告。
 
-**2026-10-31 M0 组 5 测试记录：** 补丁/锚点/历史原语先有独立金样和反例，再接 `StringBuffer` 实现。`crates/aline-buffer/tests/` 使用公共 API 集成测试，单元预算/行索引边界放在实现旁 `#[cfg(test)] mod tests`；测试名采用“行为_场景”，未使用 `test1` 式名称。时间通过 `now_millis` 显式注入，没有真实 sleep；坏数据走 `Result`/拒绝断言，未用 `unsafe` 构造无效 `str`，也未用 `should_panic` 把用户输入崩溃当作预期。正逆补丁金样共 134 例（14 例手工 + 120 例固定 seed 独立生成），另 11 例行索引金样；`cargo test -p aline-buffer patch` 的名称过滤同时命中名字含 `patch` 的锚点/历史用例，不能只按过滤后的总数判断覆盖。全 crate 29 个测试通过，未新增依赖或测试库。证据见 [group-5/step-5.5/report.md](./validation/m0-engine-foundation/group-5/step-5.5/report.md)；这些无头原语测试不替代 V-07 的 IME、命令、格式化和 UI 样例。
+**2026-10-31 M0 组 5 测试记录：** 补丁/锚点/历史原语先有独立金样和反例，再接 `StringBuffer` 实现。`crates/aline-buffer/tests/` 使用公共 API 集成测试，单元预算/行索引边界放在实现旁 `#[cfg(test)] mod tests`；测试名采用“行为_场景”，未使用 `test1` 式名称。时间通过 `now_millis` 显式注入，没有真实 sleep；坏数据走 `Result`/拒绝断言，未用 `unsafe` 构造无效 `str`，也未用 `should_panic` 把用户输入崩溃当作预期。正逆补丁金样共 134 例（14 例手工 + 120 例固定 seed 独立生成），另 11 例行索引金样；`cargo test -p aline-buffer patch` 的名称过滤同时命中名字含 `patch` 的锚点/历史用例，不能只按过滤后的总数判断覆盖。全 crate 29 个测试通过，未新增依赖或测试库。证据见 [group-5/step-5.5/report.md（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-5/step-5.5/report.md)；这些无头原语测试不替代 V-07 的 IME、命令、格式化和 UI 样例。
 
 ## 13. 并发、GPUI、锁与运行时
 
@@ -308,7 +308,7 @@ PRD §7.2 的文本处理和块提交预算是目标，不是 Aline 成绩。同
 
 **S-15-02（单一技术栈，C-02）：**仅 pulldown-cmark 解析 Markdown，不引第二解析器；同类功能不得第二库。GPUI 全 workspace 单一来源精确锁快照，升级记录补丁及平台影响；历史 `=0.3.9` 本身不构成冻结证据，本次按架构 §3.2 的实际审计登记，正式 workspace 锁定于第 2 组核验。第三方版本集中根 workspace、成员继承，应用 Cargo.lock 随实际依赖提交；仅有 lockfile 不能证明 GPUI 来源唯一。
 
-禁用库按 S-13-06 检完整图；2026-10-30 用户批准的 GPUI 例外以架构 §3.2 的精确清单和[审计身份](./validation/m0-engine-foundation/admission-2026-10-30/gpui-package-identity.json)为准。正式锁文件可新增合规节点，不得让新路径借用既有 GPUI 例外；metadata 未实际选中的过近似路径须留证而非扩张例外。发现其它传递依赖冲突须解决或提交上游裁决，不能以“我们没 import”忽略。导出/ZIP/平台与 Unicode 分段等新依赖分别按 V-02/V-04/V-01/V-07 收口，不照搬旧调研“无 ZIP/无导出”的风险判断。
+禁用库按 S-13-06 检完整图；2026-10-30 用户批准的 GPUI 例外以架构 §3.2 的精确清单和[审计身份（历史）](https://github.com/zsxink/Aline/blob/166ea4638e4dfcd102fec31d341404f3d66557d9/docs/validation/m0-engine-foundation/admission-2026-10-30/gpui-package-identity.json)为准。正式锁文件可新增合规节点，不得让新路径借用既有 GPUI 例外；metadata 未实际选中的过近似路径须留证而非扩张例外。发现其它传递依赖冲突须解决或提交上游裁决，不能以“我们没 import”忽略。导出/ZIP/平台与 Unicode 分段等新依赖分别按 V-02/V-04/V-01/V-07 收口，不照搬旧调研“无 ZIP/无导出”的风险判断。
 
 **建议：**审查维护状态及公开安全通告；工具审计覆盖不了功能重复和架构反向边。普通升级显式登记并回归，若改变铁律/产品边界先裁决；本仓库尚无依赖审批机器人或既定自动审计流程。
 
@@ -340,7 +340,7 @@ RS-05 已确认有限真实 scope：纯文档用 `docs`，workspace 工程配置
 
 ## 17. 强制规则检查矩阵
 
-下表继续规定完整检查职责。2026-10-31 已建立 C-01 的工具/lint 门禁、C-02 的真实依赖闭包、C-05 的选定 lint/词法安全补充、C-06 的 catalog 校验，证据见[第 2 组记录](./validation/m0-engine-foundation/group-2/report.md)；领域坐标/补丁/历史、任务及平台机制仍按后续任务验证。静态守卫不是语义证明：每次变更仍须提供实际结果和人工步骤。
+下表继续规定完整检查职责。2026-10-31 已建立 C-01 的工具/lint 门禁、C-02 的真实依赖闭包、C-05 的选定 lint/词法安全补充、C-06 的 catalog 校验，证据见[第 2 组记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-2/report.md)；领域坐标/补丁/历史、任务及平台机制仍按后续任务验证。静态守卫不是语义证明：每次变更仍须提供实际结果和人工步骤。
 
 | 检查组 | 覆盖规则 | 自动/类型/测试检查 | 必要人工检查与上游关联 |
 |---|---|---|---|
@@ -370,13 +370,13 @@ RS-05 已确认有限真实 scope：纯文档用 `docs`，workspace 工程配置
 
 ## 19. 待验证事项与收口时点
 
-下列完整 V 实验仍未完成，实际结果按分项记录。2026-10-31 第 2 组正式 workspace 的依赖/lint/catalog/完整 Cargo 门禁及格式配置实验已执行，见[工具实验分项](./validation/m0-engine-foundation/group-2/report.md)；不将该结果等同 V-01～V-09 通过。技术验证不代替用户政策裁决，版本/后端/工具由实际实验收口。
+下列完整 V 实验仍未完成，实际结果按分项记录。2026-10-31 第 2 组正式 workspace 的依赖/lint/catalog/完整 Cargo 门禁及格式配置实验已执行，见[工具实验分项（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-2/report.md)；不将该结果等同 V-01～V-09 通过。技术验证不代替用户政策裁决，版本/后端/工具由实际实验收口。
 
-**2026-10-31 组 9 工程与接口分项：** 最终依赖清理后的本机 macOS arm64 统一门禁为 19/19 exit 0、workspace 测试 312 passed，Clippy/test 实际带 `--locked --offline`；原始命令、环境和输出见[9.1](./validation/m0-engine-foundation/group-9/step-9.1/report.md)。八成员 lint 继承、五引擎闭包、53 例安全自测、8 个 API 编译例与 catalog 证据见[E1](./validation/m0-engine-foundation/group-9/step-9.2/report.md)，无头 API/受检坐标/预算/映射边界见[E2/E3/E5](./validation/m0-engine-foundation/group-9/step-9.3/report.md)。独立审查后清理了 ui→plugin、plugin→edit、plugin→app-core 无消费者边，plugin 成员骨架保留；未放宽 unsafe、lint 或依赖准入规则。隔离夹具中部分辅助 Cargo 命令只带 offline，不能将 workspace 参数泛化；依赖清理中遗漏 locked/原始输出的操作偏差也单列于 9.1 引用，不冒充门禁证据。宏展开、第三方长调用/运行时语义、原生平台、性能与实际保存恢复仍有盲区，完整 V-01～V-09 均未通过。独立复核与 M1/M2 前交接见[9.6](./validation/m0-engine-foundation/group-9/step-9.6/report.md)及[9.5](./validation/m0-engine-foundation/group-9/step-9.5/report.md)。
+**2026-10-31 组 9 工程与接口分项：** 最终依赖清理后的本机 macOS arm64 统一门禁为 19/19 exit 0、workspace 测试 312 passed，Clippy/test 实际带 `--locked --offline`；原始命令、环境和输出见[9.1（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.1/report.md)。八成员 lint 继承、五引擎闭包、53 例安全自测、8 个 API 编译例与 catalog 证据见[E1（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.2/report.md)，无头 API/受检坐标/预算/映射边界见[E2/E3/E5（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.3/report.md)。独立审查后清理了 ui→plugin、plugin→edit、plugin→app-core 无消费者边，plugin 成员骨架保留；未放宽 unsafe、lint 或依赖准入规则。隔离夹具中部分辅助 Cargo 命令只带 offline，不能将 workspace 参数泛化；依赖清理中遗漏 locked/原始输出的操作偏差也单列于 9.1 引用，不冒充门禁证据。宏展开、第三方长调用/运行时语义、原生平台、性能与实际保存恢复仍有盲区，完整 V-01～V-09 均未通过。独立复核与 M1/M2 前交接见[9.6（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.6/report.md)及[9.5（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.5/report.md)。
 
 第 1 组工具组合与 GPUI 核心库的实际分项见 §2.1 及候选审计；它们不代表下表完整实验通过。GPUI 精确例外已按 §13/15 及架构 §3.2 同步，正式五引擎闭包、成员 lint 与 catalog 已获第 2 组实际证据；真实平台能力仍待后续阶段验证。
 
-第 1 组纯依赖消费者的 metadata/tree、五目标解析和 macOS aarch64 check/release build 见[纯候选证据](./validation/m0-engine-foundation/pure-candidates-2026-10-30/report.md)。拟用解析/catalog 版本及 TOML build metadata 的 lock 身份边界已登记；不因此认定 V-06/V-07 语法、catalog 键/插值、拒绝或正式引擎接口已验证。
+第 1 组纯依赖消费者的 metadata/tree、五目标解析和 macOS aarch64 check/release build 见[纯候选证据（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/report.md)。拟用解析/catalog 版本及 TOML build metadata 的 lock 身份边界已登记；不因此认定 V-06/V-07 语法、catalog 键/插值、拒绝或正式引擎接口已验证。
 
 | 编号 | Rust 规范所需产物 | 推进边界 / 冻结时点 |
 |---|---|---|
@@ -438,7 +438,7 @@ RS-05 已确认有限真实 scope：纯文档用 `docs`，workspace 工程配置
 
 ## 22. 旧规范逐章处置账本
 
-2026-10-30收尾补记：PROTO-06已确认A，必要原始例证/完整源码索引已保全于[历史证据索引](./archive/migration-evidence/README.md)，Zed已有[现行复核](./zed-notes.md)。下表“移出/压缩/旧稿保留”等为首轮处置语境，不表示仍依赖docs_bak加载证据；具体本轮去向见[331主题收尾账本](maintenance/deletion-readiness/prior-evidence/closure-topic-mapping.md)。
+2026-10-30收尾补记：PROTO-06已确认A，必要原始例证/完整源码索引已保全于[历史证据索引](./archive/migration-evidence/README.md)，Zed已有[现行复核](./zed-notes.md)。下表“移出/压缩/旧稿保留”等为首轮处置语境，不表示仍依赖docs_bak加载证据；具体本轮去向见[331主题收尾账本（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/maintenance/deletion-readiness/prior-evidence/closure-topic-mapping.md)。
 
 本账本保留首轮处置分类；其中“待确认”表示迁移时状态，RS-01～RS-05 与 ED-01 现已按第 20 节关闭，不是新的阻塞。
 

@@ -904,14 +904,9 @@ impl DocCore {
         };
         let total = committed_len.checked_add(text.len()).ok_or_else(overflow)?;
         check_len(total, self.limits.text)?;
+        let next_version = self.version.next_draft().map_err(DocError::Identity)?;
         if has_group {
-            self.version
-                .next_draft()
-                .map_err(DocError::Identity)?
-                .next_draft()
-                .map_err(DocError::Identity)?;
-        } else {
-            self.version.next_draft().map_err(DocError::Identity)?;
+            next_version.next_draft().map_err(DocError::Identity)?;
         }
         let draft = copy_bounded(text, self.limits.text)?;
         let end = at.checked_add(text.len()).ok_or_else(overflow)?;
@@ -934,8 +929,11 @@ impl DocCore {
             });
             block.undone_typing = None;
         } else {
-            self.version = self.version.next_draft().map_err(DocError::Identity)?;
+            // 有效的非空输入一旦建立新草稿，即分叉当前编辑历史。
+            // 前面的校验和草稿分配均已成功，之后的状态发布不再失败。
             let block = self.open.as_mut().ok_or(DocError::NoOpenBlock)?;
+            self.buffer.discard_redo_branch();
+            self.version = next_version;
             block.range = at..at;
             block.baseline_fragment.clear();
             block.selection = selection;

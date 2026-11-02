@@ -32,7 +32,7 @@
 
 以下全是候选及取证流程，本提案不虚构任何最终锁定数值。
 
-2026-10-30 apply 更新：用户批准[最小例外草案](../../../docs/validation/m0-engine-foundation/admission-2026-10-30/proposed-policy.md)范围并指示完成第 1 组。正式规则已同步现行架构 §3.2：仅 crates.io gpui-pre 0.3.9 的已审 regex 实现路径及非桌面 WASI p2 绑定可例外；记录来源/精确版本/归档校验和/边/target/features/消费者。五引擎完整闭包无 GPUI、无禁用库，自有直接/其它路径禁止。正式 workspace 可换临时候选根并增加合规节点，但受审 GPUI 子图变化须重审。metadata 必须和实际 Cargo tree 分组合交叉核对，不能因一条合法路径而忽略其它非法入边；不得扩张为包前缀或整个 GPUI 子图豁免。详见实际审计，旧候选表的“待取证”由实际证据逐项收口，不代表全阶段通过。
+2026-10-30 apply 更新：用户批准[最小例外草案（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/admission-2026-10-30/proposed-policy.md)范围并指示完成第 1 组。正式规则已同步现行架构 §3.2：仅 crates.io gpui-pre 0.3.9 的已审 regex 实现路径及非桌面 WASI p2 绑定可例外；记录来源/精确版本/归档校验和/边/target/features/消费者。五引擎完整闭包无 GPUI、无禁用库，自有直接/其它路径禁止。正式 workspace 可换临时候选根并增加合规节点，但受审 GPUI 子图变化须重审。metadata 必须和实际 Cargo tree 分组合交叉核对，不能因一条合法路径而忽略其它非法入边；不得扩张为包前缀或整个 GPUI 子图豁免。详见实际审计，旧候选表的“待取证”由实际证据逐项收口，不代表全阶段通过。
 
 | 对象 | 候选 | 取证方法与准入判据 |
 |---|---|---|
@@ -41,7 +41,7 @@
 | gpui-pre | crates.io =0.3.9，声明 Zed 93d745668805029476e6d7fbb19652116fed51de，包校验和/发布差异见第 1 组证据 | macOS aarch64 核心库消费方与 test-support 已编译检查；按现行架构 §3.2 的精确例外验完整图，未审 features、新路径或来源/身份漂移须重审。原生平台后端/真实 harness 事件未验证 |
 | pulldown-cmark | 单解析器候选版本，关闭默认 features 后显式选项 | 分清 Cargo features 与运行期 Options，以基础/GFM/产品语法金样固定可用组合；不添加第二解析器 |
 | TOML/rust-embed | catalog 所需版本候选 | 登记用途/归属/版本/许可/feature/传递图，双语解析与嵌入消费测试 |
-| Unicode 字素分段 | **已批准的精确候选** `unicode-segmentation =1.13.3`，在 `aline-markdown` 增加唯一直接引擎边；该包提供 Unicode 17.0.0 数据，无运行时依赖/unsafe，锁定 SHA-256 `c6f5d3c3b1bf09027a88a6bc961fc00497d651009560b5463668dc81b0fa87a8` | 用户于 2026-11-01 批准 Unicode17 行为、Unicode18 GB9c 已知差异和查询预算方案，proposal/review 见 `docs/validation/m0-engine-foundation/remediation/R07/run-2/`；实现前仍须本 change 设计独立复核，不将 lockfile 中沿 GPUI 的传递可达当作既有准入 |
+| Unicode 字素分段 | **已批准的精确候选** `unicode-segmentation =1.13.3`，在 `aline-markdown` 增加唯一直接引擎边；该包提供 Unicode 17.0.0 数据，无运行时依赖/unsafe，锁定 SHA-256 `c6f5d3c3b1bf09027a88a6bc961fc00497d651009560b5463668dc81b0fa87a8` | 用户于 2026-11-01 批准 Unicode17 行为、Unicode18 GB9c 已知差异和查询预算方案，确认摘要见 `docs/decisions.md` §16；实现前仍须本 change 设计独立复核，不将 lockfile 中沿 GPUI 的传递可达当作既有准入 |
 | entities/emojis、similar/proptest | 仅发现实际缺口才提出的候选 | 与现有能力对照，证明必要性及无重复库；无需求不引入 |
 | ropey/资产/ZIP/导出后端 | 后续证据决定 | M0 不预装；禁 notify/regex/tokio/Wasmtime/WASI/动态宿主覆盖直接及传递所有路径，仅限现行架构 §3.2 已批准的精确例外 |
 
@@ -63,7 +63,7 @@ WorkingVersion 的跨层承载采用低层自有的 revision/不透明代次值�
 
 ### Source Representation Gate
 
-2026-10-31 用户批准原始行尾表示及存储行尾等价：StringBuffer+行索引的编辑源码剥离头部 BOM，保留输入 CR/LF 字节。CRLF 占两个源码字节，磁盘/源码转换仍由 source 负责；Markdown 不再次规范化源码。候选失败与独立演算见 `docs/validation/m0-engine-foundation/source-representation-review.md`，不代表实际 source 测试通过。
+2026-10-31 用户批准原始行尾表示及存储行尾等价：StringBuffer+行索引的编辑源码剥离头部 BOM，保留输入 CR/LF 字节。CRLF 占两个源码字节，磁盘/源码转换仍由 source 负责；Markdown 不再次规范化源码。确认与表示取舍见 `docs/decisions.md` §15，不代表实际 source 测试通过。
 
 编码扫描将 CRLF 对和未配对 LF 各视为一个行尾单元，包含合法编辑在边界新形成的 CRLF；未配对 CR 是普通字符。相对存储基线确有变化时，将行尾单元按基线多数派输出，平票 LF；LF 策略下紧跟在孤立 CR 之后的 CRLF 单元保留 CRLF，以免重开吞掉孤立 CR。不增加尾换行、不更改其他字符。冻结源码 `"\rX\n"` 删除 X 后为 `"\r\n"`，LF 策略下重开为 `"\n"`，只称存储行尾等价，不称严格 String 相同。
 
@@ -92,7 +92,7 @@ M0 建全量正确路径及来源相等的头尾配对最小验证；任何复�
 2. edit 先做可判定预检，在候选状态中准备待定组处理、计划、预演和 reread，目标 after 选区/保护/预算全部验证。
 3. 所有者复验 DocumentId、WorkingVersion、投影/配置及预期片段后，一次发布补丁、行索引、选区、正逆历史与新 revision；更新保持打开的块基线。低层失败不能泄漏半成品。
 4. 拒绝相对调用前完整状态零副作用；源码定位是随后独立意图。无变化不记步、不清 redo。
-5. 相邻普通输入按 900ms 分组，时间由宿主注入；提交不必关块，离块仅处理剩余组。Undo 优先待定组，Redo 恢复选区，实际新编辑才截 redo。重载是独立可撤销边界，基线不随 Undo 回退（TA-02）。
+5. 相邻普通输入按 900ms 分组，时间由宿主注入；提交不必关块，离块仅处理剩余组。Undo 优先待定组；Undo 后收到有效非空普通输入即创建新草稿并立即丢弃旧 redo 分支，即使该草稿随后被 Undo 或离块丢弃也不恢复旧分支；待定输入期间 Redo 拒绝。输入校验失败/空输入不清分支；IME 组合仍是临时候选，取消恢复前态且不清 redo，确认后作为实际编辑分叉。重载是独立可撤销边界，基线不随 Undo 回退（TA-02）。
 6. snapshot_current 冻结最新草稿/工作版本/选区/可达资源引用，不提交/封口历史。资源在 M0 仅表达引用所有权，不实现图片迁移/清理。
 
 2026-10-31 裁决：组 8 在 M0 实现最小资源引用所有权表示并以独立期望和测试验证；初始打开范围等于排序后的选区范围。`SnapshotId` 是快照实例或内容视图的来源身份，可以跨工作版本复用，相同文本也不保证相同 ID；采纳派生结果须同时核验文档、工作版本和实际依赖的其他身份。具体表示、所有者及生命周期以实现和独立复核证据为准，不将此裁决视为资源迁移/清理通过。

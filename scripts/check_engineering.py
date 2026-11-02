@@ -13,10 +13,10 @@ import os
 from pathlib import Path
 import subprocess
 import sys
-import tempfile
 
 from engineering_dependencies import Violation, load_json, validate
 from evidence_paths import resolve_path, write_json, write_text
+from validation_output import output_directory
 
 ROOT = Path(__file__).resolve().parent.parent
 POLICY = ROOT / "scripts/engineering_policy.json"
@@ -193,15 +193,17 @@ def main(argv=None):
         if args.self_test:
             from engineering_self_test import run
             return run(args.output_dir)
+        output = output_directory('engineering', args.output_dir)
         policy = load_json(args.policy)
         if args.metadata:
             if not all((args.tree, args.lock, args.scenario, args.metadata_command, args.tree_command)):
                 raise Violation("离线图核查必须提供 tree/lock/scenario/两条成功采集记录")
             result = check_inputs(args.metadata, args.tree, args.lock, policy, args.scenario, args.metadata_command, args.tree_command, args.target_metadata, args.target_metadata_command)
         else:
-            output = args.output_dir or Path(tempfile.mkdtemp(prefix="aline-engineering-"))
             result = collect(args.manifest_path.resolve(), output, policy)
-        print(json.dumps({"status": "依赖门禁通过", "results": result}, ensure_ascii=False, indent=2))
+        summary = {"status": "依赖门禁通过", "results": result}
+        write_json(output / 'summary.json', summary)
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
         return 0
     except (Violation, OSError, KeyError, TypeError, ValueError) as error:
         print("依赖门禁拒绝: " + str(error), file=sys.stderr)

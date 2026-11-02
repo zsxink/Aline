@@ -60,7 +60,7 @@
 
 解析扩展契约定义在 markdown 的纯数据 API，由宿主注入配置快照；不要求 V1 运行任意插件解析代码。PA-01 已确认未来外部接入方向，加载环境、权限和阶段另行设计，不能恢复旧 Wasmtime/WIT/tokio 路线。
 
-**2026-10-31 M0 接口基础记录（任务 3.3）：** 与本任务八接口相关的已落地公开面包括 source 的只读 `StorageSnapshot`/`StorageRange`/`BaselineId`/`DiskVersion`/`StorageBudget`、buffer 的 `TextSnapshot`/`SrcOffset`/`SrcRange`/`SrcSelection`/`DocumentRevision`/`CheckedBatch` 及预算/错误类型、markdown 的恒等 `Projection` 与坐标/预算/错误类型、UI 的 `DocumentId`/`WorkingVersion`/`InputIdentity`；app-core 的 catalog 与 app 的 `ExitCode` 入口不属于八接口（完整公开面见 3.3 记录第 2 节）。`decode`/`encode` 与最小写盘原语未实现，buffer 不 apply，edit/plugin 无公开接口，DocCore 未实现。上表中各所有者的输入输出是已确认契约，不是已实现能力。完整冻结与消费者追踪见[任务 3.3 记录](./validation/m0-engine-foundation/group-3/step-3.3/report.md)。
+**2026-10-31 M0 接口基础记录（任务 3.3）：** 与本任务八接口相关的已落地公开面包括 source 的只读 `StorageSnapshot`/`StorageRange`/`BaselineId`/`DiskVersion`/`StorageBudget`、buffer 的 `TextSnapshot`/`SrcOffset`/`SrcRange`/`SrcSelection`/`DocumentRevision`/`CheckedBatch` 及预算/错误类型、markdown 的恒等 `Projection` 与坐标/预算/错误类型、UI 的 `DocumentId`/`WorkingVersion`/`InputIdentity`；app-core 的 catalog 与 app 的 `ExitCode` 入口不属于八接口（完整公开面见 3.3 记录第 2 节）。`decode`/`encode` 与最小写盘原语未实现，buffer 不 apply，edit/plugin 无公开接口，DocCore 未实现。上表中各所有者的输入输出是已确认契约，不是已实现能力。完整冻结与消费者追踪见[任务 3.3 记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-3/step-3.3/report.md)。
 
 ## 4. 核心模型与版本
 
@@ -94,7 +94,7 @@
 
 脚注引用可嵌在普通段落内；不能因一个引用就把整段正文变成只读。建议打开该段的源码输入投影并保护引用子区间，其余正文可改；输入规划使用字符边界安全的共同前后缀收窄单区间补丁，使未变的保护片段不被整块替换范围误判为修改。若实际删除、插入或粘贴的作用范围触及保护子区间，仍必须拒绝并定位 Source；不能只比较编辑后引用字符相同就放行跨保护区操作。直接修改引用或定义统一切 Source，具体边界插入样例归 V-07。
 
-**2026-10-31 M0 接口基础记录（任务 3.3）：** `SourceBaseline`、`Parsed`、`OpenBlock`、`Change`、`HistoryStep` 仍仅契约未验证；已落地的包括 `TextSnapshot`、`SrcOffset`/`SrcRange`/`SrcSelection`、`DocumentRevision`、`CheckedBatch`、`StorageSnapshot`、恒等 `Projection` 与 `InputIdentity`（`WorkingVersion` 是 `InputIdentity` 使用的身份类型）。块、Gap、保护范围及其金样留第 6 组；本记录不把上述任何模型写成已完成。详见[任务 3.3 记录](./validation/m0-engine-foundation/group-3/step-3.3/report.md)。
+**2026-10-31 M0 接口基础记录（任务 3.3）：** `SourceBaseline`、`Parsed`、`OpenBlock`、`Change`、`HistoryStep` 仍仅契约未验证；已落地的包括 `TextSnapshot`、`SrcOffset`/`SrcRange`/`SrcSelection`、`DocumentRevision`、`CheckedBatch`、`StorageSnapshot`、恒等 `Projection` 与 `InputIdentity`（`WorkingVersion` 是 `InputIdentity` 使用的身份类型）。块、Gap、保护范围及其金样留第 6 组；本记录不把上述任何模型写成已完成。详见[任务 3.3 记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-3/step-3.3/report.md)。
 
 ## 5. 文件文本进入引擎与存储保真
 
@@ -142,7 +142,7 @@ source 必须先验输入预算，再验证有效 UTF-8。按已确认WC-03，�
 - `StorageRange` 是当前唯一公开的存储字节范围类型，显式绑定 `BaselineId`，并注明不等同源码 UTF-8 范围；source 不提供以磁盘偏移索引编辑源码的接口。
 - 最小 I/O 只实现 create-only 发布：同目录 `create_new` staging → 分块完整写入 → `sync_all` → `hard_link` 到尚不存在的目标。目标已存在普通文件返回 `MetadataPreservationUnverified`，符号链接/目录/其他非普通文件返回 `ExistingTarget{kind}`，检查后的竞争返回 `Conflict`；不覆盖、不截断、不删除，也不回退为原地写。
 
-证据：4.1～4.4 的金样在 `crates/aline-source/tests/fixtures/`，测试与门禁见 `crates/aline-source/tests/`、`scripts/check_*.py`；K-08 偏移人工复核见 `docs/validation/m0-engine-foundation/group-4/step-4.5/report.md`。未验证：ACL/xattr/权限复制、目录 fsync/断电、跨进程 CAS、现有文件覆盖保存、Windows/Linux、网络/外接卷与真实应用保存闭环。V-06/V-07/V-08 与 M0 出口均未据此判通过。
+证据：4.1～4.4 的金样在 `crates/aline-source/tests/fixtures/`，测试与门禁见 `crates/aline-source/tests/`、`scripts/check_*.py`；K-08 偏移人工复核属于历史分项，当前仍需按受影响代码核对。未验证：ACL/xattr/权限复制、目录 fsync/断电、跨进程 CAS、现有文件覆盖保存、Windows/Linux、网络/外接卷与真实应用保存闭环。V-06/V-07/V-08 与 M0 出口均未据此判通过。
 
 ## 6. 解析管线及预处理映射
 
@@ -176,7 +176,7 @@ source 必须先验输入预算，再验证有效 UTF-8。按已确认WC-03，�
 
 自动链接、Alerts、emoji、`[toc]`、公式定界符和 Front matter 按 PRD 补齐。是否使用原生选项或小型自定义扫描，由 M0 的锁定版本夹具决定，不能把旧“不开 ENABLE_GFM、自研全部 autolink”当不可更改决定；不引入另一 Markdown 解析器。公式的具体定界符/支持清单由 V-03 固化，旧 `\(...\)`、`\[...\]` 是候选覆盖，不能仅据旧稿宣布已冻结或已支持。
 
-**2026-10-31 M0 解析配置记录（任务 6.1/6.2）：** 运行期配置已落地为 `aline-markdown` 的 `ParseConfig`（配置代次 `version`）与 `ParseFeatures`（位集合），Cargo 侧 `pulldown-cmark = "=0.13.6"`、`default-features = false`，未启用任何 Cargo feature 来推断语法。M0 显式打开 `TABLES`、`FOOTNOTES`、`STRIKETHROUGH`、`TASKLISTS`、`MATH`、`GFM` 六个位（位值 `0x00000c1e`，代次 1），映射到 `ENABLE_TABLES`/`ENABLE_FOOTNOTES`/`ENABLE_STRIKETHROUGH`/`ENABLE_TASKLISTS`/`ENABLE_MATH`/`ENABLE_GFM`；代次 0 在解析入口被拒绝，代次变化使旧 `Parsed` 不可复用。未启用原生 metadata 选项，Front matter 由本 crate 的前置改写识别；smart punctuation、heading attributes 保持关闭。选择依据：M0 夹具（`crates/aline-markdown/tests/fixtures/m0/` 的 7 个文档、57 个块/Gap 区间）在关闭默认 features 的锁定版本上逐一对照，GFM 表格/任务列表/删除线/脚注/Alert 均走原生选项，`[toc]`、Front matter 与脚注保护走本 crate 的识别与保护，没有引入第二解析器，也没有为公式/Mermaid 引入渲染后端——M0 只保留并识别源码（`Math` 块、`CodeBlock` 的 info 语言），公式定界符与支持清单仍待 V-03。Alerts 的原生选项只决定引用块分类，五类提示块的产品呈现仍待 V-03/V-07。本节不改变上面的“建议配置”措辞，也不宣称 V-03/V-07 通过；详见[组 6 报告](./validation/m0-engine-foundation/group-6/report.md)及 `step-6.1`。
+**2026-10-31 M0 解析配置记录（任务 6.1/6.2）：** 运行期配置已落地为 `aline-markdown` 的 `ParseConfig`（配置代次 `version`）与 `ParseFeatures`（位集合），Cargo 侧 `pulldown-cmark = "=0.13.6"`、`default-features = false`，未启用任何 Cargo feature 来推断语法。M0 显式打开 `TABLES`、`FOOTNOTES`、`STRIKETHROUGH`、`TASKLISTS`、`MATH`、`GFM` 六个位（位值 `0x00000c1e`，代次 1），映射到 `ENABLE_TABLES`/`ENABLE_FOOTNOTES`/`ENABLE_STRIKETHROUGH`/`ENABLE_TASKLISTS`/`ENABLE_MATH`/`ENABLE_GFM`；代次 0 在解析入口被拒绝，代次变化使旧 `Parsed` 不可复用。未启用原生 metadata 选项，Front matter 由本 crate 的前置改写识别；smart punctuation、heading attributes 保持关闭。选择依据：M0 夹具（`crates/aline-markdown/tests/fixtures/m0/` 的 7 个文档、57 个块/Gap 区间）在关闭默认 features 的锁定版本上逐一对照，GFM 表格/任务列表/删除线/脚注/Alert 均走原生选项，`[toc]`、Front matter 与脚注保护走本 crate 的识别与保护，没有引入第二解析器，也没有为公式/Mermaid 引入渲染后端——M0 只保留并识别源码（`Math` 块、`CodeBlock` 的 info 语言），公式定界符与支持清单仍待 V-03。Alerts 的原生选项只决定引用块分类，五类提示块的产品呈现仍待 V-03/V-07。本节不改变上面的“建议配置”措辞，也不宣称 V-03/V-07 通过；详见[组 6 报告（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-6/report.md)及 `step-6.1`。
 
 ### 6.3 改写器的必需能力
 
@@ -215,7 +215,7 @@ pulldown 一个事件可能跨多片段，必须保留子段来源，不能仅�
 
 **存储实现建议（待 V-05/V-07）：**原样片段可仅存源起点及长度，变换片段再存相对偏移/来源记录，避免所有文本逐字分配映射表。[Splat 源码案例与限制](./splat-study.md#43-坐标映射光标与选择)提供了实际紧凑表示，不能据此采用其字符扫描对齐或静默吸附末尾的算法。压缩前后必须具有相同的来源范围、精确性和合法锚点；相对偏移位宽及累计运算受检，不因压缩丢掉一源多字符、隐藏/合成或版本信息。
 
-**2026-10-31 M0 接口基础记录（任务 3.3）：** 恒等投影的 `source_at`/`drawn_at`/`aligned`、局部/全文与 UTF-16 转换已实现并有外部消费者与编译夹具证据；当前仓库扫描未发现调用方手算 `at - range.start`、自建 UTF-16 表或映射外转换，但公开坐标访问器仍可被绕过，扫描不构成结构保证。`Aligned`/`Hidden`/`Synthetic`、实体/HTML/合成换行与块局部映射仍仅契约未验证（第 6 组）；当前没有 UI 生产消费者，不证明真实命中或 IME。详见[任务 3.3 记录](./validation/m0-engine-foundation/group-3/step-3.3/report.md)。
+**2026-10-31 M0 接口基础记录（任务 3.3）：** 恒等投影的 `source_at`/`drawn_at`/`aligned`、局部/全文与 UTF-16 转换已实现并有外部消费者与编译夹具证据；当前仓库扫描未发现调用方手算 `at - range.start`、自建 UTF-16 表或映射外转换，但公开坐标访问器仍可被绕过，扫描不构成结构保证。`Aligned`/`Hidden`/`Synthetic`、实体/HTML/合成换行与块局部映射仍仅契约未验证（第 6 组）；当前没有 UI 生产消费者，不证明真实命中或 IME。详见[任务 3.3 记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-3/step-3.3/report.md)。
 
 **2026-10-31 M0 映射与保护基础记录（任务 6.4/6.5）：** 上一条“第 6 组仍仅契约未验证”是任务 3.3 时点的状态；组 6 已在 `aline-markdown` 落地片段关系与规范锚点，并以手工金样与外部探针核对。已实现的片段精确性为 `Exact`（同源同长）、`Aligned`（同源异长：转义、实体、硬换行标记）、`Hidden`（有源无绘制：标记、标签、被消费换行）、`Synthetic`（有绘制无源：`<br>` 换行、表格单元格间隔、任务框符号）；`source_at` 对 Exact 取起点加偏移，对 Aligned/Hidden 按 affinity 取区间起止，对 Synthetic 取源锚点；`drawn_at` 对称地按 affinity 取绘制区间起止。手工金样 6 例（实体、多字符实体、软换行、硬换行、`<br>` 合成换行、隐藏+合成混合）逐项记录 drawn 文本、片段 `drawn..→source..` 与精确性、规范锚点，存于 `group-6/step-6.4/goldens/mapping-goldens.tsv`；另以仓外探针核对 ZWJ 家族 emoji（19 字节，`Exact 0..18` + `Hidden 18..19`）、重复文字、连续空白、`\*` 转义、tab 与组合字符。SoftBreak 当前实现投影为带来源的换行（`Exact` 片段，不折成空格），该口径仍待 V-07 冻结，本记录不把任一口径写成产品决定。保护范围（Front matter、`[toc]`、脚注引用/定义、HTML 块与行内标签、整源回退）按块与子区间记录，见 `step-6.5`。`mapping-goldens.tsv` 由 `tests/mapping.rs` 直接解析断言，不再只是证据文件。未验证：真实 UI 命中、IME、字素边界、窗口软折行；这些仍属 V-07。
 
@@ -258,7 +258,7 @@ Buffer 是已提交源码；OpenBlock 是至多一个受控的待提交源码替
 
 **2026-10-31 M0 实现记录（组 8）：** `aline-ui::DocCore` 在无窗口环境中持有唯一 `StringBuffer`（含历史）及至多一个 `OpenBlock`/草稿槽；实际入口 `current_snapshot` 返回 `CurrentSnapshot`，冻结最新草稿或组合候选、文档/工作版本、源码选区与资源强引用集合，取快照不提交、封口、清 redo 或压缩历史。初始打开范围等于初始选区排序后的源码范围；草稿基线冲突返回 `DraftBaselineConflict` 并保留输入。`SnapshotId` 标识快照实例/内容视图的来源，不是工作版本或内容哈希：可跨工作版本复用，相同文本也可有不同 ID，消费者不能单凭它采纳结果。
 
-资源采用 M0 最小保守所有权表示：宿主须在引用生效前完整登记同一文档的 `ResourceReference`，DocCore 保留登记集合至自身生命周期结束，冻结快照独立强持有当时集合；Undo/Redo、关块或历史裁剪不触发资源清理。空集合不证明文本没有资源，当前没有自动发现、定位值可用性验证、精确历史可达集、迁移或删除能力。实现、失败日志及未测范围见[组 8 补充记录](./validation/m0-engine-foundation/group-8/followup-2026-10-31/report.md)与[8.5 回填记录](./validation/m0-engine-foundation/group-8/step-8.5/report.md)。
+资源采用 M0 最小保守所有权表示：宿主须在引用生效前完整登记同一文档的 `ResourceReference`，DocCore 保留登记集合至自身生命周期结束，冻结快照独立强持有当时集合；Undo/Redo、关块或历史裁剪不触发资源清理。空集合不证明文本没有资源，当前没有自动发现、定位值可用性验证、精确历史可达集、迁移或删除能力。实现、失败日志及未测范围见[组 8 补充记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-8/followup-2026-10-31/report.md)与[8.5 回填记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-8/step-8.5/report.md)。
 
 ### 8.2 普通输入循环
 
@@ -290,7 +290,7 @@ Buffer 是已提交源码；OpenBlock 是至多一个受控的待提交源码替
 
 **2026-10-31 M0 事件协议记录（组 8）：** 虚拟时间测试覆盖相邻输入 899/900ms 合组、901ms 分组、非相邻输入、同块提交后继续打开、离块/Escape、待定组 Undo 与 Redo 选区恢复。`switch_mode` 在组合期返回延后信号，由宿主收到平台自然结束后重试；实际切换通过同一待定组提交通道，切换本身不新增字节或历史步。派生结果按文档、工作版本、快照来源、解析配置代次和请求/采纳代次复验；关闭块与实际模式变化也推进采纳代次，关闭后重开或模式往返不能恢复旧请求资格。身份耗尽在待定组提交前拒绝，历史预算失败、同模式请求和延后路径不提前推进身份。此处只验证纯协议，尚无真实视图切换/选区重映射、平台焦点或解析调度器。
 
-**2026-10-31 M0 实现记录（组 7）：** `aline-edit` 的 `plan_change`/`validate_change` 已按本节顺序落地为纯逻辑：预检待定输入与组合 → 模式 → 工作版本 → 快照身份 → 投影身份 → 选区合法性 → 选区绑定相等 → 批次在当前快照上重验 → 逐条期望片段重读 → Visual 权限 → 候选重建与同一复读契约 → 目标选区在候选上合法。两个入口只接收 `&TextSnapshot`/`&Parsed`/`&SrcSelection`/`&EditContext`/`&EditCommand`/`EditBudget`，不持有可变 Buffer，也没有 `apply`/`reload`/`undo`/`redo` 或文件写入，因此“拒绝相对调用前状态零副作用”在结构上成立，并由 `tests/refusals.rs` 16 例在真实 `StringBuffer` 上比较文本/选区/revision/undo/redo/历史节点数验证（round-2 复核 N-F2-1 后由 15 例补至 16 例）。本记录**不**包含真实 UI/DocCore 消费者、IME 组合的真实平台事件、块打开/提交分组、自动保存/外改提示与跨平台验证，这些仍属 M1/M2；也不构成 V-07、AC-04 或 M0 出口通过。证据见 [group-7/step-7.2/report.md](./validation/m0-engine-foundation/group-7/step-7.2/report.md)。
+**2026-10-31 M0 实现记录（组 7）：** `aline-edit` 的 `plan_change`/`validate_change` 已按本节顺序落地为纯逻辑：预检待定输入与组合 → 模式 → 工作版本 → 快照身份 → 投影身份 → 选区合法性 → 选区绑定相等 → 批次在当前快照上重验 → 逐条期望片段重读 → Visual 权限 → 候选重建与同一复读契约 → 目标选区在候选上合法。两个入口只接收 `&TextSnapshot`/`&Parsed`/`&SrcSelection`/`&EditContext`/`&EditCommand`/`EditBudget`，不持有可变 Buffer，也没有 `apply`/`reload`/`undo`/`redo` 或文件写入，因此“拒绝相对调用前状态零副作用”在结构上成立，并由 `tests/refusals.rs` 16 例在真实 `StringBuffer` 上比较文本/选区/revision/undo/redo/历史节点数验证（round-2 复核 N-F2-1 后由 15 例补至 16 例）。本记录**不**包含真实 UI/DocCore 消费者、IME 组合的真实平台事件、块打开/提交分组、自动保存/外改提示与跨平台验证，这些仍属 M1/M2；也不构成 V-07、AC-04 或 M0 出口通过。证据见 [group-7/step-7.2/report.md（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-7/step-7.2/report.md)。
 
 ## 9. 补丁、命令事务与历史
 
@@ -314,13 +314,13 @@ Buffer 是已提交源码；OpenBlock 是至多一个受控的待提交源码替
 
 表格结构命令即使替换整表范围，也必须根据原源片段规划重排/插入，不从展示 Table 序列化回 Markdown。只有用户显式“整理”允许按已冻结风格调整相应表格源码；不能把每次逐格输入都变成整表规范化。
 
-**2026-10-31 M0 实现记录（组 7）：** `aline-edit` 已落地本节的最小协议：`plan_change` 生成绑定 `before_revision`/`before_snapshot`/`before_projection`/`before_selection`/期望片段/受检批次/目标选区/复读契约/解析配置/预算的 `ChangePlan`，并在候选快照上完成预演后才返回；`validate_change` 在执行前重跑同一套检查，旧计划无法把旧范围套到新文本。复读在真实应用前运行，三份契约分别是 `Source`（候选可解析）、`Visible`（隐藏语义保全且候选绘制文本等于“before 绘制文本按替换拼接”的预期）、`Format { marker }`（绘制文本与块种类一致、去掉成对标记后隐藏语义一致）。隐藏语义比较的是非纯空白隐藏片段的原文（含内部空白），`[x](https://e "a b")` 删除标题内空格会被拒绝；**未比较**纯空白隐藏片段与片段边界，这是已接受的 V-07 限制，不得据此声称“隐藏片段已完整保留”。当前只实现 `Replace` 与 `ToggleInlineFormat`（`Strong` `**`、`Strike` `~~`）；列表、任务框、表格、代码语言、全文格式化等命令未实现。Visual `Replace` 的权威范围是命令给出的编辑范围，`before_selection` 只用于 validate 确认选区未被外部改动；`ToggleInlineFormat` 额外要求范围等于选区。M1 消费者必须由选区派生命令范围。证据见 [group-7/step-7.1/report.md](./validation/m0-engine-foundation/group-7/step-7.1/report.md)；本记录不构成 V-07 或 M0 出口通过。
+**2026-10-31 M0 实现记录（组 7）：** `aline-edit` 已落地本节的最小协议：`plan_change` 生成绑定 `before_revision`/`before_snapshot`/`before_projection`/`before_selection`/期望片段/受检批次/目标选区/复读契约/解析配置/预算的 `ChangePlan`，并在候选快照上完成预演后才返回；`validate_change` 在执行前重跑同一套检查，旧计划无法把旧范围套到新文本。复读在真实应用前运行，三份契约分别是 `Source`（候选可解析）、`Visible`（隐藏语义保全且候选绘制文本等于“before 绘制文本按替换拼接”的预期）、`Format { marker }`（绘制文本与块种类一致、去掉成对标记后隐藏语义一致）。隐藏语义比较的是非纯空白隐藏片段的原文（含内部空白），`[x](https://e "a b")` 删除标题内空格会被拒绝；**未比较**纯空白隐藏片段与片段边界，这是已接受的 V-07 限制，不得据此声称“隐藏片段已完整保留”。当前只实现 `Replace` 与 `ToggleInlineFormat`（`Strong` `**`、`Strike` `~~`）；列表、任务框、表格、代码语言、全文格式化等命令未实现。Visual `Replace` 的权威范围是命令给出的编辑范围，`before_selection` 只用于 validate 确认选区未被外部改动；`ToggleInlineFormat` 额外要求范围等于选区。M1 消费者必须由选区派生命令范围。证据见 [group-7/step-7.1/report.md（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-7/step-7.1/report.md)；本记录不构成 V-07 或 M0 出口通过。
 
 ### 9.3 历史、保存点及重载
 
 History 必须支持正逆补丁、before/after 选区、操作来源、内容身份和当前待定组。900ms 只用于连续相邻普通输入；IME 确认独立、替换/命令/跨块/重载独立。时间由宿主显式传入，纯状态机不创建计时器；计时起止、移动光标后相邻性等用 V-07 金样固定，不能从旧 Zed 300ms 继承。
 
-Undo 优先处理当前待定组，不能先制造一条重复整块提交；Redo 恢复同一组及对应选区；新增实际编辑使原 redo 分支失效。拒绝、无效命令、无变化提交和组合取消不产生空步，也不无故清空 redo。历史内存预算/裁剪策略待 V-06；裁剪必须明确保存点识别和临时资源仍被历史引用的生命周期，不能只删 Vec 后继续用旧栈深判脏。
+Undo 优先处理当前待定组，不能先制造一条重复整块提交；Redo 恢复同一组及对应选区。**有效非空普通输入在新草稿创建时即使原 redo 分支失效**，不等 Buffer 提交；即使该草稿随后被 Undo 或离块丢弃，旧分支也不恢复。待定输入期间 Redo 拒绝且保留草稿。输入校验拒绝和空输入不清分支；IME 组合候选在确认前仍属临时态，取消恢复前态且不清 redo，确认作为实际编辑时才分叉。上述行为于 2026-11-02 经用户裁决。拒绝、无效命令、无变化提交和组合取消不产生空步，也不无故清空 redo。历史内存预算/裁剪策略待 V-06；裁剪必须明确保存点识别和临时资源仍被历史引用的生命周期，不能只删 Vec 后继续用旧栈深判脏。
 
 例：A → 输入组 B → 保存当前快照 → Undo → 输入 C。B 和 C 可处同一栈深但内容不同，因此 `undo.len() == saved_at` 无效。另例：未封口组中途保存，之后继续同组合并输入；Undo 可能直接回到该组开始处，而非保存的中间快照。保存不为此封口，dirty 仍按实际已保存内容判断。
 
@@ -328,7 +328,7 @@ TA-02 已确定自动重载与“载入磁盘”都是独立可撤销边界。�
 
 撤销重载带回不同旧内容时，UI 提示来源、判脏并暂停自动保存；显式保存/另存为成功或重做回当前磁盘基线后恢复正常策略。redo 回基线为未修改；任何再写仍验外改。重载发生时若有草稿/组合输入，按当前工作内容判断本地修改，不能因为 Buffer 未变误走“无修改自动重载”。
 
-**2026-10-31 M0 历史编排记录（组 8）：** DocCore 的待定输入、组合确认、Undo/Redo 与模拟 `reload` 共享同一 Buffer/History；重载以节点数和 Undo/Redo 行为验证独立边界，未为测试新增历史可变访问器，`Reload` 来源仍属间接可观察。快照、模式协议与恢复读取不另建子编辑器历史。真实磁盘基线/保存点消费、外改提示及 TA-02 的自动保存暂停/恢复尚未接线；无头重载不能替代文件保存闭环。证据见[组 8 回填记录](./validation/m0-engine-foundation/group-8/step-8.5/report.md)。
+**2026-10-31 M0 历史编排记录（组 8）：** DocCore 的待定输入、组合确认、Undo/Redo 与模拟 `reload` 共享同一 Buffer/History；重载以节点数和 Undo/Redo 行为验证独立边界，未为测试新增历史可变访问器，`Reload` 来源仍属间接可观察。快照、模式协议与恢复读取不另建子编辑器历史。真实磁盘基线/保存点消费、外改提示及 TA-02 的自动保存暂停/恢复尚未接线；无头重载不能替代文件保存闭环。证据见[组 8 回填记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-8/step-8.5/report.md)。
 
 ### 9.4 查找、替换与格式化
 
@@ -338,9 +338,9 @@ TA-02 已确定自动重载与“载入磁盘”都是独立可撤销边界。�
 
 全文格式化仅用户菜单手动触发。当前快照 → 保留未知/HTML/原文区的源片段补丁计划 → 展示差异 → 用户确认 → 版本复验 → 一次应用、一步撤销。取消或无法安全规划时零修改；差异期间有输入则作废重算，不把旧全文覆盖当前文本。具体风格及 MD-11 区域外的安全重写范围归 V-07，不能以“全文格式化”默许 AST 序列化或重写保护内容。
 
-**2026-10-31 M0 实现记录（组 5）：** `aline-buffer` 已落地 `StringBuffer`（快照、选区、行索引与 `History` 单一持有）、`CheckedBatch` 全量预检、before/after 正逆补丁、`transform_anchor`/`transform_selection` affinity 变换，以及单调 `DocumentRevision`。批次先校验基线、端点、顺序、重叠与 after 选区，剔除内容相同的替换，再构造 after 文本、逆补丁、行索引与历史计划；全部成功后才一次性替换快照并提交历史。拒绝、无变化批次和预算失败不发布，文本/行索引/选区/代次/历史零变化。历史保存正逆补丁、before/after 选区、操作来源与快照身份；900ms 合并只用于相邻普通输入，保存点按快照身份而非栈深判断，重载是独立可撤销边界，裁剪保护保存点与当前节点。证据见 [group-5/step-5.5/report.md](./validation/m0-engine-foundation/group-5/step-5.5/report.md)。本记录不包含命令规划、IME/组合处理、自动保存/外改提示、全文内容指纹与后台比较、资源阈值；TA-02 的真实自动保存暂停/外改提示仍属 M2，这些原语测试不构成 V-07 或 M0 出口通过。
+**2026-10-31 M0 实现记录（组 5）：** `aline-buffer` 已落地 `StringBuffer`（快照、选区、行索引与 `History` 单一持有）、`CheckedBatch` 全量预检、before/after 正逆补丁、`transform_anchor`/`transform_selection` affinity 变换，以及单调 `DocumentRevision`。批次先校验基线、端点、顺序、重叠与 after 选区，剔除内容相同的替换，再构造 after 文本、逆补丁、行索引与历史计划；全部成功后才一次性替换快照并提交历史。拒绝、无变化批次和预算失败不发布，文本/行索引/选区/代次/历史零变化。历史保存正逆补丁、before/after 选区、操作来源与快照身份；900ms 合并只用于相邻普通输入，保存点按快照身份而非栈深判断，重载是独立可撤销边界，裁剪保护保存点与当前节点。证据见 [group-5/step-5.5/report.md（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-5/step-5.5/report.md)。本记录不包含命令规划、IME/组合处理、自动保存/外改提示、全文内容指纹与后台比较、资源阈值；TA-02 的真实自动保存暂停/外改提示仍属 M2，这些原语测试不构成 V-07 或 M0 出口通过。
 
-**2026-10-31 M0 实现记录（组 7，查找/替换/格式化基础）：** 本节要求的“替换前重验版本与命中文本”已在 `aline-edit` 得到最小协议支撑：`ChangePlan` 绑定工作版本、快照/投影身份与逐条期望片段，`validate_change` 在应用前重新核对全部绑定，旧命中无法套到新文本。全部替换与格式化的**事务编排**（差异展示、用户确认、取消零修改）仍属 M3，本组没有实现查找、全部替换或全文格式化；只实现了 `Replace` 与 `ToggleInlineFormat` 两个命令。Unicode 大小写、环回、退出焦点等查找样例未执行。证据见 [group-7/step-7.3/report.md](./validation/m0-engine-foundation/group-7/step-7.3/report.md)；本记录不构成 V-07 或 M0 出口通过。
+**2026-10-31 M0 实现记录（组 7，查找/替换/格式化基础）：** 本节要求的“替换前重验版本与命中文本”已在 `aline-edit` 得到最小协议支撑：`ChangePlan` 绑定工作版本、快照/投影身份与逐条期望片段，`validate_change` 在应用前重新核对全部绑定，旧命中无法套到新文本。全部替换与格式化的**事务编排**（差异展示、用户确认、取消零修改）仍属 M3，本组没有实现查找、全部替换或全文格式化；只实现了 `Replace` 与 `ToggleInlineFormat` 两个命令。Unicode 大小写、环回、退出焦点等查找样例未执行。证据见 [group-7/step-7.3/report.md（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-7/step-7.3/report.md)；本记录不构成 V-07 或 M0 出口通过。
 
 ## 10. IME、Unicode、选区与字符统计
 
@@ -423,7 +423,7 @@ HTML 块消费普通标签、保留可见文字，块级标签换行、折叠空
 
 HTML 核心金样至少包含支持标签/无 href、引号内 `>`、交叉嵌套、注释前后空白、`&amp;`/十进制/十六进制/多字符实体、`<br>`、过滤标签嵌套、不完整输入、仅标签零可见文字、深栈与重复未闭合扫描。保留源范围、展示、样式、命中精确性和命令拒绝六类期望。
 
-**2026-10-31 M0 有限 HTML 实验记录（任务 6.5）：** 已实现并测试：支持标签 `b/strong/i/em/s/del/strike/u/mark/code/kbd/a` 的样式映射与嵌套合并、`a` 仅在 `#`/`/`/`http`/`https`/`mailto` href 时获得链接样式、引号内 `>` 不提前结束标签、交叉嵌套弹栈、注释/处理指令隐藏并保留保护范围、`&amp;` 等实体按 Aligned 片段映射、`script` 等过滤标签按字面文本显示、未闭合支持标签保留样式不 panic、HTML 预算失败整源回退。保护范围按行内标签/HTML 块/整源回退分别记录。**尚未固化/未对齐项**：过滤集对 `title/textarea/xmp/noembed/noframes/plaintext` 的补全、HTML 文本空白折叠（多源合并为 Aligned 片段）、块级标签合成换行、十进制/十六进制/多字符实体与“仅标签零可见文字”的金样，以及非过滤集 void 标签（`input/link/meta/base`）的展示口径；这些在 V-07 冻结前不得写成“有限 HTML 已完成”。组 6 复核对上述缺口的编号与处置见[组 6 复核](./validation/m0-engine-foundation/group-6/review.md)与[遗留项](./validation/m0-engine-foundation/group-6/follow-ups.md)；本节不改变上方规范句，也不宣称 AC-09 或 V-07 通过。
+**2026-10-31 M0 有限 HTML 实验记录（任务 6.5）：** 已实现并测试：支持标签 `b/strong/i/em/s/del/strike/u/mark/code/kbd/a` 的样式映射与嵌套合并、`a` 仅在 `#`/`/`/`http`/`https`/`mailto` href 时获得链接样式、引号内 `>` 不提前结束标签、交叉嵌套弹栈、注释/处理指令隐藏并保留保护范围、`&amp;` 等实体按 Aligned 片段映射、`script` 等过滤标签按字面文本显示、未闭合支持标签保留样式不 panic、HTML 预算失败整源回退。保护范围按行内标签/HTML 块/整源回退分别记录。**尚未固化/未对齐项**：过滤集对 `title/textarea/xmp/noembed/noframes/plaintext` 的补全、HTML 文本空白折叠（多源合并为 Aligned 片段）、块级标签合成换行、十进制/十六进制/多字符实体与“仅标签零可见文字”的金样，以及非过滤集 void 标签（`input/link/meta/base`）的展示口径；这些在 V-07 冻结前不得写成“有限 HTML 已完成”。组 6 复核对上述缺口的编号与处置见[组 6 复核（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-6/review.md)与[遗留项（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-6/follow-ups.md)；本节不改变上方规范句，也不宣称 AC-09 或 V-07 通过。
 
 **2026-10-31 M0 有限 HTML 修复记录（任务 6.5，F2-1）：** 上一条列出的“尚未固化/未对齐项”中，已落地并测试的有：过滤集补全 `title/textarea/xmp/noembed/noframes/plaintext`（并保留 `object/embed/form/button/svg/math`），且过滤判定前置于 void 判定；HTML 文本空白折叠（连续空格/tab/换行折叠为一个 `Aligned` 空格片段，源码覆盖全部被消费空白，块首/块尾欠写空白丢弃）；块级标签边界合成 `\n`（`div/p/section/article/header/footer/ul/ol/li/h1–h6/table/tr/td/th/blockquote/pre`）；十进制/十六进制/多字符实体与“仅标签零可见文字”的金样。`cargo test -p aline-markdown --test html` 为 20 例、`--test protection` 为 6 例，均通过。**仍待 V-07 冻结**：非过滤集 void 标签（`input/link/meta/base`）的展示口径仍按“不支持标签隐藏、无可见内容”，代码处已标待定；空白折叠与块级合成换行口径本身同样待 V-07 冻结。仍未验证真实 UI 渲染与灰色只读呈现。本节仍不宣称有限 HTML 完整、AC-09 或 V-07 通过。
 
@@ -447,7 +447,7 @@ HTML 核心金样至少包含支持标签/无 href、引号内 `>`、交叉嵌�
 
 **验证建议：**优化分支与全量路径比较的不仅是可见文字，还包括块/Gap、全部源范围、映射来源与精确性、保护区及导航目标；记录实际命中优化/回退路径，避免用全部回退的测试冒充增量验证。样本包含前文引用定义改变后文链接、脚注重排、未闭合围栏/HTML、列表缩进及 Front matter 边界变化。[Splat §5](./splat-study.md#5-解析局部更新性能与异常输入)有窗口扩展、全局回退和布局差分的源码先例，仍不改变本节的全量基线。UI 若实验分批派生刷新，占位升级不得改变同一投影的文字、来源或编辑权限；资产尺寸变化另按源码锚点保持定位，任何旧投影都不能接收并静默丢弃当前输入。方法、样本和通过条件归 V-05/V-07，具体调度仍由 UI 负责。
 
-**2026-10-31 M0 复用实验记录（任务 6.7）：** `aline-markdown` 的 `reuse` 已在全量解析基线上实现头尾配对：前后两次解析的结构相同且源片段逐字节相等时配对，旧块绝对范围经 `translate` 重定位到新快照，块外偏移返回 `None` 而不 clamp。已记录的实际命中：前文插入 3 对、单段内编辑 2 对、末尾追加 4 对、不相关文档 0 对；不是“全部回退”冒充优化。拒绝条件已覆盖配置代次变化、整源回退（RawFallback）、Front matter、脚注、`[toc]`、HTML、顶层列表/围栏、引用定义（含块引用与列表容器内的 `[x]: /u`、围栏行，以及**标签跨行的定义**，如 `[foo\nbar]: /u`——复核 N-F2-1 修正前该形态会漏检并可复用出错误可见文本），以及旧绝对范围对新快照失败。差分比较除文本/块种类/重定位后范围外，还比较投影片段来源与精确性、保护范围与样式范围；M0 公开 API 不暴露链接 href，导航只比较标题的 kind/text/range。**更正（复核 N-F3-3/N-F3-7）**：上述差分比较只在测试辅助中成立，生产路径 `same_block` 只比较块种类与块文本；引用定义目标变化（单行）会被拒绝，但行内链接目标变化不在 M0 的复用比较范围，不会触发整体拒绝复用，因此“含链接目标变化的文档因整体拒绝复用而不可比”对行内链接不成立。**补充（复核 N-F2-1 处置）**：跨行标签的定义（如 `[foo\nbar]: /u`）已由逐行字节状态机识别——跨行的闭 `]` 后紧跟 `:` 即命中，空行重置状态，`\[`/`\]` 按转义跳过；删除该定义或改其目标都会整篇拒绝复用，普通跨行段落文字与“跨行标签但无定义”仍可复用（`tests/reuse.rs` 5 例）。仍未覆盖：真实 UI 消费、局部解析优化（未实现）、性能收益、跨块 Aligned/Synthetic 片段的逐对比较（当前样本未触发）。证据见[组 6 报告](./validation/m0-engine-foundation/group-6/report.md)与 `step-6.7`；本节不宣称 V-05 通过。
+**2026-10-31 M0 复用实验记录（任务 6.7）：** `aline-markdown` 的 `reuse` 已在全量解析基线上实现头尾配对：前后两次解析的结构相同且源片段逐字节相等时配对，旧块绝对范围经 `translate` 重定位到新快照，块外偏移返回 `None` 而不 clamp。已记录的实际命中：前文插入 3 对、单段内编辑 2 对、末尾追加 4 对、不相关文档 0 对；不是“全部回退”冒充优化。拒绝条件已覆盖配置代次变化、整源回退（RawFallback）、Front matter、脚注、`[toc]`、HTML、顶层列表/围栏、引用定义（含块引用与列表容器内的 `[x]: /u`、围栏行，以及**标签跨行的定义**，如 `[foo\nbar]: /u`——复核 N-F2-1 修正前该形态会漏检并可复用出错误可见文本），以及旧绝对范围对新快照失败。差分比较除文本/块种类/重定位后范围外，还比较投影片段来源与精确性、保护范围与样式范围；M0 公开 API 不暴露链接 href，导航只比较标题的 kind/text/range。**更正（复核 N-F3-3/N-F3-7）**：上述差分比较只在测试辅助中成立，生产路径 `same_block` 只比较块种类与块文本；引用定义目标变化（单行）会被拒绝，但行内链接目标变化不在 M0 的复用比较范围，不会触发整体拒绝复用，因此“含链接目标变化的文档因整体拒绝复用而不可比”对行内链接不成立。**补充（复核 N-F2-1 处置）**：跨行标签的定义（如 `[foo\nbar]: /u`）已由逐行字节状态机识别——跨行的闭 `]` 后紧跟 `:` 即命中，空行重置状态，`\[`/`\]` 按转义跳过；删除该定义或改其目标都会整篇拒绝复用，普通跨行段落文字与“跨行标签但无定义”仍可复用（`tests/reuse.rs` 5 例）。仍未覆盖：真实 UI 消费、局部解析优化（未实现）、性能收益、跨块 Aligned/Synthetic 片段的逐对比较（当前样本未触发）。证据见[组 6 报告（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-6/report.md)与 `step-6.7`；本节不宣称 V-05 通过。
 
 ### 12.2 失效与采纳
 
@@ -537,7 +537,7 @@ Source 模式只解除 Markdown 产品只读限制，不解除 UTF-8/补丁版�
 
 随机生成只向 buffer/edit 提交合法或预期拒绝的范围；随机 bytes 先走 decode，不能对非 UTF-8 强行构造 str。属性测试应保留最小失败样例。反退化测试建议记录工作步数随输入增长，辅以 Release 扩量基准；旧“4 倍输入耗时 ≤8 倍”仅是噪声敏感的实验形状，不是复杂度证明。
 
-**2026-10-31 M0 覆盖记录（组 7）：** 上表 E-T09（拒绝零副作用）、E-T10（只读保护）、E-T11（HTML 拒绝）、E-T12（命令金样，仅格式与替换）已有 M0 无头基础证据：`aline-edit` 的 `tests/refusals.rs` 16 例（round-2 复核 N-F2-1 后由 15 例补至 16 例）在真实 `StringBuffer` 上比较文本/选区/revision/undo/redo/历史节点数，覆盖 `PendingInput`、`CompositionActive`、`WrongVersion`、`BudgetExceeded`、`RereadFailed`、`ProtectedRange`、`HtmlBoundary`、`UnsupportedVisualBatch` 与 `AlreadyFormatted` 无空步；`tests/protection.rs` 4 例覆盖 front matter/`[toc]`/脚注引用的 Visual 拒绝与 Source 放行；30 例手写金样覆盖 26 个 plan 用例（其中 `allow_source_footnote` 的目标选区有书面勘误，见 [step-7.1 报告](./validation/m0-engine-foundation/group-7/step-7.1/report.md) 第 3 节）。**未覆盖**：真实 UI/DocCore 消费者与“所有已开放写入口”的检查、IME 真实平台事件、列表/表格/任务框/代码语言/全文格式化命令、MD-11 粘贴的独立用例（当前与跨区替换共用 `Replace` 路径）、HTML 右端越界与跨整个元素的格式命令、Windows/Linux 与其他 target、磁盘与自动保存。E-T09～E-T12 仍不构成 V-07 通过。
+**2026-10-31 M0 覆盖记录（组 7）：** 上表 E-T09（拒绝零副作用）、E-T10（只读保护）、E-T11（HTML 拒绝）、E-T12（命令金样，仅格式与替换）已有 M0 无头基础证据：`aline-edit` 的 `tests/refusals.rs` 16 例（round-2 复核 N-F2-1 后由 15 例补至 16 例）在真实 `StringBuffer` 上比较文本/选区/revision/undo/redo/历史节点数，覆盖 `PendingInput`、`CompositionActive`、`WrongVersion`、`BudgetExceeded`、`RereadFailed`、`ProtectedRange`、`HtmlBoundary`、`UnsupportedVisualBatch` 与 `AlreadyFormatted` 无空步；`tests/protection.rs` 4 例覆盖 front matter/`[toc]`/脚注引用的 Visual 拒绝与 Source 放行；30 例手写金样覆盖 26 个 plan 用例（其中 `allow_source_footnote` 的目标选区有书面勘误，见 [step-7.1 报告（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-7/step-7.1/report.md) 第 3 节）。**未覆盖**：真实 UI/DocCore 消费者与“所有已开放写入口”的检查、IME 真实平台事件、列表/表格/任务框/代码语言/全文格式化命令、MD-11 粘贴的独立用例（当前与跨区替换共用 `Replace` 路径）、HTML 右端越界与跨整个元素的格式命令、Windows/Linux 与其他 target、磁盘与自动保存。E-T09～E-T12 仍不构成 V-07 通过。
 
 保真、映射、拒绝测试建立清单棘轮，移除用例必须有可审查理由。无头测试覆盖纯状态机，UI 命中/IME/磁盘/真实产物另做集成；AC-07/10/12/13/15/18～20 的应用壳专项完整追踪仍在架构 §6，本表不以引擎测试冒充全产品验收。
 
@@ -547,7 +547,7 @@ M0 建 workspace 后执行 `cargo fmt --all --check`、`cargo clippy --workspace
 
 阶段沿用架构第 13 节，不沿用旧引擎稿的任务名称、估时或 M5 折叠目标。
 
-**2026-10-31 M0 阶段分项取证（组 9）：** source/buffer/markdown/edit 公共 API、预算/取消/非法输入、展示树原始范围、块+Gap 覆盖/映射以及 DocCore 单历史/草稿/输入组/组合等待已有本机无头证据；正式 workspace 门禁为 19/19 exit 0、312 passed。E2/E3/E5 的独立源范围与 dump 核对见[9.3](./validation/m0-engine-foundation/group-9/step-9.3/report.md)，AC-01～04 基础及 TA-01/TA-02/ED-01 纯协议范围见[9.4](./validation/m0-engine-foundation/group-9/step-9.4/report.md)，工程守卫见[9.2](./validation/m0-engine-foundation/group-9/step-9.2/report.md)，独立复核与未测边界见[9.6](./validation/m0-engine-foundation/group-9/step-9.6/report.md)。资源引用以宿主完整登记为前提并保守持有，不是自动发现、可读性或资源事务证明；`SnapshotId` 只标识来源，版本采纳仍需完整身份键。真实原生输入/系统字素/布局命中、通用命令消费者、现有文件替换/metadata、保存/恢复/资源迁移、Release 性能与 Windows/Linux/Intel Mac 仍未验证。V-06/V-07/V-08、AC 及 M0 出口均不据此整项判通过；M1 和 M2 前独立出口沿用下表与[交接清单](./validation/m0-engine-foundation/group-9/step-9.5/report.md)。
+**2026-10-31 M0 阶段分项取证（组 9）：** source/buffer/markdown/edit 公共 API、预算/取消/非法输入、展示树原始范围、块+Gap 覆盖/映射以及 DocCore 单历史/草稿/输入组/组合等待已有本机无头证据；正式 workspace 门禁为 19/19 exit 0、312 passed。E2/E3/E5 的独立源范围与 dump 核对见[9.3（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.3/report.md)，AC-01～04 基础及 TA-01/TA-02/ED-01 纯协议范围见[9.4（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.4/report.md)，工程守卫见[9.2（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.2/report.md)，独立复核与未测边界见[9.6（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.6/report.md)。资源引用以宿主完整登记为前提并保守持有，不是自动发现、可读性或资源事务证明；`SnapshotId` 只标识来源，版本采纳仍需完整身份键。真实原生输入/系统字素/布局命中、通用命令消费者、现有文件替换/metadata、保存/恢复/资源迁移、Release 性能与 Windows/Linux/Intel Mac 仍未验证。V-06/V-07/V-08、AC 及 M0 出口均不据此整项判通过；M1 和 M2 前独立出口沿用下表与[交接清单（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.5/report.md)。
 
 | 阶段 | 引擎交付/先决条件 | 出口与未决影响 |
 |---|---|---|
@@ -590,7 +590,7 @@ TA-01～TA-03 已由用户确认，不是本轮待决：[确认依据与原问�
 - **已确认行为：**组合未结束时，显式手动保存、另存为或导出请求进入可取消等待；平台自然确认或取消组合后，对结束后的当前文本取快照再执行。不得立即发布预编辑候选，不得伪造确认/取消或借计时器结束组合。
 - **输入与历史：**取消发布请求不改变当前输入或组合；取快照不封口输入组、不记步、不清 redo，保持 TA-01。自动保存仍延后，恢复仍保护当前输入与临时资源。
 - **实现与验收：**UI 保留 request_id/组合状态门控，实际执行时重验文档/目标/资源身份；M2 保存/另存为、M4 导出补齐平台确认、平台取消、用户取消请求和等待期间输入变化的用例，关联 AC-03/05/14、V-02/V-07/V-08。
-- **M0 基础证据（2026-10-31，组 8）：** 无头等待/取消及结束后取当前快照、自动保存延后和独立恢复读取已具备事件测试；关闭块与实际切模式作废旧采纳资格。宿主集成测试仅实际消费 source 的 create-only `Written`/既有目标拒绝分类，并保留过期输入或闭块前已经发生的写盘事实；尚无 DocCore 文件协调器、既有文件安全替换、保存点更新或发布队列。平台确认/取消、真实保存/另存为/导出、恢复记录与资源事务仍按 M2/M4 取证，详见[8.5 回填记录](./validation/m0-engine-foundation/group-8/step-8.5/report.md)。
+- **M0 基础证据（2026-10-31，组 8）：** 无头等待/取消及结束后取当前快照、自动保存延后和独立恢复读取已具备事件测试；关闭块与实际切模式作废旧采纳资格。宿主集成测试仅实际消费 source 的 create-only `Written`/既有目标拒绝分类，并保留过期输入或闭块前已经发生的写盘事实；尚无 DocCore 文件协调器、既有文件安全替换、保存点更新或发布队列。平台确认/取消、真实保存/另存为/导出、恢复记录与资源事务仍按 M2/M4 取证，详见[8.5 回填记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-8/step-8.5/report.md)。
 - **回写位置：**PRD SAFE-04/EXPORT-01/AC-05/AC-14，架构 §7.1/7.3/8.3，本文 §8.3/10.1/E-T15 及架构规范相关规则已同步；归档不等于测试已通过。
 
 RS-01～RS-05 同轮按 A 确认，具体 Rust 政策见[现行 Rust 规范](./rust-style-guide.md)。算法、平台、工具链和预算仍按第 16 节验证，不因所有问题已确认就宣称实现或技术细节全部冻结。
@@ -599,7 +599,7 @@ RS-01～RS-05 同轮按 A 确认，具体 Rust 政策见[现行 Rust 规范](./r
 
 ### 18.1 旧稿逐章处置账本
 
-2026-10-30收尾补记：PROTO-06已确认A，必要原始例证/完整源码索引已保全于[历史证据索引](./archive/migration-evidence/README.md)，Zed已有[现行复核](./zed-notes.md)。下表“移出/压缩/旧稿保留”等为首轮处置语境，不表示仍依赖docs_bak加载证据；具体本轮去向见[331主题收尾账本](maintenance/deletion-readiness/prior-evidence/closure-topic-mapping.md)。
+2026-10-30收尾补记：PROTO-06已确认A，必要原始例证/完整源码索引已保全于[历史证据索引](./archive/migration-evidence/README.md)，Zed已有[现行复核](./zed-notes.md)。下表“移出/压缩/旧稿保留”等为首轮处置语境，不表示仍依赖docs_bak加载证据；具体本轮去向见[331主题收尾账本（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/maintenance/deletion-readiness/prior-evidence/closure-topic-mapping.md)。
 
 对象是保留不改的[旧 engine-design.md](./archive/migration-evidence/engine-design.md)。**移出**指本稿不复制该专项细节、由当前架构或后续专项承接，不表示本轮已迁入其他文件。一节可拆为多种处置；“保留”保留机制价值，不把参考实现视为 Aline 测试证据。
 
@@ -660,9 +660,9 @@ RS-01～RS-05 同轮按 A 确认，具体 Rust 政策见[现行 Rust 规范](./r
 
 仅 pulldown-cmark 的单解析器路线及 GPUI 精确锁快照是当前约束；具体版本以 M0 实际登记/lockfile 为准。`entities`/`emojis` 是 HTML 实体/短代码的历史候选，`similar` 是 diff 候选，`proptest` 是测试候选；引入时核用途、归属、版本/许可证和同类库，不因旧清单出现就全部添加。
 
-第 1 组隔离消费者已实际解析 `pulldown-cmark 0.13.6` 的事件，并验证 toml/rust-embed 的当前 catalog 依赖组合，归属/精确 features/源码来源和纯候选闭包见[纯引擎候选审计](./validation/m0-engine-foundation/pure-candidates-2026-10-30/report.md)及架构 §3.2。此处只登记依赖可消费性，GFM/产品语法的运行期 Options 与映射/HTML 金样仍须第 6 组验证；不能将单一事件计数探针当作语法或保真验收。Unicode 分段现已按准入方案仅加入 `aline-markdown` 的直接依赖 `unicode-segmentation = "=1.13.3"`；M0 当前锁文件解析/依赖树记录确认该唯一新直接边及传递闭包，五引擎无 GPUI/禁用路径约束仍按正式工程守卫验证。版本采用 Unicode 17，U+094D U+0915 与 Unicode 18 的边界差异已接受。证据见 `validation/m0-engine-foundation/remediation/R07/run-3/`。其他实体/emoji/随机/diff 候选仍未准入。
+第 1 组隔离消费者已实际解析 `pulldown-cmark 0.13.6` 的事件，并验证 toml/rust-embed 的当前 catalog 依赖组合，归属/精确 features/源码来源和纯候选闭包见[纯引擎候选审计（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/report.md)及架构 §3.2。此处只登记依赖可消费性，GFM/产品语法的运行期 Options 与映射/HTML 金样仍须第 6 组验证；不能将单一事件计数探针当作语法或保真验收。Unicode 分段现已按准入方案仅加入 `aline-markdown` 的直接依赖 `unicode-segmentation = "=1.13.3"`；M0 当前锁文件解析/依赖树记录确认该唯一新直接边及传递闭包，五引擎无 GPUI/禁用路径约束仍按正式工程守卫验证。版本采用 Unicode 17，U+094D U+0915 与 Unicode 18 的边界差异已接受。准入摘要见 `docs/decisions.md` §16，回归见 `crates/aline-markdown/tests/grapheme.rs`。其他实体/emoji/随机/diff 候选仍未准入。
 
-ratex/ratex-svg、mermaid-rs-renderer、usvg、syntect/two-face 属插件/资产候选，不让纯引擎为展示而直接依赖 GPUI。ropey 只在性能证据要求时评估；V1 禁 notify/regex/tokio/Wasmtime/WASI/动态宿主，与架构 §3.2 一致。2026-10-30 批准的 GPUI 0.3.9 精确例外仅适用 app/ui/plugin：regex 既有路径及 all-target 图中的非桌面 WASI p2 绑定，完整身份、边、target 与变更复审要求以架构 §3.2 为准；五引擎完整闭包继续无 GPUI、无禁用依赖。见[实际审计](./validation/m0-engine-foundation/admission-2026-10-30/report.md)，不能以单条合法路径掩盖其它入边，也不能把 metadata 过近似包视为实际启用或忽略解析失败。主题 ZIP/导出及 Unicode 分段等新增依赖按专项验证准入，不猜定后端或冻结旧版本。
+ratex/ratex-svg、mermaid-rs-renderer、usvg、syntect/two-face 属插件/资产候选，不让纯引擎为展示而直接依赖 GPUI。ropey 只在性能证据要求时评估；V1 禁 notify/regex/tokio/Wasmtime/WASI/动态宿主，与架构 §3.2 一致。2026-10-30 批准的 GPUI 0.3.9 精确例外仅适用 app/ui/plugin：regex 既有路径及 all-target 图中的非桌面 WASI p2 绑定，完整身份、边、target 与变更复审要求以架构 §3.2 为准；五引擎完整闭包继续无 GPUI、无禁用依赖。见[实际审计（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/admission-2026-10-30/report.md)，不能以单条合法路径掩盖其它入边，也不能把 metadata 过近似包视为实际启用或忽略解析失败。主题 ZIP/导出及 Unicode 分段等新增依赖按专项验证准入，不猜定后端或冻结旧版本。
 
 后续实现的主要待验证影响：ED-01 决策阻塞已解除，组合期显式发布的等待/取消与结束后快照须按 V-07/V-08 验证；V-07 同时决定映射算法/有限 HTML/改写/命令金样能否安全开放；V-05/V-06 决定 StringBuffer、巨块与扫描预算是否满足目标；V-03 决定特殊语法后端覆盖；V-08 决定快照/重载/资源能否正确接线。任何一项缺证据，都不能以“旧项目跑过”代替。
 

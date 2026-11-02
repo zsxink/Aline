@@ -250,6 +250,11 @@ impl StringBuffer {
         Ok(revision)
     }
 
+    /// 丢弃当前游标之后的 Redo 分支，不改文本、选区或 revision。
+    pub fn discard_redo_branch(&mut self) {
+        self.history.discard_redo_branch();
+    }
+
     /// 将整段新文本作为独立历史边界发布；只改内存，不触碰磁盘基线。
     ///
     /// 逐字节相同的重载返回 `Unchanged`，不产生空历史步，也不清除 redo。
