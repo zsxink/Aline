@@ -20,6 +20,7 @@ from validation_output import output_directory
 
 ROOT = Path(__file__).resolve().parent.parent
 POLICY = ROOT / "scripts/engineering_policy.json"
+ADMISSION_POLICY = ROOT / "scripts/dependency_admission_policy.json"
 SCENARIOS = {"all": None, "macos-arm": "aarch64-apple-darwin", "macos-intel": "x86_64-apple-darwin",
              "windows-x64": "x86_64-pc-windows-msvc", "linux-x64": "x86_64-unknown-linux-gnu",
              "linux-arm": "aarch64-unknown-linux-gnu", "all-features": None}
@@ -105,7 +106,7 @@ def argument_value(args, flag):
 
 
 def check_inputs(metadata, tree, lock, policy, scenario, metadata_command, tree_command,
-                 target_metadata=None, target_metadata_command=None):
+                 target_metadata=None, target_metadata_command=None, admission=None, ledger=False):
     successful_acquisition(metadata, metadata_command, "metadata")
     successful_acquisition(tree, tree_command, "tree")
     target = SCENARIOS[scenario]
@@ -148,12 +149,12 @@ def check_inputs(metadata, tree, lock, policy, scenario, metadata_command, tree_
                 matching = [e for e in full_node["deps"] if e["pkg"] == edge["pkg"] and e["name"] == edge["name"]]
                 if not matching or any(k not in matching[0]["dep_kinds"] for k in edge["dep_kinds"]):
                     raise Violation("target-filter edge 不是完整图子集")
-    result = validate(data, tree, lock, policy, scenario)
+    result = validate(data, tree, lock, policy, scenario, admission, ledger)
     result["graph_model"] = "完整 all-target metadata 约束身份/边/保守闭包；实际 tree 包含目标及本机 host 宏/构建选包；filtered metadata 仅作交叉证据"
     return result
 
 
-def collect(manifest, output, policy):
+def collect(manifest, output, policy, admission=None, ledger=False):
     acquisitions = []
     for scenario, target in SCENARIOS.items():
         common = ["--manifest-path", str(manifest), "--locked", "--offline"]
@@ -165,7 +166,8 @@ def collect(manifest, output, policy):
         filtered = filtered_command = None
         if target:
             filtered, filtered_command = record_command(meta_args + ["--filter-platform", target], output, scenario + "-target-metadata")
-        acquisitions.append((metadata, tree, manifest.parent / "Cargo.lock", policy, scenario, meta_command, tree_command, filtered, filtered_command))
+        acquisitions.append((metadata, tree, manifest.parent / "Cargo.lock", policy, scenario, meta_command, tree_command,
+                             filtered, filtered_command, admission, ledger))
     # 当前无自有 feature；未来任何新增组合必须登记，不让全特征并集掩盖互斥组合。
     data = load_json(Path(output) / "all-metadata.stdout.log")
     for package in data["packages"]:
@@ -180,6 +182,8 @@ def main(argv=None):
     parser.add_argument("--manifest-path", type=Path, default=ROOT / "Cargo.toml")
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--policy", type=Path, default=POLICY)
+    parser.add_argument("--admission-policy", type=Path, default=ADMISSION_POLICY)
+    parser.add_argument("--ledger", type=Path)
     parser.add_argument("--metadata", type=Path)
     parser.add_argument("--tree", type=Path)
     parser.add_argument("--lock", type=Path)
@@ -195,12 +199,30 @@ def main(argv=None):
             return run(args.output_dir)
         output = output_directory('engineering', args.output_dir)
         policy = load_json(args.policy)
+        admission = load_json(args.admission_policy)
+        ledger = bool(args.ledger)
         if args.metadata:
             if not all((args.tree, args.lock, args.scenario, args.metadata_command, args.tree_command)):
                 raise Violation("离线图核查必须提供 tree/lock/scenario/两条成功采集记录")
-            result = check_inputs(args.metadata, args.tree, args.lock, policy, args.scenario, args.metadata_command, args.tree_command, args.target_metadata, args.target_metadata_command)
+            result = check_inputs(args.metadata, args.tree, args.lock, policy, args.scenario, args.metadata_command,
+                                  args.tree_command, args.target_metadata, args.target_metadata_command, admission, ledger)
         else:
-            result = collect(args.manifest_path.resolve(), output, policy)
+            result = collect(args.manifest_path.resolve(), output, policy, admission, ledger)
+        ledger_payload = None
+        if isinstance(result, list):
+            for row in result:
+                if isinstance(row, dict):
+                    payload = row.pop("_admission_ledger", None)
+                    if row.get("scenario") == "all":
+                        ledger_payload = payload
+        elif isinstance(result, dict):
+            ledger_payload = result.pop("_admission_ledger", None)
+        if ledger:
+            if ledger_payload is None:
+                raise Violation("未生成依赖准入账本")
+            ledger_path = args.ledger if args.ledger.is_absolute() else ROOT / args.ledger
+            ledger_path.parent.mkdir(parents=True, exist_ok=True)
+            write_json(ledger_path, ledger_payload)
         summary = {"status": "依赖门禁通过", "results": result}
         write_json(output / 'summary.json', summary)
         print(json.dumps(summary, ensure_ascii=False, indent=2))

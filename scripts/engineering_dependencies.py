@@ -180,6 +180,10 @@ def check_structure(packages, nodes, roots):
             if child in roots and not allowed_internal(packages[parent]["name"], packages[child]["name"]):
                 raise Violation("完整闭包内部非法方向: " + route(packages, nodes, [parent], child))
     full = reachable(nodes, roots)
+    unreachable = set(packages) - full
+    if unreachable:
+        # 不可达包不会进入 full 的禁库/例外/引擎闭包检查，必须直接拒绝而不是归入兜底组。
+        raise Violation("metadata 存在不可从 workspace 到达的包: " + ", ".join(sorted(package_key(packages[identity]) for identity in unreachable)))
     for identity in full:
         if packages[identity]["name"] == "gpui":
             raise Violation("禁止替代 GPUI 来源: " + route(packages, nodes, roots, identity))
@@ -207,9 +211,13 @@ def fingerprint(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
-def validate(data, tree, lock_path, policy, scenario):
+def validate(data, tree, lock_path, policy, scenario, admission=None, ledger=False):
     lock = parse_lock(lock_path)
     packages, nodes, roots, identities = model(data, lock)
+    extra_lock = set(lock) - {package_key(package) for package in packages.values()}
+    if extra_lock:
+        # lock 多出的身份无法由 metadata 的边/许可证/准入检查覆盖，按失败关闭处理。
+        raise Violation("Cargo.lock 存在 metadata 未出现的包: " + ", ".join(sorted(extra_lock)))
     full = check_structure(packages, nodes, roots)
     selected = parse_tree(tree, identities, roots)
     if reachable(nodes, roots, selected) != selected:
@@ -263,7 +271,15 @@ def validate(data, tree, lock_path, policy, scenario):
         rows = gpui_snapshot(packages, nodes, gpui, selected, lock)
         if fingerprint(rows) != expected["gpui_subtree_sha256"]:
             raise Violation("正式 GPUI 子图身份/来源/features/边/选包漂移，须重新审计")
-    return {"scenario": scenario, "workspace_members": sorted(packages[root]["name"] for root in roots), "selected_packages": len(selected),
-            "metadata_packages": len(packages), "metadata_unselected": sorted(package_key(packages[i]) for i in full-selected),
-            "engines": {packages[root]["name"]:len(reachable(nodes,[root])) for root in roots if packages[root]["name"] in ENGINES},
-            "gpui_subtree_sha256":fingerprint(gpui_snapshot(packages,nodes,gpui,selected,lock)) if gpui else None}
+    result = {"scenario": scenario, "workspace_members": sorted(packages[root]["name"] for root in roots), "selected_packages": len(selected),
+              "metadata_packages": len(packages), "metadata_unselected": sorted(package_key(packages[i]) for i in full-selected),
+              "engines": {packages[root]["name"]:len(reachable(nodes,[root])) for root in roots if packages[root]["name"] in ENGINES},
+              "gpui_subtree_sha256":fingerprint(gpui_snapshot(packages,nodes,gpui,selected,lock)) if gpui else None}
+    if admission is not None:
+        # 许可证/分组准入是图身份检查之后的独立覆盖缺口；失败同样 fail closed。
+        from dependency_admission import check_admission
+        outcome = check_admission(packages, nodes, roots, selected, lock, admission, scenario, ledger)
+        result["admission"] = outcome["summary"]
+        if outcome["ledger"] is not None:
+            result["_admission_ledger"] = outcome["ledger"]
+    return result

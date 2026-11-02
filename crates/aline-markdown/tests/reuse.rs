@@ -5,8 +5,9 @@ use std::ops::Range;
 
 use aline_buffer::{Affinity, BufferError, SrcOffset, TextBudget, TextSnapshot};
 use aline_markdown::{
-    BlockKind, MappingPrecision, ParseBudget, ParseConfig, Parsed, ProtectionKind, ReuseOutcome,
-    ReuseRefusal, ReuseTranslateError, ReusedBlock, TextStyle, parse, reuse,
+    BlockKind, MappingPrecision, NavigationEntry, NavigationKind, ParseBudget, ParseConfig, Parsed,
+    ProtectionKind, ReuseOutcome, ReuseRefusal, ReuseTranslateError, ReusedBlock, TextStyle, parse,
+    reuse,
 };
 
 const BUDGET: usize = 1024 * 1024;
@@ -390,6 +391,199 @@ fn old_absolute_ranges_fail_against_new_snapshot() -> Result<(), Box<dyn Error>>
 }
 
 #[test]
+fn old_navigation_ranges_fail_against_new_snapshot() -> Result<(), Box<dyn Error>> {
+    let old = parse_text("# H\n\nA\n")?;
+    let new = parse_text("X\n\n# H\n\nA\n")?;
+    let old_entry = old
+        .navigation()
+        .entries()
+        .first()
+        .ok_or("missing old navigation entry")?;
+    assert_eq!(old_entry.kind(), NavigationKind::Heading);
+    assert!(matches!(
+        new.validate_range(old_entry.source()),
+        Err(aline_markdown::ParseError::Source(
+            BufferError::SnapshotMismatch
+        ))
+    ));
+    let new_entry = new
+        .navigation()
+        .entries()
+        .first()
+        .ok_or("missing new navigation entry")?;
+    let old_start = old
+        .snapshot()
+        .src_offset(old_entry.source().byte_range().start)?;
+    let old_end = old
+        .snapshot()
+        .src_offset(old_entry.source().byte_range().end)?;
+    let outcome = reuse(&old, &new);
+    let pair = outcome
+        .reused()
+        .iter()
+        .find(|pair| pair.old_index() == 0)
+        .ok_or("missing heading reuse pair")?;
+    assert_eq!(
+        pair.translate(new.snapshot(), &old_start)?.byte_offset(),
+        new_entry.source().byte_range().start
+    );
+    assert_eq!(
+        pair.translate(new.snapshot(), &old_end)?.byte_offset(),
+        new_entry.source().byte_range().end
+    );
+    Ok(())
+}
+
+#[test]
+fn old_navigation_targets_fail_against_new_snapshot() -> Result<(), Box<dyn Error>> {
+    let old = parse_text("# H\n\n[toc]\n\nText[^a].\n\n[^a]: note\n")?;
+    let new = parse_text("X\n\n# H\n\n[toc]\n\nText[^a].\n\n[^a]: note\n")?;
+    let toc = old
+        .navigation()
+        .entries()
+        .iter()
+        .find(|entry| entry.kind() == NavigationKind::Toc)
+        .ok_or("missing old toc entry")?;
+    assert!(!toc.targets().is_empty());
+    for target in toc.targets() {
+        assert!(matches!(
+            new.validate_range(target),
+            Err(aline_markdown::ParseError::Source(
+                BufferError::SnapshotMismatch
+            ))
+        ));
+    }
+    let reference = old
+        .navigation()
+        .entries()
+        .iter()
+        .find(|entry| entry.kind() == NavigationKind::FootnoteReference)
+        .ok_or("missing old footnote reference entry")?;
+    assert!(!reference.targets().is_empty());
+    for target in reference.targets() {
+        assert!(matches!(
+            new.validate_range(target),
+            Err(aline_markdown::ParseError::Source(
+                BufferError::SnapshotMismatch
+            ))
+        ));
+    }
+    Ok(())
+}
+
+#[test]
+fn nested_toc_block_reuses_without_toc_navigation() -> Result<(), Box<dyn Error>> {
+    let old = parse_text("> [toc]\n\nA\n")?;
+    let new = parse_text("X\n\n> [toc]\n\nA\n")?;
+    assert!(old.navigation().is_empty());
+    assert!(new.navigation().is_empty());
+    assert!(
+        old.protected_ranges()
+            .iter()
+            .all(|range| range.kind() != ProtectionKind::Toc)
+    );
+    assert!(
+        new.protected_ranges()
+            .iter()
+            .all(|range| range.kind() != ProtectionKind::Toc)
+    );
+    let outcome = reuse(&old, &new);
+    assert_eq!(outcome.refusal(), None);
+    assert!(!outcome.is_empty(), "nested toc sample must reuse");
+    let quote_pair = outcome
+        .reused()
+        .iter()
+        .find(|pair| old.blocks()[pair.old_index()].kind() == BlockKind::BlockQuote)
+        .ok_or("nested toc container must itself be reused, not just the tail paragraph")?;
+    assert_eq!(
+        new.blocks()[quote_pair.new_index()].kind(),
+        BlockKind::BlockQuote
+    );
+    assert_all_reused_pairs_match(&old, &new, &outcome)?;
+    assert_heading_source_anchors_match(&old, &new, &outcome)?;
+    Ok(())
+}
+
+#[test]
+fn nested_heading_block_reuses_without_navigation_entries() -> Result<(), Box<dyn Error>> {
+    let old = parse_text("> # Nested\n\nA\n")?;
+    let new = parse_text("X\n\n> # Nested\n\nA\n")?;
+    assert!(old.navigation().is_empty());
+    assert!(new.navigation().is_empty());
+    let outcome = reuse(&old, &new);
+    assert_eq!(outcome.refusal(), None);
+    let quote_pair = outcome
+        .reused()
+        .iter()
+        .find(|pair| old.blocks()[pair.old_index()].kind() == BlockKind::BlockQuote)
+        .ok_or("nested heading container must reuse")?;
+    assert_eq!(
+        new.blocks()[quote_pair.new_index()].kind(),
+        BlockKind::BlockQuote
+    );
+    assert_all_reused_pairs_match(&old, &new, &outcome)?;
+    assert_heading_source_anchors_match(&old, &new, &outcome)?;
+    Ok(())
+}
+
+#[test]
+fn footnote_reference_alone_refuses_reuse() -> Result<(), Box<dyn Error>> {
+    let plain = parse_text("A\n\nB\n")?;
+    let referenced = parse_text("> [^n]: nested\n\nText[^n].\n")?;
+    assert!(
+        referenced
+            .protected_ranges()
+            .iter()
+            .any(|range| range.kind() == ProtectionKind::FootnoteReference)
+    );
+    assert!(
+        referenced
+            .protected_ranges()
+            .iter()
+            .all(|range| range.kind() != ProtectionKind::FootnoteDefinition)
+    );
+    assert_reuse_refused(
+        &plain,
+        &referenced,
+        ReuseRefusal::Footnote,
+        "footnote reference without a top-level definition",
+    );
+    assert_reuse_refused(
+        &referenced,
+        &plain,
+        ReuseRefusal::Footnote,
+        "footnote reference without a top-level definition reversed",
+    );
+    Ok(())
+}
+
+#[test]
+fn nested_footnote_definition_refuses_via_reference_definition() -> Result<(), Box<dyn Error>> {
+    let plain = parse_text("A\n\nB\n")?;
+    let nested = parse_text("> [^n]: nested\n\nC\n")?;
+    assert!(nested.navigation().is_empty());
+    assert!(
+        nested
+            .protected_ranges()
+            .iter()
+            .all(|range| range.kind() != ProtectionKind::FootnoteDefinition)
+    );
+    assert_reuse_refused(
+        &plain,
+        &nested,
+        ReuseRefusal::ReferenceDefinition,
+        "nested footnote definition",
+    );
+    assert_reuse_refused(
+        &nested,
+        &plain,
+        ReuseRefusal::ReferenceDefinition,
+        "nested footnote definition reversed",
+    );
+    Ok(())
+}
+
+#[test]
 fn block_quote_reference_definition_changes_refuse_reuse() -> Result<(), Box<dyn Error>> {
     let definitions = [
         "> [x]: /u\n\n[x]\n",
@@ -687,9 +881,9 @@ fn html_and_footnote_refuse_reuse_in_both_directions() -> Result<(), Box<dyn Err
 /// 复用块与全量重算的逐块签名：文本、种类、范围、映射片段（来源/绘制/precision）、
 /// 保护范围与样式范围都重定位到新快照坐标后比较。
 ///
-/// M0 的 `Parsed` 不暴露链接目标；标题作为导航目标由 `BlockKind::Heading` 的文本与
-/// 范围覆盖，而含 HTML、脚注或引用定义的文档在 `global_dependency` 处整体拒绝复用，
-/// 因此链接/脚注目标本身在复用路径上不可比，这里不作伪装比较。
+/// M0 的 `Parsed::navigation()` 只暴露标题、顶层目录与脚注的只读角色，不暴露链接目标；
+/// 含 HTML、脚注或引用定义的文档在 `global_dependency` 处整体拒绝复用。因此复用路径
+/// 只比较可安全复用的 Heading 导航条目，不把被拒绝的链接/脚注目标伪装成可复用。
 #[derive(Debug, Eq, PartialEq)]
 struct BlockSignature {
     kind: BlockKind,
@@ -706,6 +900,55 @@ struct SegmentSignature {
     drawn: Range<usize>,
     text: String,
     precision: MappingPrecision,
+}
+
+/// 取 `[start, end)` 内显式 Gap 的源码文本；Gap 不参与块重定位，
+/// 因此比较其条目数与字节内容，而不是要求旧绝对范围可直接用于新快照。
+fn gap_texts(parsed: &Parsed, start: usize, end: usize) -> Result<Vec<String>, Box<dyn Error>> {
+    parsed
+        .gaps()
+        .iter()
+        .filter_map(|gap| {
+            let range = gap.range().byte_range();
+            (range.start >= start && range.end <= end).then_some(range)
+        })
+        .map(|range| {
+            let source = parsed.snapshot().src_range(range)?;
+            Ok(parsed
+                .snapshot()
+                .slice(&source, TextBudget::new(BUDGET))?
+                .into_owned())
+        })
+        .collect()
+}
+
+fn assert_reused_gaps_match(
+    old: &Parsed,
+    new: &Parsed,
+    outcome: &ReuseOutcome,
+) -> Result<(), Box<dyn Error>> {
+    for window in outcome.reused().windows(2) {
+        let (left, right) = (&window[0], &window[1]);
+        // 只有旧/新块索引都相邻时才存在同一段块间 Gap；中间块被修改时跳过。
+        if right.old_index() != left.old_index() + 1 || right.new_index() != left.new_index() + 1 {
+            continue;
+        }
+        let old_gaps = gap_texts(
+            old,
+            left.old_range().byte_range().end,
+            right.old_range().byte_range().start,
+        )?;
+        let new_gaps = gap_texts(
+            new,
+            left.new_range().byte_range().end,
+            right.new_range().byte_range().start,
+        )?;
+        assert_eq!(
+            old_gaps, new_gaps,
+            "reused block gap content must match full reparse"
+        );
+    }
+    Ok(())
 }
 
 fn assert_all_reused_pairs_match(
@@ -744,6 +987,7 @@ fn assert_all_reused_pairs_match(
             pair.new_range().byte_range().end
         );
     }
+    assert_reused_gaps_match(old, new, outcome)?;
     Ok(())
 }
 
@@ -772,7 +1016,23 @@ fn assert_tree_partition(parsed: &Parsed) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// M0 尚无独立导航索引；此处只验证 heading block 作为源码跳转锚点的文本/端点迁移。
+fn navigation_entries_within<'a>(
+    parsed: &'a Parsed,
+    range: &Range<usize>,
+) -> Vec<&'a NavigationEntry> {
+    parsed
+        .navigation()
+        .entries()
+        .iter()
+        .filter(|entry| {
+            let source = entry.source().byte_range();
+            source.start >= range.start && source.end <= range.end
+        })
+        .collect()
+}
+
+/// 成功复用只允许 Heading 导航条目：逐对重定位旧条目端点并比较种类、级别与空目标，
+/// 同时确认其他复用块内没有 Toc、脚注或嵌套 Heading 条目。
 fn assert_heading_source_anchors_match(
     old: &Parsed,
     new: &Parsed,
@@ -783,44 +1043,47 @@ fn assert_heading_source_anchors_match(
             .blocks()
             .get(pair.old_index())
             .ok_or("missing old block")?;
-        if old_block.kind() != BlockKind::Heading {
-            continue;
-        }
         let new_block = new
             .blocks()
             .get(pair.new_index())
             .ok_or("missing new block")?;
-        assert_eq!(new_block.kind(), BlockKind::Heading);
-        assert_eq!(
-            pair.old_range().byte_range().len(),
-            pair.new_range().byte_range().len()
-        );
-        let old_heading = old
-            .snapshot()
-            .slice(old_block.range(), TextBudget::new(BUDGET))?;
-        let new_heading = new
-            .snapshot()
-            .slice(new_block.range(), TextBudget::new(BUDGET))?;
-        assert_eq!(
-            old_heading.as_ref(),
-            new_heading.as_ref(),
-            "heading source anchor text"
-        );
-        let old_start = old
-            .snapshot()
-            .src_offset(pair.old_range().byte_range().start)?;
-        let old_end = old
-            .snapshot()
-            .src_offset(pair.old_range().byte_range().end)?;
-        let new_range = new_block.range().byte_range();
-        assert_eq!(
-            pair.translate(new.snapshot(), &old_start)?.byte_offset(),
-            new_range.start
-        );
-        assert_eq!(
-            pair.translate(new.snapshot(), &old_end)?.byte_offset(),
-            new_range.end
-        );
+        let old_block_range = old_block.range().byte_range();
+        let new_block_range = new_block.range().byte_range();
+        let old_entries = navigation_entries_within(old, &old_block_range);
+        let new_entries = navigation_entries_within(new, &new_block_range);
+        if old_block.kind() == BlockKind::Heading {
+            assert_eq!(old_entries.len(), 1, "heading block must have one entry");
+            assert_eq!(new_entries.len(), 1, "reused heading must have one entry");
+            let old_entry = old_entries[0];
+            let new_entry = new_entries[0];
+            assert_eq!(old_entry.kind(), NavigationKind::Heading);
+            assert_eq!(new_entry.kind(), old_entry.kind());
+            assert_eq!(new_entry.heading_level(), old_entry.heading_level());
+            assert!(old_entry.targets().is_empty());
+            assert!(new_entry.targets().is_empty());
+            let old_source = old_entry.source().byte_range();
+            let old_start = old.snapshot().src_offset(old_source.start)?;
+            let old_end = old.snapshot().src_offset(old_source.end)?;
+            let new_source = new_entry.source().byte_range();
+            assert_eq!(
+                pair.translate(new.snapshot(), &old_start)?.byte_offset(),
+                new_source.start
+            );
+            assert_eq!(
+                pair.translate(new.snapshot(), &old_end)?.byte_offset(),
+                new_source.end
+            );
+            assert_eq!(new_source, new_block_range);
+        } else {
+            assert!(
+                old_entries.is_empty(),
+                "non-heading reused block must not contain navigation entries"
+            );
+            assert!(
+                new_entries.is_empty(),
+                "reused non-heading block must not contain navigation entries"
+            );
+        }
     }
     Ok(())
 }
@@ -961,6 +1224,55 @@ fn reused_blocks_match_full_reparse_mapping_protection_and_heading_anchor()
         assert_all_reused_pairs_match(&old, &new, &outcome)?;
         assert_heading_source_anchors_match(&old, &new, &outcome)?;
     }
+    Ok(())
+}
+
+#[test]
+fn reused_blocks_match_gap_and_aligned_synthetic_mappings() -> Result<(), Box<dyn Error>> {
+    // Aligned：实体解码与行内代码的 source 长度不同于 drawn；Synthetic：表格单元格
+    // 的分隔制表符没有源码片段。两类都必须随复用块一起与全量重算逐段一致。
+    let cases: [(&str, &str); 2] = [
+        (
+            "# H &amp; `a`\n\nA\n\nB\n",
+            "Y\n\n# H &amp; `a`\n\nA\n\nB\n",
+        ),
+        (
+            "| a | b |\n| - | - |\n| c | d |\n\nX\n",
+            "Y\n\n| a | b |\n| - | - |\n| c | d |\n\nX\n",
+        ),
+    ];
+    for (old_text, new_text) in cases {
+        let old = parse_text(old_text)?;
+        let new = parse_text(new_text)?;
+        let outcome = reuse(&old, &new);
+        assert_eq!(outcome.refusal(), None, "old {old_text:?}");
+        assert!(
+            !outcome.is_empty(),
+            "sample must exercise a real reuse hit: {old_text:?}"
+        );
+        assert_all_reused_pairs_match(&old, &new, &outcome)?;
+        assert_heading_source_anchors_match(&old, &new, &outcome)?;
+    }
+    let aligned = parse_text("# H &amp; `a`\n\nA\n")?;
+    let precisions: Vec<_> = aligned
+        .projection()
+        .segments()
+        .iter()
+        .map(|segment| segment.precision())
+        .collect();
+    assert!(
+        precisions.contains(&MappingPrecision::Aligned),
+        "entity/code sample must produce Aligned mapping"
+    );
+    let table = parse_text("| a | b |\n| - | - |\n| c | d |\n\nX\n")?;
+    assert!(
+        table
+            .projection()
+            .segments()
+            .iter()
+            .any(|segment| segment.precision() == MappingPrecision::Synthetic),
+        "table sample must produce Synthetic mapping"
+    );
     Ok(())
 }
 

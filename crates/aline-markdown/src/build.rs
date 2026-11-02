@@ -1,14 +1,16 @@
 //! pulldown-cmark 事件到块、间隙、映射片段、保护与诊断的无头构树。
 
+use std::cmp::Ordering;
 use std::ops::Range;
 
 use aline_buffer::TextSnapshot;
-use pulldown_cmark::{Event, Tag, TagEnd};
+use pulldown_cmark::{Event, HeadingLevel, Tag, TagEnd};
 
 use crate::budget::{CancelCheck, ParseBudget, ParseStats};
 use crate::diagnostic::{Diagnostic, DiagnosticKind};
 use crate::mapping::{MappingPrecision, MappingSegment};
 use crate::mdast::{Block, BlockKind, Gap};
+use crate::navigation::{NavigationEntry, NavigationIndex, NavigationKind};
 use crate::pre::Rewrite;
 use crate::protection::{ProtectedRange, ProtectionKind};
 use crate::style::{StyledRange, TextStyle};
@@ -42,13 +44,29 @@ pub(crate) struct Built {
     pub(crate) protected: Vec<ProtectedRange>,
     pub(crate) styled: Vec<StyledRange>,
     pub(crate) diagnostics: Vec<Diagnostic>,
+    pub(crate) navigation: NavigationIndex,
 }
 
 struct RootBlock {
     start: usize,
     kind: BlockKind,
+    heading_level: Option<u8>,
+    footnote_label: Option<String>,
     has_display_math: bool,
     has_non_math_visible: bool,
+}
+
+/// 构树期间暂存的导航草稿；目标在全部事件结束后统一解析。
+struct NavigationDraft {
+    source: Range<usize>,
+    kind: NavigationDraftKind,
+}
+
+enum NavigationDraftKind {
+    Heading { level: u8 },
+    Toc,
+    FootnoteReference { label: String },
+    FootnoteDefinition { label: String },
 }
 
 struct Builder<'a, 'c> {
@@ -63,6 +81,7 @@ struct Builder<'a, 'c> {
     protected: Vec<(Range<usize>, ProtectionKind)>,
     styled: Vec<(Range<usize>, TextStyle)>,
     diagnostics: Vec<(Range<usize>, DiagnosticKind)>,
+    navigation: Vec<NavigationDraft>,
     last_source_end: usize,
     depth: usize,
     root: Option<RootBlock>,
@@ -94,6 +113,7 @@ pub(crate) fn build<'a, 'c>(
         protected: Vec::new(),
         styled: Vec::new(),
         diagnostics: Vec::new(),
+        navigation: Vec::new(),
         last_source_end: 0,
         depth: 0,
         root: None,
@@ -149,7 +169,14 @@ pub(crate) fn build<'a, 'c>(
         }
         Err(error) => return Err(error),
     }
-    builder.finish()
+    match builder.finish() {
+        Ok(built) => Ok(built),
+        Err(BuildError::BudgetExceeded) => {
+            stats.budget_hits = stats.budget_hits.saturating_add(1);
+            Err(BuildError::BudgetExceeded)
+        }
+        Err(error) => Err(error),
+    }
 }
 
 impl Builder<'_, '_> {
@@ -175,9 +202,16 @@ impl Builder<'_, '_> {
         if self.depth == 0
             && let Some(kind) = block_kind(&tag)
         {
+            let (heading_level, footnote_label) = match &tag {
+                Tag::Heading { level, .. } => (Some(heading_level(*level)), None),
+                Tag::FootnoteDefinition(name) => (None, Some(name.as_ref().to_owned())),
+                _ => (None, None),
+            };
             self.root = Some(RootBlock {
                 start: source.start,
                 kind,
+                heading_level,
+                footnote_label,
                 has_display_math: false,
                 has_non_math_visible: false,
             });
@@ -339,12 +373,18 @@ impl Builder<'_, '_> {
         Ok(())
     }
 
-    fn footnote_reference(&mut self, _name: &str, range: Range<usize>) -> Result<(), BuildError> {
+    fn footnote_reference(&mut self, name: &str, range: Range<usize>) -> Result<(), BuildError> {
         let source = self.source_of(range)?;
         let slice = self.source.get(source.clone()).ok_or(BuildError::Overlap)?;
         self.push_visible(slice, source.clone(), MappingPrecision::Exact)?;
         self.protected
             .push((source.clone(), ProtectionKind::FootnoteReference));
+        self.navigation.push(NavigationDraft {
+            source: source.clone(),
+            kind: NavigationDraftKind::FootnoteReference {
+                label: name.to_owned(),
+            },
+        });
         self.mark_visible();
         self.record_html_style(source);
         Ok(())
@@ -389,6 +429,8 @@ impl Builder<'_, '_> {
         } else {
             root.kind
         };
+        let heading_level = root.heading_level;
+        let footnote_label = root.footnote_label;
         let range = start..trimmed;
         self.blocks.push((range.clone(), kind));
         if kind == BlockKind::FootnoteDefinition {
@@ -396,13 +438,32 @@ impl Builder<'_, '_> {
                 .push((range.clone(), ProtectionKind::FootnoteDefinition));
         }
         if kind == BlockKind::HtmlBlock {
-            self.protected.push((range, ProtectionKind::Html));
+            self.protected.push((range.clone(), ProtectionKind::Html));
         }
-        if kind == BlockKind::Paragraph
-            && let Some(slice) = self.source.get(start..trimmed)
-            && slice.trim().eq_ignore_ascii_case("[toc]")
+        let toc = kind == BlockKind::Paragraph && is_toc_paragraph(self.source, &range);
+        if toc {
+            self.protected.push((range.clone(), ProtectionKind::Toc));
+        }
+        if let Some(level) = heading_level
+            && kind == BlockKind::Heading
         {
-            self.protected.push((start..trimmed, ProtectionKind::Toc));
+            self.navigation.push(NavigationDraft {
+                source: range.clone(),
+                kind: NavigationDraftKind::Heading { level },
+            });
+        }
+        if let Some(label) = footnote_label
+            && kind == BlockKind::FootnoteDefinition
+        {
+            self.navigation.push(NavigationDraft {
+                source: range,
+                kind: NavigationDraftKind::FootnoteDefinition { label },
+            });
+        } else if toc {
+            self.navigation.push(NavigationDraft {
+                source: range,
+                kind: NavigationDraftKind::Toc,
+            });
         }
         Ok(())
     }
@@ -621,6 +682,247 @@ impl Builder<'_, '_> {
         self.check_segments()
     }
 
+    fn finish_navigation(&self) -> Result<NavigationIndex, BuildError> {
+        self.check_cancel()?;
+        let entries = self.navigation.len();
+        let mut headings = Vec::new();
+        let mut tocs = Vec::new();
+        let mut definitions = Vec::new();
+        let mut references = Vec::new();
+        headings
+            .try_reserve(entries)
+            .map_err(|_| BuildError::Allocation)?;
+        tocs.try_reserve(entries)
+            .map_err(|_| BuildError::Allocation)?;
+        definitions
+            .try_reserve(entries)
+            .map_err(|_| BuildError::Allocation)?;
+        references
+            .try_reserve(entries)
+            .map_err(|_| BuildError::Allocation)?;
+        for (index, draft) in self.navigation.iter().enumerate() {
+            self.check_cancel()?;
+            match draft.kind {
+                NavigationDraftKind::Heading { .. } => headings.push(index),
+                NavigationDraftKind::Toc => tocs.push(index),
+                NavigationDraftKind::FootnoteDefinition { .. } => definitions.push(index),
+                NavigationDraftKind::FootnoteReference { .. } => references.push(index),
+            }
+        }
+        for index in definitions.iter().chain(references.iter()) {
+            if self.navigation_label(*index).is_none() {
+                return Err(BuildError::Mapping);
+            }
+        }
+        headings.sort_by_key(|index| self.navigation_source_key(*index));
+        for sorted in [&mut definitions, &mut references] {
+            sorted.sort_by(|left, right| {
+                self.navigation_label_for_sort(*left)
+                    .cmp(self.navigation_label_for_sort(*right))
+                    .then_with(|| {
+                        self.navigation_source_key(*left)
+                            .cmp(&self.navigation_source_key(*right))
+                    })
+            });
+        }
+
+        // 预检只使用分组计数；任何目标向量分配都必须发生在这里之后。
+        let mut slots = entries;
+        if slots > self.budget.max_nodes() {
+            return Err(BuildError::BudgetExceeded);
+        }
+        let toc_slots = tocs
+            .len()
+            .checked_mul(headings.len())
+            .ok_or(BuildError::BudgetExceeded)?;
+        slots = slots
+            .checked_add(toc_slots)
+            .ok_or(BuildError::BudgetExceeded)?;
+        let mut definition_index = 0usize;
+        let mut reference_index = 0usize;
+        while definition_index < definitions.len() && reference_index < references.len() {
+            let definition_label = self
+                .navigation_label(definitions[definition_index])
+                .ok_or(BuildError::Mapping)?;
+            let reference_label = self
+                .navigation_label(references[reference_index])
+                .ok_or(BuildError::Mapping)?;
+            match definition_label.cmp(reference_label) {
+                Ordering::Less => {
+                    definition_index =
+                        self.label_run_end(&definitions, definition_label, definition_index)?;
+                }
+                Ordering::Greater => {
+                    reference_index =
+                        self.label_run_end(&references, reference_label, reference_index)?;
+                }
+                Ordering::Equal => {
+                    let definition_end =
+                        self.label_run_end(&definitions, definition_label, definition_index)?;
+                    let reference_end =
+                        self.label_run_end(&references, reference_label, reference_index)?;
+                    let product = (definition_end - definition_index)
+                        .checked_mul(reference_end - reference_index)
+                        .ok_or(BuildError::BudgetExceeded)?;
+                    let both = product.checked_mul(2).ok_or(BuildError::BudgetExceeded)?;
+                    slots = slots.checked_add(both).ok_or(BuildError::BudgetExceeded)?;
+                    if slots > self.budget.max_nodes() {
+                        return Err(BuildError::BudgetExceeded);
+                    }
+                    definition_index = definition_end;
+                    reference_index = reference_end;
+                }
+            }
+        }
+        if slots > self.budget.max_nodes() {
+            return Err(BuildError::BudgetExceeded);
+        }
+
+        let mut heading_ranges = Vec::new();
+        heading_ranges
+            .try_reserve(headings.len())
+            .map_err(|_| BuildError::Allocation)?;
+        for index in &headings {
+            self.check_cancel()?;
+            let draft = self.navigation.get(*index).ok_or(BuildError::Mapping)?;
+            heading_ranges.push(
+                self.snapshot
+                    .src_range(draft.source.clone())
+                    .map_err(|_| BuildError::Overlap)?,
+            );
+        }
+
+        let mut output = Vec::new();
+        output
+            .try_reserve(entries)
+            .map_err(|_| BuildError::Allocation)?;
+        for draft in &self.navigation {
+            self.check_cancel()?;
+            let targets = match &draft.kind {
+                NavigationDraftKind::Heading { .. } => Vec::new(),
+                NavigationDraftKind::Toc => {
+                    let mut targets = Vec::new();
+                    targets
+                        .try_reserve(heading_ranges.len())
+                        .map_err(|_| BuildError::Allocation)?;
+                    targets.extend(heading_ranges.iter().cloned());
+                    targets
+                }
+                NavigationDraftKind::FootnoteReference { label } => {
+                    self.target_ranges(&definitions, label)?
+                }
+                NavigationDraftKind::FootnoteDefinition { label } => {
+                    self.target_ranges(&references, label)?
+                }
+            };
+            let source = self
+                .snapshot
+                .src_range(draft.source.clone())
+                .map_err(|_| BuildError::Overlap)?;
+            let (kind, heading_level) = match &draft.kind {
+                NavigationDraftKind::Heading { level } => (NavigationKind::Heading, Some(*level)),
+                NavigationDraftKind::Toc => (NavigationKind::Toc, None),
+                NavigationDraftKind::FootnoteReference { .. } => {
+                    (NavigationKind::FootnoteReference, None)
+                }
+                NavigationDraftKind::FootnoteDefinition { .. } => {
+                    (NavigationKind::FootnoteDefinition, None)
+                }
+            };
+            output.push(NavigationEntry::new(kind, source, targets, heading_level));
+        }
+        output.sort_by_key(|entry| {
+            let source = entry.source().byte_range();
+            (source.start, source.end)
+        });
+        Ok(NavigationIndex::new(output))
+    }
+
+    fn navigation_label(&self, index: usize) -> Option<&str> {
+        match &self.navigation.get(index)?.kind {
+            NavigationDraftKind::FootnoteReference { label }
+            | NavigationDraftKind::FootnoteDefinition { label } => Some(label),
+            NavigationDraftKind::Heading { .. } | NavigationDraftKind::Toc => None,
+        }
+    }
+
+    fn navigation_label_for_sort(&self, index: usize) -> &str {
+        self.navigation_label(index).unwrap_or_default()
+    }
+
+    fn navigation_source(&self, index: usize) -> Option<&Range<usize>> {
+        self.navigation.get(index).map(|draft| &draft.source)
+    }
+
+    fn navigation_source_key(&self, index: usize) -> (usize, usize) {
+        self.navigation_source(index)
+            .map_or((usize::MAX, usize::MAX), |source| {
+                (source.start, source.end)
+            })
+    }
+
+    fn label_run_end(
+        &self,
+        indices: &[usize],
+        label: &str,
+        mut start: usize,
+    ) -> Result<usize, BuildError> {
+        while start < indices.len() {
+            self.check_cancel()?;
+            let current = self
+                .navigation_label(indices[start])
+                .ok_or(BuildError::Mapping)?;
+            if current != label {
+                break;
+            }
+            start += 1;
+        }
+        Ok(start)
+    }
+
+    fn label_range(&self, indices: &[usize], label: &str) -> Result<Range<usize>, BuildError> {
+        let start = indices.partition_point(|index| {
+            self.navigation_label(*index)
+                .is_some_and(|value| value < label)
+        });
+        let end = indices.partition_point(|index| {
+            self.navigation_label(*index)
+                .is_some_and(|value| value <= label)
+        });
+        if start > end {
+            return Err(BuildError::Mapping);
+        }
+        for index in &indices[start..end] {
+            self.check_cancel()?;
+            if self.navigation_label(*index) != Some(label) {
+                return Err(BuildError::Mapping);
+            }
+        }
+        Ok(start..end)
+    }
+
+    fn target_ranges(
+        &self,
+        indices: &[usize],
+        label: &str,
+    ) -> Result<Vec<aline_buffer::SrcRange>, BuildError> {
+        let range = self.label_range(indices, label)?;
+        let mut targets = Vec::new();
+        targets
+            .try_reserve(range.len())
+            .map_err(|_| BuildError::Allocation)?;
+        for index in &indices[range] {
+            self.check_cancel()?;
+            let draft = self.navigation.get(*index).ok_or(BuildError::Mapping)?;
+            targets.push(
+                self.snapshot
+                    .src_range(draft.source.clone())
+                    .map_err(|_| BuildError::Overlap)?,
+            );
+        }
+        Ok(targets)
+    }
+
     fn finish(mut self) -> Result<Built, BuildError> {
         self.blocks.sort_by_key(|(range, _)| range.start);
         let mut previous_end = 0usize;
@@ -666,6 +968,7 @@ impl Builder<'_, '_> {
         let protected = self.finish_protected()?;
         let styled = self.finish_styled()?;
         let diagnostics = self.finish_diagnostics()?;
+        let navigation = self.finish_navigation()?;
         Ok(Built {
             drawn: self.drawn,
             segments: self.segments,
@@ -674,6 +977,7 @@ impl Builder<'_, '_> {
             protected,
             styled,
             diagnostics,
+            navigation,
         })
     }
 
@@ -756,6 +1060,23 @@ fn trim_line_end(source: &str, mut range: Range<usize>) -> Range<usize> {
         }
     }
     range
+}
+
+fn is_toc_paragraph(source: &str, range: &Range<usize>) -> bool {
+    source
+        .get(range.clone())
+        .is_some_and(|slice| slice.trim().eq_ignore_ascii_case("[toc]"))
+}
+
+fn heading_level(level: HeadingLevel) -> u8 {
+    match level {
+        HeadingLevel::H1 => 1,
+        HeadingLevel::H2 => 2,
+        HeadingLevel::H3 => 3,
+        HeadingLevel::H4 => 4,
+        HeadingLevel::H5 => 5,
+        HeadingLevel::H6 => 6,
+    }
 }
 
 fn block_kind(tag: &Tag<'_>) -> Option<BlockKind> {

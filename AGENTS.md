@@ -6,7 +6,7 @@
 
 Aline —— Typora 式 Markdown 编辑器（Rust + GPUI，无 WebView），macOS / Windows / Linux 三端。技术路线继承 ElyMark 验证过的方案：**源文本是唯一事实来源 → 解析为携带"绘制文本 ↔ 源码字节"双向映射的展示树 → 按块虚拟化渲染 → 同一时刻最多一个块"打开"编辑 → 提交时对源文本做单区间补丁（单步撤销）→ 未编辑字节原样写回**。
 
-当前状态：**已有八成员 workspace、引擎与无头宿主基础，尚无可用原生界面；M0 出口未闭合。现行规范见 `docs/README.md`，验证状态见 `docs/v1-validation-plan.md`。调研、原型与历史材料不自动取得规范效力；旧过程报告和维护审计已按用户要求清理，必要决定见 `docs/decisions.md`，不恢复整套目录。**
+当前状态：**已有八成员 workspace、引擎与无头宿主基础，尚无可用原生界面；M0 出口已由用户 2026-11-02 验收裁决通过（验收豁免；逐包人工复核与 E2/E4/E5/E7 整项等未执行项见验证计划，不得写成已验证）。现行规范见 `docs/README.md`，验证状态见 `docs/v1-validation-plan.md`。调研、原型与历史材料不自动取得规范效力；旧过程报告和维护审计已按用户要求清理，必要决定见 `docs/decisions.md`，不恢复整套目录。**
 
 ## 文档地图（动手前必读）
 
@@ -61,6 +61,6 @@ cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 - **不写本机绝对路径**：文档、证据与脚本只写仓库内相对路径或 `<repo>`、`<tmp>`、`<home>` 等占位符，不记录本机用户目录、临时目录或仓库外磁盘位置；生成证据的脚本统一经 `scripts/evidence_paths.py` 归一化，读回时用 `resolve_path` 还原。shebang 的解释器行是唯一例外。
 - **提交可复现资产，运行产物留本地**：按 [开发流程 §5](docs/development-process.md#5-仓库产物与提交边界)保留代码、单元/集成测试、独立金样、最小失败输入和可复跑脚本；命令记录、stdout/stderr、临时夹具及 Agent 逐轮 report/review 等写 `logs/validation/...`，不因是 `.md` 就提交。换会话只在 `tmp/<任务>-resume.md` 维护一份不追踪的当前交接；必要决定回写规范，平台/手工验证摘要回填验证计划。旧过程材料按需查 Git，不重建报告目录或改写历史。
 - **按里程碑推进**（v1-architecture 第 13 章）：M0 引擎地基 → M1 单文档只读 → M2 可编辑核心（可日用）→ M3 命令与表格 → M4 插件与主题 → M5 应用壳 → M6 收尾。阶段可形成内部预览，验收按三平台分别取证；先 macOS 后 Windows/Linux 验证，正式 V1 三平台同发（PRD §9、V-01）。
-- 新增依赖先对照 engine-design §18.2 和 v1-architecture §3.2 的准入规则，同类功能不得引入第二个库。
+- 新增依赖先对照 engine-design §18.2 和 v1-architecture §3.2 的准入规则，同类功能不得引入第二个库。2026-11-02 起 `scripts/check_engineering.py` 默认执行逐依赖准入检查（用途分组/选包/许可证），传 `--ledger <path>` 时另存逐包账本，失败关闭；实际执行与限制见架构 §3.2 R14 记录，不把策略核对写成法律意见或跨平台构建证明。
 - 实现期对照：ElyMark 完整历史关键文件索引已保全于 `docs/archive/migration-evidence/engine-design.md`，当前入口见 engine-design §18.3；Zed 克隆放在仓库外的参考目录，不随本仓库分发（gpui 新架构与锁定的 gpui-pre 存在 API 代差，机制线索参考 docs/zed-notes.md §0及其完整历史证据，具体 API 及性能结论须重新取证）。Aline 全部自写实现，外部源码只作对照参考。
 - 外观与交互参照 MarkFlow（[`MarkFlow`](https://github.com/zsxink/MarkFlow)）：设置模型、导出主题、图片粘贴、自动保存/外部修改检测等功能语义从它迁移（迁语义不迁代码）。其 2026-10-25 性能诊断（128KB 文档卡顿三病根，issue #458/#459/#460）已并入 architecture-guide §11 作为反面实证；方向研究报告全文在 MarkFlow 仓库 `docs/superpowers/specs/2026-10-26-aline-gpui-rebuild-design.md`。

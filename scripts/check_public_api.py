@@ -93,6 +93,16 @@ let _stored: aline_source::StorageRange = storage.range(0..1)?;
 let tuples: Vec<(std::ops::Range<usize>, String)> = vec![(0..0, String::from("!"))];
 let batch = aline_buffer::CheckedBatch::new(&snapshot, tuples, aline_buffer::PatchBudget::new(4, 64, 64))?;
 let _borrowed: &[(std::ops::Range<usize>, String)] = batch.patches();
+let parsed = aline_markdown::parse(&snapshot, aline_markdown::ParseConfig::m0(), aline_markdown::ParseBudget::m0())?;
+let _navigation: &aline_markdown::NavigationIndex = parsed.navigation();
+for entry in parsed.navigation().entries() {
+    let _kind: aline_markdown::NavigationKind = entry.kind();
+    let _source: &aline_buffer::SrcRange = entry.source();
+    let _targets: &[aline_buffer::SrcRange] = entry.targets();
+    let _level: Option<u8> = entry.heading_level();
+}
+let _navigation_len: usize = parsed.navigation().len();
+let _navigation_empty: bool = parsed.navigation().is_empty();
 ''', 0, []),
         ('drawn-is-not-source', 'fn need(_: aline_buffer::SrcOffset) {}', 'need(projection.drawn_offset(0)?);', 101, ['E0308', 'SrcOffset', 'DrawnOffset']),
         ('drawn-is-not-utf16', 'fn need(_: aline_markdown::Utf16Offset) {}', 'need(projection.drawn_offset(0)?);', 101, ['E0308', 'Utf16Offset', 'DrawnOffset']),
@@ -100,6 +110,10 @@ let _borrowed: &[(std::ops::Range<usize>, String)] = batch.patches();
         ('private-source-fields', '', 'let _forged = aline_buffer::SrcOffset { byte: 0, snapshot: snapshot.id().clone() };', 101, ['E0451', 'private']),
         ('private-snapshot-id', '', 'let _forged = aline_buffer::SnapshotId(std::sync::Arc::new(()));', 101, ['E0423', 'private']),
         ('private-projection-id', '', 'let _forged = aline_markdown::ProjectionId(std::sync::Arc::new(()));', 101, ['E0423', 'private']),
+        ('private-navigation-entry-fields', '', 'let _forged = aline_markdown::NavigationEntry { kind: aline_markdown::NavigationKind::Heading, source: snapshot.src_range(0..0)?, targets: Vec::new(), heading_level: Some(1) };', 101, ['E0451', 'private']),
+        ('private-navigation-index-fields', '', 'let _forged = aline_markdown::NavigationIndex { entries: Vec::new() };', 101, ['E0451', 'private']),
+        ('private-navigation-index-constructor', '', 'let _forged = aline_markdown::NavigationIndex::new(Vec::new());', 101, ['E0624', 'private']),
+        ('private-navigation-entry-constructor', '', 'let _forged = aline_markdown::NavigationEntry::new(aline_markdown::NavigationKind::Heading, snapshot.src_range(0..0)?, Vec::new(), Some(1));', 101, ['E0624', 'private']),
         ('tuple-view-is-immutable', '', 'let batch = aline_buffer::CheckedBatch::new(&snapshot, vec![(0..0, String::new())], aline_buffer::PatchBudget::new(4, 64, 64))?; batch.patches()[0].1.push_str("!");', 101, ['E0596', 'cannot borrow']),
     ]
     records = []

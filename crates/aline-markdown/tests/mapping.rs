@@ -283,6 +283,102 @@ fn selections_preserve_direction_and_entity_alignment() -> Result<(), Box<dyn Er
     Ok(())
 }
 
+/// 回归：`from_segments` 不能把属于另一快照的片段装进当前投影。
+///
+/// 修复前 `from_segments` 只取 `byte_range()` 做数值边界检查，快照身份被丢弃，
+/// 于是来自同值不同快照的片段能构造成功，`source_at` 却返回绑定当前快照的坐标。
+#[test]
+fn from_segments_rejects_segments_from_another_snapshot() -> Result<(), Box<dyn Error>> {
+    // 同值不同快照：文本相同，身份不同。
+    let a = snapshot("abc")?;
+    let b = snapshot("abc")?;
+    let foreign = MappingSegment::new(0..3, b.src_range(0..3)?, MappingPrecision::Exact)?;
+    assert!(matches!(
+        Projection::from_segments(
+            a.clone(),
+            a.src_range(0..3)?,
+            "abc".to_string(),
+            vec![foreign],
+            MappingBudget::new(BUDGET, BUDGET),
+        ),
+        Err(MappingError::Source(BufferError::SnapshotMismatch))
+    ));
+
+    // 不同值快照：数值范围与文本都“看起来”合法，但身份仍属于 b。
+    let b = snapshot("xyz")?;
+    let foreign = MappingSegment::new(0..3, b.src_range(0..3)?, MappingPrecision::Exact)?;
+    assert!(matches!(
+        Projection::from_segments(
+            a.clone(),
+            a.src_range(0..3)?,
+            "abc".to_string(),
+            vec![foreign],
+            MappingBudget::new(BUDGET, BUDGET),
+        ),
+        Err(MappingError::Source(BufferError::SnapshotMismatch))
+    ));
+    Ok(())
+}
+
+/// 回归：Hidden / Aligned / Synthetic 片段同样要保留快照身份。
+#[test]
+fn from_segments_rejects_foreign_hidden_aligned_and_synthetic_segments()
+-> Result<(), Box<dyn Error>> {
+    let a = snapshot("abcdef")?;
+    let b = snapshot("abcdef")?;
+    let range = a.src_range(0..6)?;
+    let cases = [
+        (
+            MappingSegment::new(0..0, b.src_range(0..3)?, MappingPrecision::Hidden)?,
+            "Xc",
+        ),
+        (
+            MappingSegment::new(0..1, b.src_range(0..2)?, MappingPrecision::Aligned)?,
+            "X",
+        ),
+        (
+            MappingSegment::new(0..1, b.src_range(3..3)?, MappingPrecision::Synthetic)?,
+            "X",
+        ),
+    ];
+    for (segment, drawn) in cases {
+        assert!(matches!(
+            Projection::from_segments(
+                a.clone(),
+                range.clone(),
+                drawn.to_string(),
+                vec![segment],
+                MappingBudget::new(BUDGET, BUDGET),
+            ),
+            Err(MappingError::Source(BufferError::SnapshotMismatch))
+        ));
+    }
+    Ok(())
+}
+
+/// 回归：同一快照内的合法 Hidden/Aligned/Synthetic 片段仍必须成功。
+#[test]
+fn from_segments_accepts_same_snapshot_non_exact_segments() -> Result<(), Box<dyn Error>> {
+    let snapshot = snapshot("abcdef")?;
+    let range = snapshot.src_range(0..6)?;
+    let segments = vec![
+        MappingSegment::new(0..0, snapshot.src_range(0..3)?, MappingPrecision::Hidden)?,
+        MappingSegment::new(0..1, snapshot.src_range(3..3)?, MappingPrecision::Synthetic)?,
+        MappingSegment::new(1..2, snapshot.src_range(3..6)?, MappingPrecision::Aligned)?,
+    ];
+    let projection = Projection::from_segments(
+        snapshot.clone(),
+        range,
+        "Xc".to_string(),
+        segments,
+        MappingBudget::new(BUDGET, BUDGET),
+    )?;
+    assert_eq!(projection.drawn_text(), "Xc");
+    let anchor = projection.drawn_at(&snapshot.src_offset(0)?, Affinity::Before)?;
+    assert_eq!(anchor.precision(), MappingPrecision::Hidden);
+    Ok(())
+}
+
 #[test]
 fn stale_projection_and_snapshot_are_rejected() -> Result<(), Box<dyn Error>> {
     let (_snapshot, first) = identity("abc")?;

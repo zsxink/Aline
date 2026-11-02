@@ -9,7 +9,7 @@ import sys
 from engineering_dependencies import MEMBERS, load_json
 from evidence_paths import display_path, write_json
 from validation_output import output_directory
-from check_engineering import ROOT, POLICY, SCENARIOS, record_command, sha256
+from check_engineering import ADMISSION_POLICY, ROOT, POLICY, SCENARIOS, record_command, sha256
 
 
 def run(output=None):
@@ -30,10 +30,12 @@ def run(output=None):
         print(label, "符合预期" if passed else "失败", flush=True)
         return out, rec
 
-    def invoke(label, project, metadata, tree, meta_record, tree_record, scenario="all", expected=1, diagnostic=""):
+    def invoke(label, project, metadata, tree, meta_record, tree_record, scenario="all", expected=1, diagnostic="", admission=None):
         argv = [sys.executable, str(ROOT / "scripts/check_engineering.py"), "--metadata", str(metadata), "--tree", str(tree),
                 "--lock", str(project / "Cargo.lock"), "--scenario", scenario, "--metadata-command", str(meta_record), "--tree-command", str(tree_record),
                 "--output-dir", str(output / "checks" / label)]
+        if admission is not None:
+            argv += ["--admission-policy", str(admission)]
         return command(label, argv, expected, diagnostic)
 
     # 所有同名禁库均为0.0.0本地合成包；不会安装真实发布物。
@@ -160,6 +162,81 @@ def run(output=None):
         return data,tree,lock.replace(old,new)
     mutation("negative-regex-source",source,"来源/校验和漂移")
     mutation("positive-synthetic-baseline",lambda d,t,l:(d,t,l),"",expected=0)
+    # 许可证/分组准入缺失覆盖的正反例：仅变异已采集图，不安装任何真实库。
+    def license_change(name, value, label, diagnostic, expected=1):
+        def mutate(data, tree, lock):
+            next(p for p in data["packages"] if p["name"] == name)["license"] = value
+            return data, tree, lock
+        mutation(label, mutate, diagnostic, expected=expected)
+    license_change("serde", "GPL-3.0-only", "negative-license-gpl", "许可证未准入")
+    license_change("serde", None, "negative-license-missing", "缺少许可证")
+    license_change("serde", "MIT OR", "negative-license-expression", "许可证表达式无法解析")
+    license_change("serde", "MIT AND LGPL-2.1-or-later", "negative-license-and", "许可证未准入")
+    license_change("serde", "MIT OR (Apache-2.0", "negative-license-unclosed", "许可证表达式无法解析")
+    license_change("rav1e", "GPL-3.0-only", "negative-license-metadata-only", "许可证未准入")
+    # SPDX 正例：括号、WITH、旧式斜杠 OR、含拒绝原子的可满足 OR 均须通过。
+    license_change("serde", "(MIT OR Apache-2.0) AND Unicode-3.0", "positive-license-parentheses", "", expected=0)
+    license_change("serde", "Apache-2.0 WITH LLVM-exception OR MIT", "positive-license-with", "", expected=0)
+    license_change("serde", "MIT/Apache-2.0", "positive-license-legacy-slash", "", expected=0)
+    license_change("serde", "MIT OR GPL-3.0-only", "positive-license-or-election", "", expected=0)
+    def local_path(data, tree, lock):
+        identity = "path+file://<tmp>/aline-unreviewed-local#0.0.0"
+        data["packages"].append({"name": "aline-unreviewed-local", "version": "0.0.0", "id": identity,
+                                 "license": "MIT", "license_file": None, "source": None,
+                                 "dependencies": [], "targets": [], "features": {}})
+        data["resolve"]["nodes"].append({"id": identity, "dependencies": [], "deps": [], "features": []})
+        ui = node(data, "aline-ui")
+        ui["dependencies"].append(identity)
+        ui["deps"].append({"name": "unreviewed_local", "pkg": identity,
+                           "dep_kinds": [{"kind": None, "target": None}]})
+        return data, tree, lock + '\n[[package]]\nname = "aline-unreviewed-local"\nversion = "0.0.0"\n'
+    mutation("negative-admission-unreviewed-local-path", local_path, "未登记的本地路径包")
+    def disconnected(data, tree, lock):
+        identity = "registry+https://example.invalid/index#notify@0.0.0"
+        data["packages"].append({"name": "notify", "version": "0.0.0", "id": identity,
+                                 "license": "MIT", "license_file": None, "source": "registry+https://example.invalid/index",
+                                 "dependencies": [], "targets": [], "features": {}})
+        data["resolve"]["nodes"].append({"id": identity, "dependencies": [], "deps": [], "features": []})
+        return data, tree, lock + '\n[[package]]\nname = "notify"\nversion = "0.0.0"\nsource = "registry+https://example.invalid/index"\nchecksum = "' + "0" * 64 + '"\n'
+    mutation("negative-disconnected-metadata-package", disconnected, "不可从 workspace 到达")
+    def extra_lock(data, tree, lock):
+        return data, tree, lock + '\n[[package]]\nname = "orphan-lock-entry"\nversion = "0.0.0"\n'
+    mutation("negative-extra-lock-package", extra_lock, "Cargo.lock 存在 metadata 未出现的包")
+    empty_allowed = load_json(ADMISSION_POLICY)
+    empty_allowed["license"]["allowed"] = []
+    empty_allowed_path = fixtures / "negative-admission-empty-allowed-policy.json"
+    empty_allowed_path.write_text(json.dumps(empty_allowed, ensure_ascii=False))
+    invoke("negative-admission-empty-allowed", ROOT, baseline / "all-metadata.json", baseline / "all-tree.txt",
+           baseline / "all-metadata.command.json", baseline / "all-tree.command.json",
+           admission=empty_allowed_path, diagnostic="允许许可证集合为空")
+    null_purpose = load_json(ADMISSION_POLICY)
+    next(group for group in null_purpose["groups"] if group["id"] == "workspace")["purpose"] = None
+    null_purpose_path = fixtures / "negative-admission-null-purpose-policy.json"
+    null_purpose_path.write_text(json.dumps(null_purpose, ensure_ascii=False))
+    invoke("negative-admission-null-purpose", ROOT, baseline / "all-metadata.json", baseline / "all-tree.txt",
+           baseline / "all-metadata.command.json", baseline / "all-tree.command.json",
+           admission=null_purpose_path, diagnostic="准入分组说明不完整")
+    selected_disallowed = load_json(ADMISSION_POLICY)
+    next(group for group in selected_disallowed["groups"] if group["id"] == "engine-app-core")["selected_allowed"] = False
+    selected_disallowed_path = fixtures / "negative-admission-selected-disallowed-policy.json"
+    selected_disallowed_path.write_text(json.dumps(selected_disallowed, ensure_ascii=False))
+    invoke("negative-admission-selected-disallowed", ROOT, baseline / "all-metadata.json", baseline / "all-tree.txt",
+           baseline / "all-metadata.command.json", baseline / "all-tree.command.json",
+           admission=selected_disallowed_path, diagnostic="已选包未进入运行时准入分组")
+    unassigned_policy = load_json(ADMISSION_POLICY)
+    unassigned_policy["groups"] = [group for group in unassigned_policy["groups"] if group["id"] != "engine-app-core"]
+    unassigned_path = fixtures / "negative-admission-unassigned-policy.json"
+    unassigned_path.write_text(json.dumps(unassigned_policy, ensure_ascii=False))
+    invoke("negative-admission-unassigned-group", ROOT, baseline / "all-metadata.json", baseline / "all-tree.txt",
+           baseline / "all-metadata.command.json", baseline / "all-tree.command.json",
+           admission=unassigned_path, diagnostic="已选包未进入运行时准入分组")
+    branch_policy = load_json(ADMISSION_POLICY)
+    del next(group for group in branch_policy["groups"] if group["id"] == "gpui")["branch_purposes"]["lyon"]
+    branch_policy_path = fixtures / "negative-admission-branch-policy.json"
+    branch_policy_path.write_text(json.dumps(branch_policy, ensure_ascii=False))
+    invoke("negative-admission-unreviewed-branch", ROOT, baseline / "all-metadata.json", baseline / "all-tree.txt",
+           baseline / "all-metadata.command.json", baseline / "all-tree.command.json",
+           admission=branch_policy_path, diagnostic="直接依赖分支未登记")
     # 采集错误/标签/损坏输出的最小信封反例，不修改正式原始证据。
     for label,modify,diagnostic in [
         ("negative-acquisition-exit",lambda m,t:m.update(exit_code=101),"Cargo 采集失败"),

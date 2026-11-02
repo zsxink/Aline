@@ -15,7 +15,7 @@ Aline 尚无 Cargo workspace 或应用实现，需要先把现行规范转为可
 
 ### Acceptance Evidence
 
-下表逐项对应 docs/v1-architecture.md §13 M0 行；E 编号只用于本变更追踪，不新增 AC/V 编号。每项目前均为待实现、待取证。
+下表逐项对应 docs/v1-architecture.md §13 M0 行；E 编号只用于本变更追踪，不新增 AC/V 编号。2026-11-02 用户验收裁决将 E1–E7 记为验收通过；各出口的证据覆盖与未执行项见 docs/v1-validation-plan.md，裁决不等于证据补齐。
 
 | 出口 | M0 交付与证据 | 任务 |
 |---|---|---|

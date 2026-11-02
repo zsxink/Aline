@@ -10,13 +10,17 @@
     "1"
   ],
   "cwd": "<repo>",
-  "started_utc": "2026-10-30T17:33:46.200357+00:00",
-  "finished_utc": "2026-10-30T17:33:46.306123+00:00",
+  "started_utc": "2026-11-02T07:05:04.783582+00:00",
+  "finished_utc": "2026-11-02T07:05:05.409529+00:00",
   "exit_code": 0,
-  "stdout_sha256": "1535648616a01854f6b37390c8da300802bc1114528f109644bc765edb2b0324",
+  "stdout_sha256": "5ef0f471026cc6fad32b6e947da3eeebb4f1ad4111ab535968544b31bf7ac916",
   "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-  "env_overrides": {
-    "CARGO_HOME": "<tmp>/aline-m0-admission-k4_p5j6a/cargo-home",
-    "RUSTUP_TOOLCHAIN": "1.98.1"
-  }
+  "env_overrides": {},
+  "env_effective": {
+    "CARGO_NET_OFFLINE": null,
+    "RUSTUP_TOOLCHAIN": null
+  },
+  "evidence_kind": "locked-check",
+  "locked": true,
+  "offline": true
 }

@@ -12,6 +12,7 @@ use crate::config::ParseConfig;
 use crate::diagnostic::{Diagnostic, DiagnosticKind};
 use crate::mapping::{MappingBudget, MappingError, Projection};
 use crate::mdast::{Block, BlockKind, Gap};
+use crate::navigation::NavigationIndex;
 use crate::pre::{
     FrontMatter, Rewrite, RewriteError, RewriteMap, rewrite_front_matter_with_cancel,
 };
@@ -62,6 +63,7 @@ pub struct Parsed {
     projection: Projection,
     blocks: Vec<Block>,
     gaps: Vec<Gap>,
+    navigation: NavigationIndex,
     protected: Vec<ProtectedRange>,
     styled: Vec<StyledRange>,
     diagnostics: Vec<Diagnostic>,
@@ -94,6 +96,11 @@ impl Parsed {
     /// 返回块之间的显式间隙，按源码起点升序。
     pub fn gaps(&self) -> &[Gap] {
         &self.gaps
+    }
+
+    /// 返回只读导航索引；原文回退时为空。
+    pub fn navigation(&self) -> &NavigationIndex {
+        &self.navigation
     }
 
     /// 返回受保护源码子区间。
@@ -377,6 +384,7 @@ fn make_parsed(
         projection,
         blocks: built.blocks,
         gaps: built.gaps,
+        navigation: built.navigation,
         protected: built.protected,
         styled: built.styled,
         diagnostics: built.diagnostics,
@@ -440,6 +448,7 @@ fn raw_fallback(
         projection,
         blocks,
         gaps: Vec::new(),
+        navigation: NavigationIndex::new(Vec::new()),
         protected,
         styled: Vec::new(),
         diagnostics,

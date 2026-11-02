@@ -64,10 +64,8 @@ pulldown-cmark v0.13.6
 bitflags v2.13.2
 memchr v2.8.3
 unicase v2.10.0
+unicode-segmentation v1.13.3
 aline-markdown v0.1.0 (<repo>/crates/aline-markdown) (*)
-aline-plugin v0.1.0 (<repo>/crates/aline-plugin)
-aline-app-core v0.1.0 (<repo>/crates/aline-app-core) (*)
-aline-edit v0.1.0 (<repo>/crates/aline-edit) (*)
 aline-source v0.1.0 (<repo>/crates/aline-source)
 gpui-pre v0.3.9
 accesskit v0.24.1
@@ -656,7 +654,7 @@ aline-edit v0.1.0 (<repo>/crates/aline-edit) (*)
 
 aline-markdown v0.1.0 (<repo>/crates/aline-markdown) (*)
 
-aline-plugin v0.1.0 (<repo>/crates/aline-plugin) (*)
+aline-plugin v0.1.0 (<repo>/crates/aline-plugin)
 
 aline-source v0.1.0 (<repo>/crates/aline-source)
 

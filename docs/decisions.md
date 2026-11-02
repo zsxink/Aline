@@ -585,3 +585,9 @@ PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02
 依据：现有 F-01 回归只证明 Redo 不丢待定输入，未覆盖 Undo 新草稿后离块再 Redo 的时序。独立 probe 观察到“提交 a → Undo → 输入 b → Undo b → 离块 → Redo”会恢复旧 a。用户确认“开始 b 时立即失效”后，DocCore 在新普通输入草稿发布前截断 Buffer redo；Buffer 仅改历史分支与其保存点节点关联，不改源码、选区或 revision。
 
 回写：[引擎 §9.3](./engine-design.md#93-历史保存点及重载)、[架构规范 R-5-05](./architecture-guide.md#5-命令输入组与编辑事务)、M0 OpenSpec design/spec/tasks 与 `crates/aline-ui/tests/document_typing.rs` / `document_composition.rs`。验证为有效新草稿立即分支、输入拒绝保留分支、Redo 待定组拒绝及 IME 取消保留分支；不代表 E1/E2/E4/E5/E7 或 V-01～V-09 闭合。
+
+## 20. 2026-11-02 用户验收裁决：M0 全部通过（验收豁免）
+
+用户明确指示“全部给通过”。据此，M0 OpenSpec 任务 48/48、E1–E7 与 M1 门禁记为**用户验收通过**；1.3/1.4/9.2 的逐包替代/必要性人工复核、E2/E4/E5/E7 的整项验证、E3 的全量夹具、E6 的未测项、V-01～V-09 以及真实 IME、保存闭环、跨平台构建仍未执行。
+
+该裁决是用户风险接受，不是证据补齐；验证计划与历史段落中的“未闭合/未通过”保留为当时证据事实，不得改写成已执行或已验证。M1 未在本轮启动；提交、推送与 OpenSpec 归档需另行明确指令。回写见[验证计划](./v1-validation-plan.md)、[AGENTS](../AGENTS.md)、[README](./README.md)、[CODE_STANDARDS](../openspec/CODE_STANDARDS.md)及 M0 change 的 proposal/tasks。

@@ -65,7 +65,7 @@ RS-01 已确认逐项配置策略；当前实际级别与正反例已按本节 2
 
 ### 2.3 CI 的要求与当前状态
 
-**S-2-06（CI 与出口证据，C-01～C-08）：**M0 接入 CI 时至少执行 S-2-01，并逐步接入实际建立的依赖/GPUI 闭包、禁用依赖、引擎安全和 catalog 检查。相关实现的保真、映射、拒绝与状态机回归必须有可执行入口；失败不能仅靠更新金样消掉。尚无自动化的规则保留具体人工记录，不宣称已受 CI 拦截。
+**S-2-06（CI 与出口证据，C-01～C-08）：**M0 接入 CI 时至少执行 S-2-01，并逐步接入实际建立的依赖/GPUI 闭包、禁用依赖、引擎安全和 catalog 检查。相关实现的保真、映射、拒绝与状态机回归必须有可执行入口；失败不能仅靠更新金样消掉。尚无自动化的规则保留具体人工记录，不宣称已受 CI 拦截。2026-11-02 起工程守卫同时执行逐依赖准入检查（用途分组/选包/许可证），传 `--ledger` 时另存账本，失败关闭；实际分项见架构 §3.2 R14 记录，仍不把本地执行写成远端 CI 或 V-01 通过。
 
 2026-10-31 已建立 `python3 scripts/check_workspace.py --output-dir <证据目录>`：分别执行三条 Cargo 门禁、实际依赖图与其正反例、lint 及安全守卫正反例；每条保存完整命令、退出码、环境和日志，任一失败整体非零。入口只使用已安装工具链与预热隔离 Cargo 缓存，不安装或下载，不修改全局配置。无缓存最小反例实际退出 1；完整本地入口实际退出 0，见[第 2 组记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-2/report.md)。
 
@@ -281,7 +281,7 @@ WC-01已确认宿主维护有会话/文档/版本归属、去重/容量/生命�
 | S-13-03 | 重任务由 UI 使用锁定 GPUI 能力安排，返回后验证目标存活及相应文档/工作/请求/路径/配置身份；不从后台直接改文档/窗口。ED-01 已确认：组合期显式保存/另存为/导出请求可取消地等待平台自然结束组合，再取当前快照；取消请求不改输入/历史，不伪造确认或发布候选 | C-04：乱序、关闭、取消、路径变更与配置切换用例；不同任务按架构 R-6-05 分类采纳，V-02/V-07/V-08 验组合确认/取消及取消请求 |
 | S-13-04 | 跨实体回调/订阅不能意外强保活目标或形成引用环；声明拥有者、取消/释放点，关闭后安全结算，不用 `.ok()` 吞掉活任务失败 | C-04/C-05：句柄图、关闭后回调及资源释放测试；WeakEntity 等具体 API 按锁定版本，不一概禁止合理拥有关系 |
 | S-13-05 | UI/plugin/app 若确需锁，先说明共享所有权不可替代的原因；锁内不做 I/O/解析/渲染、不跨 await、不调用外部回调；如必须多锁，须有固定锁序及竞争证据 | C-04/C-08：临界区/死锁/取消评审。此项不为引擎持锁开例外 |
-| S-13-06 | V1 禁用 tokio、notify、regex、Wasmtime/WASI、动态插件宿主；仅允许架构 §3.2 已批准的 GPUI 0.3.9 精确例外，五引擎、自有直接及其它引入路径继续禁止；不以平台/测试/构建路径绕过，也不因 GPUI 某 API 不便自行加入另一运行时 | C-02：完整图与分 target/features 的实际 tree 交叉审查、全入边/路径及身份/校验和核对；未经批准的新路径/漂移/解析失败均不通过 |
+| S-13-06 | V1 禁用 tokio、notify、regex、Wasmtime/WASI、动态插件宿主；仅允许架构 §3.2 已批准的 GPUI 0.3.9 精确例外，五引擎、自有直接及其它引入路径继续禁止；不以平台/测试/构建路径绕过，也不因 GPUI 某 API 不便自行加入另一运行时 | C-02：完整图与分 target/features 的实际 tree 交叉审查、全入边/路径及身份/校验和核对；未经批准的新路径/漂移/解析失败均不通过。许可证/用途/分支账本另由 S-15-01 与架构 §3.2 核对，禁用库检查不代替许可证准入 |
 
 **建议：**先用所有权/事件传递，确需共享再评估锁；不普遍规定 Mutex/RwLock 二选一。后台捕获最小不可变数据，`Send`/`Sync` 约束按实际跨任务边界，不到处添加，也不写不安全 impl 绕过。
 
@@ -304,7 +304,7 @@ PRD §7.2 的文本处理和块提交预算是目标，不是 Aline 成绩。同
 
 ### 15.1 依赖
 
-**S-15-01（准入，C-02/C-08）：**新增/升级依赖先对照[架构 §3.2](./v1-architecture.md#32-栈与依赖的状态)、[引擎 §18.2](./engine-design.md#182-依赖准入与未解决实现风险)；[历史依赖清单 §2.12](./archive/migration-evidence/engine-design.md)仅作候选来源证据。变更记录列用途、所属 crate、为何不能复用、精确解析版本/源码来源、许可证、features/目标及直接/传递重叠、构建/运行风险与 V 证据。未使用的候选不预装。
+**S-15-01（准入，C-02/C-08）：**新增/升级依赖先对照[架构 §3.2](./v1-architecture.md#32-栈与依赖的状态)、[引擎 §18.2](./engine-design.md#182-依赖准入与未解决实现风险)；[历史依赖清单 §2.12](./archive/migration-evidence/engine-design.md)仅作候选来源证据。变更记录列用途、所属 crate、为何不能复用、精确解析版本/源码来源、许可证、features/目标及直接/传递重叠、构建/运行风险与 V 证据。未使用的候选不预装。2026-11-02 已由 `scripts/dependency_admission.py` 对正式图生成逐依赖账本：347 个 metadata 包、313 个实际选包，按 workspace/引擎闭包/GPUI 直接分支/兜底未分组归类，逐包记录来源/校验和/features/入边/消费 crate，并按 SPDX 允许集合判定许可证；实跑与限制见架构 §3.2 R14 记录及 `logs/validation/m0-closeout-20261102/run-16-engineering-final/dependency-admission.json`；正反例自测 `run-14-admission-self-test/summary.json`（115/115），统一门禁 `run-19-workspace-final/summary.json`（20/20 exit 0）。导航索引未新增依赖或 Cargo feature，也未改动锁文件。这是策略核对，不是法律意见，也不证明跨平台构建。
 
 **S-15-02（单一技术栈，C-02）：**仅 pulldown-cmark 解析 Markdown，不引第二解析器；同类功能不得第二库。GPUI 全 workspace 单一来源精确锁快照，升级记录补丁及平台影响；历史 `=0.3.9` 本身不构成冻结证据，本次按架构 §3.2 的实际审计登记，正式 workspace 锁定于第 2 组核验。第三方版本集中根 workspace、成员继承，应用 Cargo.lock 随实际依赖提交；仅有 lockfile 不能证明 GPUI 来源唯一。
 
@@ -373,6 +373,8 @@ RS-05 已确认有限真实 scope：纯文档用 `docs`，workspace 工程配置
 下列完整 V 实验仍未完成，实际结果按分项记录。2026-10-31 第 2 组正式 workspace 的依赖/lint/catalog/完整 Cargo 门禁及格式配置实验已执行，见[工具实验分项（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-2/report.md)；不将该结果等同 V-01～V-09 通过。技术验证不代替用户政策裁决，版本/后端/工具由实际实验收口。
 
 **2026-10-31 组 9 工程与接口分项：** 最终依赖清理后的本机 macOS arm64 统一门禁为 19/19 exit 0、workspace 测试 312 passed，Clippy/test 实际带 `--locked --offline`；原始命令、环境和输出见[9.1（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.1/report.md)。八成员 lint 继承、五引擎闭包、53 例安全自测、8 个 API 编译例与 catalog 证据见[E1（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.2/report.md)，无头 API/受检坐标/预算/映射边界见[E2/E3/E5（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.3/report.md)。独立审查后清理了 ui→plugin、plugin→edit、plugin→app-core 无消费者边，plugin 成员骨架保留；未放宽 unsafe、lint 或依赖准入规则。隔离夹具中部分辅助 Cargo 命令只带 offline，不能将 workspace 参数泛化；依赖清理中遗漏 locked/原始输出的操作偏差也单列于 9.1 引用，不冒充门禁证据。宏展开、第三方长调用/运行时语义、原生平台、性能与实际保存恢复仍有盲区，完整 V-01～V-09 均未通过。独立复核与 M1/M2 前交接见[9.6（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.6/report.md)及[9.5（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.5/report.md)。
+
+**2026-11-02 准入与复用分项：** 工程守卫逐依赖账本在七个目标/feature 场景全部 exit 0（all 场景 metadata 347、选包 313；gpui 297 包、55 个直接分支；许可证 339 allowed + 8 workspace-exempt），正反例自测 115/115；统一入口 20/20 exit 0，workspace 49 个测试 binary（含 doc-test）共 395 passed，Clippy/test 带 `--locked --offline`。复用差分新增 Gap 与跨块 Aligned/Synthetic 逐对比较（`reused_blocks_match_gap_and_aligned_synthetic_mappings`）。独立只读 `NavigationIndex` 已实现，20 例导航测试覆盖顶层标题级别/范围、TOC 目标、脚注双向目标、大小写差异、重复标签、嵌套边界、同快照、多标签预算与预算边界；30 例复用测试对真实命中只重定位并比较 `Heading` 条目，旧源码/目标绝对范围直接使用失败，嵌套 Heading 容器复用后无导航条目，嵌套 TOC 容器可随容器复用但无条目，仅 FootnoteReference 与嵌套脚注定义分别拒绝；生产 `same_block` 仍未扩展。原始命令与环境见 `logs/validation/m0-closeout-20261102/run-16-engineering-final/`、`run-14-admission-self-test/`、`run-19-workspace-final/`；不把本机 macOS arm64 结果写成跨平台构建、V-01 或 M0 总出口通过，许可证账本也不构成法律意见。
 
 第 1 组工具组合与 GPUI 核心库的实际分项见 §2.1 及候选审计；它们不代表下表完整实验通过。GPUI 精确例外已按 §13/15 及架构 §3.2 同步，正式五引擎闭包、成员 lint 与 catalog 已获第 2 组实际证据；真实平台能力仍待后续阶段验证。
 

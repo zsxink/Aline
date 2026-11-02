@@ -86,6 +86,21 @@ WorkingVersion 的跨层承载采用低层自有的 revision/不透明代次值�
 
 M0 建全量正确路径及来源相等的头尾配对最小验证；任何复用必须检查配置/全局语义依赖并重定位后块范围，与全量结果比较树/Gap/映射/保护/导航。允许未优化部分留后续，不以全回退样本冒充优化命中。
 
+#### 导航索引（M0 最小纯数据契约，2026-11-02 补充）
+
+`Parsed` 附带只读 `navigation()` 索引；条目按源码起点、终点稳定排序，同键保持构树顺序；全部 `SrcRange` 绑定同一快照，字段私有且不提供公开构造器，不暴露 href、UI 状态或可写入口。M0 只保存来源/目标角色，不保存渲染后的副本文本：
+
+- `Heading`：顶层 ATX/Setext 标题块；`heading_level` 为 `Some(1..=6)`，`targets` 为空；源码范围就是大纲跳转锚点。
+- `Toc`：顶层且裁剪判定与现有 `ProtectionKind::Toc` 完全相同（`trim().eq_ignore_ascii_case("[toc]")`）的段落块；`source` 是该段落，`targets` 是当前文档全部顶层 `Heading` 源码范围，按源码顺序。目录项文字的文本来源和跳转目标是这些标题块，不是 `Toc.source`。
+- `FootnoteReference`：解析器发出的脚注引用事件范围（包括嵌套容器内的引用）；`source` 是该引用，`targets` 是事件标签字节精确相等的顶层 `FootnoteDefinition` 范围，按源码顺序；定义块是脚注副本的文本来源和跳转目标。
+- `FootnoteDefinition`：顶层脚注定义块；`source` 是该定义，`targets` 是事件标签字节精确相等的引用范围（回链），按源码顺序。
+
+其余条目 `heading_level` 为 `None`。标签使用 pulldown-cmark 事件已规范化的名称做字节精确相等匹配，不另实现大小写或空白折叠；这与 pulldown 内部 `UniCase` 的 Unicode 大小写折叠存在已知差异：`[^Note]` 与定义 `[^note]:` 会被解析器配对，但 M0 导航得到空目标。该差异必须有测试固定，并在解析器一致性工作中另立 M1/V-07 事项，不能静默声称等价。重复标签按源码顺序保留全部对应目标，不猜测唯一生效定义。GFM 配置下没有定义的字面 `[^x]` 不产生引用事件，因此没有导航条目；空目标只表示事件已发出但顶层索引中没有精确匹配定义（如定义嵌套或大小写不同）。嵌套标题/定义不进入索引；嵌套引用按事件索引；嵌套 `[toc]` 不产生 Toc 条目。M0 不把未索引对象伪造为目标。
+
+预算：导航槽位总数 = 条目数 + 全部目标元素数；重复目标逐元素计数，空目标计 0。该总量与事件节点计数各自独立受 `ParseBudget::max_nodes()` 限制，导航内部不再对条目数和目标数分别设限；总数等于上限允许，超过上限或计数溢出返回 `BuildError::BudgetExceeded`。实现必须在分配任何目标向量前，以分组计数和 `checked_add`/`checked_mul` 完成预检；预检通过后才 `try_reserve` 并填充，`try_reserve` 失败返回 `BuildError::Allocation`（走既有构树失败回退，不 panic），不得截断目标，不得嵌套 R×D 扫描。收集/填充循环检查取消；导航预算失败只把 `stats.budget_hits` 增加一次，并由既有 `BuildError::BudgetExceeded` 路径整源回退，`RawFallback` 的索引为空。成功构建导航不改变保护、映射或补丁语义；预算失败与既有预算失败一样改变回退后的保护/映射，这一点不能被“导航不影响保护”误读。
+
+复用：生产 `same_block` 仍只比较块种类与文本，不因导航改变复用判定；导航差分是测试 oracle。成功复用只含 `Heading` 导航条目；顶层脚注/TOC 按全局依赖拒绝，嵌套脚注/TOC 的边界见下。测试用 `ReusedBlock::translate` 重定位旧 `source` 两端，比较 kind/level/source/空 targets，并断言复用块内无 Toc/脚注/嵌套 Heading 条目；旧绝对范围直接使用必须失败。生产未扩展链接目标复用，不能把标题锚点或拒绝样例写成链接目标复用通过。复用拒绝边界按实际保护/依赖检测固定：顶层 `FootnoteDefinition`、任意 `FootnoteReference`、顶层 Toc 段落触发拒绝；嵌套脚注定义经现有 `ReferenceDefinition` 检测拒绝（测试固定该 kind）；可复用 blockquote 内的嵌套 `[toc]` 可能复用但不产生导航条目；List 容器整体拒绝。
+
 ### Commit and Input Protocol
 
 1. DocCore 接收意图和显式时间，读取 Buffer+至多一个草稿组成的当前一致视图；不每键复制全文。

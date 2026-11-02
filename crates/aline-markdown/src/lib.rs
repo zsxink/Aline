@@ -6,6 +6,7 @@ mod config;
 mod diagnostic;
 mod mapping;
 mod mdast;
+mod navigation;
 mod parse;
 mod pre;
 mod protection;
@@ -21,6 +22,7 @@ pub use mapping::{
     MappingSegment, Projection, ProjectionId, Utf16Offset, Utf16Range,
 };
 pub use mdast::{Block, BlockKind, Gap};
+pub use navigation::{NavigationEntry, NavigationIndex, NavigationKind};
 pub use parse::{ParseError, Parsed, parse, parse_with_cancel};
 pub use pre::{
     FrontMatter, FrontMatterKind, Rewrite, RewriteEdit, RewriteError, RewriteMap, RewriteSegment,

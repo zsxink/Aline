@@ -290,13 +290,15 @@ impl Projection {
             {
                 return Err(MappingError::NotCharBoundary);
             }
-            let segment_source = segment.source_range().byte_range();
+            // 身份优先：片段必须携带当前快照的 SrcRange 身份，不能只比较裸字节数值。
+            // 只取 `byte_range()` 会把另一快照（含同值不同快照）的片段装进当前投影，
+            // 之后 `source_at` 却返回绑定当前快照的坐标与 Exact。
+            let segment_source = snapshot
+                .validate_range(segment.source_range())
+                .map_err(MappingError::Source)?;
             if segment_source.start < source_range.start || segment_source.end > source_range.end {
                 return Err(MappingError::SourceOutsideProjection);
             }
-            snapshot
-                .src_range(segment_source.clone())
-                .map_err(MappingError::Source)?;
             match segment.precision() {
                 MappingPrecision::Hidden => {}
                 MappingPrecision::Synthetic => {
