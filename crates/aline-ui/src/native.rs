@@ -7,7 +7,6 @@ use crate::native_window::{NativeWindowCopy, open_initial_window};
 
 pub(super) fn run(locale: Locale, fallback_used: bool) -> Result<(), String> {
     let translator = Translator::embedded(locale).map_err(|error| error.to_string())?;
-    let copy = NativeWindowCopy::new(&translator)?;
     let window_failed = translator
         .t("startup.window_failed")
         .map_err(|error| error.to_string())?;
@@ -20,6 +19,7 @@ pub(super) fn run(locale: Locale, fallback_used: bool) -> Result<(), String> {
     } else {
         None
     };
+    let copy = NativeWindowCopy::new(translator)?;
     Application::with_platform(std::rc::Rc::new(gpui_macos::MacPlatform::new(false)))
         .with_quit_mode(QuitMode::LastWindowClosed)
         .run(move |cx: &mut App| {

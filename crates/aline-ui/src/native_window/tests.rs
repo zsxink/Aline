@@ -1,20 +1,11 @@
 //! 原生窗口同源协调器的无窗口回归；真实 chooser/菜单/焦点另作 macOS 实验。
 
-#![cfg(target_os = "macos")]
-
 use std::error::Error;
 use std::io::{self, Cursor};
 use std::path::{Path, PathBuf};
 
-pub use aline_ui::{
-    DocLimits, DocumentId, EditorMode, InputIdentity, OpenDisposition, OpenError, OpenRequestId,
-    ReadonlyDocument, ReadonlyOpenCompletion, ReadonlyOpenJob, ReadonlyOpenLimits,
-    ReadonlyOpenPhase, ReadonlySession, WorkingVersion,
-};
-use aline_ui::{ReadonlyFileAccess, ReadonlyFileInput};
-
-#[path = "../src/native_window.rs"]
-mod native_window;
+use crate::EditorMode;
+use crate::{ReadonlyFileAccess, ReadonlyFileInput};
 
 struct Files<'a>(&'a [u8]);
 impl<'a> ReadonlyFileAccess for Files<'a> {
@@ -31,7 +22,7 @@ impl<'a> ReadonlyFileAccess for Files<'a> {
 #[test]
 fn dialog_cancel_and_failure_restore_focus_without_creating_a_document()
 -> Result<(), Box<dyn Error>> {
-    let mut state = native_window::NativeOpenCoordinator::new(native_window::open_limits());
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
     let request = state.request_open()?;
     assert!(state.accept_dialog(&request, Ok(None)).is_none());
     assert!(state.take_focus_return());
@@ -49,7 +40,7 @@ fn dialog_cancel_and_failure_restore_focus_without_creating_a_document()
 #[test]
 fn chooser_extension_rejection_is_localized_and_never_starts_a_reader() -> Result<(), Box<dyn Error>>
 {
-    let mut state = native_window::NativeOpenCoordinator::new(native_window::open_limits());
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
     let request = state.request_open()?;
     assert!(
         state
@@ -65,7 +56,7 @@ fn chooser_extension_rejection_is_localized_and_never_starts_a_reader() -> Resul
 #[test]
 fn one_running_read_and_one_latest_queued_read_keep_replacements_bounded()
 -> Result<(), Box<dyn Error>> {
-    let mut state = native_window::NativeOpenCoordinator::new(native_window::open_limits());
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
     let a = state.request_open()?;
     let running = state
         .accept_dialog(&a, Ok(Some(vec![PathBuf::from("a.md")])))
@@ -101,7 +92,7 @@ fn one_running_read_and_one_latest_queued_read_keep_replacements_bounded()
 #[test]
 fn close_and_stale_dialog_never_restore_focus_or_revive_ready_state() -> Result<(), Box<dyn Error>>
 {
-    let mut state = native_window::NativeOpenCoordinator::new(native_window::open_limits());
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
     let old = state.request_open()?;
     let latest = state.request_open()?;
     assert!(state.accept_dialog(&old, Ok(None)).is_none());
@@ -120,10 +111,10 @@ fn close_and_stale_dialog_never_restore_focus_or_revive_ready_state() -> Result<
 
 #[test]
 fn production_window_entry_remains_compiled() -> Result<(), Box<dyn Error>> {
-    let _ = native_window::open_initial_window;
+    let _ = super::open_initial_window;
     for locale in [aline_app_core::Locale::ZhCn, aline_app_core::Locale::En] {
         let translator = aline_app_core::Translator::embedded(locale)?;
-        assert!(native_window::NativeWindowCopy::new(&translator).is_ok());
+        assert!(super::NativeWindowCopy::new(translator).is_ok());
     }
     Ok(())
 }
@@ -133,7 +124,7 @@ fn newly_opened_large_document_defaults_source_with_specific_reason() -> Result<
 {
     let bytes = "中".repeat((4 * 1024 * 1024) / 3 + 1).into_bytes();
     assert!(bytes.len() > 4 * 1024 * 1024);
-    let mut state = native_window::NativeOpenCoordinator::new(native_window::open_limits());
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
     let request = state.request_open()?;
     let job = state
         .accept_dialog(&request, Ok(Some(vec![PathBuf::from("large.md")])))

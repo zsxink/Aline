@@ -10,6 +10,9 @@ use gpui::{
     px, rgb, size,
 };
 
+use super::geometry::{
+    BODY_FONT_SIZE, BODY_LINE_HEIGHT, ContentMetrics, SCROLLBAR_WIDTH, content_metrics,
+};
 use super::readonly_hit::{HitError, HitTarget, PreparedLayout};
 use super::readonly_layout::{
     LayoutCache, LayoutEnvironment, LayoutError, LayoutKey, LayoutToken, ReaderIndex, RestoreState,
@@ -20,10 +23,11 @@ use crate::{DocumentId, EditorMode, ReadonlyDocument};
 const MAX_ROWS: usize = 1_000_000;
 const MAX_ITEM_BYTES: usize = 64 * 1024;
 const HEIGHT_CACHE_CAPACITY: usize = 256;
-const COLUMN_WIDTH: f32 = 880.0;
-const SCROLLBAR_WIDTH: f32 = 12.0;
-const FONT_SIZE: f32 = 16.0;
-const LINE_HEIGHT: f32 = 24.0;
+
+/// 尚未取得窗口尺寸时的安全默认：宽窗档位的列宽与正文宽度。
+fn default_metrics() -> ContentMetrics {
+    content_metrics(1200.0, 1200.0)
+}
 
 struct MeasuredRow {
     row: usize,
@@ -44,6 +48,7 @@ pub(super) struct ReaderSurface {
     rail_bounds: Rc<Cell<Option<Bounds<Pixels>>>>,
     measured: Rc<RefCell<VecDeque<MeasuredRow>>>,
     restores: Rc<RefCell<RestoreState>>,
+    metrics: Cell<ContentMetrics>,
     alive: Rc<Cell<bool>>,
 }
 impl ReaderSurface {
@@ -70,6 +75,7 @@ impl ReaderSurface {
             rail_bounds: Rc::new(Cell::new(None)),
             measured: Rc::new(RefCell::new(VecDeque::new())),
             restores,
+            metrics: Cell::new(default_metrics()),
             alive: Rc::new(Cell::new(true)),
         })
     }
@@ -80,18 +86,17 @@ impl ReaderSurface {
         &mut self,
         document: &ReadonlyDocument,
         window: &Window,
+        metrics: ContentMetrics,
     ) -> Result<(), LayoutError> {
-        let width = (f32::from(window.viewport_size().width) - SCROLLBAR_WIDTH)
-            .clamp(64.0, COLUMN_WIDTH)
-            - 32.0;
+        self.metrics.set(metrics);
         let mode = document.core().mode();
         let environment = LayoutEnvironment::new(
-            width,
+            metrics.text_width,
             window.scale_factor(),
             1,
             true,
-            FONT_SIZE,
-            LINE_HEIGHT,
+            BODY_FONT_SIZE,
+            BODY_LINE_HEIGHT,
         )?;
         let key = LayoutKey::new(document, mode, environment);
         if !self.heights.borrow().matches_key(&key) {
@@ -199,6 +204,7 @@ impl ReaderSurface {
         ) + 'static,
     ) -> AnyElement {
         self.rendered.set(self.rendered.get().saturating_add(1));
+        let metrics = self.metrics.get();
         let projection = self
             .index
             .projection(document.parsed(), self.mode, row, MAX_ITEM_BYTES);
@@ -254,17 +260,24 @@ impl ReaderSurface {
             .source_range(document.parsed(), self.mode, row)
             .map(|range| range.byte_range().start)
             .unwrap_or_default();
+        let last_row = self.index.row_count(self.mode).saturating_sub(1);
         let element_id =
             SharedString::from(format!("reader-row-{}-{source_start}", self.generation));
         let content = div()
             .relative()
             .w_full()
-            .max_w(px(COLUMN_WIDTH))
-            .px_4()
+            .max_w(px(metrics.column_width))
+            .px(px(metrics.padding_x))
             .when(self.mode == EditorMode::Visual, |div| div.py_2())
-            .min_h(px(LINE_HEIGHT))
-            .text_size(px(FONT_SIZE))
-            .line_height(px(LINE_HEIGHT))
+            .pt(px(if row == 0 { metrics.padding_top } else { 0.0 }))
+            .pb(px(if row == last_row {
+                metrics.padding_bottom
+            } else {
+                0.0
+            }))
+            .min_h(px(BODY_LINE_HEIGHT))
+            .text_size(px(BODY_FONT_SIZE))
+            .line_height(px(BODY_LINE_HEIGHT))
             .whitespace_normal()
             .when(self.mode == EditorMode::Source, |div| {
                 div.font_family("Menlo")
@@ -280,7 +293,7 @@ impl ReaderSurface {
                     move |_, (), window, _| {
                         if let Ok(Some(point)) = caret_prepared.position_for_index(caret) {
                             window.paint_quad(fill(
-                                Bounds::new(point, size(px(1.5), px(LINE_HEIGHT))),
+                                Bounds::new(point, size(px(1.5), px(BODY_LINE_HEIGHT))),
                                 rgb(0x0969DA),
                             ));
                         }

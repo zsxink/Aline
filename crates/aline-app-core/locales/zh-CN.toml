@@ -22,6 +22,11 @@ layout_budget = "此区域超过当前布局预算。源码已保留；切换到
 [menu]
 file = "文件"
 
+[status]
+characters = "{count} 字符"
+lines = "{count} 行"
+pending = "统计中…"
+
 [open_error]
 selection = "请选择且仅选择一个 Markdown 文档。"
 extension = "请选择扩展名为 .md 的文件。"

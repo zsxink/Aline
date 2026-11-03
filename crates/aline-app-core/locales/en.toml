@@ -22,6 +22,11 @@ layout_budget = "This region exceeds the current layout budget. The source is pr
 [menu]
 file = "File"
 
+[status]
+characters = "{count} characters"
+lines = "{count} lines"
+pending = "Calculating…"
+
 [open_error]
 selection = "Choose exactly one Markdown document."
 extension = "Choose a file with the .md extension."

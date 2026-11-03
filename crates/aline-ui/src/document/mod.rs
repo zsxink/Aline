@@ -9,6 +9,7 @@ mod publication;
 mod readonly_session;
 mod resource;
 mod snapshot;
+mod statistics;
 
 pub use composition::CompositionView;
 pub use doc_core::{CommitOutcome, DocCore, DocError, DocLimits};
@@ -20,6 +21,8 @@ pub use publication::{
     PublicationKind, PublicationOutcome, PublicationResult, WaitHandle, WaitStatus, WaitView,
 };
 pub use snapshot::CurrentSnapshot;
+
+pub(crate) use statistics::DocumentStatistics;
 
 pub use mode::{EditorMode, ModeSwitchOutcome};
 pub use readonly_session::{

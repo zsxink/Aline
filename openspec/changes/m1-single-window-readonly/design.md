@@ -155,7 +155,7 @@ V-05 使用 Release 与 32/128 KiB、1/4 MiB、>4 MiB、许多短块/单巨块/�
 | `native_window/readonly_reader.rs`（改） | 只读列表的排版与虚拟化；内容列几何**由 `geometry.rs` 提供** | 列表状态、高度缓存 | GPUI、映射层、`geometry.rs` | `pub(super)`（不变） |
 | `native_window.rs`（改） | 窗口状态所有者：区域装配、工具栏/状态栏交互、统计的调度与采纳 | 统计结果与其绑定的文档身份、统计任务 | shell、geometry、statistics、GPUI | `pub(crate)` 的窗口入口（不变） |
 
-统计是**文档派生数据**（知道源码，不知道窗口），骨架几何是**窗口派生数据**（知道窗口，不知道文档），两者生命周期与变化原因不同；放进同一模块会让"排版取值"和"内容口径"互相污染。统计函数是纯的、无 GPUI，因此放在 `document/` 下并被无头测试直接覆盖。`geometry.rs` 不含任何 GPUI 类型，可被无头测试以 `#[path]` 直接引入；`shell.rs` 只做元素构造，不持有第二套数值。统计保持 `pub(crate)`，不新增跨 crate 公开面（CODE_STANDARDS §3.2）。
+统计是**文档派生数据**（知道源码，不知道窗口），骨架几何是**窗口派生数据**（知道窗口，不知道文档），两者生命周期与变化原因不同；放进同一模块会让"排版取值"和"内容口径"互相污染。统计函数是纯的、无 GPUI，因此放在 `document/` 下并被无头测试直接覆盖。`geometry.rs` 不含任何 GPUI 类型，其无头测试放在同文件的 `#[cfg(test)] mod tests` 内（safety 门禁禁止 `#[path]` 引入源模块，也不允许 `tests/` 根反向解析 `src`）；`shell.rs` 只做元素构造，不持有第二套数值。统计保持 `pub(crate)`，不新增跨 crate 公开面（CODE_STANDARDS §3.2）。
 
 #### 9.2 骨架：flex 三段，不做网格模拟
 
@@ -233,7 +233,7 @@ V-05 使用 Release 与 32/128 KiB、1/4 MiB、>4 MiB、许多短块/单巨块/�
 并入的骨架范围按以下顺序迁移，均不改变既有 `readonly_layout` 契约与测试语义（`LayoutEnvironment` 的字段与键不变）：
 
 1. `native_window.rs` 的 `render` 从"竖排一摞"改为三段结构，装配集中在新增的 `native_window/shell.rs`；原头部行（文件名 + 可视化/源码按钮）移除——文件名改由既有 `set_window_title` 承担，视图切换按钮迁入工具栏行。
-2. 打开/关闭文档按钮保留在**内容区的无文档态**内（PRD §6.1 要求无文档时保留新建/打开入口），不再占据内容区之外的行位；关闭文档按钮同理归入内容区。
+2. 打开文档按钮保留在**内容区的无文档态**内（PRD §6.1 要求无文档时保留新建/打开入口），不再占据内容区之外的行位；关闭文档不新增内容区常驻按钮，继续由文件菜单与既有 action 承担——spec 只要求无文档态保留打开入口，而常驻关闭按钮在无文档态没有作用对象，属未确认的新控件。
 3. `readonly_reader.rs` 删除自带的 `COLUMN_WIDTH`/`SCROLLBAR_WIDTH`/`FONT_SIZE`/`LINE_HEIGHT` 常量，改由 `geometry.rs` 提供；`prepare` 接受显式内容几何。
 4. `NativeWindowCopy` 按值持有 `Translator` 并增加状态栏与工具栏文案；`NativeDocumentWindow` 增加统计标签与统计任务字段。无既有公开 API 变化。
 

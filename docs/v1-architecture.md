@@ -467,6 +467,8 @@ Aline/
 
 **2026-11-03 M1 首轮只读视图：** 4.3 的系统语言读取已在真实 macOS 默认首选 `zh-Hans-CN` 和临时 OS 首选 `en-US` 的两次全新启动中观察并恢复中文；4.4 的原生打开/取消/关闭路径已接入。Visual 块列表与 Source 逻辑行列表均使用变高 GPUI `list`，共享内容列宽和外侧滚动槽，Aline 高度测量缓存限制为 256 项。用精确 1 MiB 多短块文件在两种视图实测 Home/End：分别建立 42,800 个 Visual 项和 42,801 个 Source 行，当前帧实例为 10～16 项，首尾截图可见首/尾内容。证据见 `logs/validation/m1-single-window-readonly/2026-11-03-continue-02/virtualization/` 与 `catalog/`。这是 debug 首尾滚动证据，不是 Release 性能结果；像素命中、块内锚点恢复、完整样式/目录导航/字体尚未完成，V-05/V-07/V-09 未整项通过。
 
+**2026-11-03 M1 主窗骨架：** 并入的骨架范围已落地：原生主窗改为工具栏行（44px）→ 内容区（`flex_1`）→ 状态栏行（28px）三段，几何取值集中于 `native_window/geometry.rs` 并有边界测试；工具栏只含品牌区与文档打开时的编辑模式组，状态栏在后台执行器计算字符数/行数并按 `DocumentId` 采纳，替换、关闭或晚到结果被丢弃；内容列按原型 880（含 56 水平内边距）/768 文本宽与 900/600 窄窗档位实现。`cargo test -p aline-ui --lib` 61 passed/1 ignored，完整 workspace 门禁、`check_workspace.py` 与 engineering/lints/safety/public-api 检查通过，证据 `logs/validation/m1-single-window-readonly/2026-11-03-continue-04/`。真实窗口中已取得无文档态与打开 README 后的品牌区/三段同屏截图及图标资源身份检查（证据 `logs/validation/m1-single-window-readonly/2026-11-03-continue-05/brand/`），但窄窗截图、键盘焦点与统计序列尚未观测；候选数值未冻结，V-09 与 AC-15/20 仍只按分项回填，M1 出口未完成。
+
 ### 5.2 当前文本与打开块
 
 ```text
