@@ -2,6 +2,10 @@
 
 任务按实际实施与验证状态逐项标记；用户已授权 apply，不包含 commit/push/archive。M0 的 2026-11-02 用户验收豁免继续有效，证据缺口保留。**纯机制 1～3 已完成无头部分；4.1 的后端候选、精确许可证/metadata 路径与 GPUI 指纹均获具体裁决，准入策略、7 场景真实图及完整自测已通过。4.2 的锁定离线 app build 与 macOS 原生空窗显示/退出已验证；4.3 两种系统首选语言真实启动已验证；4.4 文件打开/取消/关闭真实操作已接通。5.1 变高虚拟阅读和精确 1 MiB 双视图首尾滚动已取得 macOS 实测证据。5.2 命中、5.3 锚点恢复/预算边界、内容与导航/字体视图尚未完成。**
 
+2026-11-03 用户决定把原独立变更 `m1-main-window-skeleton` 并入本变更并删除，其任务成为第 9～15 组、证据与本变更共用同一运行目录根。**并入范围尚未开始：`crates/aline-ui/src/document/statistics.rs` 与 `crates/aline-ui/src/native_window/geometry.rs` 只有落盘草稿，未接入模块树、无测试、无证据，任务 9.1/9.2 不因文件存在而完成。**
+
+组号是范围编号，不是严格执行序号：第 9～15 组须在 8.1 独立复审前完成；8.2 逐项核对与 8.3 交接验证在全部组完成后执行。
+
 Requirement 引用缩写仅用于追踪，不另建编号规格：
 
 | 缩写 | capability / Requirement |
@@ -17,6 +21,12 @@ Requirement 引用缩写仅用于追踪，不另建编号规格：
 | E2 | engine/markdown / 导航索引为纯数据且绑定源快照（M1 修改标签等价配对） |
 | D1 | engine/document-core / 只读会话不依赖打开编辑块 |
 | G1 | workspace/engineering-gates / M1 只读出口按分项和平台交接 |
+| W1 | ui/main-window-layout / 主窗口区域骨架与原型区域对应 |
+| W2 | ui/main-window-layout / 工具栏行只承载当前阶段可用的命令 |
+| W3 | ui/main-window-layout / 状态栏提供统一统计与当前模式 |
+| W4 | ui/main-window-layout / 内容区单列居中限宽且两视图共用列宽与主滚动条 |
+| W5 | ui/main-window-layout / 骨架数值是实验候选而非冻结值 |
+| G2 | workspace/engineering-gates / M1 骨架候选数值不得记为冻结值 |
 
 所有命令在仓库根执行。Cargo 使用已登记工具链和已核对的隔离缓存，不自动安装/下载；需要时在命令前设置 `CARGO_HOME=<cargo-cache>`（占位符，证据中统一归一化）。原始 stdout/stderr、命令/环境、截图/基准及审查原文统一放 `logs/validation/m1-single-window-readonly/<run-id>/<group>/`，下文简写 `<evidence>/<group>/`；`<evidence>` 必须解析到上述 logs/validation 下的唯一运行目录。路径统一经 `scripts/evidence_paths.py` 处理。当前交接如需只维护 `tmp/m1-single-window-readonly-resume.md` 一份不追踪文件。
 
@@ -90,6 +100,60 @@ Requirement 引用缩写仅用于追踪，不另建编号规格：
 
 依赖全部已完成分项；关联 G1/全部能力、CODE_STANDARDS §2～6、R/K 与 S/C 检查组。这里复核跨组集成，不能代替前组应落的测试/文档。
 
-- [ ] 8.1 按 AGENTS 路由对公共 API、只读能力拒绝、唯一状态所有者、后台取消/关闭采纳、HTML/字体安全和虚拟化做 Sol 独立审查，主 Agent 核对 findings 和修复后相关验证；检查替代路径/无消费者导出/依赖/fake 清理。验收无未处置阻塞 finding，执行 `codegraph sync`/`codegraph status` 并核对实际调用链，原审查留 `<evidence>/review/`，必要决定仅回填既有规范。
-- [ ] 8.2 逐行核对 proposal 的 §13 对照表与实际证据，汇总前组已回填的架构 §13、验证计划 V-01/03/04/05/07/09（必要 V-06）及引擎/UI 公共契约；M0 豁免缺口、未测平台和 M2 前 V-08/保存闭环不得被关闭。验收每个 M1 必需出口均有可检查的成功证据或明确阻塞，1 MiB 真实可视化滚动不能空缺；若失败保持 M1 未完成，不把归档或 tasks 勾选当出口。
+- [ ] 8.1 按 AGENTS 路由对公共 API、只读能力拒绝、唯一状态所有者、后台取消/关闭采纳、HTML/字体安全和虚拟化做 Sol 独立审查，并覆盖并入的骨架范围（几何唯一来源、render 路径不统计、统计的身份绑定与过期丢弃、工具栏范围外入口不出现、原型 SVG 未进入运行时），主 Agent 核对 findings 和修复后相关验证；检查替代路径/无消费者导出/依赖/fake 清理。验收无未处置阻塞 finding，执行 `codegraph sync`/`codegraph status` 并核对实际调用链，原审查留 `<evidence>/review/`，必要决定仅回填既有规范。
+- [ ] 8.2 逐行核对 proposal 的 §13 对照表与实际证据（含并入后新增的区域骨架、工具栏行、状态栏统计、内容区列宽行），汇总前组已回填的架构 §13、验证计划 V-01/03/04/05/07/09（必要 V-06）及引擎/UI 公共契约；M0 豁免缺口、未测平台和 M2 前 V-08/保存闭环不得被关闭。验收每个 M1 必需出口均有可检查的成功证据或明确阻塞，1 MiB 真实可视化滚动不能空缺；骨架证据不得声称 V-09 整项通过，也不得把候选数值写成冻结值。若失败保持 M1 未完成，不把归档或 tasks 勾选当出口。
 - [ ] 8.3 执行 `openspec validate m1-single-window-readonly --strict --no-interactive`、`openspec validate --all --strict --no-interactive`、`git diff --check` 和引用/绝对路径/变更范围检查；只汇报实际执行的命令、平台与限制。工件与实现一致且原始输出未入库后交付评审；本变更任务不包含 commit/push/archive，后续需用户另行指令。证据 `<evidence>/handoff/`。
+
+## 9. 纯几何与统计机制（无头）
+
+关联 W1/W3/W4/W5/G2，UI §3.3/§4.1/§5.4，V-07/V-09；CODE_STANDARDS §2.2/§3，R-3/10/13，S-3/5/7/12/14。
+
+- [ ] 9.1 在 `crates/aline-ui/src/document/` 建并登记 `statistics` 模块（现有草稿未接入模块树，不算完成）：纯函数 `DocumentStatistics::compute(source: &str) -> DocumentStatistics`，口径为非空白 Unicode 标量值计数与按 LF 的行数（`max(1, LF+1)`）。先写独立预期测试（拟新增 `crates/aline-ui/tests/document_statistics.rs`）覆盖空文本、纯空白、中英文、标点、emoji ZWJ、组合字符、CRLF、孤立 CR、无末尾换行；行数口径与 `aline_buffer::LineIndex::line_count()` 一致。验收 `cargo test -p aline-ui --test document_statistics`；证据 `<evidence>/statistics/`。
+- [ ] 9.2 在 `crates/aline-ui/src/native_window/` 建并登记 `geometry` 模块的几何来源（纯数值、不依赖 GPUI，可被无头测试以 `#[path]` 直接引入）：区域高度（工具栏 44 / 状态栏 28）、内容列最大宽 880、水平内边距 56、垂直内边距 40/100、窄窗档位 900（28/30/80）与 600（20/24/60）、字号 16 与行高 28（16×1.75）；纯函数 `content_metrics(window_width, area_width)` 产出档位、列宽与文本宽。GPUI 元素装配另置 `shell.rs`（任务 10.1），其中不定义第二套数值。先写无头测试（拟新增 `crates/aline-ui/tests/window_geometry.rs`）覆盖三档边界值、极窄窗口与列宽下限。验收 `cargo test -p aline-ui --test window_geometry`；证据 `<evidence>/geometry/`。
+- [ ] 9.3 核对几何来源唯一性：把 `readonly_reader.rs` 自带的 `COLUMN_WIDTH`/`SCROLLBAR_WIDTH`/`FONT_SIZE`/`LINE_HEIGHT` 迁出并删除原常量，确保全文只有 `geometry.rs` 一处出处；用 `rg`/CodeGraph 确认无第二处同值定义。证据 `<evidence>/geometry/grep/`。
+
+## 10. 主窗口区域骨架
+
+依赖 9 的几何来源；关联 W1/W5，UI §4/§4.1，PRD §6.1，V-09；R-1/6/8/13，S-2/11/13。
+
+- [ ] 10.1 新增 `native_window/shell.rs` 装配三段（工具栏行、内容区、状态栏行，几何一律取自 `geometry.rs`），把 `native_window.rs` 的 `render` 改为该三段垂直结构：工具栏行（固定高 44）→ 内容区（`flex_1`，内部为 `flex_row` 容器）→ 状态栏行（固定高 28）；平台原生窗口装饰承担标题栏，不自绘交通灯。移除原头部行（文件名 + 可视化/源码按钮），文件名改由既有 `set_window_title` 承担。打开/关闭文档按钮迁入内容区的无文档态，PRD §6.1 的"无文档时保留新建/打开入口"仍成立。
+- [ ] 10.2 核对区域顺序与原型一致：工具栏行在最上、状态栏行在最下、内容区居中且可伸展；无自绘标题栏、无交通灯元素、无范围外入口。验收真实 macOS 窗口截图（无文档态与阅读态各一），证据 `<evidence>/skeleton/`。
+
+## 11. 工具栏行
+
+依赖 10；关联 W2，UI §10.5（UI-04 已确认），V-09；S-11/12/14。
+
+- [ ] 11.1 按已确认分组顺序渲染工具栏行：M1 只出现"编辑模式"组（可视化 / 源码），且仅在文档已打开时出现，当前模式用强调色弱背景 + 强调色文字表达选中态；范围外分组（侧栏、行内格式、段落/插入、导出、设置）既不出现也不置灰占位。
+- [ ] 11.2 控件可达性：两个模式按钮可鼠标点击、可 Tab 到达、Enter/Space 激活，焦点有可见边界，`aria_label` 取自 catalog 名称；不引入原型 SVG（PROTO-03 许可未补证），只用文字标签。验收真实窗口键盘操作与既有 `FocusNext`/`FocusPrevious` 不冲突；证据 `<evidence>/toolbar/`。
+
+## 12. 状态栏统计与身份
+
+依赖 9.1 与 10；关联 W3，UI §5.4、PRD §6.1，V-07/V-09；R-5/8/13/16，S-7/8/13/14。
+
+- [ ] 12.1 状态栏行渲染：左侧字符数与行数（`t_with` 插值），中间弹性空白，右侧当前编辑模式标签（复用 `action.visual_view`/`action.source_view`）。无文档时不显示任何文档统计（不显示"0 字 / 1 行"），符合 UI §4"无文档状态不得显示可编辑的假文档数据"。
+- [ ] 12.2 统计在后台执行器计算，不在 render 路径；结果连同 `DocumentId` 回到窗口，只有与当前文档身份相同才被采纳显示；文档替换或关闭时统计立即作废，窗口关闭后晚到结果被丢弃。验收：打开 A 显示 A 的统计 → 打开 B 期间不得显示 A 的数值 → B 的统计到达后替换；文档替换后旧值不残留；证据 `<evidence>/statusbar/`。
+- [ ] 12.3 "尚未计算"与零值可区分：统计未到达时显示占位符而非 0；零字符文档显示真实的 0。验收真实窗口在统计到达前后各截一次，证据 `<evidence>/statusbar/`。
+
+## 13. 内容区单列限宽与两视图共享
+
+依赖 9.2 与 10；关联 W4/W5，UI §6/§4.1，V-09；R-3/4/7/10，S-5/8/14。
+
+- [ ] 13.1 内容区为单列居中限宽：内容列按 `border-box` 语义取 880（含水平内边距），文本宽 768；首行加 40px 上内边距、末行加 100px 下内边距（窄窗按档位取 30/80 与 24/60），随行号判定。高度缓存记录实测高度，内边距变化不与缓存冲突。
+- [ ] 13.2 两种只读视图共用同一内容列宽与同一根主纵向滚动条：切换可视化/源码不改变列宽与滚动条位置；`readonly_layout` 的 `LayoutEnvironment` 键语义不变。验收 `cargo test -p aline-ui --test readonly_layout --test readonly_document` 与真实双视图往返截图对比列宽；证据 `<evidence>/content-column/`。
+- [ ] 13.3 窄窗档位：窗口宽 ≤900 与 ≤600 时内边距按档位收缩，内容不横向溢出、不被裁切；验收真实窗口三档宽度截图与既有命中/滚动回归测试通过；证据 `<evidence>/content-column/`。
+
+## 14. 文案与 i18n
+
+关联 W2/W3，UI §14，AGENTS 铁律 7；S-7/11。
+
+- [ ] 14.1 在 `crates/aline-app-core/locales/zh-CN.toml` 与 `en.toml` 新增状态栏统计与占位符键（字符数、行数、统计未就绪占位），双语同键同占位符；`Translator::embedded` 的既有键集合与占位符校验必须覆盖新键，任一侧缺失即启动失败。验收 `cargo test -p aline-app-core` 与 `cargo test -p aline-ui catalog`；证据 `<evidence>/catalog/`。
+- [ ] 14.2 真实窗口分别以 zh-CN 与 en 启动，确认状态栏数值、占位符与模式标签完整可读，无缺 key、无插值漂移；证据 `<evidence>/catalog/`。
+
+## 15. 骨架门禁、真实窗口与回填
+
+依赖 9～14；关联全部 W 与 G2，架构 §13 出口分项、V-09；CODE_STANDARDS §6，R-11/17，S-2/12/14/19。
+
+- [ ] 15.1 骨架范围完成后复跑 7.5 的完整 `cargo fmt --all --check`、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo test --workspace` 与 `python3 scripts/check_workspace.py --cargo-home <cargo-cache> --output-dir <evidence>/workspace`，并补跑 `python3 scripts/check_engineering.py`、`scripts/check_lints.py`、`scripts/check_safety.py`、`scripts/check_public_api.py`，确认新增模块未把 GPUI/线程/全局状态带入五引擎、未新增公开面或依赖；逐一确认八成员实际 lint 继承，不以 all-targets 代表三平台。原始输出经路径归一化留本地；失败不勾任务；证据 `<evidence>/workspace/`。
+- [ ] 15.2 在 7.2 的 V-09 矩阵基础上补骨架分项：无文档态、阅读态、窄窗三档、双视图往返、键盘可达性、统计未就绪与就绪两态；记录设备/系统/架构/工具与 GPUI 身份、窗口尺寸、观察结果与未测项。保留 Windows 10/Intel Mac/Linux 未测，不以 macOS 结果推断其他平台，不声称 V-09 整项通过；证据 `<evidence>/window-baseline/`。
+- [ ] 15.3 回填现行文档：更新 `docs/ui-spec.md` §4.1 的实现状态与 §3.3 的候选数值说明（明确标注未冻结、待 V-09）、`docs/v1-validation-plan.md` 的 V-09 分项（骨架/工具栏/状态栏/内容列各自的实际结果与未测边界）、`docs/v1-architecture.md` §13 的 M1 阶段状态；必要决定回填 `docs/decisions.md`。只写实际取得的结果，候选数值不写成发布门槛或冻结值；证据 `<evidence>/docs/`。
+- [ ] 15.4 执行 `openspec validate m1-single-window-readonly --strict --no-interactive`、`openspec validate --all --strict --no-interactive`、`git diff --check` 与引用/绝对路径/变更范围检查，并确认并入后无残留的 `m1-main-window-skeleton` 路径、重复的几何/统计口径或两条并行任务编号；只汇报实际执行的命令、平台与限制。证据 `<evidence>/handoff/`。

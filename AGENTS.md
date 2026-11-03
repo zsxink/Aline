@@ -20,7 +20,7 @@ Aline —— Typora 式 Markdown 编辑器（Rust + GPUI，无 WebView），macO
 | [docs/v1-prd.md](docs/v1-prd.md) | V1 产品范围、非目标、行为与 AC-01～AC-20 | 判断一个功能该不该做 |
 | [docs/v1-validation-plan.md](docs/v1-validation-plan.md) | V-01～V-09 实验、样本与阶段依赖，当前均未执行 | 判断技术和验收是否已有证据 |
 | [docs/plugin-system.md](docs/plugin-system.md) | V1 内置插件的产品行为、设置归属、启停与架构边界 | 设计或实现插件功能和插件设置前 |
-| [docs/ui-spec.md](docs/ui-spec.md) | 产品界面规范：布局/交互/视觉基线、图片只读 tab、菜单/设置/主题、键盘与中英文验收；UI-01～UI-06 已确认，原问题见 [UI 确认归档](docs/archive/2026-10-29-ui-decisions.md)，V 项仍未执行 | 实现或评审任何面向用户的界面 |
+| [docs/ui-spec.md](docs/ui-spec.md) | 产品界面规范：布局/交互/视觉基线、图片只读 tab、菜单/设置/主题、键盘与中英文验收；§4.1 原型布局对照（实现参照）；UI-01～UI-06 已确认，原问题见 [UI 确认归档](docs/archive/2026-10-29-ui-decisions.md)，V 项仍未执行 | 实现或评审任何面向用户的界面 |
 | [docs/theme-package-spec.md](docs/theme-package-spec.md) | 自定义主题包格式、可配置样式字段、继承规则和导入校验 | 设计或实现主题包字段与主题加载前 |
 | [docs/v1-architecture.md](docs/v1-architecture.md) | 实施蓝图：crate 划分、模块骨架、各功能组实现方案、里程碑 M0–M6（历史蓝图处置见 §15） | 实现任何功能前 |
 | [docs/rust-style-guide.md](docs/rust-style-guide.md) | Rust 代码规范：强制/建议/待验证、S/C 规则检查、工具链、坐标分型、错误/panic/unsafe、测试与提交；RS-01～RS-05/ED-01 已确认，原问题见 [确认归档](docs/archive/2026-10-29-rust-style-decisions.md) | 写任何 Rust 代码前 |
@@ -64,3 +64,4 @@ cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 - 新增依赖先对照 engine-design §18.2 和 v1-architecture §3.2 的准入规则，同类功能不得引入第二个库。2026-11-02 起 `scripts/check_engineering.py` 默认执行逐依赖准入检查（用途分组/选包/许可证），传 `--ledger <path>` 时另存逐包账本，失败关闭；实际执行与限制见架构 §3.2 R14 记录，不把策略核对写成法律意见或跨平台构建证明。
 - 实现期对照：ElyMark 完整历史关键文件索引已保全于 `docs/archive/migration-evidence/engine-design.md`，当前入口见 engine-design §18.3；Zed 克隆放在仓库外的参考目录，不随本仓库分发（gpui 新架构与锁定的 gpui-pre 存在 API 代差，机制线索参考 docs/zed-notes.md §0及其完整历史证据，具体 API 及性能结论须重新取证）。Aline 全部自写实现，外部源码只作对照参考。
 - 外观与交互参照 MarkFlow（[`MarkFlow`](https://github.com/zsxink/MarkFlow)）：设置模型、导出主题、图片粘贴、自动保存/外部修改检测等功能语义从它迁移（迁语义不迁代码）。其 2026-10-25 性能诊断（128KB 文档卡顿三病根，issue #458/#459/#460）已并入 architecture-guide §11 作为反面实证；方向研究报告全文在 MarkFlow 仓库 `docs/superpowers/specs/2026-10-26-aline-gpui-rebuild-design.md`。
+- **原生 UI 布局与控件邻接对照历史原型**：`docs/prototype/legacy/` 的 HTML/CSS 是原生界面的布局参照（区域构成、自上而下顺序、控件邻接、图标语义与交互意图），逐区域映射与冲突裁决见 [UI 规范 §4.1](docs/ui-spec.md#41-原型布局对照实现参照)。原型决定“怎么摆”，PRD 与已确认规范决定“有什么”，冲突时以 PRD/已确认规范为准；不从原型反推新功能、键位、默认值或运行时主题格式，也不把浏览器行为当原生能力证明。参照不等于拷贝：不把 `legacy/` 复制进应用 `src/` 或 `resources/themes/`。
