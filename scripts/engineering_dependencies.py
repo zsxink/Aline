@@ -229,7 +229,12 @@ def validate(data, tree, lock_path, policy, scenario, admission=None, ledger=Fal
     outside = reachable(nodes, roots, selected, omit=gpui) if gpui else selected
     gpui_full = reachable(nodes, [gpui]) if gpui else set()
     full_outside = reachable(nodes, roots, omit=gpui) if gpui else full
+    from engineering_native_paths import check_native_paths
+    native = check_native_paths(packages, nodes, roots, selected, lock, policy, scenario)
+    native_approved = native["forbidden"] | native["sidecars"]
     for identity in full_outside - selected:
+        if identity in native_approved:
+            continue
         name = packages[identity]["name"]
         if forbidden_name(name) or gpui_name(name) or name in PARSERS:
             raise Violation("metadata-only 自有禁库旁路: " + route(packages, nodes, roots, identity))
@@ -243,6 +248,8 @@ def validate(data, tree, lock_path, policy, scenario, admission=None, ledger=Fal
         if name in PARSERS:
             raise Violation("第二 Markdown 解析器: " + route(packages, nodes, roots, identity))
         if not forbidden_name(name):
+            continue
+        if identity in native["forbidden"]:
             continue
         key = package_key(packages[identity])
         if not gpui or identity in outside:
@@ -258,12 +265,14 @@ def validate(data, tree, lock_path, policy, scenario, admission=None, ledger=Fal
             if edge not in exception["incoming"]:
                 raise Violation("精确例外新增入边/target/kind: " + json.dumps(edge, ensure_ascii=False))
     for identity in full - selected - gpui_full:
+        if identity in native_approved:
+            continue
         name = packages[identity]["name"]
         if forbidden_name(name) or gpui_name(name) or name in PARSERS:
             raise Violation("未经审查的 metadata-only 自有禁库路径: " + route(packages, nodes, roots, identity))
     if gpui:
         for identity in full - gpui_full:
-            if gpui_name(packages[identity]["name"]):
+            if gpui_name(packages[identity]["name"]) and identity not in native["sidecars"]:
                 raise Violation("未审 GPUI 旁支身份: " + route(packages, nodes, roots, identity))
         expected = policy["scenarios"].get(scenario)
         if expected is None or not policy.get("reviewed"):
@@ -275,6 +284,8 @@ def validate(data, tree, lock_path, policy, scenario, admission=None, ledger=Fal
               "metadata_packages": len(packages), "metadata_unselected": sorted(package_key(packages[i]) for i in full-selected),
               "engines": {packages[root]["name"]:len(reachable(nodes,[root])) for root in roots if packages[root]["name"] in ENGINES},
               "gpui_subtree_sha256":fingerprint(gpui_snapshot(packages,nodes,gpui,selected,lock)) if gpui else None}
+    result["native_target_branches"] = [{"package": package_key(packages[identity]), "metadata_only": identity not in selected}
+                                        for identity in sorted(native["forbidden"], key=lambda item: package_key(packages[item]))]
     if admission is not None:
         # 许可证/分组准入是图身份检查之后的独立覆盖缺口；失败同样 fail closed。
         from dependency_admission import check_admission

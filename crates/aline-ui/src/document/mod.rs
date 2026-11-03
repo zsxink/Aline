@@ -6,6 +6,7 @@ mod identity;
 mod mode;
 mod open_block;
 mod publication;
+mod readonly_session;
 mod resource;
 mod snapshot;
 
@@ -21,4 +22,9 @@ pub use publication::{
 pub use snapshot::CurrentSnapshot;
 
 pub use mode::{EditorMode, ModeSwitchOutcome};
+pub use readonly_session::{
+    OpenDisposition, OpenError, OpenRequestId, ReadonlyDocument, ReadonlyFileAccess,
+    ReadonlyFileInput, ReadonlyOpenCompletion, ReadonlyOpenJob, ReadonlyOpenLimits,
+    ReadonlyOpenPhase, ReadonlySession,
+};
 pub use resource::{ResourceReference, WeakResourceReference};

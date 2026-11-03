@@ -9,6 +9,7 @@ mod mdast;
 mod navigation;
 mod parse;
 mod pre;
+mod presentation;
 mod protection;
 mod reuse;
 mod style;
@@ -28,6 +29,7 @@ pub use pre::{
     FrontMatter, FrontMatterKind, Rewrite, RewriteEdit, RewriteError, RewriteMap, RewriteSegment,
     RewriteSource, detect_front_matter, rewrite_front_matter, rewrite_front_matter_with_cancel,
 };
+pub use presentation::{AlertKind, CodeLine, PresentationKind, PresentationNode, TableAlignment};
 pub use protection::{ProtectedRange, ProtectionKind};
 pub use reuse::{ReuseOutcome, ReuseRefusal, ReuseTranslateError, ReusedBlock, reuse};
 pub use style::{StyledRange, TextStyle};

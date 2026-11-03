@@ -1,6 +1,6 @@
 # Aline V1 实现前验证清单
 
-更新日期：2026-11-02
+更新日期：2026-11-03
 需求依据：[V1 PRD 0.9](./v1-prd.md)  
 评审记录：[产品问题批阅归档](./archive/2026-10-28-v1-open-questions.md) · [架构问题确认归档](./archive/2026-10-29-v1-architecture-decisions.md) · [Rust 与引擎问题确认归档](./archive/2026-10-29-rust-style-decisions.md) · [UI 问题确认归档](./archive/2026-10-29-ui-decisions.md) · [插件问题确认归档](./archive/2026-10-29-plugin-decisions.md) · [主题决定归档](./archive/2026-10-29-theme-decisions.md)
 
@@ -9,6 +9,18 @@
 以下 V 项均**未整项完成**；M0 已执行的工程与无头基础分项在对应条目和结果表中单列，不能由局部结果推断整项通过。涉及格式、默认数值或边界尚未固化的地方，先制作可检查的方案或样本，再回填 PRD 及专门规范。正式 V1 发布前，所有发布阻塞项必须完成。
 
 ## 当前 M0 状态与复跑入口
+
+**2026-11-02 M1 apply 进度：** OpenSpec `m1-single-window-readonly` 已开始实施。夹具、Markdown 只读语义/映射/脚注目标、DocCore 只读边界与只读文件会话已完成无头分项；映射空窗口/Hidden 边界及 FIFO 阻塞/文本预算顺序修复有独立审查和回归。M0 豁免缺证仍保留。用户已批准原生后端候选 `gpui-pre-macos@0.3.9` + `sys-locale@0.3.2`、`cbindgen@0.28.0`/`option-ext@0.2.0`/`dwrote@0.11.5` 三个精确 MPL 例外、`libloading@0.8.9` 的精确 ISC metadata-only 完整路径例外、`wasi@0.11.1`/`wasip2@1.0.4` 原列及新增9条精确 metadata 边，以及七场景 M1 GPUI 组合图指纹。工程准入 all/all-features、macOS ARM/Intel、Windows x64、Linux x64/ARM 七场景已通过；完整自测117/117、path union14/14、许可证自测13/13通过，五个桌面 target tree 均不选中 dwrote/libloading。当前环境没有 `xcrun metal`，原生依赖编译不能越过 shader build；尚未创建/验证窗口、未执行系统语言 GUI 观测、未做 1 MiB 可视化滚动。Windows 10、Intel Mac、Linux 仍未做真实平台实验，不能声明 AC-16 或 V-01/V-05/V-07/V-09 整项通过。证据见 [M1 原生准入候选方案](../openspec/changes/m1-single-window-readonly/native-admission-proposal.md)及 `logs/validation/m1-single-window-readonly/2026-11-02-apply/`。
+
+**2026-11-03 M1 原生入口进度：** 4.1 准入门已完成；`app` 现在读取系统首选语言并调用 `aline-ui::run_application`，macOS 原生入口和一个本地化空状态窗口构造已写入源码。锁定 GPUI 的静态复审确认初窗失败立即以状态码 1 退出、最后窗口关闭时退出。catalog 专项测试、Linux 目标 app 检查、`-D warnings` Clippy、UI 测试目标编译和完整 fmt 检查通过；完整准入/lint/safety/public API 守卫通过。完整 workspace Clippy 与测试仍被 `gpui-pre-apple` 的 Metal shader 构建阻断（缺少 `xcrun metal`），因此 macOS 专属源码尚未完成实际 Rust 编译，未运行原生窗口或观测系统语言。4.2/4.3 保持未完成；V-01、V-05、V-07、V-09 仍未整项通过，未取得 1 MiB 可视化滚动证据。原始输出见 `logs/validation/m1-single-window-readonly/2026-11-03-continue/`。
+
+**2026-11-03 Xcode 环境复查：** 用户已安装 Xcode 27.2，但当前全局 developer directory 仍为 Command Line Tools。设置进程级 `DEVELOPER_DIR` 后可读取 Xcode 版本；`xcrun --find metal` 被未接受的 Apple Xcode/SDK license 拦截，Metal Toolchain 状态尚未确认。`xcode-select --switch` 要求 root 权限，本轮未切换全局设置。待用户在本机接受 Apple license 后，再以 `DEVELOPER_DIR` 重试，不把“已安装 Xcode”记为 Metal 编译器可用。检查输出见 `logs/validation/m1-single-window-readonly/2026-11-03-continue/xcode-detection/`。
+
+**2026-11-03 Xcode/原生空窗复核（更新）：** 用户完成 Xcode 首次运行配置并安装 Metal Toolchain；当前 `xcode-select -p` 指向 Xcode 27.2，`xcrun --find metal` 和 `xcrun -sdk macosx metal --version` 均成功。`cargo fmt --all --check` 与 `cargo build -p aline --locked --offline` 通过；完整 `scripts/check_workspace.py` 汇总也通过。启动 `cargo run -p aline --locked --offline` 后，真实 macOS 单窗显示本地化空状态（本次系统首选语言为中文），退出后 Cargo 进程以状态码 0 结束。初次截图发现内容区域未设背景/文字色，已按现行 UI 颜色契约修复，并由后续真实截图复核。截图与原生构建输出见 `logs/validation/m1-single-window-readonly/2026-11-03-continue/native-window/`、`native-build-run-after-metal/`；环境探测历史见 `xcode-detection/`。这只完成原生入口/空窗分项；默认语言随系统的完整验证、打开文档、1 MiB 可视化滚动、V-01/V-09 整项和 AC-16 均未完成，Windows 10、Intel Mac、Linux 与 M0 豁免缺证仍保留。
+
+**2026-11-03 M1 语言、打开与 1 MiB 虚拟阅读实测：** macOS arm64 / 27.2 的系统首选语言从实际全局 `AppleLanguages=zh-Hans-CN` 切为 `en-US` 后，分别全新启动最新离线 app 并截图核对英文、恢复 `zh-Hans-CN` 后核对中文；未使用 `LANG` 或应用测试注入。`aline-app-core`、`aline-ui catalog`、`aline` 三组 Cargo 测试通过，截图、系统语言前后状态和启动输出见 `logs/validation/m1-single-window-readonly/2026-11-03-continue-02/catalog/`。真实原生窗口通过系统文件选择器打开生成器创建的精确 1,048,576 字节多短块夹具，在 Visual 与 Source 分别 Home/End 滚动；Visual 42,800 项、可见渲染项 10～13，Source 42,801 行、可见渲染项 16，高度缓存上限 256，首尾截图及调试度量见 `.../2026-11-03-continue-02/virtualization/`。这是 macOS debug 可视化滚动分项，不是 Release 性能基准，V-05 未通过；V-01/V-07/V-09 仍未整项通过，AC-01/09 仅能报告有证分项，不能宣称完整 AC-16。Windows 10、Intel Mac、Linux 和 M0 豁免缺证继续保留。
+
+**2026-11-03 V-07 用户裁决的解析分项：** SoftBreak `a\nb` 保留带来源可见换行；有限 HTML 子集以外的 void 标签显示原标签；未支持非 void 容器按完整原文显示标签与内部空白。新增反例/绿测与独立 `.drawn` 预期后，`cargo test -p aline-markdown --locked --offline` 全部通过（17 个测试目标）；完整原始输出含早期金样冲突和修正结果见 `.../2026-11-03-continue-02/v07-contract/`。这不代表其他 V-07 语义、像素命中或原生 HTML 视觉样式通过。
 
 2026-11-01 清理过程文档时保留的状态摘要：已有八成员 workspace、无头引擎/宿主与依赖/lint/安全/公共 API 守卫；**M0 出口未闭合，不能进入依赖该出口的 M1**。现有 OpenSpec 勾选不等于重新核实完成，继续以原任务与实际代码/测试逐项核对。旧过程目录已清理，历史报告引用仅说明当时事实。
 - **2026-11-02 用户验收裁决：**用户明确指示“全部给通过”。据此，M0 任务 48/48、E1–E7 与 M1 门禁记为**用户验收通过**；1.3/1.4/9.2 的逐包替代/必要性人工复核、E2/E4/E5/E7 的整项验证、E3 的全量夹具、E6 的未测项、V-01～V-09 以及真实 IME/保存/跨平台仍未执行。该裁决是风险接受，不是证据补齐；本文件及历史段落中的“未闭合/未通过”保留为当时证据事实，不得改写成已执行或已验证。M1 未在本轮启动；提交、推送、OpenSpec 归档需另行明确指令。验收裁决回填后已复跑 OpenSpec strict：`run-21-openspec-acceptance/stdout.log` 2/2、exit 0；`git diff --check` exit 0。
@@ -25,6 +37,8 @@
 ## V-01 · 三平台兼容与发布矩阵
 
 2026-10-31 M0 组 9 分项：当前 macOS arm64 的正式 workspace 统一门禁为 19/19 exit 0、312 passed，见[9.1 原始记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.1/report.md)。它只覆盖无窗口工程与纯状态基础；`--all-targets` 和目标依赖图解析不代表其他 OS/架构构建。M1 原生 macOS 冒烟、后续 Windows/Linux、Intel Mac/低系统版本与安装/真实输入仍未执行，V-01 未通过；完整交接见[E6（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.5/report.md)。
+
+2026-11-03 增补：已在 `aline-ui` 源码中装配锁定 GPUI macOS 后端与单个初始空状态窗口，但 `cargo check -p aline --locked --offline`、workspace Clippy 和 workspace test 均在 `gpui-pre-apple` 的 Metal shader build 失败，错误为 `xcrun` 找不到 `metal`。这只证明宿主实现待平台编译，不是原生应用构建或窗口冒烟；macOS 真机打开/关闭及失败退出码仍待实际取证。
 
 顺序固定：先验证 macOS，完成后再验证 Windows/Linux；正式 V1 三平台一起发布。Windows 10、Intel Mac 必须保留。
 
@@ -85,6 +99,8 @@ Mermaid 护眼模式使用亮色映射；固定主题不跟随应用，主题是
 产物：打开、输入、块提交、查找、模式切换、滚动、图片/图表处理的 P50/P95、最长主线程停顿和内存报告。引擎处理与端到端输入到呈现分别计时；先有实际基准，再固化尚缺的打开耗时、帧率及内存门槛。PRD 的处理预算仍是目标，不是实测成绩。
 
 由 [Splat 静态源码研究 §5](./splat-study.md#5-解析局部更新性能与异常输入)补充的实验问题（**未执行**）：紧凑映射、块复用、批量/分批派生刷新是否在保持同一来源关系的前提下降低实际成本。沿用上述规模，另加“许多短块/单个巨块”、密集实体/转义/emoji、远处引用定义变化、光标块与相邻相同块样本。分别计快照/坐标转换、解析、映射构建、布局、主线程应用、等待排队及最终呈现，记录分配和峰值内存；对优化分支与全量/未压缩路径做差分并记录优化命中率。正确性通过条件是块/源范围/映射精确性/保护/导航一致、复用后重新定位、占位与完成态同一投影文字和来源不变，且没有旧结果覆盖输入；性能结论按实际端到端报告评估，不复制 Splat 的 300/120 块或 16ms 参数，不把分批循环预算冒充巨块最长停顿保证。此实验不预先启用局部 Markdown 解析，不更改 PRD 性能门禁。
+
+**2026-11-02 M1 样本生成器：** `scripts/generate_m1_fixtures.py --output-dir <evidence>/fixtures-generated` 以固定 seed 生成 32/128 KiB、1/4/5 MiB 五个尺寸样本，并为许多短块、单巨段、长行、巨表、密集实体各生成 128 KiB 复杂度样本；清单记录精确字节数、SHA-256 和首尾 32 字节锚点。本轮在两个独立输出目录重复运行，10 个文件字节和清单相同。大文件仅留在 `logs/validation/`。这只是可复跑输入准备，不是解析/布局/滚动性能测量；V-05 仍未执行。
 
 时点：M1 建基准，M6 冻结且通过全部发布门禁。对应第 7.2 节、AC-16。
 
@@ -153,6 +169,8 @@ M0 编码基础证据（2026-10-31）：行尾边界金样已固定 CR-X-LF 删�
 
 **接口基础记录（2026-10-31，任务 3.3）：** 八接口（decode/encode/parse/映射/plan/validate/apply/snapshot）的输入输出、错误类别、唯一写入口与相等证据来源已按已确认架构/引擎规范冻结；实际落地的包括 `TextSnapshot`/`StorageSnapshot`、受检坐标/身份、`CheckedBatch` 构造/校验、恒等 `Projection` 与 `InputIdentity`，decode/encode、完整 parse、edit 层 plan/validate、apply 与 `snapshot_current` 内容快照仍仅契约未验证。公开面追踪未发现映射 API 的 UI 生产消费者，当前仓库扫描也未发现映射外手算局部差或自建 UTF-16 表，但公开坐标访问器仍可被绕过；这不证明真实命中、IME、保存或本节任何用例通过。完整记录见[任务 3.3 记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-3/step-3.3/report.md)。本节上方“补充可视化机制回归矩阵”仍全部未执行。
 
+**2026-11-02 M1 V-07 夹具分项：** `crates/aline-markdown/tests/fixtures/m1/README.md` 区分现状、独立预期和待冻结语义，覆盖 SoftBreak/HardBreak/布局软折行、HTML void/未知/交叉嵌套/过滤集、未闭合 Front matter、TOC 大小写与重复标题、脚注缺失/重复/大小写/含非 ASCII 字符标签。新增 `readonly_presentation` 实际消费五组展示预期并检验源码块+Gap 完整分区；导航回归先复现大小写标签目标丢失，再按 pulldown-cmark 0.13.6 的 ASCII-only `UniCase` 等价规则修复。HTML void 与未支持标签差异、SoftBreak 展示口径、真实 UI/像素命中仍未冻结或未执行。本分项不改变 V-07 未通过状态，也不宣称 AC-09 通过。
+
 ## V-08 · 文件操作、临时图片与恢复事务
 
 **M0 身份/快照设计准备（2026-10-31，组 8）：** 已有文档/工作版本/快照来源/配置/请求采纳身份、冻结当前输入与已登记资源、组合期显式等待/自动保存延后及独立恢复读取的无头基础。`SnapshotId` 不是版本或内容哈希；宿主须在引用生效前完整登记资源，M0 保守保留而不精确追踪/回收。source create-only 集成用例只证明宿主可保留实际 `Written` 及既有目标拒绝分类，即使派生输入过期/块关闭也不能丢弃已发生写盘事实；它未消费到 DocCore 保存点或真实文件协调器。**未执行**：现有文件安全替换及 metadata 保全、版本竞争/权限/断电、多资源事务、真实手动/自动保存、10 秒恢复与恢复图片可读、另存为迁移/清理、真实平台组合等待、Windows/Linux/Intel Mac。M2 前身份/事务方案及最小安全闭环仍为独立出口，V-08 未通过。证据见[8.5 回填记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-8/step-8.5/report.md)。
@@ -170,6 +188,8 @@ M0 编码基础证据（2026-10-31）：行尾边界金样已固定 CR-X-LF 删�
 由 [Splat 文件链路差异](./splat-study.md#6-文件保存保真外改依赖与测试)补充反例（**未执行**）：外部文件在检查间隙被同尺寸改写、时间戳不变/不可读、刚完成自身保存后再外改，以及本地草稿/组合尚未写入 Buffer 时触发检查。使用受控文件服务/故障注入并辅以实际平台文件操作，记录内容基线、工作版本、检查及写盘顺序；通过条件是按当前工作内容判冲突、写前重验磁盘版本，不以 mtime/size 或通知缺失证明未变，不丢本地输入；重载依 TA-02 可撤销且不清旧历史，磁盘基线不随 Undo/Redo 回退。BOM、混合行尾多数/平票、无末尾换行另做字节对照，未修改仍返回原 bytes，不继承 Splat 的混合行尾保持策略。
 
 ## V-09 · 视觉尺寸、默认值与平台状态
+
+**2026-11-03 M1 启动语言分项：** `aline` 通过锁定 `sys-locale@0.3.2` 读取 macOS 首选语言列表首项，中文/英语选择双语内嵌 catalog；首项缺失或不支持时回退英语并在窗口显示说明。实际 macOS 首选项最初为 `zh-Hans-CN`；临时把系统 `AppleLanguages` 偏好改为 `en-US` 后，以当前用户默认启动参数运行原生 app，窗口标题为 “Aline”，空状态为 “Open a Markdown document to start reading.”，见 `logs/validation/m1-single-window-readonly/2026-11-03-continue-02/catalog-en/english-empty-window.png`。测试后恢复 `zh-Hans-CN`；`AppleLocale` 为 `zh_CN`，provider 依据首选语言列表而非 locale 字段。当前截图是在回退提示接线前取得；正常英语文案相同，更新后版本仍需随 4.4 原生打开验证复跑。catalog 正反例与启动语言映射/空列表回退测试已运行，当前新增 catalog keys 的专项复跑待记录。此分项不表示完整 V-09/AC-15 通过。
 
 产物：主窗口、设置、菜单、对话框和图片预览 tab 的尺寸与状态基准；窗口最小尺寸、侧栏范围、字体/间距、键盘焦点与中英文裁切检查。主题预览必须反映实际三模式；验证 outline/filled 两种图标风格的实际覆盖、描边参数与可辨认状态，并记录预览图与实际样式一致。数值和平台支持由样本实测确定。
 

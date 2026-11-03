@@ -52,6 +52,7 @@
 | source/decode、encode | 原 bytes → 有效源码与存储元数据；冻结源码 + 基线 → 待写 bytes 或错误 | 不持有 Buffer、历史、IME，不调度保存。受检 I/O 原语虽也在 source，文件事务由架构 §7.3 管 |
 | buffer/patch、history、selection、anchors | 合法源码快照、补丁批次、源选区 → 新 revision、逆补丁及位置变换 | 不解析 Markdown，不理解保护区或磁盘路径，不调用 source |
 | markdown/pre、build、tree、protection | 源码快照、解析配置、预算 → Parsed、映射、语义/保护范围及诊断 | 不创建线程，不认识 GPUI、主题颜色或插件注册表 |
+| markdown/presentation | `Parsed` 同一快照上的只读语义树、代码行和表格对齐；局部布局范围由 `Projection::window` 受检适配 | 不成为第二种文本真源，不做颜色/布局/资源加载，不使用调用方手算偏移 |
 | edit/command、check、find、tables、formatter | 当前快照 + 匹配版本 Parsed + 源选区 + 命令 → Change 或 EditRefusal | 不自行写 Buffer/磁盘、不弹差异对话框、不调用执行器 |
 | app-core | 显式 settings/locale/token 数据及校验结果 | 不存全局当前语言，不引入 GPUI 字体/颜色类型 |
 | ui/document 的 DocCore | 唯一可写 Buffer/History、OpenBlock、组合状态机和当前快照；串行采纳 Change | 不让子输入控件另建文档历史；跨模块编排状态可由无窗口驱动测试 |
@@ -170,6 +171,8 @@ source 必须先验输入预算，再验证有效 UTF-8。按已确认WC-03，�
 
 中间树不必公开其全部字段；事件构树建议显式栈，限制嵌套与节点数量。Markdown 不完整通常是合法的未闭合输入，按解析器/产品夹具呈现或原文回退，不等同“解析异常”。内部缺陷和资源超限必须有区别诊断。
 
+M1 结构构建已使用统一 ParseBudget 约束语义节点、表格列和代码逻辑行；超限/取消发布完整 Raw fallback，不发布部分结构。无头消费边界与实现状态见 §19；这不表示 GPU 布局或虚拟滚动已经实现。
+
 ### 6.2 解析器配置与扩展
 
 唯一解析器锁定 pulldown-cmark。首轮**建议配置**为关闭默认 Cargo features，按需启用 TABLES、FOOTNOTES、STRIKETHROUGH、TASKLISTS、MATH 对应 Options；Cargo features 与运行期 Options 不混为一谈。smart punctuation、heading attributes 等未列入需求的行为不默认开启，不能改变源码显示口径。
@@ -209,7 +212,7 @@ pulldown 一个事件可能跨多片段，必须保留子段来源，不能仅�
 | 零宽/隐藏 | Markdown 标记、HTML 标签/注释、链接目标 | 仍有语义源范围；`drawn_at` 可给相邻锚点及 Hidden 状态，整区无可见内容则给源码入口，不能冒充精确命中 |
 | 合成 | 块级 HTML 标签产生换行、图元占位 | 记录来源/边界锚点及 Synthetic 状态；不可据此直接删除一个虚构源码字符 |
 
-普通 Markdown 的三种换行必须分开：SoftBreak 来自段内源码换行，投影为换行或空格的样例/默认口径由 V-07 冻结，旧 `lines=true` 不是当前决定；无论哪种，都记录该源码换行的来源，不按像素宽度猜。HardBreak 来自两空格加换行或反斜杠加换行时，投影为换行并覆盖完整源标记/换行区间；`<br>` 则走 HTML 标签来源/合成锚点。窗口宽度产生的自动折行只属于布局，没有新增源码或绘制字符；命中折行边缘仍回到原投影的合法锚点。V-07 夹具还需区分行末空白、行首缩进与代码内 tab/换行的字面保留，不能对所有 Inline 一律 trim 或合并空白。
+普通 Markdown 的三种换行必须分开：SoftBreak 来自段内源码换行，M1 已裁决 `a\nb` 投影为带来源的可见换行（`Exact`）；HardBreak 来自两空格加换行或反斜杠加换行时，投影为换行并覆盖完整源标记/换行区间；`<br>` 则走 HTML 标签来源/合成锚点。窗口宽度产生的自动折行只属于布局，没有新增源码或绘制字符；命中折行边缘仍回到原投影的合法锚点。V-07 夹具还需区分行末空白、行首缩进与代码内 tab/换行的字面保留，不能对所有 Inline 一律 trim 或合并空白。
 
 建议映射结果除目标坐标还含 `Exact / Aligned / Hidden / Synthetic` 等精确性信息及来源范围，错误使用单独 Result 表示。具体类型可调整，但调用者必须能区分“合法近似锚点”和“可直接用于编辑的精确区间”。
 
@@ -218,6 +221,8 @@ pulldown 一个事件可能跨多片段，必须保留子段来源，不能仅�
 **2026-10-31 M0 接口基础记录（任务 3.3）：** 恒等投影的 `source_at`/`drawn_at`/`aligned`、局部/全文与 UTF-16 转换已实现并有外部消费者与编译夹具证据；当前仓库扫描未发现调用方手算 `at - range.start`、自建 UTF-16 表或映射外转换，但公开坐标访问器仍可被绕过，扫描不构成结构保证。`Aligned`/`Hidden`/`Synthetic`、实体/HTML/合成换行与块局部映射仍仅契约未验证（第 6 组）；当前没有 UI 生产消费者，不证明真实命中或 IME。详见[任务 3.3 记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-3/step-3.3/report.md)。
 
 **2026-10-31 M0 映射与保护基础记录（任务 6.4/6.5）：** 上一条“第 6 组仍仅契约未验证”是任务 3.3 时点的状态；组 6 已在 `aline-markdown` 落地片段关系与规范锚点，并以手工金样与外部探针核对。已实现的片段精确性为 `Exact`（同源同长）、`Aligned`（同源异长：转义、实体、硬换行标记）、`Hidden`（有源无绘制：标记、标签、被消费换行）、`Synthetic`（有绘制无源：`<br>` 换行、表格单元格间隔、任务框符号）；`source_at` 对 Exact 取起点加偏移，对 Aligned/Hidden 按 affinity 取区间起止，对 Synthetic 取源锚点；`drawn_at` 对称地按 affinity 取绘制区间起止。手工金样 6 例（实体、多字符实体、软换行、硬换行、`<br>` 合成换行、隐藏+合成混合）逐项记录 drawn 文本、片段 `drawn..→source..` 与精确性、规范锚点，存于 `group-6/step-6.4/goldens/mapping-goldens.tsv`；另以仓外探针核对 ZWJ 家族 emoji（19 字节，`Exact 0..18` + `Hidden 18..19`）、重复文字、连续空白、`\*` 转义、tab 与组合字符。SoftBreak 当前实现投影为带来源的换行（`Exact` 片段，不折成空格），该口径仍待 V-07 冻结，本记录不把任一口径写成产品决定。保护范围（Front matter、`[toc]`、脚注引用/定义、HTML 块与行内标签、整源回退）按块与子区间记录，见 `step-6.5`。`mapping-goldens.tsv` 由 `tests/mapping.rs` 直接解析断言，不再只是证据文件。未验证：真实 UI 命中、IME、字素边界、窗口软折行；这些仍属 V-07。
+
+**2026-11-02 M1 夹具语义核对（任务 1.1/1.2）：** 新增 `crates/aline-markdown/tests/fixtures/m1/` 的基础行内、嵌套容器、代码/表格、公式/Mermaid 原文、图片/有限 HTML 五组输入及独立绘制文本预期；集成测试消费全部五组并核对块+Gap 覆盖完整源码。另含空文档与 BOM/CRLF/孤立 CR/无尾换行样例。该时点 `fixtures/m1/README.md` 中 SoftBreak、非过滤集 void 标签及未支持非 void HTML 仍列为待裁决；这些语义已由 2026-11-03 用户裁决和回归更新。HardBreak 与 `<br>` 有独立来源语义，布局软折行不得插入逻辑字符。脚注标签等价修复见第 12.1 节；本次夹具/无头测试不证明真实 UI 展示或命中。
 
 ### 7.2 操作语义
 
@@ -257,6 +262,8 @@ Buffer 是已提交源码；OpenBlock 是至多一个受控的待提交源码替
 `snapshot_current` 必须返回包含最新草稿/当前输入的不可变一致快照、WorkingVersion、选区及所需资源引用；允许在消费任务开始时物化，不允许每键复制全文。取快照不提交、封口、清空 redo 或压缩历史；取完继续输入只会产生新工作版本。
 
 **2026-10-31 M0 实现记录（组 8）：** `aline-ui::DocCore` 在无窗口环境中持有唯一 `StringBuffer`（含历史）及至多一个 `OpenBlock`/草稿槽；实际入口 `current_snapshot` 返回 `CurrentSnapshot`，冻结最新草稿或组合候选、文档/工作版本、源码选区与资源强引用集合，取快照不提交、封口、清 redo 或压缩历史。初始打开范围等于初始选区排序后的源码范围；草稿基线冲突返回 `DraftBaselineConflict` 并保留输入。`SnapshotId` 标识快照实例/内容视图的来源，不是工作版本或内容哈希：可跨工作版本复用，相同文本也可有不同 ID，消费者不能单凭它采纳结果。
+
+**2026-11-02 M1 无头只读生命周期（任务 3.1～3.4）：** `DocCore::new_readonly` 从源码直接建立没有 `OpenBlock`、草稿和组合状态的文档核心；只读写入能力由核心入口逐项拒绝，`navigate_readonly` 只接受完整匹配身份与同快照源码选区，不推进文本 revision 或历史。`ReadonlySession` 单独持有当前 Ready 文档和至多一个 Selecting/Loading 请求；读取工作只接收路径、取消 token 与显式预算，通过只读 reader 解码、解析后生成候选，交回会话复验请求身份才可替换。取消、失败、旧请求和关闭后结果都不能发布；替换失败保留既有文档。文件适配拒绝非普通文件，以同一句柄复核元数据，已核目标用非阻塞 open 避免 FIFO 无限等待；Unix 另复核设备/ inode。解码后的文档字节预算在 UI 源码副本及行索引构造前检查。该纯机制不调度线程、不提供写接口、不接 GPUI；当前 macOS FIFO 与替换回归由隔离无头 probe 实测，Linux ABI 分支/Windows 文件身份仍未实测，常规 workspace Cargo target 被 macOS Metal 工具缺失阻断。它不等于真实窗口文件选择、1 MiB 滚动或 M1 出口通过。
 
 资源采用 M0 最小保守所有权表示：宿主须在引用生效前完整登记同一文档的 `ResourceReference`，DocCore 保留登记集合至自身生命周期结束，冻结快照独立强持有当时集合；Undo/Redo、关块或历史裁剪不触发资源清理。空集合不证明文本没有资源，当前没有自动发现、定位值可用性验证、精确历史可达集、迁移或删除能力。实现、失败日志及未测范围见[组 8 补充记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-8/followup-2026-10-31/report.md)与[8.5 回填记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-8/step-8.5/report.md)。
 
@@ -403,13 +410,15 @@ UI 集成须覆盖真实中文输入法的候选更新/替换/确认/取消、�
 
 基础跨块选择/复制/删除/粘贴必须交付，不能用“复杂命令可拒绝”取消基线。写操作统一检查 MD-11；只读命中允许导航/复制。HTML 禁止的是格式/块转换，不能因此禁止其原文编辑；表格基础能力也不能放到 table 插件才存在。
 
+M1 已为只读消费提供上述基础语法所需的语义节点、Alert 类型、表格列对齐、代码正文行、受保护范围和原文映射；公式/Mermaid 与图片引用仍按原文回退。当前只有解析/映射数据和无头测试，没有真实 renderer、图片/公式执行或可视化修改入口，故本状态不构成 AC-09 验收。
+
 ### 11.2 HTML 的有限解析与映射
 
 必须支持 PRD 的标签样式映射：`b/strong`、`i/em`、`s/del/strike`、`u`、`mark`、`code/kbd`、`a`。`a` 需有效 href 才有链接行为；实体解码和协议 allowlist 校验是不同环节，解码后仍要安全检查。其他属性不成为脚本/CSS 执行入口。
 
 HTML 块消费普通标签、保留可见文字，块级标签换行、折叠空白、忽略展示注释、解码实体/emoji；代码字面上下文不得误替 emoji。显示成 Paragraph 不会抹掉 Html 源语义。注释仅从展示忽略，源码、查找和保存仍能访问。HTML 块中 Markdown 文字不能被另一条 Markdown 解析链重复解释。
 
-过滤集合沿 PRD：`script/style/iframe/title/textarea/xmp/noembed/noframes/plaintext` 等按字面文本显示，不执行脚本、不加载 iframe、不采用网页盒模型。旧“过滤标签本身字面、后续内容继续扫描”、属性内实体/emoji 与未闭合 HTML 行为须在 V-07 金样中明确；本稿不把它们扩成完整 HTML5 raw-text/浏览器兼容保证。
+过滤集合沿 PRD：`script/style/iframe/title/textarea/xmp/noembed/noframes/plaintext` 等按字面文本显示，不执行脚本、不加载 iframe、不采用网页盒模型。有限 HTML 子集之外的 void 标签（包括 `input/link/meta/base`）显示原始标签；未支持的非 void 容器整段按源码文本显示，包含开闭标签和内部空白，不解释容器、不折叠其内部空白。进入有限子集支持的 HTML 行为后，受支持标签仍按本节规则隐藏标记并呈现内容。旧“过滤标签本身字面、后续内容继续扫描”、属性内实体/emoji 与未闭合 HTML 行为须在 V-07 金样中明确；本稿不把它们扩成完整 HTML5 raw-text/浏览器兼容保证。
 
 | 旧算法候选 | 可保留的机制价值 | 必须补的验证/修正 |
 |---|---|---|
@@ -428,6 +437,10 @@ HTML 核心金样至少包含支持标签/无 href、引号内 `>`、交叉嵌�
 **2026-10-31 M0 有限 HTML 修复记录（任务 6.5，F2-1）：** 上一条列出的“尚未固化/未对齐项”中，已落地并测试的有：过滤集补全 `title/textarea/xmp/noembed/noframes/plaintext`（并保留 `object/embed/form/button/svg/math`），且过滤判定前置于 void 判定；HTML 文本空白折叠（连续空格/tab/换行折叠为一个 `Aligned` 空格片段，源码覆盖全部被消费空白，块首/块尾欠写空白丢弃）；块级标签边界合成 `\n`（`div/p/section/article/header/footer/ul/ol/li/h1–h6/table/tr/td/th/blockquote/pre`）；十进制/十六进制/多字符实体与“仅标签零可见文字”的金样。`cargo test -p aline-markdown --test html` 为 20 例、`--test protection` 为 6 例，均通过。**仍待 V-07 冻结**：非过滤集 void 标签（`input/link/meta/base`）的展示口径仍按“不支持标签隐藏、无可见内容”，代码处已标待定；空白折叠与块级合成换行口径本身同样待 V-07 冻结。仍未验证真实 UI 渲染与灰色只读呈现。本节仍不宣称有限 HTML 完整、AC-09 或 V-07 通过。
 
 **2026-10-31 M0 有限 HTML round-2 处置记录（任务 6.5，复核 N-F3-1/N-F3-2）：** 上一条中“过滤判定前置于 void 判定”对 `input/link/meta/base` 实为 **no-op**：过滤集合（`script/style/iframe/title/textarea/xmp/noembed/noframes/plaintext/object/embed/form/button/svg/math`）与 void 集合（`img/hr/input/meta/link/source/area/base/col`）不相交，这些标签从未进入过滤分支，移动判定顺序不改变其行为，它们仍走 void 分支整体隐藏；`tree/html.rs` 的对应注释已按此更正（N-F3-1）。未支持的非 void 标签（如 `<foo>`）当前绘制为 `"<foo>a   b"`——开标签字面可见、闭标签隐藏、内部连续空白不折叠，与支持标签 `<span>e   f</span>` 的 `"e f"` 不对称；该行为已由 `tests/html.rs` 的 `unsupported_non_void_tags_record_the_v07_pending_asymmetry` 固定为**现状记录**（html 21 例），是否统一处理属 V-07 待定，本记录不把任一口径写成产品决定（N-F3-2）。
+
+**2026-11-03 M1 V-07 语义裁决：** 用户确认 SoftBreak `a\nb` 保留为带来源的可见换行；未支持的 HTML void 标签（`input/link/meta/base` 等）显示原始标签文本；未支持非 void 容器按整段原始源码文本显示，包括闭标签及连续空白。支持的有限 HTML 标签继续隐藏标签并按已确认规则呈现内容。Markdown 解析回归位于 `tests/mapping.rs` 与 `tests/html.rs`，并更新 `tests/fixtures/m1/README.md`。该裁决不覆盖 V-07 其他待验样例，也不证明 HTML 全集、原生样式或像素命中已通过。
+
+M1 夹具中的 `<script>` 样例继续只核对字面文字与保护范围，不创建 HTML 执行、网络加载或远程图片行为；图片引用保留可识别源文。具体输入见 `crates/aline-markdown/tests/fixtures/m1/README.md`；该矩阵不构成真实 UI 安全/渲染验证。
 
 ### 11.3 特殊资产的边界
 
@@ -452,6 +465,8 @@ HTML 核心金样至少包含支持标签/无 href、引号内 `>`、交叉嵌�
 **2026-11-02 收口补充（任务 6.7）：** `tests/reuse.rs` 新增 `reused_blocks_match_gap_and_aligned_synthetic_mappings`，对真实复用命中同时比较 Gap 内容、保护/样式范围及跨块 `Aligned`（实体、行内代码）与 `Synthetic`（表格单元格）片段；`gap_texts` 只取完整落在复用区间内的 Gap，避免把区间外文本当作差分。结论仍是 M0 边界内：复用 oracle 只重定位并比较独立只读 `NavigationIndex` 中 `Heading` 条目的 kind/level/source/空 targets，不把标题范围写成完整导航行为；生产 `same_block` 仍只比较块种类与块文本，测试辅助差分不能扩写成生产复用语义已比较链接目标。此补充不改变“全量正确、头尾配对复用”的基线，也不宣称 V-05 通过。
 
 **2026-11-02 导航索引收口（任务 6.7/6.10）：** `Parsed::navigation()` 返回只读 `NavigationIndex`，条目按源码起点、终点稳定排序，全部范围绑定同一快照，字段私有且无公开构造器。`Heading` 记录顶层 ATX/Setext 标题及 `Some(1..=6)` 级别，`Toc` 记录与 `ProtectionKind::Toc` 同源识别的顶层段落并指向全部顶层标题，`FootnoteReference`/`FootnoteDefinition` 按解析器事件的标签字节精确相等建立双向目标；大小写差异保留空目标。嵌套标题/定义不进入索引，嵌套引用按事件索引，嵌套 `[toc]` 不产生条目。导航槽位 `entries + Σtargets` 在分配任何目标向量前以 checked 计数预检，独立受 `ParseBudget::max_nodes()` 限制；超限或计数溢出走既有整源回退，`RawFallback` 索引为空且 `budget_hits` 只增一次。复用测试用 `ReusedBlock::translate` 重定位旧 `Heading` 源码端点，比较 kind/level/source/空 targets，并确认其他复用块无导航条目；旧绝对范围直接使用失败。顶层脚注定义、任意脚注引用和顶层 Toc 拒绝复用，嵌套脚注定义经 `ReferenceDefinition` 拒绝，嵌套 `[toc]` 可随可复用容器复用但无条目。生产 `same_block` 仍只比较块种类与块文本，导航差分仅是测试 oracle。已知 `[^Note]`/`[^note]:` 的解析器 `UniCase` 配对与导航字节精确匹配差异未修复，留给 M1/V-07。实现、回归与门禁证据见下条验证计划记录；本节不宣称 V-05 或完整导航复用通过。
+
+**2026-11-02 M1 脚注标签等价修复（任务 2.5）：** 上段记录的是修复前行为。pulldown-cmark 0.13.6 用 ASCII 大小写不敏感的 `UniCase` 键识别脚注，事件仍保留原标签；导航的定义/引用分组、排序、范围查找现统一用逐字节 ASCII-fold 比较，非 ASCII UTF-8 字节保持不变，不引入匹配依赖。`tests/navigation.rs` 先有独立回归证明 `[^Note]` 与 `[^note]:` 已被解析器识别但旧导航丢目标，再覆盖标签中含相同非 ASCII 字符、ASCII 大小写差异、重复定义/引用、真正未定义、嵌套定义和预算回退。修复后重复目标仍按源码顺序，非顶层定义不成为目标，导航预算仍在目标向量分配前预检。局部 navigation/reuse/hostile 测试结果回填 V-07；未执行完整 V-07/真实 UI 回跳，不得据此关闭相关整项。
 
 ### 12.2 失效与采纳
 
@@ -666,7 +681,7 @@ RS-01～RS-05 同轮按 A 确认，具体 Rust 政策见[现行 Rust 规范](./r
 
 第 1 组隔离消费者已实际解析 `pulldown-cmark 0.13.6` 的事件，并验证 toml/rust-embed 的当前 catalog 依赖组合，归属/精确 features/源码来源和纯候选闭包见[纯引擎候选审计（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/pure-candidates-2026-10-30/report.md)及架构 §3.2。此处只登记依赖可消费性，GFM/产品语法的运行期 Options 与映射/HTML 金样仍须第 6 组验证；不能将单一事件计数探针当作语法或保真验收。Unicode 分段现已按准入方案仅加入 `aline-markdown` 的直接依赖 `unicode-segmentation = "=1.13.3"`；M0 当前锁文件解析/依赖树记录确认该唯一新直接边及传递闭包，五引擎无 GPUI/禁用路径约束仍按正式工程守卫验证。版本采用 Unicode 17，U+094D U+0915 与 Unicode 18 的边界差异已接受。准入摘要见 `docs/decisions.md` §16，回归见 `crates/aline-markdown/tests/grapheme.rs`。其他实体/emoji/随机/diff 候选仍未准入。
 
-ratex/ratex-svg、mermaid-rs-renderer、usvg、syntect/two-face 属插件/资产候选，不让纯引擎为展示而直接依赖 GPUI。ropey 只在性能证据要求时评估；V1 禁 notify/regex/tokio/Wasmtime/WASI/动态宿主，与架构 §3.2 一致。2026-10-30 批准的 GPUI 0.3.9 精确例外仅适用 app/ui/plugin：regex 既有路径及 all-target 图中的非桌面 WASI p2 绑定，完整身份、边、target 与变更复审要求以架构 §3.2 为准；五引擎完整闭包继续无 GPUI、无禁用依赖。见[实际审计（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/admission-2026-10-30/report.md)，不能以单条合法路径掩盖其它入边，也不能把 metadata 过近似包视为实际启用或忽略解析失败。主题 ZIP/导出及 Unicode 分段等新增依赖按专项验证准入，不猜定后端或冻结旧版本。
+ratex/ratex-svg、mermaid-rs-renderer、usvg、syntect/two-face 属插件/资产候选，不让纯引擎为展示而直接依赖 GPUI。ropey 只在性能证据要求时评估；V1 禁 notify/regex/tokio/Wasmtime/WASI/动态宿主，与架构 §3.2 一致。2026-10-30 批准的 GPUI 0.3.9 精确例外仅适用 app/ui/plugin：regex 既有路径及 all-target 图中的非桌面 WASI p2 绑定，完整身份、边、target 与变更复审要求以架构 §3.2 为准；五引擎完整闭包继续无 GPUI、无禁用依赖。2026-11-02 用户批准 M1 候选包含 `gpui-pre-macos@0.3.9`、`sys-locale@0.3.2`、`cbindgen@0.28.0`/`option-ext@0.2.0`/`dwrote@0.11.5` 三个精确 MPL 闭包例外、`libloading@0.8.9` 的完整互斥条件 ISC metadata-only 路径例外，以及原列的 `wasi@0.11.1`/`wasip2@1.0.4` metadata 路径和新增9条 wasip2 精确边（desktop target trees 不得选中）；也批准 GPUI 子图七场景 M1 指纹，M0 值保留历史。许可证13/13、完整合成自测117/117和路径并集14/14通过；真实准入 all 与七场景通过。各例外仍精确校验身份/checksum/root/边/target，不扩展全局 MPL/ISC allowlist。Metal 原生 build 和真实窗口仍未验证。候选、9边清单、差分及状态见 [M1 原生后端准入提案](../openspec/changes/m1-single-window-readonly/native-admission-proposal.md)。不能以单条合法路径掩盖其它入边，也不能把 metadata 过近似包视为实际启用或忽略解析失败。主题 ZIP/导出及 Unicode 分段等新增依赖按专项验证准入，不猜定后端或冻结旧版本。
 
 **2026-11-02 逐依赖准入账本：** 工程守卫已在既有图身份/GPUI 子图检查之后逐包生成用途分组、消费 crate、版本/来源/校验和、features、选包、全部入边/路径及许可证判定；许可证用 SPDX 表达式在允许集合下判定，未知/缺失/无法解析、未登记直接分支、未审本地路径及兜底 `unassigned` 组出现选包均失败关闭。实际 all 场景为 metadata 347 包、选包 313，分组 workspace 8 / engine-markdown 5 / engine-app-core 37 / gpui 297；all 场景 tree 未选中的 34 个 metadata 包（33 个在 gpui 分支、1 个在 engine-app-core/toml）在账本中标记 `selected:false`，兜底 `unassigned` 组为空，表示所有包均被已登记组覆盖；六个 AND/WITH 或含未允许原子的选择单独留痕。账本不构成法律意见、不把 metadata 包当已构建选包、不证明跨平台原生构建；tree 用 `-e normal,build,dev` 保留包/别名/传递边，feature 组合由 metadata 七场景解析。最终工程证据见 `logs/validation/m0-closeout-20261102/run-16-engineering-final/`（七场景 exit 0，含 `dependency-admission.json`）、正反例自测 `run-14-admission-self-test/summary.json`（115/115）及统一门禁 `run-19-workspace-final/summary.json`（20/20 exit 0）；架构 §3.2 同名条目同步相同口径。导航索引仅消费既有 `pulldown-cmark` 事件与 `SrcRange`，未新增依赖或 Cargo feature，也未改动锁文件，因此上述包集/边集不因任务 6.7/6.10 改变。
 
@@ -687,3 +702,11 @@ ratex/ratex-svg、mermaid-rs-renderer、usvg、syntect/two-face 属插件/资产
 | [Zed 调研](./archive/migration-evidence/zed-notes.md) §0/1.5/3 | UTF-16/IME、事务与增量失效机制；不继承 CRDT、300ms 分组或未锁定 API |
 
 Ely 索引中的 `document/{edit,parse,apart,format,block,tables}.rs`、`markdown/{flow,tex,front,build}.rs`、`tree/{sources,html,html_block,stack}.rs` 是机制导航，`ely-editor/ime.rs`/`ely-core/forms/text` 是平台输入参考；没有本地路径或版本复验时不写成可点击的“已验证源码”。Zed 参考放在仓库外的参考目录，不随本仓库分发，只供后续按锁定 GPUI 核对。Aline 必须自写实现，技术借鉴不扩大产品范围。
+
+## 19. 2026-11-02 M1 只读展示机制实现状态
+
+本节同步 §3、§6、§7、§11 的只读数据 API 状态。`aline-markdown` 已实现带来源的 `PresentationNode` 树、五种 Alert 语义、表格列对齐、代码正文逻辑行，以及受检局部 `Projection::window`。构建预算覆盖结构节点、表格列和代码行；结构预算耗尽产生完整原文回退，取消返回 `ParseError::Cancelled`，均不发布部分树。局部窗口具有独立投影身份，映射关系仍由 `Projection` 管理，调用方不手算源偏移。
+
+独立样例和无头回归见 `crates/aline-markdown/tests/fixtures/m1/`、`readonly_presentation.rs`、`readonly_mapping.rs`、`navigation.rs`。这些测试证明数据结构、来源映射、预算回退与解析器已识别脚注的标签匹配，不证明 GPUI renderer、真实像素命中或布局软折行，也不能单独证明五类基础内容已在窗口正确展示。SoftBreak、有限 HTML 子集外 void/未支持容器的展示口径已按 2026-11-03 用户裁决冻结；V-07 仍有其他未测样例，AC-09 仅按各自证据报告分项。
+
+**2026-11-02 独立 API 复核修复：** `Projection::window` 的两个最小失败回归已先复现再修复：空窗口现明确返回 `MappingError::InvalidMapping`，纯锚点应在父投影上调用 `source_at` 并保留 affinity，不能以空投影伪造 Exact/空来源；非空窗口仅对单调绘制起点二分，并单独纳入跨起点的可见片段，不再假定允许嵌入可见区间的零宽 Hidden 终点单调。`readonly_mapping` 覆盖实体边界拒绝、内嵌 Hidden、跨窗口及再次局部化，相关 mapping/grapheme 共 33 例和完整 `aline-markdown` 测试已通过。此处记录无头修复，不替代独立复审或真实像素命中验证。

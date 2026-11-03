@@ -16,6 +16,7 @@ use crate::navigation::NavigationIndex;
 use crate::pre::{
     FrontMatter, Rewrite, RewriteError, RewriteMap, rewrite_front_matter_with_cancel,
 };
+use crate::presentation::{self, PresentationNode};
 use crate::protection::{ProtectedRange, ProtectionKind};
 use crate::style::StyledRange;
 
@@ -70,6 +71,7 @@ pub struct Parsed {
     front_matter: Option<FrontMatter>,
     rewrite: Option<Rewrite>,
     stats: ParseStats,
+    presentation: Vec<PresentationNode>,
 }
 
 impl Parsed {
@@ -91,6 +93,14 @@ impl Parsed {
     /// 返回顶层块，按源码起点升序。
     pub fn blocks(&self) -> &[Block] {
         &self.blocks
+    }
+
+    /// 返回同一解析事件链生成的只读嵌套语义树。
+    ///
+    /// 节点来源属于当前快照，绘制范围属于当前全文投影；原文回退只返回 Raw 节点。
+    /// 消费者据此布局基础 Markdown，不应在 UI 重扫 Markdown 或手算坐标。
+    pub fn presentation(&self) -> &[PresentationNode] {
+        &self.presentation
     }
 
     /// 返回块之间的显式间隙，按源码起点升序。
@@ -344,30 +354,25 @@ pub fn parse_with_cancel(
     if cancel.is_cancelled() {
         return Err(ParseError::Cancelled);
     }
-    make_parsed(
-        snapshot,
-        config,
-        source_range,
-        rewrite,
-        built,
-        budget,
-        stats,
-    )
+    make_parsed(snapshot, config, rewrite, built, budget, stats, cancel)
 }
 
 fn make_parsed(
     snapshot: &TextSnapshot,
     config: ParseConfig,
-    source_range: SrcRange,
     rewrite: Rewrite,
     built: build::Built,
     budget: ParseBudget,
     mut stats: ParseStats,
+    cancel: &dyn CancelCheck,
 ) -> Result<Parsed, ParseError> {
     // M0 语义：`max_mapping_points` 同时作为投影索引点与片段数上限；
     // 片段数超限与索引点超限都映射为 `Mapping(BudgetExceeded)`。
     let mapping_budget =
         MappingBudget::new(budget.max_rewritten_bytes(), budget.max_mapping_points());
+    let source_range = snapshot
+        .src_range(0..snapshot.len_bytes())
+        .map_err(ParseError::Source)?;
     let mapping_points = built.drawn.chars().count().saturating_add(1);
     let projection = Projection::from_segments(
         snapshot.clone(),
@@ -378,6 +383,24 @@ fn make_parsed(
     )
     .map_err(ParseError::Mapping)?;
     stats.mapping_points = mapping_points;
+    let presentation =
+        match presentation::bind(built.presentation, snapshot, &projection, budget, cancel) {
+            Ok(presentation) => presentation,
+            Err(BuildError::Cancelled) => return Err(ParseError::Cancelled),
+            Err(BuildError::BudgetExceeded) => {
+                stats.budget_hits = stats.budget_hits.saturating_add(1);
+                return raw_fallback(
+                    snapshot,
+                    config,
+                    budget,
+                    DiagnosticKind::BudgetExceeded,
+                    stats,
+                );
+            }
+            Err(_) => {
+                return raw_fallback(snapshot, config, budget, DiagnosticKind::RawFallback, stats);
+            }
+        };
     Ok(Parsed {
         snapshot: snapshot.clone(),
         config,
@@ -391,6 +414,7 @@ fn make_parsed(
         front_matter: rewrite.front_matter().cloned(),
         rewrite: Some(rewrite),
         stats,
+        presentation,
     })
 }
 
@@ -442,6 +466,8 @@ fn raw_fallback(
         Vec::new()
     };
     let diagnostics = vec![Diagnostic::new(source_range, kind)];
+    let presentation =
+        presentation::raw_node(snapshot, &projection).map_err(|_| ParseError::Internal)?;
     Ok(Parsed {
         snapshot: snapshot.clone(),
         config,
@@ -455,5 +481,6 @@ fn raw_fallback(
         front_matter: None,
         rewrite: None,
         stats,
+        presentation,
     })
 }

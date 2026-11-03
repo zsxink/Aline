@@ -387,24 +387,28 @@ fn html_entities_decode_with_aligned_mapping() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn unsupported_non_void_tags_record_the_v07_pending_asymmetry() -> Result<(), Box<dyn Error>> {
-    // 记录当前实际行为，不表示该口径已冻结：§11.2 的有限 HTML 子集不含 `foo`，
-    // 开标签按字面可见、闭标签隐藏、内部连续空白不折叠。复核 N-F3-2 指出该不对称
-    // 既无测试也无文档；本用例只固定现状并标 V-07 待定，不宣称这是最终口径。
-    let parsed = parse_text("<foo>a   b</foo>\n")?;
-    assert_eq!(parsed.projection().drawn_text(), "<foo>a   b");
-    let open = segment_with_source(&parsed, 0..5)?;
-    assert_eq!(open.precision(), MappingPrecision::Exact);
-    assert_eq!(open.drawn_range(), 0..5);
-    let text = segment_with_source(&parsed, 5..10)?;
-    assert_eq!(text.precision(), MappingPrecision::Exact);
-    let close = segment_with_source(&parsed, 10..17)?;
-    assert_eq!(close.precision(), MappingPrecision::Hidden);
+fn unsupported_non_void_container_is_preserved_as_literal_source() -> Result<(), Box<dyn Error>> {
+    let source = "<foo>a   b</foo>\n";
+    let parsed = parse_text(source)?;
+    assert_eq!(parsed.projection().drawn_text(), "<foo>a   b</foo>");
+    assert_literal_segments(&parsed, "<foo>a   b</foo>");
     assert!(parsed.styled_ranges().is_empty());
 
-    // 对照：支持的 `span` 两侧标签都隐藏，内部空白按 HTML 空白折叠。
+    // 对照：支持的 `span` 隐藏标签并折叠 HTML 文本空白。
     let supported = parse_text("<span>e   f</span>\n")?;
     assert_eq!(supported.projection().drawn_text(), "e f");
+    Ok(())
+}
+
+#[test]
+fn unsupported_void_tags_are_preserved_as_literal_source() -> Result<(), Box<dyn Error>> {
+    for tag in [
+        "<input>", "<link>", "<meta>", "<base>", "<img>", "<hr>", "<source>", "<area>", "<col>",
+    ] {
+        let parsed = parse_text(&format!("{tag}\n"))?;
+        assert_eq!(parsed.projection().drawn_text(), tag, "tag {tag}");
+        assert_literal_segments(&parsed, tag);
+    }
     Ok(())
 }
 

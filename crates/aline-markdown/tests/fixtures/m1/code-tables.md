@@ -1,0 +1,9 @@
+```rust
+fn main() {
+    println!("hello");
+}
+```
+
+| left | right |
+| :--- | ---: |
+| a\|b | `x|y` |

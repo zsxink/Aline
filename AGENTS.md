@@ -53,7 +53,7 @@ cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 
 - 跑单个测试：`cargo test -p <crate> <test_name>`（测试命名 `被测行为_场景`，如 `edit_single_patch_creates_one_undo_step`）。
 - RS-01 已确认：默认 lint + 逐项启用铁律/高价值 lint，`pedantic` 按项引入，不整组开启；保留 `-D warnings`，不全局放行坐标转换。根 `Cargo.toml` 已配置 `[workspace.lints]`，8 个成员均继承；工程/lint/安全/公共 API 守卫入口及自测见 `scripts/check_engineering.py`、`scripts/check_lints.py`、`scripts/check_safety.py`、`scripts/check_public_api.py`。`.github/workflows/m0.yml` 已配置 `workflow_dispatch` 和推送 `main` 时运行；远端 Actions 实际运行状态未核实。此配置状态不表示 M0 总验收完成，状态见 `docs/v1-validation-plan.md`。
-- gpui 锁死快照版本（`gpui-pre`），升级是显式动作；V1 不引入 notify / regex / tokio 等运行时与额外依赖。2026-10-30 已批准的例外仅为架构 §3.2 登记的 GPUI 0.3.9→regex 精确路径与非桌面 WASI p2 绑定路径；Aline 自有直接依赖、五引擎及其它路径继续禁止。按来源/版本/校验和/边/target/features 审计，不全包或前缀放行（当前准入见 engine-design §18.2 和 v1-architecture §3.2；历史依赖表不是预装许可）。
+- gpui 锁死快照版本（`gpui-pre`），升级是显式动作；V1 不引入 notify / regex / tokio 等运行时与额外依赖。2026-10-30 已批准的例外仅为架构 §3.2 登记的 GPUI 0.3.9→regex 精确路径与非桌面 WASI p2 绑定路径；2026-11-02 用户另批准 M1 macOS 后端候选 `gpui-pre-macos@0.3.9`、`sys-locale@0.3.2`、三个精确 MPL 包例外（`cbindgen@0.28.0`、`option-ext@0.2.0`、`dwrote@0.11.5`）、`libloading@0.8.9` 的精确 ISC metadata-only 完整路径例外、`wasi@0.11.1` 与 `wasip2@1.0.4` 原列及新增的精确 metadata 路径边，并批准七场景 M1 GPUI 组合图指纹。`wasip2`、`dwrote` 与 `libloading` 可按各自精确约束出现在 metadata-only，desktop target tree 不得选中。守卫已按逐节点身份/checksum/边/target 更新，真实 all 与七目标场景通过，合成自测通过；这不代表 Metal build/窗口/跨平台构建已验证。Aline 自有直接依赖、五引擎及其它路径继续禁止。按来源/版本/校验和/边/target/features 审计，不全包或前缀放行（当前状态见 engine-design §18.2 和 v1-architecture §3.2；历史依赖表不是预装许可）。
 
 ## 工作方式
 

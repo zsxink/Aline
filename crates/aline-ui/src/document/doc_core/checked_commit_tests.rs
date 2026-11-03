@@ -24,6 +24,8 @@ struct State {
     document: DocumentId,
     resources: Arc<[ResourceReference]>,
     limits: DocLimits,
+    access: readonly::DocumentAccess,
+    alive: bool,
 }
 fn state(doc: &DocCore) -> State {
     State {
@@ -58,6 +60,8 @@ fn state(doc: &DocCore) -> State {
         document: doc.document.clone(),
         resources: doc.resources.clone(),
         limits: doc.limits,
+        access: doc.access,
+        alive: doc.alive,
     }
 }
 

@@ -1,2 +1,37 @@
 [app]
 name = "Aline"
+platform_unavailable = "The native window backend is not enabled on this platform."
+
+[window]
+empty = "Open a Markdown document to start reading."
+selecting = "Choose a Markdown document…"
+loading = "Loading Markdown document…"
+readonly = "Read-only in M1."
+
+[action]
+open = "Open Markdown…"
+close_document = "Close Document"
+visual_view = "Rendered View"
+source_view = "Source View"
+cancel_navigation = "Cancel Navigation"
+
+[reading]
+large_source = "This document exceeds 4 MiB. It opened in Source View by default; you can switch to Rendered View."
+layout_budget = "This region exceeds the current layout budget. The source is preserved; switch to Source View to continue reading."
+
+[menu]
+file = "File"
+
+[open_error]
+selection = "Choose exactly one Markdown document."
+extension = "Choose a file with the .md extension."
+not_regular = "The selected path is not a regular file."
+budget = "The document exceeds the current reading limit."
+io = "The document could not be read."
+decode = "The document is not valid UTF-8."
+internal = "The document could not be prepared for reading."
+dialog = "The file chooser could not be opened."
+
+[startup]
+window_failed = "The application window could not be opened."
+language_fallback = "System language detection failed; using English."

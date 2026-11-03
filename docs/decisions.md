@@ -584,6 +584,12 @@ PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02
 
 依据：现有 F-01 回归只证明 Redo 不丢待定输入，未覆盖 Undo 新草稿后离块再 Redo 的时序。独立 probe 观察到“提交 a → Undo → 输入 b → Undo b → 离块 → Redo”会恢复旧 a。用户确认“开始 b 时立即失效”后，DocCore 在新普通输入草稿发布前截断 Buffer redo；Buffer 仅改历史分支与其保存点节点关联，不改源码、选区或 revision。
 
+## 21. 2026-11-02 M1 原生后端候选与准入暂停
+
+用户批准 M1 macOS 后端候选：crates.io `gpui-pre-macos@0.3.9`，关闭默认 features、只开 `font-kit`，由 `aline-ui` 以 `cfg(target_os="macos")` 依赖；系统默认语言检测使用 `sys-locale@0.3.2`。用户批准三个且仅三个精确 MPL-2.0 包例外：`cbindgen@0.28.0`、`option-ext@0.2.0` 与 `dwrote@0.11.5`，严格锁定来源、checksum、后端 root 与入边；`dwrote` 只在目标条件矛盾的完整 metadata 路径出现，所有桌面 target tree 不得选中。用户也批准 `libloading@0.8.9` 的精确 ISC metadata-only 路径例外（checksum `d7c4b02199fee7c5d21a5ae7d8cfa79a6ef5bb2fc834d6e9058e89c825efdc55`），完整路径逐节点身份、checksum、alias、target/kind 锁定；不扩大全局 ISC/MPL 允许集，五个登记桌面 target tree 均不得选中。用户批准准入提案中原列的 `wasi@0.11.1+wasi-snapshot-preview1` metadata-only 路径，以及 `wasip2@1.0.4+wasi-0.2.12` 的原5条与新增9条精确路径边；同一 wasip2 可在 desktop target-filtered metadata 出现，macOS/Windows/Linux target tree 必须不选中。所有边仍只限已登记 package/version/source/checksum、alias、target 和 root。
+
+用户已批准保持原有 hash 算法并为 M1 组合图登记7个具体 GPUI 子图新 fingerprint；M0 hash 保留历史值。候选值见[准入提案](../openspec/changes/m1-single-window-readonly/native-admission-proposal.md)。真实依赖准入 all/all-features 与 macOS ARM/Intel、Windows x64、Linux x64/ARM 共7场景通过；合成完整自测117/117、路径并集14/14、精确许可证回归13/13通过。五个登记 desktop target 对 dwrote/libloading 的 tree 检查均不选中。规则仍按精确 package identity/path/target 检查，不能按包名扩大例外或修改指纹算法。Metal 构建工具当前缺失，真实原生构建及窗口尚未验证。
+
 回写：[引擎 §9.3](./engine-design.md#93-历史保存点及重载)、[架构规范 R-5-05](./architecture-guide.md#5-命令输入组与编辑事务)、M0 OpenSpec design/spec/tasks 与 `crates/aline-ui/tests/document_typing.rs` / `document_composition.rs`。验证为有效新草稿立即分支、输入拒绝保留分支、Redo 待定组拒绝及 IME 取消保留分支；不代表 E1/E2/E4/E5/E7 或 V-01～V-09 闭合。
 
 ## 20. 2026-11-02 用户验收裁决：M0 全部通过（验收豁免）

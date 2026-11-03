@@ -19,6 +19,7 @@ impl DocCore {
         resource: ResourceReference,
         max_references: usize,
     ) -> Result<(), DocError> {
+        self.ensure_writable()?;
         self.accept_derived_result(identity)?;
         if resource.document_id() != &self.document {
             return Err(DocError::WrongDocument);
@@ -60,6 +61,7 @@ impl DocCore {
 
     /// 宿主改变有效解析配置时推进代次，使旧配置的结果失效。
     pub fn advance_parse_config(&mut self) -> Result<(), DocError> {
+        self.ensure_document_alive()?;
         let next = self.parse_config.next().map_err(DocError::Identity)?;
         self.parse_config = next;
         Ok(())
@@ -78,7 +80,8 @@ impl DocCore {
         .map_err(DocError::Identity)
     }
 
-    /// 为新派生任务发放单调请求身份；同文本同配置的旧请求也将拒收。
+    /// 为新编辑投影任务发放单调请求身份；同文本同配置的旧请求也将拒收。
+    /// 无打开块时仍按既有编辑协议拒绝；文档解析使用 begin_document_request。
     pub fn begin_derived_request(&mut self) -> Result<InputIdentity, DocError> {
         self.ensure_ready()?;
         let next = self.derived_request.next().map_err(DocError::Identity)?;
@@ -108,7 +111,10 @@ impl DocCore {
         mode: EditorMode,
         now_millis: u64,
     ) -> Result<ModeSwitchOutcome, DocError> {
-        self.ensure_ready()?;
+        self.ensure_document_alive()?;
+        if !self.is_readonly() {
+            self.ensure_ready()?;
+        }
         if self.is_composition_active() {
             return Ok(ModeSwitchOutcome::Deferred);
         }
@@ -117,17 +123,21 @@ impl DocCore {
         }
         // 即使源码不变，模式变化也使先前请求失效；失败不得先改变输入历史。
         let next_request = self.derived_request.next().map_err(DocError::Identity)?;
-        self.commit_typing_group(now_millis)?;
+        if !self.is_readonly() {
+            self.commit_typing_group(now_millis)?;
+        }
         self.derived_request = next_request;
         self.mode = mode;
         Ok(ModeSwitchOutcome::Ready)
     }
 
     /// 组合期自动保存只返回延后信号；调度时钟和真实保存由宿主承担。
+    /// 只读阶段返回 ReadOnly，不发放持久化任务输入。
     pub fn autosave_snapshot(
         &mut self,
         budget: TextBudget,
     ) -> Result<Option<CurrentSnapshot>, DocError> {
+        self.ensure_writable()?;
         if self.is_composition_active() {
             return Ok(None);
         }
@@ -135,7 +145,9 @@ impl DocCore {
     }
 
     /// 恢复保护独立读取当前输入（含组合候选），不发起显式发布等待。
+    /// 只读阶段返回 ReadOnly，普通阅读仍可使用 current_snapshot。
     pub fn recovery_snapshot(&mut self, budget: TextBudget) -> Result<CurrentSnapshot, DocError> {
+        self.ensure_writable()?;
         self.current_snapshot(budget)
     }
 }
@@ -166,6 +178,8 @@ mod lifecycle_tests {
         mode: EditorMode,
         cache: Option<(WorkingVersion, SnapshotId)>,
         limits: DocLimits,
+        access: super::super::readonly::DocumentAccess,
+        alive: bool,
     }
 
     fn state(doc: &DocCore) -> Result<State, DocError> {
@@ -188,6 +202,8 @@ mod lifecycle_tests {
                 .as_ref()
                 .map(|cache| (cache.version, cache.snapshot.snapshot_id().clone())),
             limits: doc.limits,
+            access: doc.access,
+            alive: doc.alive,
         })
     }
 

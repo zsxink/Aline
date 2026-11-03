@@ -1,2 +1,37 @@
 [app]
 name = "Aline"
+platform_unavailable = "此平台尚未启用原生窗口后端。"
+
+[window]
+empty = "打开一个 Markdown 文档开始阅读。"
+selecting = "请选择一个 Markdown 文档…"
+loading = "正在读取 Markdown 文档…"
+readonly = "M1 阶段仅支持只读。"
+
+[action]
+open = "打开 Markdown 文档…"
+close_document = "关闭文档"
+visual_view = "可视化"
+source_view = "源码"
+cancel_navigation = "取消定位"
+
+[reading]
+large_source = "文档超过 4 MiB，已默认以源码视图打开；你仍可切换到可视化视图。"
+layout_budget = "此区域超过当前布局预算。源码已保留；切换到源码视图可继续阅读。"
+
+[menu]
+file = "文件"
+
+[open_error]
+selection = "请选择且仅选择一个 Markdown 文档。"
+extension = "请选择扩展名为 .md 的文件。"
+not_regular = "所选路径不是普通文件。"
+budget = "文档超过当前阅读上限。"
+io = "无法读取文档。"
+decode = "文档不是有效的 UTF-8 文本。"
+internal = "无法准备该文档进行阅读。"
+dialog = "无法打开文件选择器。"
+
+[startup]
+window_failed = "无法打开应用窗口。"
+language_fallback = "无法检测系统语言，当前使用英语。"

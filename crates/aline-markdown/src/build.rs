@@ -12,6 +12,7 @@ use crate::mapping::{MappingPrecision, MappingSegment};
 use crate::mdast::{Block, BlockKind, Gap};
 use crate::navigation::{NavigationEntry, NavigationIndex, NavigationKind};
 use crate::pre::Rewrite;
+use crate::presentation::{self, DraftNode, PresentationBuilder};
 use crate::protection::{ProtectedRange, ProtectionKind};
 use crate::style::{StyledRange, TextStyle};
 use crate::tree::html::{
@@ -45,6 +46,7 @@ pub(crate) struct Built {
     pub(crate) styled: Vec<StyledRange>,
     pub(crate) diagnostics: Vec<Diagnostic>,
     pub(crate) navigation: NavigationIndex,
+    pub(crate) presentation: Vec<DraftNode>,
 }
 
 struct RootBlock {
@@ -90,6 +92,7 @@ struct Builder<'a, 'c> {
     table_cells: usize,
     html_stack: HtmlStack,
     nodes: usize,
+    presentation: PresentationBuilder,
 }
 
 pub(crate) fn build<'a, 'c>(
@@ -122,6 +125,7 @@ pub(crate) fn build<'a, 'c>(
         table_cells: 0,
         html_stack: HtmlStack::default(),
         nodes: 0,
+        presentation: PresentationBuilder::new(budget),
     };
     builder
         .drawn
@@ -133,6 +137,12 @@ pub(crate) fn build<'a, 'c>(
         .map_err(|_| BuildError::Allocation)?;
     if let Some(front_matter) = rewrite.front_matter() {
         let range = front_matter.range();
+        if let Err(error) = builder.presentation.front_matter(range.clone()) {
+            if matches!(error, BuildError::BudgetExceeded) {
+                stats.budget_hits = stats.budget_hits.saturating_add(1);
+            }
+            return Err(error);
+        }
         builder.blocks.push((range.clone(), BlockKind::FrontMatter));
         builder.protected.push((range, ProtectionKind::FrontMatter));
     }
@@ -181,6 +191,32 @@ pub(crate) fn build<'a, 'c>(
 
 impl Builder<'_, '_> {
     fn event(&mut self, event: Event<'_>, range: Range<usize>) -> Result<(), BuildError> {
+        let source = self.source_of(range.clone())?;
+        let start_kind = match &event {
+            Event::Start(tag) => Some(self.presentation.prepare_tag(
+                tag,
+                self.depth == 0
+                    && is_toc_paragraph(self.source, &trim_line_end(self.source, source.clone())),
+                self.cancel,
+            )?),
+            _ => None,
+        };
+        let is_end = matches!(event, Event::End(_));
+        let leaf_kind = presentation::leaf_kind(&event);
+        let drawn_start = self.drawn.len();
+        self.event_output(event, range)?;
+        if let Some(kind) = start_kind {
+            self.presentation.start(kind, source, self.drawn.len())?;
+        } else if is_end {
+            self.presentation.end(source.end, self.drawn.len())?;
+        } else if let Some(kind) = leaf_kind {
+            self.presentation
+                .leaf(kind, source, drawn_start..self.drawn.len())?;
+        }
+        Ok(())
+    }
+
+    fn event_output(&mut self, event: Event<'_>, range: Range<usize>) -> Result<(), BuildError> {
         match event {
             Event::Start(tag) => self.start(tag, range),
             Event::End(tag) => self.end(tag, range),
@@ -717,12 +753,14 @@ impl Builder<'_, '_> {
         headings.sort_by_key(|index| self.navigation_source_key(*index));
         for sorted in [&mut definitions, &mut references] {
             sorted.sort_by(|left, right| {
-                self.navigation_label_for_sort(*left)
-                    .cmp(self.navigation_label_for_sort(*right))
-                    .then_with(|| {
-                        self.navigation_source_key(*left)
-                            .cmp(&self.navigation_source_key(*right))
-                    })
+                compare_footnote_labels(
+                    self.navigation_label_for_sort(*left),
+                    self.navigation_label_for_sort(*right),
+                )
+                .then_with(|| {
+                    self.navigation_source_key(*left)
+                        .cmp(&self.navigation_source_key(*right))
+                })
             });
         }
 
@@ -747,7 +785,7 @@ impl Builder<'_, '_> {
             let reference_label = self
                 .navigation_label(references[reference_index])
                 .ok_or(BuildError::Mapping)?;
-            match definition_label.cmp(reference_label) {
+            match compare_footnote_labels(definition_label, reference_label) {
                 Ordering::Less => {
                     definition_index =
                         self.label_run_end(&definitions, definition_label, definition_index)?;
@@ -872,7 +910,7 @@ impl Builder<'_, '_> {
             let current = self
                 .navigation_label(indices[start])
                 .ok_or(BuildError::Mapping)?;
-            if current != label {
+            if !footnote_labels_equal(current, label) {
                 break;
             }
             start += 1;
@@ -883,18 +921,21 @@ impl Builder<'_, '_> {
     fn label_range(&self, indices: &[usize], label: &str) -> Result<Range<usize>, BuildError> {
         let start = indices.partition_point(|index| {
             self.navigation_label(*index)
-                .is_some_and(|value| value < label)
+                .is_some_and(|value| compare_footnote_labels(value, label) == Ordering::Less)
         });
         let end = indices.partition_point(|index| {
             self.navigation_label(*index)
-                .is_some_and(|value| value <= label)
+                .is_some_and(|value| compare_footnote_labels(value, label) != Ordering::Greater)
         });
         if start > end {
             return Err(BuildError::Mapping);
         }
         for index in &indices[start..end] {
             self.check_cancel()?;
-            if self.navigation_label(*index) != Some(label) {
+            if !self
+                .navigation_label(*index)
+                .is_some_and(|value| footnote_labels_equal(value, label))
+            {
                 return Err(BuildError::Mapping);
             }
         }
@@ -969,6 +1010,7 @@ impl Builder<'_, '_> {
         let styled = self.finish_styled()?;
         let diagnostics = self.finish_diagnostics()?;
         let navigation = self.finish_navigation()?;
+        let presentation = self.presentation.finish()?;
         Ok(Built {
             drawn: self.drawn,
             segments: self.segments,
@@ -978,6 +1020,7 @@ impl Builder<'_, '_> {
             styled,
             diagnostics,
             navigation,
+            presentation,
         })
     }
 
@@ -1052,6 +1095,17 @@ impl Builder<'_, '_> {
     }
 }
 
+/// 与 pulldown-cmark 的 `UniCase` 脚注键一致：仅折叠 ASCII 字母大小写。
+fn compare_footnote_labels(left: &str, right: &str) -> Ordering {
+    left.bytes()
+        .map(|byte| byte.to_ascii_lowercase())
+        .cmp(right.bytes().map(|byte| byte.to_ascii_lowercase()))
+}
+
+fn footnote_labels_equal(left: &str, right: &str) -> bool {
+    compare_footnote_labels(left, right) == Ordering::Equal
+}
+
 fn trim_line_end(source: &str, mut range: Range<usize>) -> Range<usize> {
     while range.start < range.end {
         match source.as_bytes().get(range.end.saturating_sub(1)).copied() {
@@ -1109,5 +1163,67 @@ fn html_error(error: HtmlError) -> BuildError {
     match error {
         HtmlError::BudgetExceeded => BuildError::BudgetExceeded,
         HtmlError::Allocation(_) => BuildError::Allocation,
+    }
+}
+
+#[cfg(test)]
+mod presentation_budget_tests {
+    use std::error::Error;
+
+    use aline_buffer::{TextBudget, TextSnapshot};
+    use pulldown_cmark::{Alignment, Event, Tag, TagEnd};
+
+    use super::{BuildError, build};
+    use crate::budget::{NeverCancel, ParseBudget, ParseStats};
+    use crate::pre::rewrite_front_matter;
+
+    #[test]
+    fn front_matter_node_budget_is_checked_during_build() -> Result<(), Box<dyn Error>> {
+        let source = "---\na: b\n---\n";
+        let budget = ParseBudget::m0().with_max_nodes(0);
+        let snapshot = TextSnapshot::new(source.to_owned(), TextBudget::new(1024))?;
+        let rewrite = rewrite_front_matter(source, budget)?;
+        let mut stats = ParseStats::default();
+        let result = build(
+            &snapshot,
+            source,
+            &rewrite,
+            std::iter::empty(),
+            budget,
+            &NeverCancel,
+            &mut stats,
+        );
+        assert!(matches!(result, Err(BuildError::BudgetExceeded)));
+        assert_eq!(stats.budget_hits(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn table_alignment_budget_precedes_child_events_and_allocation() -> Result<(), Box<dyn Error>> {
+        let source = "| a | b | c | d | e |\n";
+        let budget = ParseBudget::m0().with_max_nodes(4);
+        let snapshot = TextSnapshot::new(source.to_owned(), TextBudget::new(1024))?;
+        let rewrite = rewrite_front_matter(source, budget)?;
+        // 故障注入只交付表格开始/结束，证明列向量不能等待后续单元格事件才检查预算。
+        let events = vec![
+            (
+                Event::Start(Tag::Table(vec![Alignment::None; 5])),
+                0..source.len(),
+            ),
+            (Event::End(TagEnd::Table), 0..source.len()),
+        ];
+        let mut stats = ParseStats::default();
+        let result = build(
+            &snapshot,
+            source,
+            &rewrite,
+            events.into_iter(),
+            budget,
+            &NeverCancel,
+            &mut stats,
+        );
+        assert!(matches!(result, Err(BuildError::BudgetExceeded)));
+        assert_eq!(stats.budget_hits(), 1);
+        Ok(())
     }
 }

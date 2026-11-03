@@ -63,8 +63,10 @@
 |---|---|
 | `regex =1.13.1`，及其实现包 `regex-automata =0.4.18`、`regex-syntax =0.8.11` | 只允许 app/aline-ui/aline-plugin 经锁定 GPUI 既有路径消费，包含已审 `GPUI/test-support → proptest =1.12.0 → regex-syntax =0.8.11` 入边；Aline 自有代码禁止直接依赖，五引擎禁止借其它中间包引入（含引擎测试的 proptest）。必须检查所有实际入边及根路径，存在一条合法 GPUI 路径不能掩盖其它非法路径 |
 | `gpui-pre =0.3.9 → getrandom =0.3.4 → wasip2 =1.0.4+wasi-0.2.12` | 仅允许末边条件 `cfg(all(target_arch = "wasm32", target_os = "wasi", target_env = "p2"))`；保留 all-target 图且证明登记桌面目标的实际选包均不包含该绑定。不得加入 WASI 执行宿主、Wasmtime 或动态加载能力 |
+| M1 候选 `aline-ui --[cfg(target_os="macos")]→ gpui-pre-macos@0.3.9 → gpui-pre-apple@0.3.9` | 2026-11-02 用户批准候选及精确直接边，`font-kit` feature；`app → sys-locale@0.3.2` 用于系统首选语言。`cbindgen@0.28.0`、`option-ext@0.2.0` 与 `dwrote@0.11.5` 各自仅在此 macOS 后端闭包获精确 MPL-2.0 例外；后两者仅 metadata-only。`libloading@0.8.9` 获准的精确 ISC 例外锁定完整互斥条件 metadata 路径，不扩大 ISC allowlist。用户已批准 M1 组合图七场景新 fingerprint，旧 M0 值保留历史；all 与七场景准入守卫已通过。2026-11-03 用户配置 Xcode 27.2/Metal Toolchain 后，离线 app build 与首个 macOS 原生空窗已通过；后续阶段及非 macOS 平台仍待验证 |
+| M1 `wasi@0.11.1+wasi-snapshot-preview1` 与 `wasip2@1.0.4+wasi-0.2.12` | 用户批准原提案所列路径及9条额外 `wasip2` metadata 边，限精确身份/边/root/target；`wasip2` 可出现在 desktop target-filtered metadata-only，任何 desktop target tree 必须不选中。不得把包身份批准扩大为其它入边许可 |
 
-例外按包身份、来源、归档校验和、依赖边、target 条件、features 和消费方共同约束。正式 workspace 可替换隔离消费方并新增已准入节点，但 GPUI 受审子图变化须重新审计，不能要求整个锁文件与临时候选根字节相等。metadata 过近似路径与实际 Cargo tree 分目标/feature 交叉核对；图解析失败或未解析组合不能判合规。旧 `wasi 0.11.1` 只见于本次 metadata 过近似路径，实际 tree 未选中，本次不批准其例外。未使用的 screen-capture/bench-support/profiler/stacker/inspector 等 features 仍未准入，升级或新路径不自动获得例外。
+例外按包身份、来源、归档校验和、依赖边、target 条件、features 和消费方共同约束。正式 workspace 可替换隔离消费方并新增已准入节点，但 GPUI 受审子图变化须重新审计，不能要求整个锁文件与临时候选根字节相等。metadata 过近似路径与实际 Cargo tree 分目标/feature 交叉核对；图解析失败或未解析组合不能判合规。2026-11-02 用户已批准 M1 候选的精确 `wasi@0.11.1`/`wasip2@1.0.4` metadata 路径及9条 `wasip2` 额外边，并批准七场景 M1 组合图 fingerprint；target tree 不选中约束仍有效。实际守卫是否通过以更新后逐边验证为准。未使用的 screen-capture/bench-support/profiler/stacker/inspector 等 features 仍未准入，升级或新路径不自动获得例外。
 
 已实际验证 Rust/Cargo 1.98.1、edition 2024、rustfmt 1.9.0、Clippy 0.1.98 下的 macOS aarch64 GPUI 核心库消费方构建/检查；未声明 MSRV，未构建原生平台后端。`metal` 工具缺失、Intel Mac/Windows/Linux 构建、真实窗口/输入及五引擎正式闭包继续留待对应任务取证，不能据此宣称 V-01 或 M0 出口通过。
 
@@ -413,7 +415,7 @@ Aline/
 |---|---|
 | app/src/platform 与 aline-ui/src/platform_services.rs | app 实现/注入 OS 服务，UI 声明并消费接口；窗口/保存/恢复业务留在 UI。M0 建边界，M5～M6 验证平台矩阵；禁止 UI 反向依赖 bin。 |
 | aline-buffer/src/history.rs 与 aline-ui/src/document/open_block.rs | buffer 管补丁、历史组与保存内容身份；DocCore 管唯一草稿及当前快照。提交与关块按 TA-01 分离，M2 联调，不能由子编辑器另建历史。 |
-| aline-markdown/src/tree 与 aline-ui/src/editors | 源码/绘制/块局部/UTF-16 转换统一在映射层；UI 只处理 GPUI 输入和像素几何，M0 映射测试先于 M2 IME。 |
+| aline-markdown/src/tree 与 aline-ui/src/editors | 源码/绘制/块局部/UTF-16 转换统一在映射层；UI 只处理 GPUI 输入和像素几何。M0 映射测试先于 M2 IME；M1 已实现只读语义树、结构预算与局部窗口映射，尚未接真实 renderer/像素命中。 |
 | aline-edit/src/formatter 与 aline-plugin/src/built_in/export | formatter 规划源码片段补丁，必须差异确认并进历史；export 只生成外部格式产物，不修改文档或历史。分别 M3 / M4。 |
 | aline-plugin/src/contracts、registry/lifecycle/dispatch 与 built_in | 前者是插件系统公共语义、登记与能力路由；built_in 是当前六个具体提供者。未来外部提供者通过宿主适配接入相同能力边界，不将内部 Rust/GPUI 对象当外部协议，不在 V1 建外部加载器。M4 先验证系统不依赖六实现的硬编码分支。 |
 | aline-edit/src/tables.rs 与 aline-plugin/src/built_in/table.rs | 解析、逐格/结构编辑、基础右键属于核心；插件只增悬停快捷按钮，关闭不影响核心能力。M3 核心、M4 门控。 |
@@ -458,6 +460,12 @@ Aline/
 `Source` 不用一个 `crlf: bool` 代替行尾统计；也不把“是否修改过”“当前是否等于已保存内容”“是否正在写盘”合成一个标志。2026-10-31 用户批准导入文本仅剥离头部 BOM、保留原始 CR/LF，原 bytes 与原始行尾统计仅作存储基线；编码按 CRLF/LF 行尾单元多数派输出，包含编辑新拼接 CRLF，未配对 CR 保留，不增删末尾换行。LF 策略下紧跟在孤立 CR 之后的 CRLF 单元保留 CRLF，以免重开时吞掉孤立 CR。存储往返只允许行尾表示等价，不用于吞掉真实补丁或改变历史/版本；源码补丁、选区和逆操作保持精确字节语义。src_off 始终指编辑器源码快照的 UTF-8 字节，不混用磁盘 bytes（含 BOM/CRLF）的偏移；如需原文件定位，由 source 的存储转换接口承担。编码时对未修改快照直接返回原 bytes，对已修改文本按读取基线的 BOM/多数派规则输出；成功写盘后更新对应基线，失败不得更新。`DocumentId` 不由文件名或路径哈希充当；恢复后的未命名文档也有独立身份。
 
 2026-10-31 回填：4.1～4.4 已实现 source 侧 `StorageSnapshot`/`StorageRange`、`decode`/`encode`、`SourceBaseline` 与 create-only `prepare_atomic`。`StorageRange` 显式绑定基线身份并注明是存储字节范围，source 不提供以磁盘偏移索引编辑源码的接口；当前 crate 外尚无 `aline_source` 代码级消费者（`aline-ui` 仅在 manifest 声明未使用的依赖），因此未出现跨层偏移混用。现有普通文件覆盖、ACL/xattr/权限复制、目录同步/断电、跨进程 CAS、Windows/Linux 与真实保存闭环均未验证；目标已存在时原语拒绝：普通文件返回 `MetadataPreservationUnverified`，符号链接/目录/其他非普通文件返回 `ExistingTarget{kind}`，不构成现有文件保存能力。证据与 K-08 人工复核见 [group-4/step-4.5/report.md（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-4/step-4.5/report.md)。
+
+**2026-11-02 M1 无头只读状态：** `aline-ui` 的 `DocCore` 可在不打开编辑块的情况下持有文档级源码选区和只读模式；全部写入/发布入口拒绝且不改变文本、版本、选区或历史。`ReadonlySession` 唯一持有 Ready 文档及一个 Loading/Selecting 候选，失败保留旧文档，关闭/取消/旧请求不能发布迟到结果；只读文件读取经限制的 reader 适配层、解码和解析后原子替换，不写源文件。`aline-markdown` 展示树和局部映射、`aline-buffer` 只读选区原语分别由现行测试覆盖。该状态尚未接 GPUI 窗口、文件选择器、像素命中或视图虚拟化，不代表 M1 原生 UI 出口完成；M0 豁免缺证仍保留。
+
+**2026-11-03 M1 原生入口首轮：** Xcode 27.2 已选为 active developer directory，Metal Toolchain 可由 `xcrun` 调用。`cargo build -p aline --locked --offline`、完整工作区检查通过；`cargo run -p aline --locked --offline` 在真实 macOS 显示单个 960×672 GPUI 空状态窗口，窗口本地化为当前系统中文，关闭后进程正常退出。首张截图发现根容器默认黑底且正文不可见，设置产品白色画布/正文颜色后复查通过。证据见 `logs/validation/m1-single-window-readonly/2026-11-03-continue/native-window/` 与 `native-build-run-after-metal/`。这只完成任务 4.2 的原生空窗分项；尚无文件选择器/文档 renderer、视图虚拟化、系统语言切换实验或 1 MiB 可视化滚动证据。V-01/V-09 与 AC-01/09 仅可按后续实测分项回填；M0 豁免缺证、Windows 10、Intel Mac、Linux 未测项继续保留。
+
+**2026-11-03 M1 首轮只读视图：** 4.3 的系统语言读取已在真实 macOS 默认首选 `zh-Hans-CN` 和临时 OS 首选 `en-US` 的两次全新启动中观察并恢复中文；4.4 的原生打开/取消/关闭路径已接入。Visual 块列表与 Source 逻辑行列表均使用变高 GPUI `list`，共享内容列宽和外侧滚动槽，Aline 高度测量缓存限制为 256 项。用精确 1 MiB 多短块文件在两种视图实测 Home/End：分别建立 42,800 个 Visual 项和 42,801 个 Source 行，当前帧实例为 10～16 项，首尾截图可见首/尾内容。证据见 `logs/validation/m1-single-window-readonly/2026-11-03-continue-02/virtualization/` 与 `catalog/`。这是 debug 首尾滚动证据，不是 Release 性能结果；像素命中、块内锚点恢复、完整样式/目录导航/字体尚未完成，V-05/V-07/V-09 未整项通过。
 
 ### 5.2 当前文本与打开块
 
@@ -816,7 +824,7 @@ cargo test --workspace
 
 **2026-10-31 M0 分项取证记录（组 9）：** 依赖清理后的正式统一门禁在当前 macOS arm64 主机记录 19/19 exit 0、workspace 测试 312 passed，见[9.1 原始证据入口（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.1/report.md)。八成员保留，`aline-plugin` 仍为空骨架；没有消费者的 ui→plugin、plugin→edit、plugin→app-core 边已删除，先前 ui→edit 直接边也已清理。E1 工程、E2 无头 API/预算、E3 展示树 dump、E4 AC-01～04 基础、E5 覆盖/映射、E6 未测清单及 E7 输入协议的证据分别见[9.2（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.2/report.md)、[9.3（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.3/report.md)、[9.4（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.4/report.md)、[9.5（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.5/report.md)；独立复核与记录限制见[9.6（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.6/report.md)。这些是可检查的 M0 分项，不是 M0 出口、AC 或 V 项整项通过声明。
 
-M1 交接仍先取得锁定 GPUI 的原生 macOS 单窗冒烟、V-04 中文字体回退、V-05 Release 基准与真实语法/点击/灰区样本，再按 V-01 顺序补 Windows/Linux；Windows 10、Intel Mac 和最低系统版本目标继续保留。当前没有原生窗口、真实 IME/焦点/候选窗或其他平台成绩；M2 前 V-08 身份/事务方案及保存、自动保存、外改重载、10 秒恢复和恢复图片可读的最小安全闭环仍是独立出口，不能由无头快照/资源引用或 create-only 写盘原语代替。交接清单见[9.5（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.5/report.md)。
+M1 交接仍先取得锁定 GPUI 的原生 macOS 单窗冒烟、V-04 中文字体回退、V-05 Release 基准与真实语法/点击/灰区样本，再按 V-01 顺序补 Windows/Linux；Windows 10、Intel Mac 和最低系统版本目标继续保留。现有源码已装配 macOS 单窗启动和空状态构造，但尚无已编译或真实运行的原生窗口证据；Xcode 27.2 已安装，当前 developer directory 仍选 Command Line Tools，进程级 `DEVELOPER_DIR` 调用 Metal 受未接受的 Apple license 阻拦，Metal Toolchain 状态未确认。真实 IME/焦点/候选窗及其他平台成绩也未取得。M2 前 V-08 身份/事务方案及保存、自动保存、外改重载、10 秒恢复和恢复图片可读的最小安全闭环仍是独立出口，不能由无头快照/资源引用或 create-only 写盘原语代替。交接清单见[9.5（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.5/report.md)。
 
 | 阶段 | 实施任务与先决依赖 | 可检查的出口（逐目标平台记录） |
 |---|---|---|

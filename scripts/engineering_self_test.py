@@ -30,12 +30,14 @@ def run(output=None):
         print(label, "符合预期" if passed else "失败", flush=True)
         return out, rec
 
-    def invoke(label, project, metadata, tree, meta_record, tree_record, scenario="all", expected=1, diagnostic="", admission=None):
+    def invoke(label, project, metadata, tree, meta_record, tree_record, scenario="all", expected=1, diagnostic="", admission=None, policy=None):
         argv = [sys.executable, str(ROOT / "scripts/check_engineering.py"), "--metadata", str(metadata), "--tree", str(tree),
                 "--lock", str(project / "Cargo.lock"), "--scenario", scenario, "--metadata-command", str(meta_record), "--tree-command", str(tree_record),
                 "--output-dir", str(output / "checks" / label)]
         if admission is not None:
             argv += ["--admission-policy", str(admission)]
+        if policy is not None:
+            argv += ["--policy", str(policy)]
         return command(label, argv, expected, diagnostic)
 
     # 所有同名禁库均为0.0.0本地合成包；不会安装真实发布物。
@@ -102,7 +104,36 @@ def run(output=None):
     baseline = ROOT / "scripts/fixtures/engineering/live-graphs"
     base = load_json(baseline / "all-metadata.json")
     base_tree = (baseline / "all-tree.txt").read_text()
-    base_lock = (ROOT / "Cargo.lock").read_text()
+    # 固定图必须绑定自己的锁夹具；正式 root 新增依赖不能改变这组反例输入。
+    baseline_project = fixtures / "frozen-baseline"
+    baseline_project.mkdir(exist_ok=True)
+    base_lock = (baseline / "all-lock.txt").read_text()
+    (baseline_project / "Cargo.lock").write_text(base_lock)
+    baseline_records = []
+    for label in ("all-metadata", "all-tree"):
+        record = load_json(baseline / (label + ".command.json"))
+        args = record["argv"]
+        args[args.index("--manifest-path") + 1] = str(baseline_project / "Cargo.toml")
+        record["evidence_kind"] = "明确的冻结图/锁策略夹具，不是重新执行的 Cargo 输出"
+        target_record = baseline_project / (label + ".synthetic-command.json")
+        write_json(target_record, record)
+        baseline_records.append(target_record)
+    baseline_metadata_record, baseline_tree_record = baseline_records
+    # 冻结 M0 图必须继续使用其原 hash 预期；正式策略更新到 M1 后，历史反例不能借新值漂移。
+    baseline_policy = load_json(POLICY)
+    m0_hashes = {
+        "all": "cfb02f486601ea7deabbb3f00e252a09a584ae4ffd1edc27f1d826bd50da6793",
+        "all-features": "cfb02f486601ea7deabbb3f00e252a09a584ae4ffd1edc27f1d826bd50da6793",
+        "macos-arm": "566a8f38426457379e7f65e1fd302b5852b062544222a5f43cf331da88816f0b",
+        "macos-intel": "720d711d934a5556d7c353f01745ed1dddd5614fd8b9790f9d0e0cd4eea6c22a",
+        "windows-x64": "7be384797015bcf31fb7907681c8e1489aa296e3eef09d62034f8cd0e7bc682e",
+        "linux-x64": "9a9e650697a552c5984fdaf0e93f75f87bf38655915769a91a1250039462f3b3",
+        "linux-arm": "02fee5ca4c0b024365fce876ff3a4b7d6e325efe6d563b9322b4729fa689537a",
+    }
+    for scenario, digest in m0_hashes.items():
+        baseline_policy["scenarios"][scenario]["gpui_subtree_sha256"] = digest
+    frozen_policy_path = fixtures / "frozen-m0-engineering-policy.json"
+    write_json(frozen_policy_path, baseline_policy)
     def mutation(label, mutate, diagnostic, expected=1):
         project = fixtures / label
         project.mkdir(exist_ok=True)
@@ -118,7 +149,7 @@ def run(output=None):
             write_json(record, {"evidence_kind":"明确合成变异，不是实际Cargo命令输出", "argv":argv,"exit_code":0,"stdout_sha256":sha256(path)})
             records.append(record)
         write_json(project / "fixture.json", {"kind":"明确的图/lock变异", "base":str(baseline),"transformation":label,"independent_expectation":"现行架构§3.2精确身份/边/target/features；任务2.2"})
-        invoke(label,project,metadata,tree_path,*records,expected=expected,diagnostic=diagnostic)
+        invoke(label,project,metadata,tree_path,*records,expected=expected,diagnostic=diagnostic,policy=frozen_policy_path)
     def node(data,name):
         identity=next(p["id"] for p in data["packages"] if p["name"]==name)
         return next(n for n in data["resolve"]["nodes"] if n["id"]==identity)
@@ -132,12 +163,12 @@ def run(output=None):
     mutation("negative-metadata-only-wasip2-bypass",noise_bypass,"metadata-only 自有禁库旁路")
     def checksum(data,tree,lock):
         from engineering_dependencies import parse_lock
-        entry=parse_lock(ROOT/"Cargo.lock")["regex@1.13.1"]
+        entry=parse_lock(baseline_project/"Cargo.lock")["regex@1.13.1"]
         return data,tree,lock.replace(entry["checksum"],"0"*64)
     mutation("negative-regex-checksum",checksum,"来源/校验和漂移")
     def metadata_checksum(data,tree,lock):
         from engineering_dependencies import parse_lock
-        entry=next(v for k,v in parse_lock(ROOT/"Cargo.lock").items() if k.startswith("rav1e@"))
+        entry=next(v for k,v in parse_lock(baseline_project/"Cargo.lock").items() if k.startswith("rav1e@"))
         return data,tree,lock.replace(entry["checksum"],"0"*64)
     mutation("negative-metadata-only-checksum",metadata_checksum,"子图身份/来源/features/边/选包漂移")
     # getrandom存在多版本，按实际wasip2入边定位。
@@ -206,37 +237,37 @@ def run(output=None):
     empty_allowed["license"]["allowed"] = []
     empty_allowed_path = fixtures / "negative-admission-empty-allowed-policy.json"
     empty_allowed_path.write_text(json.dumps(empty_allowed, ensure_ascii=False))
-    invoke("negative-admission-empty-allowed", ROOT, baseline / "all-metadata.json", baseline / "all-tree.txt",
-           baseline / "all-metadata.command.json", baseline / "all-tree.command.json",
-           admission=empty_allowed_path, diagnostic="允许许可证集合为空")
+    invoke("negative-admission-empty-allowed", baseline_project, baseline / "all-metadata.json", baseline / "all-tree.txt",
+           baseline_metadata_record, baseline_tree_record,
+           admission=empty_allowed_path, diagnostic="允许许可证集合为空", policy=frozen_policy_path)
     null_purpose = load_json(ADMISSION_POLICY)
     next(group for group in null_purpose["groups"] if group["id"] == "workspace")["purpose"] = None
     null_purpose_path = fixtures / "negative-admission-null-purpose-policy.json"
     null_purpose_path.write_text(json.dumps(null_purpose, ensure_ascii=False))
-    invoke("negative-admission-null-purpose", ROOT, baseline / "all-metadata.json", baseline / "all-tree.txt",
-           baseline / "all-metadata.command.json", baseline / "all-tree.command.json",
-           admission=null_purpose_path, diagnostic="准入分组说明不完整")
+    invoke("negative-admission-null-purpose", baseline_project, baseline / "all-metadata.json", baseline / "all-tree.txt",
+           baseline_metadata_record, baseline_tree_record,
+           admission=null_purpose_path, diagnostic="准入分组说明不完整", policy=frozen_policy_path)
     selected_disallowed = load_json(ADMISSION_POLICY)
     next(group for group in selected_disallowed["groups"] if group["id"] == "engine-app-core")["selected_allowed"] = False
     selected_disallowed_path = fixtures / "negative-admission-selected-disallowed-policy.json"
     selected_disallowed_path.write_text(json.dumps(selected_disallowed, ensure_ascii=False))
-    invoke("negative-admission-selected-disallowed", ROOT, baseline / "all-metadata.json", baseline / "all-tree.txt",
-           baseline / "all-metadata.command.json", baseline / "all-tree.command.json",
-           admission=selected_disallowed_path, diagnostic="已选包未进入运行时准入分组")
+    invoke("negative-admission-selected-disallowed", baseline_project, baseline / "all-metadata.json", baseline / "all-tree.txt",
+           baseline_metadata_record, baseline_tree_record,
+           admission=selected_disallowed_path, diagnostic="已选包未进入运行时准入分组", policy=frozen_policy_path)
     unassigned_policy = load_json(ADMISSION_POLICY)
     unassigned_policy["groups"] = [group for group in unassigned_policy["groups"] if group["id"] != "engine-app-core"]
     unassigned_path = fixtures / "negative-admission-unassigned-policy.json"
     unassigned_path.write_text(json.dumps(unassigned_policy, ensure_ascii=False))
-    invoke("negative-admission-unassigned-group", ROOT, baseline / "all-metadata.json", baseline / "all-tree.txt",
-           baseline / "all-metadata.command.json", baseline / "all-tree.command.json",
-           admission=unassigned_path, diagnostic="已选包未进入运行时准入分组")
+    invoke("negative-admission-unassigned-group", baseline_project, baseline / "all-metadata.json", baseline / "all-tree.txt",
+           baseline_metadata_record, baseline_tree_record,
+           admission=unassigned_path, diagnostic="已选包未进入运行时准入分组", policy=frozen_policy_path)
     branch_policy = load_json(ADMISSION_POLICY)
     del next(group for group in branch_policy["groups"] if group["id"] == "gpui")["branch_purposes"]["lyon"]
     branch_policy_path = fixtures / "negative-admission-branch-policy.json"
     branch_policy_path.write_text(json.dumps(branch_policy, ensure_ascii=False))
-    invoke("negative-admission-unreviewed-branch", ROOT, baseline / "all-metadata.json", baseline / "all-tree.txt",
-           baseline / "all-metadata.command.json", baseline / "all-tree.command.json",
-           admission=branch_policy_path, diagnostic="直接依赖分支未登记")
+    invoke("negative-admission-unreviewed-branch", baseline_project, baseline / "all-metadata.json", baseline / "all-tree.txt",
+           baseline_metadata_record, baseline_tree_record,
+           admission=branch_policy_path, diagnostic="直接依赖分支未登记", policy=frozen_policy_path)
     # 采集错误/标签/损坏输出的最小信封反例，不修改正式原始证据。
     for label,modify,diagnostic in [
         ("negative-acquisition-exit",lambda m,t:m.update(exit_code=101),"Cargo 采集失败"),
@@ -248,10 +279,20 @@ def run(output=None):
         m=load_json(baseline/"all-metadata.command.json");t=load_json(baseline/"all-tree.command.json")
         # 使用正式文件和锁，不需要伪造内容。
         modify(m,t);mp=project/"metadata.command.json";tp=project/"tree.command.json";mp.write_text(json.dumps(m));tp.write_text(json.dumps(t))
-        invoke(label,ROOT,baseline/"all-metadata.json",baseline/"all-tree.txt",mp,tp,diagnostic=diagnostic)
+        invoke(label,baseline_project,baseline/"all-metadata.json",baseline/"all-tree.txt",mp,tp,diagnostic=diagnostic)
     # 确认失败Cargo本身不会转成通过，保留真实失败原输出。
     failed,fr=command("negative-real-cargo-acquisition",["cargo","metadata","--locked","--offline","--format-version","1","--manifest-path",str(fixtures/"missing/Cargo.toml")],101,"does not exist",expectation="不存在清单应由Cargo报错；不是合规图")
-    invoke("negative-real-cargo-error-not-pass",ROOT,failed,baseline/"all-tree.txt",fr,baseline/"all-tree.command.json",diagnostic="Cargo 采集失败")
+    invoke("negative-real-cargo-error-not-pass",baseline_project,failed,baseline/"all-tree.txt",fr,baseline/"all-tree.command.json",diagnostic="Cargo 采集失败")
+    from dependency_admission_self_test import run as run_exact_admission_tests
+    exact_code = run_exact_admission_tests(output / "exact-license-exceptions")
+    results.append({"id": "exact-license-exceptions", "exit_code": exact_code,
+                    "expected_exit_code": 0, "passed": exact_code == 0,
+                    "independent_expectation": "已批准的两个 MPL 包仅在精确 macOS 根与全部登记入边内通过；其他身份和路径拒绝"})
+    from engineering_native_paths_self_test import run as run_native_path_tests
+    native_code = run_native_path_tests(output / "native-target-paths")
+    results.append({"id": "native-target-paths", "exit_code": native_code,
+                    "expected_exit_code": 0, "passed": native_code == 0,
+                    "independent_expectation": "精确 WASI 目标分支仅在获批根/路径与场景内存在；所有桌面 target tree 不得选中"})
     summary={"passed":all(r["passed"] for r in results),"records":results,"limits":"本机host为aarch64 macOS；桌面target仅依赖解析。局部合成包均0.0.0，图漂移明确标记synthetic；未构建任何违规库或宣称平台支持。"}
     write_json(output/"summary.json", summary)
     print(json.dumps({"passed":summary["passed"],"commands":len(results),"summary":str(output/"summary.json")},ensure_ascii=False))

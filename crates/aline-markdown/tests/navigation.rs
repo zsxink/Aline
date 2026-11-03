@@ -227,16 +227,52 @@ fn dangling_footnote_reference_has_no_event_entry() -> Result<(), Box<dyn Error>
 }
 
 #[test]
-fn footnote_label_case_divergence_yields_empty_targets() -> Result<(), Box<dyn Error>> {
+fn footnote_label_ascii_case_difference_keeps_resolved_targets() -> Result<(), Box<dyn Error>> {
     let parsed = parse_text("A[^Note].\n\n[^note]: Note.\n")?;
     let entries = parsed.navigation().entries();
     assert_eq!(entries.len(), 2);
     assert_eq!(entries[0].kind(), NavigationKind::FootnoteReference);
     assert_eq!(source_range(&entries[0]), 1..8);
-    assert!(entries[0].targets().is_empty());
+    assert_eq!(target_ranges(&entries[0]), vec![11..25]);
     assert_eq!(entries[1].kind(), NavigationKind::FootnoteDefinition);
     assert_eq!(source_range(&entries[1]), 11..25);
-    assert!(entries[1].targets().is_empty());
+    assert_eq!(target_ranges(&entries[1]), vec![1..8]);
+    Ok(())
+}
+
+#[test]
+fn parser_equivalent_footnote_labels_link_with_non_ascii_text_and_duplicates()
+-> Result<(), Box<dyn Error>> {
+    let text =
+        "[First][^ÉNote] [Second][^Énote].\n\n[^Énote]: shared target\n\n[^ÉNOTE]: second target\n";
+    let parsed = parse_text(text)?;
+    let entries = parsed.navigation().entries();
+    let references = entries
+        .iter()
+        .filter(|entry| entry.kind() == NavigationKind::FootnoteReference)
+        .collect::<Vec<_>>();
+    let definitions = entries
+        .iter()
+        .filter(|entry| entry.kind() == NavigationKind::FootnoteDefinition)
+        .collect::<Vec<_>>();
+    assert_eq!(references.len(), 2);
+    assert_eq!(definitions.len(), 2);
+    let definition_ranges = definitions
+        .iter()
+        .map(|entry| source_range(entry))
+        .collect::<Vec<_>>();
+    for reference in &references {
+        assert_eq!(target_ranges(reference), definition_ranges);
+    }
+    for definition in &definitions {
+        assert_eq!(
+            target_ranges(definition),
+            references
+                .iter()
+                .map(|entry| source_range(entry))
+                .collect::<Vec<_>>()
+        );
+    }
     Ok(())
 }
 

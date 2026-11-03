@@ -105,6 +105,15 @@ impl StringBuffer {
         &self.selection
     }
 
+    /// 在当前源码快照上受检更新文档选区；不改文本、revision、历史或 redo。
+    ///
+    /// 该入口仅提供导航能力。外部快照的端点明确拒绝，失败保留原选区。
+    pub fn set_selection(&mut self, selection: &SrcSelection) -> Result<(), BufferError> {
+        self.snapshot.validate_selection(selection)?;
+        self.selection = selection.clone();
+        Ok(())
+    }
+
     /// 返回与当前文本同步的行索引。
     pub fn line_index(&self) -> &LineIndex {
         &self.line_index

@@ -7,6 +7,7 @@
 //!
 //! 模块所有者：`aline-ui` 文档层。输入：源码文本、源码选区、虚拟毫秒与宿主
 //! 发布结果。输出：当前快照、提交结果与明确错误。副作用：仅内存状态变化。
+//! 只读会话直接建立空打开槽；文档目标存活与编辑块存活分别复验。
 
 use std::fmt;
 use std::ops::Range;
@@ -84,6 +85,10 @@ pub enum CommitOutcome {
 /// 文档核心的拒绝原因；拒绝不改变调用前状态。
 #[derive(Debug)]
 pub enum DocError {
+    /// 当前会话只允许阅读，拒绝编辑、资源登记和发布意图。
+    ReadOnly,
+    /// 该入口仅接受只读会话，编辑会话必须沿既有输入协议执行。
+    RequiresReadonly,
     /// 没有打开块。
     NoOpenBlock,
     /// 已有打开块，不能重复打开。
@@ -151,6 +156,8 @@ pub struct DocCore {
     parse_config: ParseConfigGeneration,
     derived_request: DerivedRequestId,
     mode: EditorMode,
+    access: readonly::DocumentAccess,
+    alive: bool,
 }
 
 impl DocCore {
@@ -193,6 +200,8 @@ impl DocCore {
             parse_config: ParseConfigGeneration::initial(),
             derived_request: DerivedRequestId::initial(),
             mode: EditorMode::Visual,
+            access: readonly::DocumentAccess::Editing,
+            alive: true,
         })
     }
 
@@ -306,6 +315,7 @@ impl DocCore {
         range: Range<usize>,
         selection: SelectionSpec,
     ) -> Result<(), DocError> {
+        self.ensure_writable()?;
         if self.open.is_some() {
             return Err(DocError::BlockAlreadyOpen);
         }
@@ -413,6 +423,7 @@ impl DocCore {
         &mut self,
         text_budget: TextBudget,
     ) -> Result<CurrentSnapshot, DocError> {
+        self.ensure_document_alive()?;
         if self.open.is_some() {
             self.ensure_ready()?;
         }
@@ -560,6 +571,7 @@ impl DocCore {
 
     /// 请求取消发布等待；只改等待状态，结束组合、输入与历史零变化。
     pub fn request_cancel_wait(&mut self, handle: WaitHandle) -> Result<(), DocError> {
+        self.ensure_writable()?;
         let wait = self.wait.as_mut().ok_or(DocError::UnknownWait)?;
         if wait.handle != handle || wait.status != WaitStatus::Pending {
             return Err(DocError::UnknownWait);
@@ -583,6 +595,7 @@ impl DocCore {
         outcome: PublicationOutcome,
         _now_millis: u64,
     ) -> Result<PublicationResult, DocError> {
+        self.ensure_writable()?;
         let kind = {
             let wait = self.wait.as_ref().ok_or(DocError::UnknownWait)?;
             if wait.handle != handle || wait.status != WaitStatus::Pending {
@@ -608,14 +621,19 @@ impl DocCore {
         self.finish_publication(handle, outcome, now_millis)
     }
 
-    /// 按 `InputIdentity` 校验派生结果；成功不改变任何状态。
+    /// 按 `InputIdentity` 校验编辑投影结果；成功不改变任何状态。
     ///
     /// 校验顺序：先确认目标仍打开，再取当前快照并逐项比较文档、工作版本与
     /// 快照身份。失败是零副作用；成功返回值仅为 `()`（T-8-14 的实现决定）。
     pub fn accept_derived_result(&mut self, identity: &InputIdentity) -> Result<(), DocError> {
+        self.ensure_document_alive()?;
         if self.open.is_none() {
             return Err(DocError::ClosedTarget);
         }
+        self.validate_result_identity(identity)
+    }
+
+    fn validate_result_identity(&mut self, identity: &InputIdentity) -> Result<(), DocError> {
         let snapshot = self.current_snapshot(self.limits.text)?;
         let current = InputIdentity::for_request(
             self.document.clone(),
@@ -642,6 +660,7 @@ impl DocCore {
     ///
     /// 组合活动时拒绝。撤销不产生空步；撤销后的草稿代次不复用。
     pub fn undo(&mut self) -> Result<(), DocError> {
+        self.ensure_writable()?;
         if self.open.is_some() {
             self.ensure_ready()?;
         }
@@ -688,6 +707,7 @@ impl DocCore {
     /// 当前存在待定输入组时拒绝：Redo 不得越过尚未结算的输入去重做旧节点，
     /// 否则待定草稿会被 `sync_block_after_buffer_change` 清空。拒绝不改变任何状态。
     pub fn redo(&mut self) -> Result<(), DocError> {
+        self.ensure_writable()?;
         if self.open.is_some() {
             self.ensure_ready()?;
         }
@@ -748,6 +768,7 @@ impl DocCore {
         after_selection: SelectionSpec,
         now_millis: u64,
     ) -> Result<ReloadOutcome, DocError> {
+        self.ensure_writable()?;
         if self.is_composition_active() {
             return Err(DocError::CompositionActive);
         }
@@ -777,6 +798,7 @@ impl DocCore {
     }
 
     fn ensure_ready(&self) -> Result<(), DocError> {
+        self.ensure_writable()?;
         let block = self.open.as_ref().ok_or(DocError::NoOpenBlock)?;
         if block.baseline_revision != self.buffer.revision() {
             return Err(DocError::DraftBaselineConflict);
@@ -1269,6 +1291,7 @@ fn selection_of(selection: &aline_buffer::SrcSelection) -> SelectionSpec {
 
 mod checked_commit;
 mod protocols;
+mod readonly;
 
 #[cfg(test)]
 mod checked_commit_tests;

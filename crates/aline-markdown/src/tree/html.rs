@@ -4,8 +4,9 @@
 //! 本模块不把重写坐标当作源码坐标；调用方传入片段在快照中的绝对起点。
 //!
 //! 展示行为对齐 `docs/engine-design.md` §11.2：支持标签映射样式；过滤集合按字面
-//! 文本显示（内部原始文本不再当作标签解析）；块级标签产生合成换行；HTML 文本
-//! 折叠连续空白并让折叠后的空格携带被消费的完整源码范围；注释与处理指令不显示。
+//! 文本显示（内部原始文本不再当作标签解析）；未支持标签按原文保留；块级标签产生
+//! 合成换行；HTML 文本折叠连续空白并让折叠后的空格携带被消费的完整源码范围。
+//! 注释与处理指令不显示。
 
 use std::fmt;
 use std::ops::Range;
@@ -326,6 +327,11 @@ impl HtmlStack {
                 self.push_literal(output, markup, absolute, HtmlStyle::default());
                 return Ok(());
             }
+            if !is_supported_tag(&name) {
+                // 有限 HTML 子集之外的标签按原文显示；不识别其容器语义或折叠内部空白。
+                self.push_literal(output, markup, absolute, HtmlStyle::default());
+                return Ok(());
+            }
             self.pop(&name);
             if is_block_tag(&name) {
                 self.push_block_break(output, absolute);
@@ -335,9 +341,7 @@ impl HtmlStack {
         let inner = trimmed.strip_prefix('<').unwrap_or(trimmed);
         let name = tag_name(inner);
         if is_filtered_tag(&name) {
-            // 过滤集合与 void 集合互不相交：这里的顺序对 input/link/meta/base 没有
-            // 影响，它们仍走下方 void 分支（标签隐藏、无可见内容）；只有过滤集合中
-            // 的标签才按字面显示。复核 N-F3-1 更正了原先“避免抢占字面路径”的说法。
+            // 过滤集合按字面显示且不执行；判定必须早于 void 规则。
             self.push_literal(output, markup, absolute, HtmlStyle::default());
             self.filtered = Some(name);
             return Ok(());
@@ -348,10 +352,9 @@ impl HtmlStack {
             self.push_synthetic(output, "\n", absolute, style, HtmlSegmentKind::Text);
             return Ok(());
         }
-        // V-07 待定：input/link/meta/base 等不在过滤集合中的 void 标签仍按
-        // “不支持标签”处理（标签隐藏、无可见内容）。§11.2 尚未冻结其展示口径，
-        // 这里保持现状，不在组 6.5 中宣称对齐。
         if is_void_tag(&name) {
+            // 未支持的 void 标签保留原始标签文本；有限 HTML 子集外不解释它们。
+            self.push_literal(output, markup, absolute, HtmlStyle::default());
             return Ok(());
         }
         if is_block_tag(&name) {
@@ -790,7 +793,7 @@ fn is_allowed_link(href: &str) -> bool {
     lower.starts_with("http://") || lower.starts_with("https://") || lower.starts_with("mailto:")
 }
 
-/// void 标签不产生可见内容。`input/link/meta/base` 的展示口径属于 V-07 待定项。
+/// 有限 HTML 子集之外的 void 标签按字面显示；`br` 在专用分支输出合成换行。
 fn is_void_tag(name: &str) -> bool {
     matches!(
         name,

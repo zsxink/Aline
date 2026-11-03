@@ -399,6 +399,120 @@ impl Projection {
         )
     }
 
+    /// 从当前完整投影构造受检局部绘制窗口；窗口片段继续映射到同一源码快照。
+    ///
+    /// 窗口端点绑定父投影身份并必须位于 UTF-8 边界。Exact 片段按字节裁剪，
+    /// Aligned 片段的可见子范围仍指向其完整来源，Hidden/Synthetic 关系保留。
+    /// 返回投影拥有新的身份，不能与父投影或旧窗口坐标混用。
+    ///
+    /// 空窗口返回 [`MappingError::InvalidMapping`]；纯锚点查询应直接调用父投影
+    /// 的 [`Projection::source_at`] 并给出 affinity，不能用空投影丢失来源精确性。
+    pub fn window(&self, window: &DrawnRange, budget: MappingBudget) -> Result<Self, MappingError> {
+        if window.projection_id() != &self.id {
+            return Err(MappingError::ProjectionMismatch);
+        }
+        let window_bytes = window.byte_range();
+        self.drawn_offset(window_bytes.start)?;
+        self.drawn_offset(window_bytes.end)?;
+        if window_bytes.is_empty() {
+            return Err(MappingError::InvalidMapping);
+        }
+        let text = self
+            .drawn
+            .get(window_bytes.clone())
+            .ok_or(MappingError::NotCharBoundary)?;
+        if text.len() > budget.max_drawn_bytes {
+            return Err(MappingError::BudgetExceeded);
+        }
+        let mut drawn = String::new();
+        drawn
+            .try_reserve_exact(text.len())
+            .map_err(MappingError::Allocation)?;
+        drawn.push_str(text);
+
+        let mut segments = Vec::new();
+        let mut source_start = usize::MAX;
+        let mut source_end = 0usize;
+        // 只有绘制起点单调；Hidden 可以位于可见片段内部，其终点不保证单调。
+        let first_segment = self
+            .segments
+            .partition_point(|segment| segment.drawn.start < window_bytes.start);
+        let crossing = self.segments[..first_segment]
+            .iter()
+            .rev()
+            .find(|segment| segment.precision() != MappingPrecision::Hidden)
+            .filter(|segment| segment.drawn.end > window_bytes.start);
+        let following = self
+            .segments
+            .iter()
+            .skip(first_segment)
+            .take_while(|segment| segment.drawn.start <= window_bytes.end);
+        for segment in crossing.into_iter().chain(following) {
+            let parent_drawn = segment.drawn_range();
+            let parent_source = segment.source_range().byte_range();
+            let clipped = match segment.precision() {
+                MappingPrecision::Hidden => {
+                    if parent_drawn.start < window_bytes.start
+                        || parent_drawn.start > window_bytes.end
+                    {
+                        continue;
+                    }
+                    let local = parent_drawn.start - window_bytes.start;
+                    Some((local..local, parent_source))
+                }
+                MappingPrecision::Exact
+                | MappingPrecision::Aligned
+                | MappingPrecision::Synthetic => {
+                    let start = parent_drawn.start.max(window_bytes.start);
+                    let end = parent_drawn.end.min(window_bytes.end);
+                    if start >= end {
+                        continue;
+                    }
+                    let local = start - window_bytes.start..end - window_bytes.start;
+                    let source = match segment.precision() {
+                        MappingPrecision::Exact => {
+                            let source_start = parent_source
+                                .start
+                                .checked_add(start - parent_drawn.start)
+                                .ok_or(MappingError::LengthOverflow)?;
+                            let source_end = source_start
+                                .checked_add(end - start)
+                                .ok_or(MappingError::LengthOverflow)?;
+                            source_start..source_end
+                        }
+                        MappingPrecision::Aligned => parent_source,
+                        MappingPrecision::Synthetic => parent_source.start..parent_source.start,
+                        MappingPrecision::Hidden => return Err(MappingError::InvalidMapping),
+                    };
+                    Some((local, source))
+                }
+            };
+            if let Some((local_drawn, local_source)) = clipped {
+                if segments.len() >= budget.max_points {
+                    return Err(MappingError::BudgetExceeded);
+                }
+                segments.try_reserve(1).map_err(MappingError::Allocation)?;
+                source_start = source_start.min(local_source.start);
+                source_end = source_end.max(local_source.end);
+                segments.push(MappingSegment::new(
+                    local_drawn,
+                    self.snapshot
+                        .src_range(local_source)
+                        .map_err(MappingError::Source)?,
+                    segment.precision(),
+                )?);
+            }
+        }
+        if source_start == usize::MAX {
+            return Err(MappingError::InvalidMapping);
+        }
+        let source = self
+            .snapshot
+            .src_range(source_start..source_end)
+            .map_err(MappingError::Source)?;
+        Self::from_segments(self.snapshot.clone(), source, drawn, segments, budget)
+    }
+
     /// 校验 UTF-16 半开范围的两端和投影身份。
     pub fn utf16_range(&self, units: Range<usize>) -> Result<Utf16Range, MappingError> {
         Utf16Range::new(

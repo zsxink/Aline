@@ -27,13 +27,122 @@
     ],
     "legacy_slash_means_or": true,
     "forbid_unreviewed_local_paths": true,
-    "conclusion": "只准入宽松许可证；SPDX 表达式在允许集合下可满足即视为满足准入策略（OR 选允许分支，AND 全部需允许）。LGPL/GPL/AGPL/MPL 不作为允许原子；r-efi 等以 OR 列出 LGPL 时按 MIT/Apache-2.0 分支选择，不选 LGPL。",
-    "limits": "这是工程准入策略判定，不是法律意见；未执行许可证全文核对、再分发合规审查或跨平台构建。"
+    "conclusion": "只准入宽松许可证；SPDX 表达式在允许集合下可满足即视为满足准入策略（OR 选允许分支，AND 全部需允许）。LGPL/GPL/AGPL/MPL 不作为允许原子；r-efi 等以 OR 列出 LGPL 时按 MIT/Apache-2.0 分支选择，不选 LGPL。2026-11-02 用户精确批准 cbindgen@0.28.0、option-ext@0.2.0 与 dwrote@0.11.5 的 MPL-2.0 metadata 闭包例外，以及 libloading@0.8.9 的 ISC 互斥条件 metadata-only 路径例外；不扩展全局 MPL 或 ISC 允许集合。",
+    "limits": "这是工程准入策略判定，不是法律意见；未执行许可证全文核对、再分发合规审查或跨平台构建。",
+    "exact_exceptions": [
+      {
+        "package": "cbindgen@0.28.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "eadd868a2ce9ca38de7eeafdcec9c7065ef89b42b32f0839278d55f35c54d1ff",
+        "license": "MPL-2.0",
+        "group": "gpui-macos-backend",
+        "root": "gpui-pre-macos@0.3.9",
+        "incoming": [
+          {
+            "from": "gpui-pre-apple@0.3.9",
+            "to": "cbindgen@0.28.0",
+            "alias": "cbindgen",
+            "kinds": [
+              {
+                "kind": "build",
+                "target": "cfg(any(target_os = \"macos\", target_os = \"ios\"))"
+              }
+            ]
+          }
+        ],
+        "basis": "2026-11-02 用户仅批准此精确包及 macOS 后端闭包的例外"
+      },
+      {
+        "package": "option-ext@0.2.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d",
+        "license": "MPL-2.0",
+        "group": "gpui-macos-backend",
+        "root": "gpui-pre-macos@0.3.9",
+        "incoming": [
+          {
+            "from": "dirs-sys@0.4.1",
+            "to": "option-ext@0.2.0",
+            "alias": "option_ext",
+            "kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ],
+        "basis": "2026-11-02 用户仅批准此精确包及 macOS 后端闭包的例外"
+      },
+      {
+        "package": "dwrote@0.11.5",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "9e1b35532432acc8b19ceed096e35dfa088d3ea037fe4f3c085f1f97f33b4d02",
+        "license": "MPL-2.0",
+        "group": "gpui-macos-backend",
+        "root": "gpui-pre-macos@0.3.9",
+        "incoming": [
+          {
+            "from": "zed-font-kit@0.14.1-zed",
+            "to": "dwrote@0.11.5",
+            "alias": "dwrote",
+            "kinds": [
+              {
+                "kind": null,
+                "target": "cfg(target_family = \"windows\")"
+              }
+            ]
+          }
+        ],
+        "basis": "2026-11-02 用户批准此精确 metadata-only 身份/路径；完整 target 条件矛盾，desktop target tree 不选中"
+      },
+      {
+        "package": "libloading@0.8.9",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "d7c4b02199fee7c5d21a5ae7d8cfa79a6ef5bb2fc834d6e9058e89c825efdc55",
+        "license": "ISC",
+        "group": "gpui-macos-backend",
+        "root": "gpui-pre-macos@0.3.9",
+        "incoming": [
+          {
+            "from": "dlib@0.5.3",
+            "to": "libloading@0.8.9",
+            "alias": "libloading",
+            "kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ],
+        "path": {
+          "packages": [
+            {"package": "gpui-pre-macos@0.3.9", "source": "registry+https://github.com/rust-lang/crates.io-index", "checksum": "c7c988b7e49775cc8542dbe48d5a10e073d8e898a023ef3ff3d24f33363e9863"},
+            {"package": "gpui-pre-apple@0.3.9", "source": "registry+https://github.com/rust-lang/crates.io-index", "checksum": "b52f58893fe1a0836464428dfad2b5eaf42c9c303a9638f4c2aced5a69072a15"},
+            {"package": "zed-font-kit@0.14.1-zed", "source": "registry+https://github.com/rust-lang/crates.io-index", "checksum": "a3898e450f36f852edda72e3f985c34426042c4951790b23b107f93394f9bff5"},
+            {"package": "yeslogic-fontconfig-sys@6.0.1", "source": "registry+https://github.com/rust-lang/crates.io-index", "checksum": "1d8b8abf912b9a29ff112e1671c97c33636903d13a69712037190e6805af4f76"},
+            {"package": "dlib@0.5.3", "source": "registry+https://github.com/rust-lang/crates.io-index", "checksum": "ab8ecd87370524b461f8557c119c405552c396ed91fc0a8eec68679eab26f94a"},
+            {"package": "libloading@0.8.9", "source": "registry+https://github.com/rust-lang/crates.io-index", "checksum": "d7c4b02199fee7c5d21a5ae7d8cfa79a6ef5bb2fc834d6e9058e89c825efdc55"}
+          ],
+          "edges": [
+            {"from": "gpui-pre-macos@0.3.9", "to": "gpui-pre-apple@0.3.9", "alias": "gpui_apple", "kinds": [{"kind": null, "target": "cfg(target_os = \"macos\")"}]},
+            {"from": "gpui-pre-apple@0.3.9", "to": "zed-font-kit@0.14.1-zed", "alias": "font_kit", "kinds": [{"kind": null, "target": "cfg(any(target_os = \"macos\", target_os = \"ios\"))"}]},
+            {"from": "zed-font-kit@0.14.1-zed", "to": "yeslogic-fontconfig-sys@6.0.1", "alias": "fontconfig_sys", "kinds": [{"kind": null, "target": "cfg(not(any(target_family = \"windows\", target_os = \"macos\", target_os = \"ios\", target_arch = \"wasm32\", target_env = \"ohos\")))"}]},
+            {"from": "yeslogic-fontconfig-sys@6.0.1", "to": "dlib@0.5.3", "alias": "dlib", "kinds": [{"kind": null, "target": null}]},
+            {"from": "dlib@0.5.3", "to": "libloading@0.8.9", "alias": "libloading", "kinds": [{"kind": null, "target": null}]}
+          ]
+        },
+        "basis": "2026-11-02 用户仅批准此精确 ISC package/checksum、macOS 后端 root 与完整 metadata 路径；macOS 与 non-macOS fontconfig target 条件矛盾，desktop target tree 不选中；不扩展 ISC 全局允许集合"
+      }
+    ]
   },
   "groups": [
     {
       "id": "workspace",
-      "rule": {"kind": "workspace"},
+      "rule": {
+        "kind": "workspace"
+      },
       "selected_allowed": true,
       "purpose": "Aline 自有八成员；publish=false，不适用第三方许可证准入",
       "consumer": "workspace 内部",
@@ -42,7 +151,12 @@
     },
     {
       "id": "engine-markdown",
-      "rule": {"kind": "closure", "roots": ["aline-markdown"]},
+      "rule": {
+        "kind": "closure",
+        "roots": [
+          "aline-markdown"
+        ]
+      },
       "selected_allowed": true,
       "purpose": "Markdown 解析、字素边界与映射所需的纯工具闭包：pulldown-cmark 0.13.6、unicode-segmentation 1.13.3、bitflags、memchr、unicase",
       "consumer": "aline-markdown（aline-edit 经其传递）",
@@ -51,7 +165,12 @@
     },
     {
       "id": "engine-edit",
-      "rule": {"kind": "closure", "roots": ["aline-edit"]},
+      "rule": {
+        "kind": "closure",
+        "roots": [
+          "aline-edit"
+        ]
+      },
       "selected_allowed": true,
       "purpose": "编辑计划层不新增外部依赖；闭包由 aline-buffer/aline-markdown 共享",
       "consumer": "aline-edit",
@@ -60,7 +179,10 @@
     },
     {
       "id": "engine-app-core",
-      "rule": {"kind": "branches", "root": "aline-app-core"},
+      "rule": {
+        "kind": "branches",
+        "root": "aline-app-core"
+      },
       "selected_allowed": true,
       "purpose": "catalog 嵌入、配置解析、摘要与资源扫描的零 GPUI 闭包",
       "consumer": "aline-app-core（aline 经主链消费）",
@@ -73,7 +195,10 @@
     },
     {
       "id": "gpui",
-      "rule": {"kind": "branches", "root": "gpui-pre"},
+      "rule": {
+        "kind": "branches",
+        "root": "gpui-pre"
+      },
       "selected_allowed": true,
       "purpose": "已批准 gpui-pre =0.3.9 的受审子图；Aline 自有代码不直接依赖，仅 app/aline-ui/aline-plugin 经锁定路径消费",
       "consumer": "aline-ui（app 经其消费；aline-plugin 属允许层但当前无依赖边）",
@@ -138,8 +263,80 @@
       }
     },
     {
+      "id": "gpui-macos-backend",
+      "rule": {
+        "kind": "closure",
+        "roots": [
+          "gpui-pre-macos"
+        ],
+        "optional": true,
+        "root_identities": [
+          {
+            "package": "gpui-pre-macos@0.3.9",
+            "source": "registry+https://github.com/rust-lang/crates.io-index",
+            "checksum": "c7c988b7e49775cc8542dbe48d5a10e073d8e898a023ef3ff3d24f33363e9863"
+          }
+        ],
+        "root_incoming": [
+          {
+            "from": "aline-ui@0.1.0",
+            "to": "gpui-pre-macos@0.3.9",
+            "alias": "gpui_macos",
+            "kinds": [
+              {
+                "kind": null,
+                "target": "cfg(target_os = \"macos\")"
+              }
+            ]
+          }
+        ]
+      },
+      "selected_allowed": true,
+      "purpose": "已批准 gpui-pre-macos =0.3.9 的 macOS 原生后端与 font-kit 闭包；与既有 GPUI 核心共享包按先登记分组归属",
+      "consumer": "aline-ui，仅 cfg(target_os = \"macos\")",
+      "alternatives": "同快照发布后端避免自行 vendor/unsafe 平台实现；Windows/Linux 后端未纳入本次裁决",
+      "necessity": "M1 原生单窗只读入口；版本、来源、checksum、入边和许可证例外均精确核对"
+    },
+    {
+      "id": "system-locale",
+      "rule": {
+        "kind": "closure",
+        "roots": [
+          "sys-locale"
+        ],
+        "optional": true,
+        "root_identities": [
+          {
+            "package": "sys-locale@0.3.2",
+            "source": "registry+https://github.com/rust-lang/crates.io-index",
+            "checksum": "8eab9a99a024a169fe8a903cf9d4a3b3601109bcc13bd9e3c6fff259138626c4"
+          }
+        ],
+        "root_incoming": [
+          {
+            "from": "aline@0.1.0",
+            "to": "sys-locale@0.3.2",
+            "alias": "sys_locale",
+            "kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ]
+      },
+      "selected_allowed": true,
+      "purpose": "sys-locale =0.3.2 的真实系统首选语言检测；桌面闭包无第三方依赖",
+      "consumer": "app（aline），启动时映射到 app-core Locale",
+      "alternatives": "GPUI 核心没有系统首选语言 API；显式测试语言和 LANG 不能替代 macOS GUI 系统偏好",
+      "necessity": "M1 默认随系统语言；许可证按全局允许集合校验，不适用 MPL 例外"
+    },
+    {
       "id": "unassigned",
-      "rule": {"kind": "remaining"},
+      "rule": {
+        "kind": "remaining"
+      },
       "selected_allowed": false,
       "purpose": "兜底分组：未被 workspace/引擎闭包/GPUI 直接分支覆盖的包；正常图应为空，非空时必须逐包重新审查后才能进入运行时",
       "consumer": "无（未进入运行时分组；已选包出现在此组即拒绝）",

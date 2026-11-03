@@ -10,3 +10,4 @@ workspace = true
 [dependencies]
 aline-ui.workspace = true
 aline-app-core.workspace = true
+sys_locale.workspace = true
