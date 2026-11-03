@@ -590,6 +590,8 @@ PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02
 
 用户已批准保持原有 hash 算法并为 M1 组合图登记7个具体 GPUI 子图新 fingerprint；M0 hash 保留历史值。候选值见[准入提案](../openspec/changes/m1-single-window-readonly/native-admission-proposal.md)。真实依赖准入 all/all-features 与 macOS ARM/Intel、Windows x64、Linux x64/ARM 共7场景通过；合成完整自测117/117、路径并集14/14、精确许可证回归13/13通过。五个登记 desktop target 对 dwrote/libloading 的 tree 检查均不选中。规则仍按精确 package identity/path/target 检查，不能按包名扩大例外或修改指纹算法。Metal 构建工具当前缺失，真实原生构建及窗口尚未验证。
 
+2026-11-03 更新：Xcode 27.2/Metal Toolchain 可用后，锁定离线构建与真实 macOS 单窗显示/退出已由 tasks 4.2 记录；该结果属于 M1 分项，不改写本条当时的“尚未验证”事实。
+
 回写：[引擎 §9.3](./engine-design.md#93-历史保存点及重载)、[架构规范 R-5-05](./architecture-guide.md#5-命令输入组与编辑事务)、M0 OpenSpec design/spec/tasks 与 `crates/aline-ui/tests/document_typing.rs` / `document_composition.rs`。验证为有效新草稿立即分支、输入拒绝保留分支、Redo 待定组拒绝及 IME 取消保留分支；不代表 E1/E2/E4/E5/E7 或 V-01～V-09 闭合。
 
 ## 20. 2026-11-02 用户验收裁决：M0 全部通过（验收豁免）
@@ -613,3 +615,13 @@ PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02
 实现限于原型：新增 `i18n.js`，在设置 → 通用 → 语言提供跟随系统 / 简体中文 / English；界面文案、菜单、对话框、提示与可访问名称即时切换，偏好写入本 origin 的 localStorage（`aline.prototype.locale`）；文档正文、文件名与用户导入主题的自带文案不翻译。修改 `index.html`（加载 i18n.js、脚本缓存版本）、`prototype.js`（语言行与内部页面键）、`interactions.js`（设置记忆按内部键）、`menus.js`（菜单动作读取内部标签），其余40个历史文件保持原字节。授权链、新增文件哈希与验证边界见 [inventory.json](./prototype/inventory.json)。
 
 该实现是 DOM 层演示，不是正式 i18n 架构或原生能力证据；不改变 PRD APP-04、UI 规范 §14 或原生 M1 范围（即时切换控件仍不在 M1），也不表示 V-09 或三平台本地化验收通过。浏览器原型检查：73 项断言通过（中文基线、英文全界面、动态计数/光标/未命名文档、主题库与预览、插件选项值保持、跨语言设置恢复、刷新持久化、切回中文），并另行核对英文系统菜单动作（设置、关于、快捷键、视图切换、侧栏、专注模式、新建/关闭标签）、中文残留扫描与无 JS 异常；这些只证明当前浏览器原型，不证明原生实现。
+
+## 24. 2026-11-03 验证取证只做中文
+
+用户明确指示：以后的验证不需要双语验证，只需要验证中文即可。据此，自本条起，面向用户的原生/平台/界面人工验证（启动语言观测、窗口与状态、文案、键盘与焦点、尺寸、错误反馈、截图类证据）只以中文界面取证，不再把系统首选语言切到 `en-US` 复验英文作为必需步骤。
+
+边界：本条只收窄**人工验证取证范围**。PRD APP-04 的 zh-CN/en 首发支持、AGENTS.md 铁律 7 的双语 catalog，以及 `Translator::embedded` 的键集合/占位符一致性和缺键/漂移反例等自动校验继续保留；英文实现与自动门禁不因本条减为中文。文档正文、文件名等英文内容样本属于排版/内容验证，不是界面语言验证，是否使用由具体测试决定，不受本条限制。
+
+已取得的英文观测记录（[验证计划 V-09](./v1-validation-plan.md#v-09--视觉尺寸默认值与平台状态)与 [UI 规范 §14](./ui-spec.md#14-本地化长文本与窗口适配) 的 2026-11-03 记录）是裁决前的历史事实，保留不改写；后续复跑只核对中文。本条不表示 V-09、AC-15 或任何 V/AC 整项通过，也不关闭 Windows/Linux/Intel Mac 等平台缺口。
+
+回写：[验证计划](./v1-validation-plan.md)、[UI 规范 §14/§15](./ui-spec.md#14-本地化长文本与窗口适配)、M1 OpenSpec change 的 proposal/design/tasks 与 `ui/readonly-document`、`workspace/engineering-gates` delta。

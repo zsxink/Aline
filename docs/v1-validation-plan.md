@@ -8,6 +8,8 @@
 
 以下 V 项均**未整项完成**；M0 已执行的工程与无头基础分项在对应条目和结果表中单列，不能由局部结果推断整项通过。涉及格式、默认数值或边界尚未固化的地方，先制作可检查的方案或样本，再回填 PRD 及专门规范。正式 V1 发布前，所有发布阻塞项必须完成。
 
+**2026-11-03 验证取证语言范围：** 用户裁决以后验证不需要双语验证，只需要验证中文（见[决定 §24](./decisions.md#24-2026-11-03-验证取证只做中文)）。界面语言的人工/原生取证只做中文，不再切换系统首选语言复验英文；catalog 的 zh-CN/en 键与占位符自动校验、缺键/漂移反例继续保留。2026-11-03 已取得的英文启动记录保留为裁决前的事实，后续复跑只核对中文。本条不改变 APP-04 产品范围，也不表示任何 V 项整项通过。
+
 ## 当前 M0 状态与复跑入口
 
 **2026-11-02 M1 apply 进度：** OpenSpec `m1-single-window-readonly` 已开始实施。夹具、Markdown 只读语义/映射/脚注目标、DocCore 只读边界与只读文件会话已完成无头分项；映射空窗口/Hidden 边界及 FIFO 阻塞/文本预算顺序修复有独立审查和回归。M0 豁免缺证仍保留。用户已批准原生后端候选 `gpui-pre-macos@0.3.9` + `sys-locale@0.3.2`、`cbindgen@0.28.0`/`option-ext@0.2.0`/`dwrote@0.11.5` 三个精确 MPL 例外、`libloading@0.8.9` 的精确 ISC metadata-only 完整路径例外、`wasi@0.11.1`/`wasip2@1.0.4` 原列及新增9条精确 metadata 边，以及七场景 M1 GPUI 组合图指纹。工程准入 all/all-features、macOS ARM/Intel、Windows x64、Linux x64/ARM 七场景已通过；完整自测117/117、path union14/14、许可证自测13/13通过，五个桌面 target tree 均不选中 dwrote/libloading。当前环境没有 `xcrun metal`，原生依赖编译不能越过 shader build；尚未创建/验证窗口、未执行系统语言 GUI 观测、未做 1 MiB 可视化滚动。Windows 10、Intel Mac、Linux 仍未做真实平台实验，不能声明 AC-16 或 V-01/V-05/V-07/V-09 整项通过。证据见 [M1 原生准入候选方案](../openspec/changes/m1-single-window-readonly/native-admission-proposal.md)及 `logs/validation/m1-single-window-readonly/2026-11-02-apply/`。
@@ -18,7 +20,7 @@
 
 **2026-11-03 Xcode/原生空窗复核（更新）：** 用户完成 Xcode 首次运行配置并安装 Metal Toolchain；当前 `xcode-select -p` 指向 Xcode 27.2，`xcrun --find metal` 和 `xcrun -sdk macosx metal --version` 均成功。`cargo fmt --all --check` 与 `cargo build -p aline --locked --offline` 通过；完整 `scripts/check_workspace.py` 汇总也通过。启动 `cargo run -p aline --locked --offline` 后，真实 macOS 单窗显示本地化空状态（本次系统首选语言为中文），退出后 Cargo 进程以状态码 0 结束。初次截图发现内容区域未设背景/文字色，已按现行 UI 颜色契约修复，并由后续真实截图复核。截图与原生构建输出见 `logs/validation/m1-single-window-readonly/2026-11-03-continue/native-window/`、`native-build-run-after-metal/`；环境探测历史见 `xcode-detection/`。这只完成原生入口/空窗分项；默认语言随系统的完整验证、打开文档、1 MiB 可视化滚动、V-01/V-09 整项和 AC-16 均未完成，Windows 10、Intel Mac、Linux 与 M0 豁免缺证仍保留。
 
-**2026-11-03 M1 语言、打开与 1 MiB 虚拟阅读实测：** macOS arm64 / 27.2 的系统首选语言从实际全局 `AppleLanguages=zh-Hans-CN` 切为 `en-US` 后，分别全新启动最新离线 app 并截图核对英文、恢复 `zh-Hans-CN` 后核对中文；未使用 `LANG` 或应用测试注入。`aline-app-core`、`aline-ui catalog`、`aline` 三组 Cargo 测试通过，截图、系统语言前后状态和启动输出见 `logs/validation/m1-single-window-readonly/2026-11-03-continue-02/catalog/`。真实原生窗口通过系统文件选择器打开生成器创建的精确 1,048,576 字节多短块夹具，在 Visual 与 Source 分别 Home/End 滚动；Visual 42,800 项、可见渲染项 10～13，Source 42,801 行、可见渲染项 16，高度缓存上限 256，首尾截图及调试度量见 `.../2026-11-03-continue-02/virtualization/`。这是 macOS debug 可视化滚动分项，不是 Release 性能基准，V-05 未通过；V-01/V-07/V-09 仍未整项通过，AC-01/09 仅能报告有证分项，不能宣称完整 AC-16。Windows 10、Intel Mac、Linux 和 M0 豁免缺证继续保留。
+**2026-11-03 M1 语言、打开与 1 MiB 虚拟阅读实测：** macOS arm64 / 27.2 的系统首选语言从实际全局 `AppleLanguages=zh-Hans-CN` 切为 `en-US` 后，分别全新启动最新离线 app 并截图核对英文、恢复 `zh-Hans-CN` 后核对中文；未使用 `LANG` 或应用测试注入。该英文切换属裁决前记录，按[决定 §24](./decisions.md#24-2026-11-03-验证取证只做中文)后续复跑只核对中文。`aline-app-core`、`aline-ui catalog`、`aline` 三组 Cargo 测试通过，截图、系统语言前后状态和启动输出见 `logs/validation/m1-single-window-readonly/2026-11-03-continue-02/catalog/`。真实原生窗口通过系统文件选择器打开生成器创建的精确 1,048,576 字节多短块夹具，在 Visual 与 Source 分别 Home/End 滚动；Visual 42,800 项、可见渲染项 10～13，Source 42,801 行、可见渲染项 16，高度缓存上限 256，首尾截图及调试度量见 `.../2026-11-03-continue-02/virtualization/`。这是 macOS debug 可视化滚动分项，不是 Release 性能基准，V-05 未通过；V-01/V-07/V-09 仍未整项通过，AC-01/09 仅能报告有证分项，不能宣称完整 AC-16。Windows 10、Intel Mac、Linux 和 M0 豁免缺证继续保留。
 
 **2026-11-03 V-07 用户裁决的解析分项：** SoftBreak `a\nb` 保留带来源可见换行；有限 HTML 子集以外的 void 标签显示原标签；未支持非 void 容器按完整原文显示标签与内部空白。新增反例/绿测与独立 `.drawn` 预期后，`cargo test -p aline-markdown --locked --offline` 全部通过（17 个测试目标）；完整原始输出含早期金样冲突和修正结果见 `.../2026-11-03-continue-02/v07-contract/`。这不代表其他 V-07 语义、像素命中或原生 HTML 视觉样式通过。
 
@@ -189,13 +191,13 @@ M0 编码基础证据（2026-10-31）：行尾边界金样已固定 CR-X-LF 删�
 
 ## V-09 · 视觉尺寸、默认值与平台状态
 
-**2026-11-03 M1 启动语言分项：** `aline` 通过锁定 `sys-locale@0.3.2` 读取 macOS 首选语言列表首项，中文/英语选择双语内嵌 catalog；首项缺失或不支持时回退英语并在窗口显示说明。实际 macOS 首选项最初为 `zh-Hans-CN`；临时把系统 `AppleLanguages` 偏好改为 `en-US` 后，以当前用户默认启动参数运行原生 app，窗口标题为 “Aline”，空状态为 “Open a Markdown document to start reading.”，见 `logs/validation/m1-single-window-readonly/2026-11-03-continue-02/catalog-en/english-empty-window.png`。测试后恢复 `zh-Hans-CN`；`AppleLocale` 为 `zh_CN`，provider 依据首选语言列表而非 locale 字段。当前截图是在回退提示接线前取得；正常英语文案相同，更新后版本仍需随 4.4 原生打开验证复跑。catalog 正反例与启动语言映射/空列表回退测试已运行，当前新增 catalog keys 的专项复跑待记录。此分项不表示完整 V-09/AC-15 通过。
+**2026-11-03 M1 启动语言分项（历史，裁决前）：** `aline` 通过锁定 `sys-locale@0.3.2` 读取 macOS 首选语言列表首项，中文/英语选择双语内嵌 catalog；首项缺失或不支持时回退英语并在窗口显示说明。实际 macOS 首选项最初为 `zh-Hans-CN`；临时把系统 `AppleLanguages` 偏好改为 `en-US` 后，以当前用户默认启动参数运行原生 app，窗口标题为 “Aline”，空状态为 “Open a Markdown document to start reading.”，见 `logs/validation/m1-single-window-readonly/2026-11-03-continue-02/catalog-en/english-empty-window.png`。测试后恢复 `zh-Hans-CN`；`AppleLocale` 为 `zh_CN`，provider 依据首选语言列表而非 locale 字段。当前截图是在回退提示接线前取得；正常英语文案相同。catalog 正反例与启动语言映射/空列表回退测试已运行，当前新增 catalog keys 的专项复跑待记录。此分项不表示完整 V-09/AC-15 通过。按[决定 §24](./decisions.md#24-2026-11-03-验证取证只做中文)，后续该分项复跑只核对中文启动，英文观测不再作为必需步骤。
 
-产物：主窗口、设置、菜单、对话框和图片预览 tab 的尺寸与状态基准；窗口最小尺寸、侧栏范围、字体/间距、键盘焦点与中英文裁切检查。主题预览必须反映实际三模式；验证 outline/filled 两种图标风格的实际覆盖、描边参数与可辨认状态，并记录预览图与实际样式一致。主窗口结构与控件邻接按[UI 规范 §4.1 原型布局对照](./ui-spec.md#41-原型布局对照实现参照)实现，数值以原型取值为测量起点、再由本项实测冻结。数值和平台支持由样本实测确定。
+产物：主窗口、设置、菜单、对话框和图片预览 tab 的尺寸与状态基准；窗口最小尺寸、侧栏范围、字体/间距、键盘焦点与中文界面裁切检查（界面语言取证按[决定 §24](./decisions.md#24-2026-11-03-验证取证只做中文)只做中文；中英文混排、标点、emoji 与组合字符作为内容排版样本仍保留）。主题预览必须反映实际三模式；验证 outline/filled 两种图标风格的实际覆盖、描边参数与可辨认状态，并记录预览图与实际样式一致。主窗口结构与控件邻接按[UI 规范 §4.1 原型布局对照](./ui-spec.md#41-原型布局对照实现参照)实现，数值以原型取值为测量起点、再由本项实测冻结。数值和平台支持由样本实测确定。
 
 按已确认 TA-03 增加常规启动单窗口恢复最后工作区根、侧栏显隐/宽度/文件或大纲视图的状态样例；不恢复 tabs，显式打开请求不因偏好恢复额外开窗，异常恢复提示独立验收。
 
-按已确认 WC-01 验证 APP-06 降级摘要的中英文呈现、键盘焦点可达性、按类别去重、会话/文档/版本归属、容量边界、关闭文档释放所属条目、关闭后旧任务晚到不得恢复条目、关闭会话释放集合，以及版本变化后旧结果失效且不回填；验证中不预设容量或布局数值。以上样例均未执行。
+按已确认 WC-01 验证 APP-06 降级摘要的中文界面呈现（英文文案由 catalog 自动校验覆盖，见[决定 §24](./decisions.md#24-2026-11-03-验证取证只做中文)）、键盘焦点可达性、按类别去重、会话/文档/版本归属、容量边界、关闭文档释放所属条目、关闭后旧任务晚到不得恢复条目、关闭会话释放集合，以及版本变化后旧结果失效且不回填；验证中不预设容量或布局数值。以上样例均未执行。
 
 按已确认 UI-01～UI-06 增加主窗口内设置页及返回原编辑上下文、名称按钮应用主题/缩略图独立预览及各自焦点、已确认[菜单/工具栏/键位基线](./ui-spec.md#105-菜单与工具栏编排基线ui-04-已确认)的实际名称/触发/系统冲突（含 Windows AltGr/欧洲键盘输入不被 Ctrl+Alt 键位误吞）、“移动到…”键盘访问/取消/焦点归还、关闭工作区后标签保留与根偏好为空等样例。大纲验标题层级与主动跳转，不将正文滚动反向高亮/自动展开/揭示标题纳入 V1 门禁（UI-03）。尺寸、收纳与平台能力仍需实测，决定确认不等于本项通过。
 
