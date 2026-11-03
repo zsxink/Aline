@@ -1,6 +1,6 @@
 # 旧版原型与素材首轮整理结果
 
-后续状态（2026-10-30）：PROTO-01～06已确认A，见[确认归档](../archive/2026-10-30-migration-decisions.md)与[迁移收尾报告（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/maintenance/deletion-readiness/prior-evidence/closure-report.md)。以下为首轮整理快照，其中“待裁决/历史docs未迁”的措辞属于确认前状态；原字节/运行资源检查事实不因确认改变。
+后续状态（2026-10-30）：PROTO-01～06已确认A，见[确认归档](../archive/2026-10-30-migration-decisions.md)与[迁移收尾报告（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/maintenance/deletion-readiness/prior-evidence/closure-report.md)。以下为首轮整理快照，其中“待裁决/历史docs未迁”的措辞属于确认前状态；原字节/运行资源检查事实不因确认改变。2026-11-03 用户另行授权原型语言切换（新增 `i18n.js`、修改4个文件）；本页的45文件/6脚本等统计保留为首轮快照，当前状态见[原型 README](./README.md)与[逐文件账本](./inventory.md)。
 
 日期：2026-10-30。状态：**已完成首轮盘点、安全复制和路径检查，PROTO-01～PROTO-06 待用户裁决。本轮不删除旧目录，不新增功能，不重做产品界面。**
 
@@ -29,7 +29,7 @@
 
 已核对仓库 AGENTS、docs/README、PRD 0.8、验证计划、UI 0.4、架构0.8、主题包规范及原型README/index；逐项检查原型全部HTML/CSS/JS、四家族全部JSON/SVG、工具和指定图片目录。无 `.codegraph/`，本轮采用文件/脚本静态检查。权威次序按本任务：AGENTS → 当前 PRD → 已确认 UI/专项规范 → 验证状态 → 旧原型。架构仅用于确认 Rust + GPUI 与资源/运行时代码边界。
 
-原型README保留 MarkFlow 0.1.5、Primer与Measure的参照线索，不代表本轮重验其外部源码、授权或视觉一致性。迁移对象来自旧目录，最近涉及它的Git提交为 `28254bb214da4e9a77967a0a4604a9fcbb9a8935`。实际源文件与副本逐个按 SHA-256 核对，不能仅靠提交号假定内容。
+原型README保留 MarkFlow 0.1.5、Primer与Measure的参照线索，不代表本轮重验其外部源码、授权或视觉一致性。迁移对象来自旧目录，首轮整理时最近涉及它的Git提交为 `28254bb214da4e9a77967a0a4604a9fcbb9a8935`。实际源文件与副本逐个按 SHA-256 核对，不能仅靠提交号假定内容。
 
 ## 功能与视觉映射
 

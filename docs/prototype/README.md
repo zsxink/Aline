@@ -41,7 +41,7 @@ docs/prototype/
     └── tools/generate-theme-previews.py      # 历史生成器，禁止在归档内重跑
 ```
 
-`legacy/` 初次保存45个文件的原始字节；2026-10-30 按用户要求删除旧品牌 PNG，`index.html` 三处图标 src 改为共享新 PNG；2026-11-03 按用户要求新增界面语言切换演示，新增 `i18n.js`，修改 `index.html`、`prototype.js`、`interactions.js`、`menus.js`。现存45文件，其中40个仍与初次清单逐字节一致。两次变更的授权链、旧/新哈希与新增文件见 `inventory.json` 的 `authorized_updates` / `added_files`；除此之外不整合页面、不修复历史交互。最新涉及旧原型内容的仓库提交为 `28254bb214da4e9a77967a0a4604a9fcbb9a8935`（2026-10-28）；逐文件哈希记录本轮实际文件，不能用该提交号替代内容核对。原 `docs_bak/`、`reports/` 已经用户授权删除，见[删除执行记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/maintenance/deletion-readiness/deletion-execution.md)；本目录的历史副本及独立证据继续保留，运行不需要原目录。
+`legacy/` 初次保存45个文件的原始字节；2026-10-30 按用户要求删除旧品牌 PNG，`index.html` 三处图标 src 改为共享新 PNG；2026-11-03 按用户要求新增界面语言切换演示，新增 `i18n.js`，修改 `index.html`、`prototype.js`、`interactions.js`、`menus.js`。现存45文件，其中40个仍与初次清单逐字节一致。两次变更的授权链、旧/新哈希与新增文件见 `inventory.json` 的 `authorized_updates` / `added_files`；除此之外不整合页面、不修复历史交互。涉及旧原型内容的仓库提交依次为 `28254bb214da4e9a77967a0a4604a9fcbb9a8935`（2026-10-28 迁移）与 `ad7e19d2866d5655be3cf05f3e36dda63ca10fc5`（2026-11-03 语言切换）；逐文件哈希记录当前实际文件，不能用提交号替代内容核对。原 `docs_bak/`、`reports/` 已经用户授权删除，见[删除执行记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/maintenance/deletion-readiness/deletion-execution.md)；本目录的历史副本及独立证据继续保留，运行不需要原目录。
 
 维护只处理来源说明、入口、迁移完整性和记录在案的授权变更。除 2026-11-03 用户明确要求的原型语言切换外，历史浏览器逻辑不追随 PRD 改造；发现差异记入账本，未来若制作新参考应建独立版本并注明与原件关系。语言切换只是原型内的 DOM 翻译演示，不构成正式 i18n 架构，也不改变原生 M1 的语言范围。不要把 `legacy/` 拷贝到应用 `src/` 或 `resources/themes/`，不要从它反推新功能、键位、默认值或运行时主题格式。
 
