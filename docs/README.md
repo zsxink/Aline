@@ -35,7 +35,7 @@ PRD定义产品结果，AGENTS铁律及已确认架构/专项约束实现，验�
 
 - [Zed复核](./zed-notes.md)、[WordCraft调研](./wordcraft-study.md)、[Splat调研](./splat-study.md)是参考研究，不能替代锁定源码核对与Aline实测。
 - [确认归档](./archive/)及[迁移历史证据](./archive/migration-evidence/README.md)保存已确认决定与必要研究来源，不自动取得现行规范效力。
-- [历史原型](./prototype/README.md)为用户已确认长期保留的只读参考，且是原生 UI 的布局与控件邻接参照（[UI 规范 §4.1](./ui-spec.md#41-原型布局对照实现参照)）；PROTO-01/03来源/许可事实仍待补证，原型主题不是正式schema 1包。
+- [历史原型](./prototype/README.md)为用户已确认长期保留的参考，且是原生 UI 的布局与控件邻接参照（[UI 规范 §4.1](./ui-spec.md#41-原型布局对照实现参照)）；除图标删除与 2026-11-03 语言切换两次记录在案的授权变更外不改历史字节；PROTO-01/03来源/许可事实仍待补证，原型主题不是正式schema 1包。
 - [应用图标](./assets/app-icon/README.md)、[素材来源](./assets/provenance.md)、[架构总览](./assets/v1-architecture.svg)、[模块目录](./assets/v1-modules.svg)分别负责正式资源、来源与规划视图。
 
 2026-11-01已按用户要求清理旧过程报告/审计目录，必要决定与状态已迁入现有入口，见[收敛决定](./decisions.md#18-2026-11-01-仓库过程产物收敛)。现行文档中的旧报告引用标为历史并指向清理前Git版本；它们只说明当时分项，不能证明当前工作树或M0/V出口。原 `docs_bak/`、`reports/` 也已授权删除；不为恢复过程痕迹重新生成目录。

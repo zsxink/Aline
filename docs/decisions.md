@@ -522,7 +522,7 @@
 
 用户答复“待确认的清单采纳你的建议”，13题推荐均为A；[原话/完整问题/决定与回写](./archive/2026-10-30-migration-decisions.md)。WC-01新增有归属/版本/容量/生命周期、按类去重的会话内存降级汇总（PRD APP-06），由UI呈现、不持久化敏感内容；WC-02不新增通用命令catch，WC-03不以签名拒收有效UTF8，WC-04只在明确不支持且临时文件/替换访问语义已证明安全时允许权限复制失败后继续，WC-05仅逐文档恢复/丢弃，WC-06无设默认按钮/自动改默认，WC-07保留三项缺项占位。
 
-PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02山丘仅随原型，PROTO-04长期保留只读历史副本，PROTO-05旧视觉值仅候选，PROTO-06按逐篇复核/必要证据保全/引用核对实施。完整Zed调研已迁入，历史来源见[证据索引](./archive/migration-evidence/README.md)。策略已确认不等于许可已证明或V实验已执行；[收尾结论（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/maintenance/deletion-readiness/prior-evidence/closure-report.md)不授权删除旧目录。
+PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02山丘仅随原型，PROTO-04长期保留历史副本，PROTO-05旧视觉值仅候选，PROTO-06按逐篇复核/必要证据保全/引用核对实施。2026-11-03 用户另行授权原型语言切换，见第23节。完整Zed调研已迁入，历史来源见[证据索引](./archive/migration-evidence/README.md)。策略已确认不等于许可已证明或V实验已执行；[收尾结论（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/maintenance/deletion-readiness/prior-evidence/closure-report.md)不授权删除旧目录。
 
 ## 12. 2026-10-30 应用图标采用与旧图删除
 
@@ -605,3 +605,11 @@ PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02
 回写：[UI 规范 §2](./ui-spec.md#2-参照来源与使用限制)、新增 §4.1 原型布局对照（实现参照）、[原型整理入口](./prototype/README.md)、[docs/README.md](./README.md) 与 [AGENTS.md](../AGENTS.md) 文档地图及工作方式。本条是 UI 细化——不新增产品能力，不改 PRD/AC、跨模块契约、依赖与架构边界、阶段范围或验收方式，故按[开发流程 §2](./development-process.md#2-openspec-变更流程)以现行规范回写，不另开 OpenSpec 变更；像素、命中尺寸、可访问性与收口仍由 V-09 处理。本条不表示原生 UI 已实现，也不表示任何 V 项已通过。
 
 已知冲突以 UI 规范 §4.1“冲突裁决”记录：工具栏的文件操作常驻按钮、编辑模式位置、段落/插入常驻数量，状态栏的专注按钮，以及侧栏 250px 与原型旧 README 分类，均以已确认规范为准。
+
+## 23. 2026-11-03 原型界面语言切换
+
+用户要求在 `docs/prototype/legacy/index.html` 的设置中加入语言设置（简体中文 / English），并明确“真的切换，界面文案跟着变”。在“只有控件、不翻译”与“直接改 legacy”之间，用户选择“直接改 legacy（推荐）”，授权修改历史副本并同步哈希/账本。
+
+实现限于原型：新增 `i18n.js`，在设置 → 通用 → 语言提供跟随系统 / 简体中文 / English；界面文案、菜单、对话框、提示与可访问名称即时切换，偏好写入本 origin 的 localStorage（`aline.prototype.locale`）；文档正文、文件名与用户导入主题的自带文案不翻译。修改 `index.html`（加载 i18n.js、脚本缓存版本）、`prototype.js`（语言行与内部页面键）、`interactions.js`（设置记忆按内部键）、`menus.js`（菜单动作读取内部标签），其余40个历史文件保持原字节。授权链、新增文件哈希与验证边界见 [inventory.json](./prototype/inventory.json)。
+
+该实现是 DOM 层演示，不是正式 i18n 架构或原生能力证据；不改变 PRD APP-04、UI 规范 §14 或原生 M1 范围（即时切换控件仍不在 M1），也不表示 V-09 或三平台本地化验收通过。浏览器原型检查：73 项断言通过（中文基线、英文全界面、动态计数/光标/未命名文档、主题库与预览、插件选项值保持、跨语言设置恢复、刷新持久化、切回中文），并另行核对英文系统菜单动作（设置、关于、快捷键、视图切换、侧栏、专注模式、新建/关闭标签）、中文残留扫描与无 JS 异常；这些只证明当前浏览器原型，不证明原生实现。

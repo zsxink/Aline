@@ -446,7 +446,7 @@
   const defaultPages = {};
   const originalPage = window.setPage;
   function rememberSettings() {
-    const page = q('#settings-current-page').textContent;
+    const page = q('#settings-current-page').dataset.page || q('#settings-current-page').textContent;
     settingsState[page] = qa('#settings-content input,#settings-content select,#settings-content .toggle').map(el => el.matches('.toggle') ? el.classList.contains('active') : el.value);
   }
   function settingsPage(page) {

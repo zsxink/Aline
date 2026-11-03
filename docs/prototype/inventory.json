@@ -431,6 +431,52 @@
       "new_sha256": "816c119e4b0c48fc9dfdcecf96397515d400a070fc47a767241752052f330843",
       "replacement": "docs/assets/app-icon/aline.png",
       "replacement_sha256": "fed6b07ef4e94d48d14cb70a19b91d2f17c1650834d7dbf620ada94ca6cbfd37"
+    },
+    {
+      "date": "2026-11-03",
+      "authorization": "用户要求为原型设置增加界面语言（简体中文/英文）并真实切换界面文案；经裁决直接修改 legacy 并同步账本。",
+      "path": "docs/prototype/legacy/index.html",
+      "action": "update",
+      "reason": "language_switch",
+      "old_sha256": "816c119e4b0c48fc9dfdcecf96397515d400a070fc47a767241752052f330843",
+      "new_sha256": "c1baa03cd38ea369ee4211304a9645fcce51e275cc193431f675d22dac50ae39"
+    },
+    {
+      "date": "2026-11-03",
+      "authorization": "用户要求为原型设置增加界面语言（简体中文/英文）并真实切换界面文案；经裁决直接修改 legacy 并同步账本。",
+      "path": "docs/prototype/legacy/prototype.js",
+      "action": "update",
+      "reason": "language_switch",
+      "old_sha256": "ceacef60d03c13d21ae7012972d1430004fb30aa7a0118c8406b8a8c507d03d6",
+      "new_sha256": "afc249e51a94afce1b5203fe87d6b697833a39080647f2239144a78e7649bebb"
+    },
+    {
+      "date": "2026-11-03",
+      "authorization": "用户要求为原型设置增加界面语言（简体中文/英文）并真实切换界面文案；经裁决直接修改 legacy 并同步账本。",
+      "path": "docs/prototype/legacy/interactions.js",
+      "action": "update",
+      "reason": "language_switch",
+      "old_sha256": "60afb32f169344d5bd5adc80e6763b5bd969d3aa75632e67ed828bf9fcecdd29",
+      "new_sha256": "df422966dc37478eddd569be98da23426c432613bc15e04f8954eccc1fc42b6b"
+    },
+    {
+      "date": "2026-11-03",
+      "authorization": "用户要求为原型设置增加界面语言（简体中文/英文）并真实切换界面文案；经裁决直接修改 legacy 并同步账本。",
+      "path": "docs/prototype/legacy/menus.js",
+      "action": "update",
+      "reason": "language_switch",
+      "old_sha256": "4bb285c15a492a45417e405084bad2b854b2cc03d756baaaa7eb6ce5da6bcb2a",
+      "new_sha256": "74944a1d58a302e04906112dc2f98ad79724ec11da19a335c392cc25d3be8fef"
+    }
+  ],
+  "added_files": [
+    {
+      "path": "docs/prototype/legacy/i18n.js",
+      "bytes": 36450,
+      "sha256": "85d23eba6dbdfe23b85d5b4c8d30129aa1cfc37f8410de02d7411a8615d5b9bf",
+      "date": "2026-11-03",
+      "authorization": "用户要求为原型设置增加界面语言（简体中文/英文）并真实切换界面文案；经裁决直接修改 legacy 并同步账本。",
+      "purpose": "原型界面语言切换：跟随系统/简体中文/English，DOM 文案即时切换并持久化；不翻译文档正文、文件名或用户主题自带文案"
     }
   ]
 }

@@ -1,6 +1,8 @@
 # 原型与素材逐文件账本
 
-后续状态（2026-10-30）：用户要求采用新应用图标并删除旧图，两份旧 PNG 已删除，legacy/index.html 仅更新三处引用，现存44个legacy文件；43文件保持原字节。下表保留初次48项盘点及当时目标，不表示旧图仍存在或可用于开发。精确授权与现状哈希见 [inventory.json](./inventory.json) 的 authorized_updates，开发选图见[图标说明](../assets/app-icon/README.md)。
+后续状态（2026-10-30）：用户要求采用新应用图标并删除旧图，两份旧 PNG 已删除，legacy/index.html 仅更新三处引用，当时现存44个legacy文件；43文件保持原字节。下表保留初次48项盘点及当时目标，不表示旧图仍存在或可用于开发。精确授权与现状哈希见 [inventory.json](./inventory.json) 的 authorized_updates，开发选图见[图标说明](../assets/app-icon/README.md)。
+
+后续状态（2026-11-03）：用户要求原型设置增加界面语言（简体中文/英文）并真实切换界面文案；经裁决直接修改 legacy，新增 i18n.js，修改 index.html、prototype.js、interactions.js、menus.js，现存45个legacy文件，其中40个仍与初次清单逐字节一致。授权链、新增文件大小/哈希见 [inventory.json](./inventory.json) 的 authorized_updates 与 added_files；这是原型演示，不改变原生 M1 范围。变更用途见下节。
 
 初次盘点日期：2026-10-30。范围含旧原型46文件、旧icons目录2文件，共48项；其中2个系统文件不迁移。`docs_bak/docs/assets/` 不存在，不虚构已迁移内容。逐字节副本45项；旧icons PNG复用现有参考1项；没有删除原件。
 
@@ -59,6 +61,18 @@
 | `docs_bak/docs/icons/.DS_Store` | 系统文件：macOS Finder 元数据 | 无运行资源引用 | 不适用 | 废弃建议明确，无长期参考价值；原件未删 | 无需迁移；保留原件待整体删除 |
 | `docs_bak/docs/icons/Aline.png` | 品牌重复 PNG：512×512 RGBA；与两个现存PNG字节相同 | 旧 UI 稿图标链接；现行 PRD/UI 已指向 docs/assets/aline.png | PRD §6.1；UI §3.1 | 不再新增重复正式资产；授权待 PROTO-01 | 复用现有参考；`docs/assets/aline.png` |
 
+## 2026-11-03 语言切换新增与修改
+
+用户要求“真的切换，界面文案跟着变”，并裁决直接修改 `legacy/`。新增 `i18n.js` 在 DOM 层按现有中文源文案切换界面语言；修改的四个历史文件只做必要的内部键与加载接入，不改变原有历史交互范围。精确字节与授权链以 [inventory.json](./inventory.json) 为准。
+
+| 路径 | 类别/用途 | 依赖/影响 | 处置边界 |
+|---|---|---|---|
+| `i18n.js` | JavaScript：中→英词表、动态文案规则、DOM/属性翻译、MutationObserver、localStorage 偏好 | index.html 首个脚本；读取 `#editor`、系统菜单、设置/主题/对话框等现有 DOM | 新增；原型演示，不是正式 i18n 架构或原生能力证据 |
+| `index.html` | 页面入口：增加 i18n.js 加载与脚本缓存版本 | 静态加载顺序 | 授权修改；三处图标引用仍指向共享新 PNG |
+| `prototype.js` | 设置模板：通用页新增“语言”分组与内部页面键 `dataset.page` | 设置导航、插件可见性 | 授权修改；不改变其他设置模板 |
+| `interactions.js` | 设置记忆改用内部页面键，避免英文显示值破坏恢复 | 设置控件状态 | 授权修改；不改变保存/交互逻辑 |
+| `menus.js` | 菜单项保留内部 `data-label` 供动作判断 | 系统菜单动作 | 授权修改；修复英文下动作退化为提示的问题 |
+
 ## 视觉素材与来源
 
 | 素材 | 尺寸/格式/数量 | 已知来源线索 | 授权与使用限制 |
@@ -76,7 +90,7 @@
 index.html
   ├─ measure.css → prototype.css → light.css → menus.css → theme-gallery.css（加载顺序）
   ├─ ../../assets/app-icon/aline.png（当前共享图标；旧品牌 PNG 已删除）
-  └─ prototype.js → icons.js → menus.js → showcase.js → interactions.js → theme-library.js
+  └─ i18n.js → prototype.js → icons.js → menus.js → showcase.js → interactions.js → theme-library.js
        ├─ showcase/interactions → assets/showcase-landscape.svg
        └─ theme-library → themes/index.json → 4×theme.json
                            └─ 各自3配置JSON + 3模式SVG
