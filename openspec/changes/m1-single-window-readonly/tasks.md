@@ -1,6 +1,6 @@
 # Tasks
 
-任务按实际实施与验证状态逐项标记；用户已授权 apply，不包含 commit/push/archive。M0 的 2026-11-02 用户验收豁免继续有效，证据缺口保留。**纯机制 1～3 已完成无头部分；4.1 的后端候选、精确许可证/metadata 路径与 GPUI 指纹均获具体裁决，准入策略、7 场景真实图及完整自测已通过。4.2 的锁定离线 app build 与 macOS 原生空窗显示/退出已验证；4.3 两种系统首选语言真实启动已验证；4.4 文件打开/取消/关闭真实操作已接通。5.1 变高虚拟阅读和精确 1 MiB 双视图首尾滚动已取得 macOS 实测证据。5.2 命中、5.3 锚点恢复/预算边界、内容与导航/字体视图尚未完成。**
+任务按实际实施与验证状态逐项标记；用户已授权 apply，不包含 commit/push/archive。M0 的 2026-11-02 用户验收豁免继续有效，证据缺口保留。**纯机制 1～3 已完成无头部分；4.1 的后端候选、精确许可证/metadata 路径与 GPUI 指纹均获具体裁决，准入策略、7 场景真实图及完整自测已通过。4.2 的锁定离线 app build 与 macOS 原生空窗显示/退出已验证；4.3 两种系统首选语言真实启动已验证（2026-11-03 裁决后界面语言取证只做中文，见[决定 §24](../../../docs/decisions.md#24-2026-11-03-验证取证只做中文)）；4.4 文件打开/取消/关闭真实操作已接通。5.1 变高虚拟阅读和精确 1 MiB 双视图首尾滚动已取得 macOS 实测证据。5.2 命中、5.3 锚点恢复/预算边界、内容与导航/字体视图尚未完成。**
 
 2026-11-03 用户决定把原独立变更 `m1-main-window-skeleton` 并入本变更并删除，其任务成为第 9～15 组、证据与本变更共用同一运行目录根。**并入范围尚未开始：`crates/aline-ui/src/document/statistics.rs` 与 `crates/aline-ui/src/native_window/geometry.rs` 只有落盘草稿，未接入模块树、无测试、无证据，任务 9.1/9.2 不因文件存在而完成。**
 
@@ -16,7 +16,7 @@ Requirement 引用缩写仅用于追踪，不另建编号规格：
 | U4 | ui/readonly-document / 点击命中只产生受检源码定位 |
 | U5 | ui/readonly-document / Markdown 有限 HTML 与保护区展示 |
 | U6 | ui/readonly-document / 大纲目录脚注主动导航 |
-| U7 | ui/readonly-document / 普通代码行号与双语键盘基线 |
+| U7 | ui/readonly-document / 普通代码行号与键盘基线 |
 | E1 | engine/markdown / 只读结构展示与局部命中保留统一来源 |
 | E2 | engine/markdown / 导航索引为纯数据且绑定源快照（M1 修改标签等价配对） |
 | D1 | engine/document-core / 只读会话不依赖打开编辑块 |
@@ -65,7 +65,7 @@ Requirement 引用缩写仅用于追踪，不另建编号规格：
 
 - [x] 4.1 提交并完成最小平台后端准入裁决：核对锁定 GPUI 的 `with_platform`/原生后端缺口、候选类型、来源/版本/许可证/依赖闭包/features/目标/unsafe 所属及系统语言来源。用户已批准 `gpui-pre-macos@0.3.9` + `sys-locale@0.3.2`，三个精确 MPL 包例外、精确 `libloading@0.8.9` ISC metadata-only 路径、wasi/wasip2 登记路径与新增9条 wasip2 边，以及7个 M1 GPUI 组合图指纹。完整工程自测117/117、路径并集14/14、许可证回归13/13通过；真实准入 all、all-features 与五目标场景均通过；五个 desktop target 的 dwrote/libloading tree 均未选中。证据 `<evidence>/native-admission/` 与 `<evidence>/root-admission/real-after-libloading/`。限制：当前环境无 `xcrun metal`，最小原生 build 尚未通过；该限制归 4.2/平台验证，不伪称窗口已接通。
 - [x] 4.2 仅在4.1已获准后，按批准的精确范围完成后端准入接线，再用锁定 GPUI `with_platform` 在 ui 装配主循环/一个空窗口并保持 app 薄入口；核对实际原生构建与 Metal 工具，不安装/升级绕过。验收 `cargo build -p aline --locked --offline`、`cargo run -p aline --locked --offline` 后真实 macOS 显示/关闭单窗，以及 `python3 scripts/check_engineering.py --ledger <evidence>/native-admission/ledger.json --output-dir <evidence>/native-admission`；摘要回填 V-01，明确仅 macOS 首轮、Intel/Win10/Linux 未测。2026-11-03 Xcode 27.2/Metal Toolchain 可用后，锁定离线构建通过；真实窗口截图确认白色画布和本地化空状态，退出后运行正常返回。证据 `<evidence>/native-window/` 与 `<evidence>/native-build-run-after-metal/`；仍未覆盖文档选择/加载，这属于4.4。
-- [x] 4.3 为已开放标题/无文档/加载/只读/错误/action 新增 zh-CN/en catalog，按4.1查明的真实系统首选语言来源接 Locale 与最小配置；检测失败回退可见，不假定 GPUI 有 locale API。测试缺 key/插值漂移和未知语言回退，所有错误枚举在 UI 翻译。验收 `cargo test -p aline-app-core`、`cargo test -p aline-ui catalog`、两语言真实启动与默认系统语言检测；系统首选语言从 `zh-Hans-CN` 切到 `en-US` 实测窗口英文，再恢复 `zh-Hans-CN` 并实测中文；三项 Cargo 测试通过，证据 `<evidence>/catalog/`，回填 UI §14/V-09 已测边界。
+- [x] 4.3 为已开放标题/无文档/加载/只读/错误/action 新增 zh-CN/en catalog，按4.1查明的真实系统首选语言来源接 Locale 与最小配置；检测失败回退可见，不假定 GPUI 有 locale API。测试缺 key/插值漂移和未知语言回退，所有错误枚举在 UI 翻译。验收 `cargo test -p aline-app-core`、`cargo test -p aline-ui catalog`、真实系统首选语言检测与中文界面启动；系统首选语言 `zh-Hans-CN` 实测中文窗口（2026-11-03 裁决前的 `en-US` 英文启动记录保留为历史，不再作为后续必需步骤）；三项 Cargo 测试通过，证据 `<evidence>/catalog/`，回填 UI §14/V-09 已测边界。按[决定 §24](../../../docs/decisions.md#24-2026-11-03-验证取证只做中文)验证取证只做中文。
 - [x] 4.4 接 GPUI 路径选择到同一打开 action（按钮/文件菜单/Cmd+O），关闭文档/系统关闭归统一只读生命周期；覆盖取消焦点返回、读取失败/替换/关闭晚到，用户写入不可用。验收 `cargo test -p aline-ui --test readonly_open` 和真实 macOS 选择 `.md`/`.MD`、取消、多次打开、关闭；协调器/只读打开回归、当前离线 UI Clippy/app build 通过，真实按钮/Cmd+O、`.md`/`.MD`、取消后文档与焦点保持、关闭文档回到同窗空态已实测；打开 1 MiB 夹具也成功，证据 `<evidence>/native-open/` 与 `<evidence>/virtualization/`，回填 UI §4/10/12 的阶段接线及 V-01/V-09，不建关联/拖放/CLI/多窗。
 
 ## 5. Virtual Views and Hit Testing
@@ -91,7 +91,7 @@ Requirement 引用缩写仅用于追踪，不另建编号规格：
 依赖 4～6；关联全部 U/E1/D1/G1，架构 §13 出口、AC-01/09/15/16/20 **分项**，V-01/04/05/07/09；CODE_STANDARDS §6，R-11/17，S-2/12/14/19。
 
 - [ ] 7.1 建可复跑的 M1 Release 测量入口（拟新增 `python3 scripts/run_m1_readonly.py --suite performance --output-dir <evidence>/performance`），先用独立时间序列正例验证分位数/样本数与阶段归属，错误/缺指标/取消/旧运行结果不得伪成功；真实执行 design §8 的尺寸/复杂度/冷热/至少20次方案，记录首屏、切模式、滚动、分段成本/排队、P50/P95、最长主线程停顿、峰值内存与虚拟实例。回填 V-05 首轮结果，明确没有编辑/输入/查找/资源时延成绩，不判完整 AC-16。
-- [ ] 7.2 在真实 macOS 上执行 V-09 主窗无文档/加载/正常/失败/取消/回退、窄窗/高 DPI/长英文、打开与双视图/大纲/反馈键盘焦点矩阵；入口拟为 `python3 scripts/run_m1_readonly.py --suite window-baseline --output-dir <evidence>/window-baseline`，脚本输出检查清单并记录人工结果，缺少人工观测不能自动通过。回填 V-09 尺寸/默认/平台观测，AC-15/20 仅主窗/行号贡献；保留 Windows 10/Intel Mac/Linux 与完整设置/菜单/主题矩阵未测。
+- [ ] 7.2 在真实 macOS 上执行 V-09 主窗无文档/加载/正常/失败/取消/回退、窄窗/高 DPI/长英文文件名、打开与双视图/大纲/反馈键盘焦点矩阵；界面语言只核对中文（[决定 §24](../../../docs/decisions.md#24-2026-11-03-验证取证只做中文)）。入口拟为 `python3 scripts/run_m1_readonly.py --suite window-baseline --output-dir <evidence>/window-baseline`，脚本输出检查清单并记录人工结果，缺少人工观测不能自动通过。回填 V-09 尺寸/默认/平台观测，AC-15/20 仅主窗/行号贡献；保留 Windows 10/Intel Mac/Linux 与完整设置/菜单/主题矩阵未测。
 - [ ] 7.3 跨组执行阅读字节不变端到端：BOM/混合行尾/孤立 CR/空白/无尾换行，打开→滚动→命中→主动跳转→两视图往返→关闭，前后实际磁盘 bytes 和内存源码精确比较、无草稿/空历史，保真失败非零。验收拟新增 `python3 scripts/run_m1_readonly.py --suite readonly-bytes --output-dir <evidence>/readonly-bytes` 与 `cargo test -p aline-ui --test readonly_document`；回填 AC-01 阅读/字节和 AC-09 只读展示分项，保存/重开明确归 M2。
 - [ ] 7.4 守卫如因公开面/原生 feature/catalog/证据入口变化需要更新，最小增量修改既有入口并先运行正例及最小违规反例：只读误开块/半字符或旧范围（领域测试）、漏继承成员/引擎间接 GPUI/硬编码或缺 catalog key/不归一化证据/缺测量字段（对应既有或新增检查），准确区分自动检查与人工盲区。验收受影响 `--self-test` 与 `python3 scripts/check_public_api.py --output-dir <evidence>/public-api`、`python3 scripts/check_validation_output.py --output-dir <evidence>/evidence-guard`；受审依赖漂移不得自动刷新通过，证据 `<evidence>/guards/`。
 - [ ] 7.5 执行完整 `cargo fmt --all --check`、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo test --workspace`，以及 `python3 scripts/check_workspace.py --cargo-home <cargo-cache> --output-dir <evidence>/workspace`；逐一检查八成员实际 lint 继承及工程/安全/公共 API/catalog 结果，不以 all-targets 代表三平台。原始输出经路径归一化留本地；失败不勾任务，证据 `<evidence>/workspace/`。
@@ -108,8 +108,8 @@ Requirement 引用缩写仅用于追踪，不另建编号规格：
 
 关联 W1/W3/W4/W5/G2，UI §3.3/§4.1/§5.4，V-07/V-09；CODE_STANDARDS §2.2/§3，R-3/10/13，S-3/5/7/12/14。
 
-- [ ] 9.1 在 `crates/aline-ui/src/document/` 建并登记 `statistics` 模块（现有草稿未接入模块树，不算完成）：纯函数 `DocumentStatistics::compute(source: &str) -> DocumentStatistics`，口径为非空白 Unicode 标量值计数与按 LF 的行数（`max(1, LF+1)`）。先写独立预期测试（拟新增 `crates/aline-ui/tests/document_statistics.rs`）覆盖空文本、纯空白、中英文、标点、emoji ZWJ、组合字符、CRLF、孤立 CR、无末尾换行；行数口径与 `aline_buffer::LineIndex::line_count()` 一致。验收 `cargo test -p aline-ui --test document_statistics`；证据 `<evidence>/statistics/`。
-- [ ] 9.2 在 `crates/aline-ui/src/native_window/` 建并登记 `geometry` 模块的几何来源（纯数值、不依赖 GPUI，可被无头测试以 `#[path]` 直接引入）：区域高度（工具栏 44 / 状态栏 28）、内容列最大宽 880、水平内边距 56、垂直内边距 40/100、窄窗档位 900（28/30/80）与 600（20/24/60）、字号 16 与行高 28（16×1.75）；纯函数 `content_metrics(window_width, area_width)` 产出档位、列宽与文本宽。GPUI 元素装配另置 `shell.rs`（任务 10.1），其中不定义第二套数值。先写无头测试（拟新增 `crates/aline-ui/tests/window_geometry.rs`）覆盖三档边界值、极窄窗口与列宽下限。验收 `cargo test -p aline-ui --test window_geometry`；证据 `<evidence>/geometry/`。
+- [ ] 9.1 在 `crates/aline-ui/src/document/` 建并登记 `statistics` 模块（现有草稿未接入模块树，不算完成）：纯函数 `DocumentStatistics::compute(source: &str) -> DocumentStatistics`，口径为非空白 Unicode 标量值计数与按 LF 的行数（`max(1, LF+1)`）。先写独立预期测试（拟新增 `crates/aline-ui/tests/document_statistics.rs`）覆盖空文本、纯空白、中英文、标点、emoji ZWJ、组合字符、U+FEFF、U+0085、CRLF、孤立 CR、无末尾换行；行数口径与 `aline_buffer::LineIndex::line_count()` 一致。验收 `cargo test -p aline-ui --test document_statistics`；证据 `<evidence>/statistics/`。
+- [ ] 9.2 在 `crates/aline-ui/src/native_window/` 建并登记 `geometry` 模块的几何来源（纯数值、不依赖 GPUI，可被无头测试以 `#[path]` 直接引入）：区域高度（工具栏 44 / 状态栏 28）、内容列最大宽 880、水平内边距 56、垂直内边距 40/100、窄窗档位 900（28/30/80）与 600（20/24/60）、字号 16 与行高 28（16×1.75）；纯函数 `content_metrics(window_width, area_width)` 产出档位、列宽与文本宽。`SCROLLBAR_WIDTH`、`MIN_TEXT_WIDTH` 与窄窗收缩规则是本实现的实验候选，注释须与原型像素区分，不得写成原型冻结值。GPUI 元素装配另置 `shell.rs`（任务 10.1），其中不定义第二套数值。先写无头测试（拟新增 `crates/aline-ui/tests/window_geometry.rs`）覆盖三档边界值、极窄窗口与列宽下限，并在 `area_width >= SCROLLBAR_WIDTH` 时断言 `column_width + SCROLLBAR_WIDTH <= area_width`；内容区窄于滚动条宽属不可用退化尺寸，只断言列宽为 0、由平台窗口尺寸下限兜底。验收 `cargo test -p aline-ui --test window_geometry`；证据 `<evidence>/geometry/`。
 - [ ] 9.3 核对几何来源唯一性：把 `readonly_reader.rs` 自带的 `COLUMN_WIDTH`/`SCROLLBAR_WIDTH`/`FONT_SIZE`/`LINE_HEIGHT` 迁出并删除原常量，确保全文只有 `geometry.rs` 一处出处；用 `rg`/CodeGraph 确认无第二处同值定义。证据 `<evidence>/geometry/grep/`。
 
 ## 10. 主窗口区域骨架
@@ -125,6 +125,7 @@ Requirement 引用缩写仅用于追踪，不另建编号规格：
 
 - [ ] 11.1 按已确认分组顺序渲染工具栏行：M1 只出现"编辑模式"组（可视化 / 源码），且仅在文档已打开时出现，当前模式用强调色弱背景 + 强调色文字表达选中态；范围外分组（侧栏、行内格式、段落/插入、导出、设置）既不出现也不置灰占位。
 - [ ] 11.2 控件可达性：两个模式按钮可鼠标点击、可 Tab 到达、Enter/Space 激活，焦点有可见边界，`aria_label` 取自 catalog 名称；不引入原型 SVG（PROTO-03 许可未补证），只用文字标签。验收真实窗口键盘操作与既有 `FocusNext`/`FocusPrevious` 不冲突；证据 `<evidence>/toolbar/`。
+- [ ] 11.3 工具栏行左侧应用品牌区：从 `docs/assets/app-icon/aline.png` 加载或内嵌图标（按目标尺寸缩放，不二次加白底或圆角），与产品名 `Aline` 一起显示，无文档时也可见；不复制原型 `icons.js` SVG，不新增文件菜单或最近记录。macOS 包/Dock 图标仍由 `aline.icns` 在打包阶段接入（V-01/M6），Windows/Linux 分别使用 `aline.ico`/`aline.png`，本轮只验证窗口内品牌显示，不声称打包图标已接入。验收真实 macOS 窗口截图（有/无文档）与图标资源身份检查；证据 `<evidence>/brand/`。
 
 ## 12. 状态栏统计与身份
 
@@ -147,7 +148,7 @@ Requirement 引用缩写仅用于追踪，不另建编号规格：
 关联 W2/W3，UI §14，AGENTS 铁律 7；S-7/11。
 
 - [ ] 14.1 在 `crates/aline-app-core/locales/zh-CN.toml` 与 `en.toml` 新增状态栏统计与占位符键（字符数、行数、统计未就绪占位），双语同键同占位符；`Translator::embedded` 的既有键集合与占位符校验必须覆盖新键，任一侧缺失即启动失败。验收 `cargo test -p aline-app-core` 与 `cargo test -p aline-ui catalog`；证据 `<evidence>/catalog/`。
-- [ ] 14.2 真实窗口分别以 zh-CN 与 en 启动，确认状态栏数值、占位符与模式标签完整可读，无缺 key、无插值漂移；证据 `<evidence>/catalog/`。
+- [ ] 14.2 真实窗口以中文界面启动，确认状态栏数值、占位符与模式标签完整可读，无缺 key、无插值漂移（[决定 §24](../../../docs/decisions.md#24-2026-11-03-验证取证只做中文)：界面取证只做中文，英文由 14.1 的自动校验覆盖）；证据 `<evidence>/catalog/`。
 
 ## 15. 骨架门禁、真实窗口与回填
 
