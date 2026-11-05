@@ -4,9 +4,9 @@ context: |
   Language: zh-CN
   All artifacts must be written in zh-CN.
   Keep OpenSpec structural headings and SHALL/MUST keywords in English.
-  Aline is a Rust + GPUI Markdown editor. An eight-member Cargo workspace, headless engine foundations and engineering guards exist; the M0 exit remains open and no usable native UI is available.
+  Aline is a Rust + GPUI Markdown editor. An eight-member Cargo workspace, headless engine foundations and engineering guards exist; M0 was accepted by user waiver on 2026-11-02 with evidence gaps still open, and M1 (native single-window readonly) is in progress with a partially implemented native window.
   Authoritative product scope: docs/v1-prd.md. Architecture and implementation constraints: AGENTS.md and the current docs linked from docs/README.md. Validation evidence: docs/v1-validation-plan.md.
-  OpenSpec records proposed changes and implementation plans; it does not supersede confirmed repository docs. Cite relevant sections and do not turn unverified plans into claims of completed validation.
+  OpenSpec records proposed changes and implementation plans; it does not supersede confirmed repository docs. Cite relevant sections and do not turn unverified plans into claims of completed validation. Since 2026-11-03, manual/native UI evidence is Chinese-only (decision 24); bilingual catalog key/placeholder automatic checks remain mandatory.
   Follow docs/development-process.md and docs/v1-architecture.md §13 for M0–M6 sequencing and phase exits.
   Mandatory engineering baseline: openspec/CODE_STANDARDS.md and openspec/specs/engineering-governance/spec.md. Read them and the affected current docs before coding or reviewing. They supplement implementation governance; existing product and confirmed architecture contracts retain their responsibilities.
   Divide modules by responsibility, state ownership, lifecycle and testable boundaries; line counts are review signals rather than automatic split thresholds. Use design patterns only for real boundaries, variation or testing needs, and prefer the simplest sufficient concrete implementation.

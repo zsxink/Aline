@@ -20,7 +20,7 @@ Aline —— Typora 式 Markdown 编辑器（Rust + GPUI，无 WebView），macO
 | [docs/v1-prd.md](docs/v1-prd.md) | V1 产品范围、非目标、行为与 AC-01～AC-20 | 判断一个功能该不该做 |
 | [docs/v1-validation-plan.md](docs/v1-validation-plan.md) | V-01～V-09 实验、样本与阶段依赖，当前均未执行 | 判断技术和验收是否已有证据 |
 | [docs/plugin-system.md](docs/plugin-system.md) | V1 内置插件的产品行为、设置归属、启停与架构边界 | 设计或实现插件功能和插件设置前 |
-| [docs/ui-spec.md](docs/ui-spec.md) | 产品界面规范：布局/交互/视觉基线、图片只读 tab、菜单/设置/主题、键盘与中英文验收；§4.1 原型布局对照（实现参照）；UI-01～UI-06 已确认，原问题见 [UI 确认归档](docs/archive/2026-10-29-ui-decisions.md)，V 项仍未执行 | 实现或评审任何面向用户的界面 |
+| [docs/ui-spec.md](docs/ui-spec.md) | 产品界面规范：布局/交互/视觉基线、图片只读 tab、菜单/设置/主题、键盘与中文界面验收（决定 §24：人工/原生取证只做中文，双语 catalog 自动校验保留）；§4.1 原型布局对照（实现参照）；UI-01～UI-06 已确认，原问题见 [UI 确认归档](docs/archive/2026-10-29-ui-decisions.md)，V 项仍未执行 | 实现或评审任何面向用户的界面 |
 | [docs/theme-package-spec.md](docs/theme-package-spec.md) | 自定义主题包格式、可配置样式字段、继承规则和导入校验 | 设计或实现主题包字段与主题加载前 |
 | [docs/v1-architecture.md](docs/v1-architecture.md) | 实施蓝图：crate 划分、模块骨架、各功能组实现方案、里程碑 M0–M6（历史蓝图处置见 §15） | 实现任何功能前 |
 | [docs/rust-style-guide.md](docs/rust-style-guide.md) | Rust 代码规范：强制/建议/待验证、S/C 规则检查、工具链、坐标分型、错误/panic/unsafe、测试与提交；RS-01～RS-05/ED-01 已确认，原问题见 [确认归档](docs/archive/2026-10-29-rust-style-decisions.md) | 写任何 Rust 代码前 |
@@ -28,7 +28,7 @@ Aline —— Typora 式 Markdown 编辑器（Rust + GPUI，无 WebView），macO
 | [docs/zed-notes.md](docs/zed-notes.md) | Zed逐主题复核与完整历史证据入口；旧“照搬”标签不作当前决定，主线与gpui-pre有API代差 | UI / GPUI 实现时仅作机制线索，须核对锁定源码及 V 验证 |
 | [docs/decisions.md](docs/decisions.md) | 决策时间线 + 常设决定清单（含 2026-10-26 复核裁决） | 争议选型查先例 |
 | [docs/wordcraft-study.md](docs/wordcraft-study.md) | WordCraft（storytold/wordcraft @ 0.11.0）调研：手写 markdown 解析的抗退化工程、性能案例库、保真方法论、敌意输入防御；原文实际 21 条提案，W22～W24 缺项，WC-01～WC-07 已确认A，技术验证仍未执行 | 实现自研扫描 pass、文件层/保存、安全上限、formatter 时对照 |
-| [docs/quiet-md-study.md](docs/quiet-md-study.md) | quiet-md 工程实践调研与 Aline 采纳方案（研究文档，非权威）：fuzz/不变量、性能报告、保存/恢复、IME、语义 token、中文排版、离屏证据；QMD-01 已把方法回写规范，治理入口为 change `qmd-01-engineering-practices`，W0～W7 未立项（与 WordCraft W22～W24 不共用编号空间） | 做引擎测试、保存恢复、字体/主题或补强验证证据时对照；实施前按开发流程逐项建档 |
+| [docs/quiet-md-study.md](docs/quiet-md-study.md) | quiet-md 工程实践调研与 Aline 采纳方案（研究文档，非权威）：fuzz/不变量、性能报告、保存/恢复、IME、语义 token、中文排版、离屏证据；QMD-01 已把方法回写规范，治理 delta 已并入 change `m1-single-window-readonly`，W0～W7 未立项（与 WordCraft W22～W24 不共用编号空间） | 做引擎测试、保存恢复、字体/主题或补强验证证据时对照；实施前按开发流程逐项建档 |
 
 ## 架构铁律（任何代码不得绕过）
 

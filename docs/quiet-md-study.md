@@ -1,6 +1,6 @@
 # quiet-md 工程实践调研与 Aline 采纳方案
 
-更新日期：2026-11-05 · 修订：2026-11-06（事实与来源校正） · 状态：调研与独立复核完成；工程/验证方法已按[决定 QMD-01](./decisions.md#25-2026-11-05-quiet-md-工程实践采纳qmd-01)回写现行规范，治理入口为 OpenSpec change [`qmd-01-engineering-practices`](../openspec/changes/qmd-01-engineering-practices/proposal.md)，W0～W7 未立项；未修改代码
+更新日期：2026-11-05 · 修订：2026-11-06（事实与来源校正） · 状态：调研与独立复核完成；工程/验证方法已按[决定 QMD-01](./decisions.md#25-2026-11-05-quiet-md-工程实践采纳qmd-01)回写现行规范，治理 delta 已并入 OpenSpec change [`m1-single-window-readonly`](../openspec/changes/m1-single-window-readonly/proposal.md)，W0～W7 未立项；未修改代码
 
 交付：quiet-md 快照核对、独立复核、采纳矩阵、W0～W7 工作流、证据与决策门。无代码、依赖或实验产物。复核记录为调研过程，不构成独立入库证据。
 
@@ -470,7 +470,7 @@ M2 再立 `m2-save-recovery` 与 `m2-ime-protocol`。
 
 ## 12. 执行交接
 
-本文先作为参考研究落库；2026-11-05 已按决定 QMD-01 把方法回写现行规范，并由 OpenSpec change [`qmd-01-engineering-practices`](../openspec/changes/qmd-01-engineering-practices/proposal.md) 记录治理入口；不改代码、不加依赖。建议下一步：
+本文先作为参考研究落库；2026-11-05 已按决定 QMD-01 把方法回写现行规范，并由 OpenSpec change [`m1-single-window-readonly`](../openspec/changes/m1-single-window-readonly/proposal.md) 记录治理 delta；不改代码、不加依赖。建议下一步：
 
 1. 用户审阅本文与 QMD-01 的回写范围，确认要授权哪些 W 项；未授权的保持“建议/待验证”。
 2. 对授权项分别建 OpenSpec change，先做 W0 的范围/非目标/证据表，再做实现。

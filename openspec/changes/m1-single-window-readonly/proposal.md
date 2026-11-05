@@ -4,9 +4,11 @@
 
 Aline 已有八成员 workspace、无头引擎和 `aline-ui/document`，但 `app/src/main.rs` 仍是查询应用名后退出的 M0 薄入口，没有原生窗口。按 `docs/v1-architecture.md` §13 和 `docs/development-process.md` §1～3，下一阶段需要把现有源快照、解析与映射接到可检查的原生单文档阅读闭环。
 
-2026-11-03 用户裁决：原生 UI 实现按 `docs/prototype/legacy/` 的 HTML/CSS 对照布局、控件邻接与图标语义；逐区域映射与取值口径已回写 `docs/ui-spec.md` §4.1，并在 `docs/decisions.md` §22 记录。M1 现有原生窗口与这一参照无关：`crates/aline-ui/src/native_window.rs` 的 `render` 把文件名、只读说明、打开/关闭按钮和阅读列表竖排在一列，没有工具栏行、没有状态栏行，也没有原型那样限宽居中的内容列。本变更因而在本轮一并交付主窗口区域骨架与状态栏统计；原独立变更 `m1-main-window-skeleton` 已按 2026-11-03 决定并入本变更并删除，不再单独存在。
+2026-11-03 用户裁决：原生 UI 实现按 `docs/prototype/legacy/` 的 HTML/CSS 对照布局、控件邻接与图标语义；逐区域映射与取值口径已回写 `docs/ui-spec.md` §4.1，并在 `docs/decisions.md` §22 记录。并入骨架范围前，`crates/aline-ui/src/native_window.rs` 的 `render` 把文件名、只读说明、打开/关闭按钮和阅读列表竖排在一列，没有工具栏行、没有状态栏行，也没有原型那样限宽居中的内容列。本变更因而一并交付主窗口区域骨架与状态栏统计；原独立变更 `m1-main-window-skeleton` 已按 2026-11-03 决定并入本变更并删除，不再单独存在。
 
 2026-11-02 用户将 M0 出口及 M1 准入记为通过，性质是**验收豁免和风险接受，不是证据补齐**（`docs/decisions.md` §20、`docs/v1-validation-plan.md`「当前 M0 状态」）。逐包人工复核、E2/E4/E5/E7 整项、E3 全量、E6 未测项及 V-01～V-09 仍未执行或未整项完成；本变更不重开 M0、不关闭这些缺口。
+
+2026-11-06 用户决定把 2026-11-05 决定 QMD-01 建立的治理 change `qmd-01-engineering-practices` 并入本变更并删除。该 change 只把 quiet-md 调研中不改变产品契约的工程/验证方法（来源标注、随机不变量与性能证据、保存/恢复分离、IME 清理与坐标、语义 token/中文排版/离屏证据边界、W0～W7 立项门）写成 `engineering-governance` 的增量要求，并校正回写文档的字段与口径；它没有代码、依赖、夹具或平台证据，15 项范围任务与校验均已完成。合并后其 6 条要求/17 个场景整体移入本变更的 `specs/engineering-governance/spec.md`，方法与效力边界不变：W1～W7 仍未立项，实施前逐项另建 change，不因并入而被视为已批准；本合并不改变 M1 的任务勾选、验收结论或阶段出口，也不批准任何 W 项。记录见[决定 §26](../../../docs/decisions.md#26-2026-11-06-合并-qmd-01-治理-change-并校正口径)。
 
 ## What Changes
 
@@ -14,7 +16,7 @@ Aline 已有八成员 workspace、无头引擎和 `aline-ui/document`，但 `app
 - 可视化按变高块、源码按逻辑行虚拟化，共用内容列宽和主纵向滚动入口；以源码锚点切换两种视图，零文本/历史变化。M1 的只读是阶段能力限制，不是 PRD §8 排除的第三种 Preview 模式（PRD EDIT-01/04、§6.1/7.2，UI §6，架构规范 R-10）。
 - 补齐消费者真正需要的只读结构投影、局部布局到全文映射适配，以及不开编辑块的文档初始化/导航/结果采纳边界。已有 `Parsed` 只有顶层 `BlockKind` 与全文 `Projection`，不能假定已具备完整嵌套展示树；现有 `DocCore::new` 自动开块，不能直接用作只读初始化（引擎 §3/4/6/7，CODE_STANDARDS §2～4）。
 - 展示基础 Markdown、表格结构、五类 Alerts、有限 HTML、灰色脚注/目录/Front matter、大纲层级及主动跳转；代码行号常显。表格仅展示，语言修改/任务框切换等写动作不可用。公式/Mermaid 和图片引用保留原文/可识别回退，不接资产后端、不建图片 tab（PRD MD-01～11、UI §5.3/7/8；架构 §6/13）。
-- 建立 V-03/V-07 基础夹具，安排 V-04 中文字体与静态字体加载实验、V-05 首轮 Release 基准、V-09 主窗中文界面/焦点/尺寸基准，按 V-01 先执行 macOS 原生冒烟。保留 Windows 10、Intel Mac、Linux 和最低系统证据缺口（验证计划对应条目）。界面语言人工取证只做中文（2026-11-03 用户裁决，见 `docs/decisions.md` §24）；双语 catalog 实现与键/占位符自动校验不变。
+- 建立 V-03/V-07 基础夹具，安排 V-04 中文字体与静态字体加载实验、V-05 首轮 Release 基准、V-09 主窗中文界面/焦点/尺寸基准，按 V-01 先执行 macOS 原生冒烟。保留 Windows 10、Intel Mac、Linux 和最低系统证据缺口（验证计划对应条目）。界面语言人工取证只做中文（2026-11-03 用户裁决，见 `docs/decisions.md` §24）；zh-CN/en 双语 catalog 实现与键/占位符自动校验不变，不新增英文界面取证任务。
 
 2026-11-03 范围修订（并入原 `m1-main-window-skeleton`）：
 
@@ -40,7 +42,8 @@ Aline 已有八成员 workspace、无头引擎和 `aline-ui/document`，但 `app
 
 - `engine/markdown`：新增带来源的只读结构展示及局部投影消费契约；修正已由解析器识别的脚注因导航标签匹配不一致而丢目标的契约，不另立解析器或竞争性映射真源。
 - `engine/document-core`：新增不开编辑块的只读会话及导航/结果采纳契约，保留 M0 编辑初始化和输入组协议。
-- `workspace/engineering-gates`：新增 M1 分项证据交接要求与"骨架候选数值不得记为冻结值"要求；复用现有门禁能力，不新建近义治理规格，不改 M0 历史验收要求。
+- `workspace/engineering-gates`：新增 M1 分项证据交接、"骨架候选数值不得记为冻结值"与"界面语言验证只做中文"三条要求；复用现有门禁能力，不新建近义治理规格，不改 M0 历史验收要求。
+- `engineering-governance`（2026-11-06 并入）：新增 QMD-01 方法来源与效力边界、随机不变量/性能证据可复现、保存与恢复分离且故障安全、IME 显式清理与受检坐标、UI 语义 token/中文排版/离屏证据边界、W0～W7 逐项立项门六条要求；均为 ADDED，不修改既有 12 条主规格要求。
 
 ## Impact
 
@@ -48,7 +51,7 @@ Aline 已有八成员 workspace、无头引擎和 `aline-ui/document`，但 `app
 
 工程约束：CODE_STANDARDS §2～6、engineering-governance 全部适用要求；架构规范 R-1～4、R-6～8、R-10～13、R-16～17；Rust S-2～5、S-7～15/16，重点为最窄可见性、零副作用拒绝、类型化错误、引擎无 panic、所有文案 `t("key")`、布局热路径和生命周期。现有 `gpui-pre =0.3.9`、pulldown-cmark 及依赖准入保持；若原生 feature 激活改变受审子图，须重新审计，不能刷新指纹以掩盖漂移（架构 §3.2、引擎 §18.2）。
 
-实施完成后才按真实结果回填 `docs/v1-architecture.md` §13、`docs/v1-validation-plan.md` 相关 V 项及受影响的引擎/UI 公共契约；必要决定回填 `docs/decisions.md`。2026-11-03 用户已授权 apply；本 change 现按该授权修改现行 docs/config/实现，依赖候选已按 tasks 4.1 与 `docs/decisions.md` §21 获具体裁决。规划时“本轮只新增本 change 工件、不改现行 docs/config/实现”的表述仅指创建阶段，不再是当前状态；commit/push/archive 仍需用户另行明确指令。
+实施结果按真实证据回填 `docs/v1-architecture.md` §13、`docs/v1-validation-plan.md` 相关 V 项及受影响的引擎/UI 公共契约；必要决定回填 `docs/decisions.md`。2026-11-03 用户已授权 apply，本 change 依该授权维护现行 docs/config/实现，依赖候选已按 tasks 4.1 与 `docs/decisions.md` §21 获具体裁决。并入的治理范围已于 2026-11-06 完成文档回写与校验（`openspec validate --all --strict --no-interactive` 9 passed、链接/锚点检查、`git diff --check`），不含代码或平台验证；原始输出留在未跟踪的 `logs/validation/`。commit/push/archive 仍需用户另行明确指令。
 
 ### Acceptance Evidence
 
@@ -82,5 +85,5 @@ Aline 已有八成员 workspace、无头引擎和 `aline-ui/document`，但 `app
 
 - V-07 样例始终保留“现状”与“独立预期”两列。SoftBreak `a\nb` 保留带来源的可见换行；有限 HTML 子集之外的 void 标签显示原始标签，未知非 void 容器整段按原文显示；用户已于 2026-11-03 裁决，独立回归和契约见任务 1.2 证据及引擎 §7/11。已被解析器识别配对却因标签大小写而导航为空是引擎 §12.1 明留 M1 的缺陷，列为修复任务，不能归为正常缺失目标验收。其他样例若不能由 PRD MD-04/07～11 和引擎 §7/11 裁决，列明最小冲突并暂停该语义的实施/通过声明，交用户确认，不以本提案授权任意口径。
 - V-04/V-05/V-09 的字体实际可用性、布局数值、预算/性能门槛留实验收口，不能预填为成绩或降低现行产品目标。
-- 并入的骨架范围没有阻塞其创建的问题：统计口径的最终冻结、像素冻结与图标库选型分别归 V-07、V-09 与后续主题/图标决定；按 UI §3.3 与 §4.1 的候选口径执行，遇到不能裁决的呈现细节列入最小冲突并暂停依赖项，不自行扩大产品范围。
-- `openspec/config.yaml` 的 “M0 exit remains open” 与部分 M0 主规格的历史准入措辞仍在；按已明确的 §20 用户风险接受及本轮指令解释为证据未闭合，不重开 M0。本轮不改这些现行文件。
+- 并入的骨架范围没有阻塞实施的问题：统计口径的最终冻结、像素冻结与图标库选型分别归 V-07、V-09 与后续主题/图标决定；按 UI §3.3 与 §4.1 的候选口径执行，遇到不能裁决的呈现细节列入最小冲突并暂停依赖项，不自行扩大产品范围。
+- `openspec/config.yaml` 的 “M0 exit remains open” 与部分 M0 主规格的历史准入措辞仍在；按已明确的 §20 用户风险接受解释为证据未闭合，不重开 M0。本变更不修改 `openspec/config.yaml` 与 M0 主规格的历史表述。

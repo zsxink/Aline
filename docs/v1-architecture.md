@@ -864,7 +864,7 @@ M1 交接仍先取得锁定 GPUI 的原生 macOS 单窗冒烟、V-04 中文字�
 | UI-01～UI-06（A） | 主窗口内设置；主题名称应用/缩略图预览；大纲仅主动跳转；采用 UI 菜单/工具栏/键位表；键盘“移动到…”；关闭工作区保留标签、待恢复根为空 | §7.4/7.5/8.2、[UI §17](./ui-spec.md#17-待确认问题清单)、[确认归档](./archive/2026-10-29-ui-decisions.md)；V-01/V-04/V-07～09仍未执行 |
 | PL-01～PL-03（A） | Mermaid 独立图像操作仅受自身开关控制；关闭高亮回内容主题普通表面、独立配置保留暂停；图片预览再启用恢复仍打开 tab 的原模式/视口并按当前约束重算 | §8、[插件规范 §12](./plugin-system.md#12-待确认问题清单)、[确认归档](./archive/2026-10-29-plugin-decisions.md)；V-02/03/04/09仍未执行 |
 | TH-01～TH-10（A） | schema 1/封闭字段/合并规则、静态 PNG、outline/filled；无覆盖升级/删除按钮，安装不应用，受保护 GitHub 根、磁盘副本保修改，失效身份保留且修复/重启不自动应用 | §8.2、[主题 §14](./theme-package-spec.md#14-待确认问题清单)、[确认归档](./archive/2026-10-29-theme-decisions.md)；数值/原生能力及 V-04/V-06/V-09 仍未验证 |
-| QMD-01（工程方法） | 按用户 2026-11-05 指令，记录 quiet-md 调研启发的随机不变量、性能报告字段、保存/恢复分离、IME 核对点、语义 token、中文排版测量门与离屏证据边界；其中部分为 Aline 既有或追加方法，不整体归为 quiet-md 采纳；不改产品契约，W0～W7 未立项 | [决定 §25](./decisions.md#25-2026-11-05-quiet-md-工程实践采纳qmd-01)、[研究文档](./quiet-md-study.md)、[治理 change](../openspec/changes/qmd-01-engineering-practices/proposal.md)；实施前按[开发流程 §2](./development-process.md#2-openspec-变更流程)逐项建档 |
+| QMD-01（工程方法） | 按用户 2026-11-05 指令，记录 quiet-md 调研启发的随机不变量、性能报告字段、保存/恢复分离、IME 核对点、语义 token、中文排版测量门与离屏证据边界；其中部分为 Aline 既有或追加方法，不整体归为 quiet-md 采纳；不改产品契约，W0～W7 未立项 | [决定 §25](./decisions.md#25-2026-11-05-quiet-md-工程实践采纳qmd-01)、[研究文档](./quiet-md-study.md)、[治理 delta 所在 change](../openspec/changes/m1-single-window-readonly/proposal.md)；实施前按[开发流程 §2](./development-process.md#2-openspec-变更流程)逐项建档 |
 
 产品决定阻塞已解除；输入状态机、重载事务和偏好持久化仍须实现及验收。V-01～V-09 均未整项完成，归档不代表架构全部技术细节冻结或发布门禁通过。QMD-01 是工程/验证方法采纳记录，其 W1 依赖准入、W2 vendor 顺序、W6 时点、fuzz 规模等仍待用户确认，不因本表登记成为架构决定。
 

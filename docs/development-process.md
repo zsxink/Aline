@@ -43,7 +43,7 @@ OpenSpec 使用仓库根目录 `openspec/` 下的 `spec-driven` schema，所有�
 
 ### 3.1 研究采纳与工程实践落点（2026-11-05）
 
-[决定 QMD-01](./decisions.md#25-2026-11-05-quiet-md-工程实践采纳qmd-01) 已把 [quiet-md 调研](./quiet-md-study.md) 中不改变产品契约的工程/验证方法回写现行规范；治理入口是 OpenSpec change [`qmd-01-engineering-practices`](../openspec/changes/qmd-01-engineering-practices/proposal.md)，它只记录方法与边界，不批准任何 W 项。下列 W0～W7 是**工作分解与建议顺序**，不是已批准任务；实施前按 §2 逐项建 change，W0 未批准不写代码。
+[决定 QMD-01](./decisions.md#25-2026-11-05-quiet-md-工程实践采纳qmd-01) 已把 [quiet-md 调研](./quiet-md-study.md) 中不改变产品契约的工程/验证方法回写现行规范；治理 delta 已并入 OpenSpec change [`m1-single-window-readonly`](../openspec/changes/m1-single-window-readonly/proposal.md)，该部分只记录方法与边界，不批准任何 W 项。下列 W0～W7 是**工作分解与建议顺序**，不是已批准任务；实施前按 §2 逐项建 change，W0 未批准不写代码。
 
 | 工作流 | 落点与阶段 | 前置/边界 |
 |---|---|---|

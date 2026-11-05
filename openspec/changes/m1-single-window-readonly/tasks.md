@@ -1,6 +1,6 @@
 # Tasks
 
-任务按实际实施与验证状态逐项标记；用户已授权 apply，不包含 commit/push/archive。M0 的 2026-11-02 用户验收豁免继续有效，证据缺口保留。**纯机制 1～3 已完成无头部分；4.1 的后端候选、精确许可证/metadata 路径与 GPUI 指纹均获具体裁决，准入策略、7 场景真实图及完整自测已通过。4.2 的锁定离线 app build 与 macOS 原生空窗显示/退出已验证；4.3 两种系统首选语言真实启动已验证（2026-11-03 裁决后界面语言取证只做中文，见[决定 §24](../../../docs/decisions.md#24-2026-11-03-验证取证只做中文)）；4.4 文件打开/取消/关闭真实操作已接通。5.1 变高虚拟阅读和精确 1 MiB 双视图首尾滚动已取得 macOS 实测证据。5.2 命中、5.3 锚点恢复/预算边界、内容与导航/字体视图尚未完成。**
+任务按实际实施与验证状态逐项标记；用户已授权 apply，本变更不包含 commit/push/archive，三者需用户另行明确指令。M0 的 2026-11-02 用户验收豁免继续有效，证据缺口保留。2026-11-06 用户决定把治理 change `qmd-01-engineering-practices` 并入本变更并删除，其范围成为第 16～17 组；第 16 组为已完成的文档/规格动作，第 17 组记录范围外的 W 项立项门，勾选只表示文档/规格动作完成，不表示任何 V/AC、平台能力或 W 项通过。合并记录见[决定 §26](../../../docs/decisions.md#26-2026-11-06-合并-qmd-01-治理-change-并校正口径)。**纯机制 1～3 已完成无头部分；4.1 的后端候选、精确许可证/metadata 路径与 GPUI 指纹均获具体裁决，准入策略、7 场景真实图及完整自测已通过。4.2 的锁定离线 app build 与 macOS 原生空窗显示/退出已验证；4.3 系统首选语言读取与中文界面启动已验证（英文启动记录为 2026-11-03 裁决前的历史事实；按[决定 §24](../../../docs/decisions.md#24-2026-11-03-验证取证只做中文)，后续界面取证只做中文，不再切换语言复验英文）；4.4 文件打开/取消/关闭真实操作已接通。5.1 变高虚拟阅读和精确 1 MiB 双视图首尾滚动已取得 macOS 实测证据。5.2 命中、5.3 锚点恢复/预算边界、内容与导航/字体视图尚未完成。**
 
 2026-11-03 用户决定把原独立变更 `m1-main-window-skeleton` 并入本变更并删除，其任务成为第 9～15 组、证据与本变更共用同一运行目录根。**第 9 组已完成：`statistics` 与 `geometry` 已接入模块树，9.1/9.2 的无头测试通过，`readonly_reader.rs` 的重复几何常量已迁移并删除，`rg` 确认只有 `geometry.rs` 一处定义。10.1、11.1、11.3、12.1、13.1、14.1、15.1、15.3、15.4 已完成；依赖真实窗口观测的 10.2、11.2、12.2、12.3、13.2 的真实截图/序列部分、13.3、14.2、15.2 因 macOS 会话锁定（`CGSSessionScreenIsLocked`）暂未执行，未勾选，不以代码或无头测试代替真实观测。11.3 已趁会话解锁补做有/无文档截图与图标资源身份检查。** 原五个 `#[path]` 集成测试目标已按 safety 门禁迁入对应源模块的 `#[cfg(test)] mod tests`，验收命令相应改为 `cargo test -p aline-ui --lib <filter>`；裁定记录见 `.superpowers/sdd/tasks/progress.md`。
 
@@ -27,6 +27,13 @@ Requirement 引用缩写仅用于追踪，不另建编号规格：
 | W4 | ui/main-window-layout / 内容区单列居中限宽且两视图共用列宽与主滚动条 |
 | W5 | ui/main-window-layout / 骨架数值是实验候选而非冻结值 |
 | G2 | workspace/engineering-gates / M1 骨架候选数值不得记为冻结值 |
+| G3 | workspace/engineering-gates / 界面语言验证只做中文 |
+| Q1 | engineering-governance / 验证方法采纳必须标明来源和效力边界 |
+| Q2 | engineering-governance / 随机不变量与性能证据必须可复现和可追溯 |
+| Q3 | engineering-governance / 保存与恢复必须分离且故障安全 |
+| Q4 | engineering-governance / IME 集成必须有显式清理和受检坐标 |
+| Q5 | engineering-governance / UI 语义 token、中文排版与离屏证据必须按边界使用 |
+| Q6 | engineering-governance / W0～W7 必须逐项立项 |
 
 所有命令在仓库根执行。Cargo 使用已登记工具链和已核对的隔离缓存，不自动安装/下载；需要时在命令前设置 `CARGO_HOME=<cargo-cache>`（占位符，证据中统一归一化）。原始 stdout/stderr、命令/环境、截图/基准及审查原文统一放 `logs/validation/m1-single-window-readonly/<run-id>/<group>/`，下文简写 `<evidence>/<group>/`；`<evidence>` 必须解析到上述 logs/validation 下的唯一运行目录。路径统一经 `scripts/evidence_paths.py` 处理。当前交接如需只维护 `tmp/m1-single-window-readonly-resume.md` 一份不追踪文件。
 
@@ -157,4 +164,22 @@ Requirement 引用缩写仅用于追踪，不另建编号规格：
 - [x] 15.1 骨架范围完成后复跑 7.5 的完整 `cargo fmt --all --check`、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo test --workspace` 与 `python3 scripts/check_workspace.py --cargo-home <cargo-cache> --output-dir <evidence>/workspace`，并补跑 `python3 scripts/check_engineering.py`、`scripts/check_lints.py`、`scripts/check_safety.py`、`scripts/check_public_api.py`，确认新增模块未把 GPUI/线程/全局状态带入五引擎、未新增公开面或依赖；逐一确认八成员实际 lint 继承，不以 all-targets 代表三平台。原始输出经路径归一化留本地；失败不勾任务；证据 `<evidence>/workspace/`。**已通过：`check_workspace.py` exit 0 / `passed: true`，fmt、clippy、workspace tests、engineering、lints、safety、public-api 全部 exit 0；证据 `2026-11-03-continue-04/workspace` 与 `gate-*`。**
 - [ ] 15.2 在 7.2 的 V-09 矩阵基础上补骨架分项：无文档态、阅读态、窄窗三档、双视图往返、键盘可达性、统计未就绪与就绪两态；记录设备/系统/架构/工具与 GPUI 身份、窗口尺寸、观察结果与未测项。保留 Windows 10/Intel Mac/Linux 未测，不以 macOS 结果推断其他平台，不声称 V-09 整项通过；证据 `<evidence>/window-baseline/`。**真实窗口矩阵待会话解锁；锁定状态探测证据见 `2026-11-03-continue-04/window-baseline/lock-state.*`。**
 - [x] 15.3 回填现行文档：更新 `docs/ui-spec.md` §4.1 的实现状态与 §3.3 的候选数值说明（明确标注未冻结、待 V-09）、`docs/v1-validation-plan.md` 的 V-09 分项（骨架/工具栏/状态栏/内容列各自的实际结果与未测边界）、`docs/v1-architecture.md` §13 的 M1 阶段状态；必要决定回填 `docs/decisions.md`。只写实际取得的结果，候选数值不写成发布门槛或冻结值；证据 `<evidence>/docs/`。**已完成；本轮为实施裁定，未新增 `docs/decisions.md` 条目；证据 `2026-11-03-continue-04/docs/`。**
-- [x] 15.4 执行 `openspec validate m1-single-window-readonly --strict --no-interactive`、`openspec validate --all --strict --no-interactive`、`git diff --check` 与引用/绝对路径/变更范围检查，并确认并入后无残留的 `m1-main-window-skeleton` 路径、重复的几何/统计口径或两条并行任务编号；只汇报实际执行的命令、平台与限制。证据 `<evidence>/handoff/`。**已通过：两条 validate exit 0、`git diff --check` exit 0、138 条相对链接 0 缺失、绝对路径无匹配、骨架目录不存在、几何/统计各一处定义、任务编号 1～15 无重复；限制为真实窗口观测仍受会话锁定阻塞。**
+- [x] 15.4 执行 `openspec validate m1-single-window-readonly --strict --no-interactive`、`openspec validate --all --strict --no-interactive`、`git diff --check` 与引用/绝对路径/变更范围检查，并确认并入后无残留的 `m1-main-window-skeleton` 路径、重复的几何/统计口径或两条并行任务编号；只汇报实际执行的命令、平台与限制。证据 `<evidence>/handoff/`。**已通过：两条 validate exit 0、`git diff --check` exit 0、138 条相对链接 0 缺失、绝对路径无匹配、骨架目录不存在、几何/统计各一处定义、任务编号 1～15 无重复；限制为真实窗口观测仍受会话锁定阻塞。2026-11-06 合并后的复跑结果另记第 16 组。**
+
+## 16. QMD-01 工程治理 delta 并入（2026-11-06）
+
+关联 Q1～Q6，决定 §25/§26、开发流程 §2/§3.1、CODE_STANDARDS §6；本组只有文档/规格动作，不含代码、依赖、夹具或平台证据。原 `qmd-01-engineering-practices` 的 15 项范围任务与校验已全部完成，合并后按下列条目重述，不重做已核实的文档回写。
+
+- [x] 16.1 建档与来源校正：把 quiet-md 方法表按 quiet-md 已有 / Aline 既有 / Aline 追加三类标注来源，删除"采纳 quiet-md 的冷/热"等错误归因；修正研究文档的事实与重复（保存基线/锁失败语义、flush 与退出路径、派生顺序、表格裁剪、主题 `allow(dead_code)`、Markdown 粘贴、GPUI glyph 版本限定、`native_window` 路径、E01～E12 重复索引）。验收 `docs/decisions.md` §25.1、[研究文档](../../../docs/quiet-md-study.md) 与 `git diff --check`。
+- [x] 16.2 统一证据字段与阶段口径：fuzz 失败证据统一为 `seed、步号、操作日志、最小输入`（引擎 E-T20/§14、架构 §10.1、验证计划 V-07、Rust §12.2）；E-T20 阶段改为"M1 起（W3 立项后），M2/M3 扩展"，不追溯改变 M0 验收；UI §6 与决定 QMD-01.4 补"先等待平台组合完成结果，等待期间保留原上下文"。验收各文档同一字段集与阶段措辞一致。
+- [x] 16.3 保存/恢复与文档一致性：合并架构 §7.3 重复保存序列为一条"至少核对"清单并保留目录同步/权限/Windows 占用边界（R-15-13 同步）；把"不产生用户可见 `.bak`/`.corrupt-*`"改为"恢复快照写应用管理的独立目标，不以文档旁副本作为恢复手段"；补 `S-12-06` 到 Rust §17 检查组、给架构状态行加"截至 2026-11-05"限定、统一 QMD-01 与开发流程的 W4/W5 阶段措辞。
+- [x] 16.4 OpenSpec 与工程基线同步：把原 change 的 `engineering-governance` delta（6 条 ADDED 要求、17 个场景）整体移入本变更 `specs/engineering-governance/spec.md`，与 `workspace/engineering-gates` 分文件记录；同步 `openspec/CODE_STANDARDS.md` §6 的方法证据行，明确未建立门禁不得写成已启用；在 `AGENTS.md`、决定 §25、开发流程 §3.1、`docs/README.md`、研究文档与架构 §14 把治理入口改指本变更的 delta，删除 `qmd-01-engineering-practices/` 目录。
+- [x] 16.5 合并后校验：执行 `openspec validate m1-single-window-readonly --strict --no-interactive` 与 `openspec validate --all --strict --no-interactive`；文档链接/锚点检查、`git diff --check`、绝对路径扫描；`git diff --stat` 确认无 `Cargo.toml`/`Cargo.lock`/`crates/`/`app/` 或主规格改动；`grep` 确认无残留的旧治理 change 路径引用（历史叙述中的名称除外）；人工核对 fuzz 字段、阶段、保存序列与 `.bak` 措辞一致，确认未声称任何 V/AC 或 W 项通过。**实际结果（2026-11-06）：单 change 与全量 validate 分别 `Change 'm1-single-window-readonly' is valid` / `8 passed, 0 failed`（治理 change 删除后全量项由 9 变 8）；`openspec list` 仅 `m1-single-window-readonly`；规范/文档范围链接锚点 `checked_links=1033`、`LINKS_OK`；`git diff --check` 无输出；绝对路径扫描无命中（原型 README 的 `file://` 说明为既有内容）；`git diff --stat` 仅 `AGENTS.md`、`docs/`、`openspec/CODE_STANDARDS.md`、`openspec/config.yaml` 与两个 change 目录，无 Cargo/`crates/`/`app/` 或主规格改动；6 个 capability delta 共 24 条要求/76 个场景，其中 governance 6 条/17 场景；本变更 60 项任务（35 完成、25 未完成）。** 只汇报实际执行的命令、平台与限制；结构校验不写成 V/AC 通过，原始输出按开发流程 §5.1 留在未跟踪的 `logs/validation/`。
+- [x] 16.6 口径校正：清理 M1 proposal/design 中"本轮为规划""不声称已执行任何实验""本轮不改这些现行文件"等与已授权 apply、docs 已回填状态矛盾的规划期残留；把"界面语言验证只做中文"的表述统一为"人工/原生取证只做中文、zh-CN/en 双语 catalog 键集合/占位符与缺键/漂移反例自动校验保留、不新增英文界面取证任务"（决定 §24、`workspace/engineering-gates` G3）；`proposal.md` 的 capability 清单补列 G3 与并入的 6 条 engineering-governance 要求，消除"列 2 条实际 3 条"的不一致。
+
+## 17. 后续 W 项（不属于本变更）
+
+Q6 规定 W0～W7 是工作分解与建议顺序，不是已批准任务；实施前逐项另建可独立验收的 OpenSpec change，W0 未批准不写代码。下列两项保持未勾选，不因本变更归档而视为完成。
+
+- [ ] 17.1 W1 离屏视觉证据：先做依赖准入与能力 spike，另建 change。
+- [ ] 17.2 W2 中文排版与字体、W3 随机不变量、W4 保存/恢复、W5 IME、W6 语义 token、W7 工程门禁：各自按范围另建 change，未批准不写代码。

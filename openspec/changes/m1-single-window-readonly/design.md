@@ -2,7 +2,9 @@
 
 ## Context
 
-动机与范围见 `proposal.md`。本轮为规划，不表示下列拟新增接口或实验已实现。2026-11-02 通过 `openspec list --json` 确认无进行中 change，主规格包含 engine/*、engineering-governance 和 workspace/engineering-gates；M0 已归档，验收豁免不补证。CODE_STANDARDS §2～6、架构规范 R/K 与 Rust S/C 继续约束实现。
+动机与范围见 `proposal.md`。本变更创建于 2026-11-02 并自 2026-11-03 获授权 apply，当前按 `tasks.md` 部分实施：纯机制、原生准入与骨架无头部分已完成，真实窗口观测与阶段出口仍在进行；下列模块表是实施落位说明，不是"尚未开始"的声明。建仓时主规格包含 engine/*、engineering-governance 和 workspace/engineering-gates；M0 已归档，验收豁免不补证。CODE_STANDARDS §2～6、架构规范 R/K 与 Rust S/C 继续约束实现。
+
+2026-11-06 用户决定把治理 change `qmd-01-engineering-practices` 并入本变更并删除。本节 §10 说明合并结构与边界；其 `engineering-governance` delta 见 `specs/engineering-governance/spec.md`。该范围没有运行时模块、状态所有者或依赖变化，不影响 §1～9 的 M1 实现设计。
 
 CodeGraph 与磁盘源码核对得到的实施起点：
 
@@ -27,7 +29,7 @@ CodeGraph 与磁盘源码核对得到的实施起点：
 - `src/text_system.rs` 与 `src/styled.rs`：`TextSystem::add_fonts(Vec<Cow<'static, [u8]>>)`、font family/fallback 样式；静态字体可注册，缺字实际回退及缓存刷新必须由 V-04 证明。
 - `src/app.rs`、`src/app/context.rs`、`src/app/async_context.rs`：`background_executor`、`AppContext::background_spawn`，后台 future/结果需 `Send + 'static`；UI 只捕获最小不可变输入。包内未找到系统首选语言 API，不能假定 GPUI 会提供 locale。
 
-原生前置门：当前 lock 没有 `gpui_platform` 或对应原生后端包，GPUI 的 `macos` feature 也不存在。保留 GPUI 0.3.9 和自有 unsafe forbid；实施须先提交最小平台后端准入工件，核对与该 GPUI 公共类型的兼容性及完整依赖/许可/目标，再获具体裁决后接线。用户明确裁决前不改 lock、加依赖或改指纹；窗口及依赖真实 UI 的任务在准入完成前阻塞。现有纯逻辑任务可继续。系统 locale 来源须使用真实系统首选语言 API；不能假用 LANG 等同于 GUI 首选语言或硬选中文/英文当随系统完成。
+原生前置门（已在 2026-11-02/03 结案）：建仓时 lock 没有 `gpui_platform` 或对应原生后端包，GPUI 的 `macos` feature 也不存在。当时保留 GPUI 0.3.9 和自有 unsafe forbid，要求先提交最小平台后端准入工件、核对与 GPUI 公共类型的兼容性及完整依赖/许可/目标，再获具体裁决后接线；裁决前不改 lock、加依赖或改指纹，窗口及依赖真实 UI 的任务阻塞，纯逻辑任务继续。该门已按下节 2026-11-02/03 的裁决关闭，不再是当前阻塞。系统 locale 来源须使用真实系统首选语言 API；不能假用 LANG 等同于 GUI 首选语言或硬选中文/英文当随系统完成。
 
 2026-11-02/03 apply 调查与裁决更新：候选为同源发布 `gpui-pre-macos =0.3.9` + `font-kit`，系统首选语言使用 `sys-locale =0.3.2`。精确 package identity 与来源、target 闭包、许可证及用户逐项裁决见[原生准入候选方案](./native-admission-proposal.md)。task 4.1 的精确策略守卫、Cargo.lock 与七个 M1 图基线已重跑通过；例外仅限裁决列出的包身份/校验和/路径/目标。后续 Metal Toolchain 安装后，`cargo build -p aline --locked --offline` 已通过，macOS 单个空窗口实际显示并正常退出；4.2 完成。此证据只覆盖原生入口/空状态，不覆盖系统语言切换、文件选择或跨平台窗口。
 
@@ -117,7 +119,7 @@ Visual 用锁定 GPUI `list`/`ListState` 的变高测量；估算只用于未测
 
 ### 7. 字体、本地化与主窗基准
 
-启动由经前置门核对的系统首选语言适配输出映射到现有 Locale，其他语言回退英文；GPUI 核心无该 API，检测来源/失败回退必须实证，未具备时标阻塞而不能宣称随系统已完成。双语测试可注入显式 Locale，但不能替代真实默认语言检测。所有标题/菜单/按钮/错误/加载/只读/降级/无文档文字走 `Translator::t`，catalog key/插值测试继续双语一致。文档正文/文件名不翻译。完整语言覆盖设置和即时切换服务属于后续，不造无效开关。2026-11-03 用户裁决界面语言人工/原生取证只做中文（`docs/decisions.md` §24）：启动语言观测、窗口文案与键盘矩阵只核对中文，英文由 `Translator::embedded` 的键集合/占位符校验与缺键反例覆盖。
+启动由经前置门核对的系统首选语言适配输出映射到现有 Locale，其他语言回退英文；GPUI 核心无该 API，检测来源/失败回退必须实证，未具备时标阻塞而不能宣称随系统已完成。双语 catalog 的键集合/占位符自动校验继续保留，可注入显式 Locale 做覆盖测试，但不替代真实默认语言检测。所有标题/菜单/按钮/错误/加载/只读/降级/无文档文字走 `Translator::t`，catalog key/插值测试继续双语一致。文档正文/文件名不翻译。完整语言覆盖设置和即时切换服务属于后续，不造无效开关。2026-11-03 用户裁决界面语言人工/原生取证只做中文（`docs/decisions.md` §24）：启动语言观测、窗口文案与键盘矩阵只核对中文，不切换系统首选语言复验英文；英文实现由 `Translator::embedded` 的键集合/占位符校验与缺键/插值漂移反例自动覆盖，不降级或删除该自动检查。
 
 M1 提供受保护默认 GitHub 语义配色的最小内容样式，随系统亮暗的启动环境输入保留；不实现四主题三模式选择、主题安装或配置持久化。排版/宽度/侧栏数值标实验候选，不从原型抄冻结值；内容列宽、留白与正文度量的唯一取数与纯计算见 §9.3，取值仍标实验候选。默认与字体配置显式从 UI 启动配置传入，app-core 无 GPUI 类型。
 
@@ -133,7 +135,7 @@ V-05 使用 Release 与 32/128 KiB、1/4 MiB、>4 MiB、许多短块/单巨块/�
 
 不开编辑/IME/查找/资产后端，对应时延项标不适用 M1、未测留后续，不能填零。>4 MiB Source 是已确认默认策略，不是硬上限；硬预算与 layout chunk 数值通过 V-05/V-06 参数实验确定并记录，不能无限输入或降目标。
 
-继续跑完整 Cargo 门禁与既有 workspace/工程/lint/安全/公共 API/catalog 检查。若原生 features 导致实际图变化，登记精确差异并独立审计再接线，禁止自动置 reviewed 或扩禁用例外；无合规现有组合则暂停受影响任务，提出最小准入问题。新/改守卫只扩既有 `workspace/engineering-gates` 能力，必须正例/最小反例。本设计不声称已执行任何实验。
+继续跑完整 Cargo 门禁与既有 workspace/工程/lint/安全/公共 API/catalog 检查。若原生 features 导致实际图变化，登记精确差异并独立审计再接线，禁止自动置 reviewed 或扩禁用例外；无合规现有组合则暂停受影响任务，提出最小准入问题。新/改守卫只扩既有 `workspace/engineering-gates` 能力，必须正例/最小反例。M1 已取得的部分无头与原生证据见 `tasks.md`，真实窗口观测、V-05/V-09 与阶段出口仍未完成，不写成已验证。
 
 原始输出按 `logs/validation/m1-single-window-readonly/<run-id>/` 的分项子目录保存，使用 `scripts/evidence_paths.py` 归一化；不得把本机绝对路径写进工件/证据。独立输入与预期可入库，临时副本/截图/计时数据/Agent 审查原文不入库。最终摘要回填原验证计划和架构，保留 M0 豁免缺口及 Windows 10/Intel Mac/Linux 未测；`--all-targets` 不证明跨平台。详细执行命令与每组关联在 tasks。
 
@@ -212,8 +214,35 @@ V-05 使用 Release 与 32/128 KiB、1/4 MiB、>4 MiB、许多短块/单巨块/�
 4. **真实窗口**：macOS 实测截图（无文档态、阅读态、窄窗），核对三段骨架、列宽共用、状态栏数值与"未计算"占位。
 5. **回填**：`docs/ui-spec.md` §4.1 实现状态、`docs/v1-validation-plan.md` V-09 分项、`docs/v1-architecture.md` §13；原始输出留 `logs/validation/`，与既有证据同一根目录分项存放，不倒改旧证据。
 
+## 10. 并入的 QMD-01 工程治理范围（2026-11-06）
+
+2026-11-06 用户决定把治理 change `qmd-01-engineering-practices` 并入本变更并删除，沿用 2026-11-03 并入 `m1-main-window-skeleton` 的先例。原 change 是 2026-11-05 决定 QMD-01 的治理入口：方法正文已回写现行 `docs/`，但当时缺少对应 OpenSpec 工件；它只追认文档与方法边界，不实施 W1～W7。
+
+### 10.1 合并结构
+
+| 原工件 | 合并后落点 | 处理 |
+|---|---|---|
+| `specs/engineering-governance/spec.md`（6 条 ADDED 要求、17 个场景） | 本变更 `specs/engineering-governance/spec.md` | 整体移入，正文不改；仍为独立 capability delta，不与 M1 的 `workspace/engineering-gates` 混写 |
+| proposal / design 的方法来源与效力边界 | 本 `proposal.md` 的合并说明与本节 | 压缩为范围、效力与验收边界，不复制方法正文 |
+| tasks 1～5（15 项，全部完成）与执行记录 | 本 `tasks.md` 第 16 组 | 合并为已完成组；第 17 组承接范围外的 W 项门 |
+| 原 `.openspec.yaml`（created 2026-11-06） | 删除 | 本变更沿用 created 2026-11-02 |
+
+各 capability 的 delta 独立成文件：产品实现侧为 `ui/*`、`engine/*`、`workspace/engineering-gates`，治理侧为 `engineering-governance`。归档时分别同步到对应的主规格，互不覆盖；`engineering-governance` 的 6 条要求均为 ADDED，不修改既有 12 条主规格要求。
+
+### 10.2 决策：一个 change 同时承载产品实现与治理 delta
+
+QMD-01 的方法采纳是一次决定，来源、效力和边界共享，单独建 change 是为了补齐"方法已回写规范、治理入口缺失"的缺口；并入后该缺口仍由本 change 内的独立 delta 承载，不需要第二份背景与边界。代价是审阅面较宽、归档需等 M1 实现与平台证据齐备，因此治理 delta 同步到主规格也被推迟；收益是 `changes/` 只有一个进行中变更，W 项的立项门与本变更的阶段出口在同一处可查。W0～W7 仍视为工作分解与建议顺序，实施前逐项另建可独立验收的 change，不因并入而被视为已批准。
+
+### 10.3 边界与验证
+
+- 方法正文继续留在 `docs/` 对应章节与决定 §25，delta 只写工程治理必须满足的结果与证据边界，避免同一要求出现两个措辞版本；研究文档只作证据索引。
+- 本范围没有运行时模块、状态所有者、依赖、feature、夹具或平台证据；校验手段是 `openspec validate`、链接/锚点检查、`git diff --check` 与 `git diff --stat`。原 change 曾记录 9 passed / 0 failed、`checked_links=643`、`LINKS_OK`；合并后重新执行，全量项因治理 change 删除由 9 变 8，链接/锚点检查按现行规范/文档范围重跑为 `checked_links=1033`、`LINKS_OK`，具体命令与结果见 `tasks.md` 第 16 组。未改代码、Cargo 或主规格。
+- 未新增自动门禁，不把未实施方法写成已启用；原始输出留在未跟踪的 `logs/validation/`。
+- 界面语言人工/原生取证只做中文（决定 §24）；zh-CN/en 双语 catalog 的键集合/占位符校验与缺键/漂移反例自动检查保留。本合并既不新增英文界面取证任务，也不降级该自动检查。
+
 ## Risks / Trade-offs
 
+- [治理 delta 与 M1 实现共用归档门] → 治理 delta 已具备同步条件但须等 M1 实现与平台证据齐备才随本 change 归档；期间 `engineering-governance` 主规格不含这 6 条要求，查阅以本 change 的 delta 为准。
 - [API 比蓝图更小] → 先补真实消费者所需的只读结构与生命周期；不假设已有 Inline/嵌套树或“不开块也可 switch_mode”。公共边界独立审查，原输入组回归必须通过。
 - [锁定 GPUI 无原生 Platform 实现] → 平台后端准入是已知阻塞，不是稍后再查 feature；保留锁版及 unsafe 基线，先提供具体最小审计方案再获裁决，之后才有 macOS 单窗/Metal 工具验证，不自动引依赖绕过。
 - [块级虚拟化挡不住巨块] → 预算前检、局部 shape 与错误入口单独测试；回退与基础成功两类证据分列。
@@ -228,7 +257,7 @@ V-05 使用 Release 与 32/128 KiB、1/4 MiB、>4 MiB、许多短块/单巨块/�
 
 ## Migration Plan
 
-实施从增量 API 和测试开始，不改变现有用户数据格式；当前没有可用原生 UI 或持久化设置迁移。保持 `DocCore::new` 与已有公开语义兼容，新增只读构造/结果目标类型；先让现有无头测试通过，再替换 app 薄入口为 ui 启动装配。回退可撤回新窗口接线并保留引擎无头边界，无源文件写入或磁盘迁移；回退不算 M1 出口完成。实施结束的 docs 回填不包含 archive；归档另等用户指令。
+实施从增量 API 和测试开始，不改变现有用户数据格式；当前没有持久化设置迁移，M1 原生窗口已按准入裁决接通，持久化设置仍待后续阶段。保持 `DocCore::new` 与已有公开语义兼容，新增只读构造/结果目标类型；先让现有无头测试通过，再替换 app 薄入口为 ui 启动装配。回退可撤回新窗口接线并保留引擎无头边界，无源文件写入或磁盘迁移；回退不算 M1 出口完成。实施结束的 docs 回填不包含 archive；归档另等用户指令。
 
 并入的骨架范围按以下顺序迁移，均不改变既有 `readonly_layout` 契约与测试语义（`LayoutEnvironment` 的字段与键不变）：
 
@@ -239,4 +268,4 @@ V-05 使用 Release 与 32/128 KiB、1/4 MiB、>4 MiB、许多短块/单巨块/�
 
 ## Open Questions
 
-没有阻塞本规划创建的范围问题；原生后端及系统首选语言来源按 proposal 的前置门处理。实验收口预算/布局候选数值、实际字体可用性和未覆盖平台，不授权修改既定产品目标。并入的骨架范围同样没有阻塞其创建的问题：统计口径的最终冻结、像素冻结与图标库选型分别归 V-07、V-09 与后续主题/图标决定；按 UI §3.3 与 §4.1 的候选口径执行，遇到不能裁决的呈现细节列入最小冲突并暂停依赖项，不自行扩大产品范围。用户已于 2026-11-03 裁决 SoftBreak 为带来源可见换行、有限 HTML 子集之外的 void 标签显示原文、未知非 void 容器整段显示原文；后续按用户裁决和 V-07 样例执行。其他未决导航样例继续沿 proposal 的冲突处理门；解析器已识别脚注的标签不一致必须修复，不能当正常失败收口。
+没有阻塞本变更实施的范围问题；原生后端及系统首选语言来源已按 proposal 的前置门于 2026-11-02/03 获具体裁决。实验收口预算/布局候选数值、实际字体可用性和未覆盖平台，不授权修改既定产品目标。并入的骨架范围同样没有阻塞实施的问题：统计口径的最终冻结、像素冻结与图标库选型分别归 V-07、V-09 与后续主题/图标决定；按 UI §3.3 与 §4.1 的候选口径执行，遇到不能裁决的呈现细节列入最小冲突并暂停依赖项，不自行扩大产品范围。用户已于 2026-11-03 裁决 SoftBreak 为带来源可见换行、有限 HTML 子集之外的 void 标签显示原文、未知非 void 容器整段显示原文；后续按用户裁决和 V-07 样例执行。其他未决导航样例继续沿 proposal 的冲突处理门；解析器已识别脚注的标签不一致必须修复，不能当正常失败收口。

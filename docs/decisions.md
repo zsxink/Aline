@@ -44,7 +44,7 @@
 | 三格式导出；D15、Q-10、PL-01、ED-01 | PDF/.docx/HTML 含当前输入快照；公式/图表允许静态图；PDF 独立页样式；Mermaid 独立 SVG/PNG/图像复制只受自身开关控制 | [PRD EXPORT-01～06](./v1-prd.md)、[插件 §6.3/8.2](./plugin-system.md)、架构 §8.3；AC-14 | V-02/03；后端/离线资源策略未验 |
 | 性能；D04、Q-17 | ≤32KiB 提交 <10ms、≤128KiB <50ms 等为目标；>4MiB 默认 Source 可配置，不等于文件无限接收 | [PRD §7.2](./v1-prd.md)、[架构 §10.2](./v1-architecture.md#102-性能数字的地位)；AC-16 | V-05/06；无 Aline 实测结论 |
 | UI/工程；UI、RS | 菜单/设置/键盘按已确认 UI；逐项 lint、无 panic 输入、unsafe 默认 forbid、有限提交 scope；文案从第一天 t(key) | [UI §10.5/17](./ui-spec.md)、[Rust §20](./rust-style-guide.md#20-待确认问题清单)、AGENTS.md | V-01/07/09 与 M0 工具实验 |
-| 工程/验证方法；QMD-01 | quiet-md 方法采纳：fuzz 确定性复现、性能报告字段、1 秒/10 秒保存恢复分离、IME 核对点、语义 token、中文排版测量门、离屏证据边界；不改产品契约，W0～W7 未立项 | [决定 §25](#25-2026-11-05-quiet-md-工程实践采纳qmd-01)、[开发流程 §3.1](./development-process.md#31-研究采纳与工程实践落点2026-11-05) | V-04/05/07/08/09；治理 change 已建，W 项实施前仍须逐项建档 |
+| 工程/验证方法；QMD-01 | quiet-md 方法采纳：fuzz 确定性复现、性能报告字段、1 秒/10 秒保存恢复分离、IME 核对点、语义 token、中文排版测量门、离屏证据边界；不改产品契约，W0～W7 未立项 | [决定 §25](#25-2026-11-05-quiet-md-工程实践采纳qmd-01)、[开发流程 §3.1](./development-process.md#31-研究采纳与工程实践落点2026-11-05) | V-04/05/07/08/09；治理 delta 已并入 M1 change，W 项实施前仍须逐项建档 |
 
 ## 4. 历史时间线与逐条复核
 
@@ -629,7 +629,7 @@ PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02
 
 ## 25. 2026-11-05 quiet-md 工程实践采纳（QMD-01）
 
-用户要求把 [quiet-md 调研与采纳方案](./quiet-md-study.md) 中可迁移的工程实践整合进开发/设计规范，并在后续开发中遵循。quiet-md 是外部参考实现，其快照、证据限制与独立复核见研究文档 §2、§6；本条只把**不改变 Aline 产品契约的工程方法与验证方法**回写到现行规范，不把 quiet-md 的实现、数值或能力当作 Aline 已实现、已冻结或已通过的事实。来源分三类逐项标注：quiet-md 已有机制、Aline 既有规则、Aline 追加/补强；没有直接证据的 quiet-md 行为只作“未确认/仅方向参考”。方法回写的治理入口是 OpenSpec change [`qmd-01-engineering-practices`](../openspec/changes/qmd-01-engineering-practices/proposal.md)；它只记录方法与边界，W1～W7 仍需逐项另建 change。
+用户要求把 [quiet-md 调研与采纳方案](./quiet-md-study.md) 中可迁移的工程实践整合进开发/设计规范，并在后续开发中遵循。quiet-md 是外部参考实现，其快照、证据限制与独立复核见研究文档 §2、§6；本条只把**不改变 Aline 产品契约的工程方法与验证方法**回写到现行规范，不把 quiet-md 的实现、数值或能力当作 Aline 已实现、已冻结或已通过的事实。来源分三类逐项标注：quiet-md 已有机制、Aline 既有规则、Aline 追加/补强；没有直接证据的 quiet-md 行为只作“未确认/仅方向参考”。方法回写的治理 delta 是 OpenSpec change [`m1-single-window-readonly`](../openspec/changes/m1-single-window-readonly/proposal.md) 中 `engineering-governance` 的增量规格；该部分只记录方法与边界，W1～W7 仍需逐项另建 change。
 
 ### 25.1 采纳结论
 
@@ -646,11 +646,11 @@ PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02
 
 ### 25.2 效力与实施边界
 
-本条是**工程/验证方法采纳**，不改变 PRD、AC、跨模块契约、依赖/架构边界、阶段范围或已确认数值。方法回写本身已建档为 OpenSpec change [`qmd-01-engineering-practices`](../openspec/changes/qmd-01-engineering-practices/proposal.md)，只追认文档与方法边界；W1～W7 仍须逐项另建 change。按[开发流程 §2](./development-process.md#2-openspec-变更流程)，实施时凡新增/升级依赖（如锁定 GPUI 的 `test-support` feature、`image`）、改变验收方式（如 V-04/V-05/V-09 增加夹具或报告字段）、改变跨模块契约（如保存/恢复状态机）或进入 M2/M4 范围，仍须先建对应 OpenSpec change；研究文档的 W0 治理门继续有效，未批准不写代码。
+本条是**工程/验证方法采纳**，不改变 PRD、AC、跨模块契约、依赖/架构边界、阶段范围或已确认数值。方法回写本身的治理 delta 已并入 OpenSpec change [`m1-single-window-readonly`](../openspec/changes/m1-single-window-readonly/proposal.md)，只追认文档与方法边界；W1～W7 仍须逐项另建 change。按[开发流程 §2](./development-process.md#2-openspec-变更流程)，实施时凡新增/升级依赖（如锁定 GPUI 的 `test-support` feature、`image`）、改变验收方式（如 V-04/V-05/V-09 增加夹具或报告字段）、改变跨模块契约（如保存/恢复状态机）或进入 M2/M4 范围，仍须先建对应 OpenSpec change；研究文档的 W0 治理门继续有效，未批准不写代码。
 
 研究文档中的 W0～W7、Q01～Q32 与建议 change 名称是工作分解和证据矩阵，不是已批准任务，也不构成本条之外的新决定。其待确认问题（test-support 准入、vendor 顺序、M1 是否允许中文排版已知限制、token 时点、fuzz 规模、W4/W5 阶段、窗口构造重构）保持待确认，本条不自行裁决；开发流程与架构 §13 表中的阶段落点只是建议，批准对应 change 时才定。
 
-证据边界：本条与 `qmd-01-engineering-practices` 均未写代码、未新增依赖、未运行新测试，change 未归档；不表示任何 V/AC 通过，也不改变 M1 当前状态。后续每次实施仍按[开发流程 §3](./development-process.md#3-单项实现的执行顺序)记录输入、输出、拒绝/失败语义和验证命令。回写文档为：
+证据边界：本条与并入 M1 change 的治理 delta 均未写代码、未新增依赖、未运行新测试；M1 change 未归档，不表示任何 V/AC 通过。后续每次实施仍按[开发流程 §3](./development-process.md#3-单项实现的执行顺序)记录输入、输出、拒绝/失败语义和验证命令。回写文档为：
 
 - [开发流程 §3.1](./development-process.md#31-研究采纳与工程实践落点2026-11-05)
 - [架构 §7.3/§7.4](./v1-architecture.md#73-保存外部变化和关闭)、[§10.1](./v1-architecture.md#101-测试分层)、[§10.2](./v1-architecture.md#102-性能数字的地位)、[§13](./v1-architecture.md)
@@ -661,3 +661,14 @@ PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02
 - [验证计划 V-04～V-05、V-07～V-09](./v1-validation-plan.md)
 
 研究文档继续作为证据索引，不是第二份规范；与现行 `docs/` 冲突时以现行规范为准。
+
+## 26. 2026-11-06 合并 QMD-01 治理 change 并校正口径
+
+用户决定把进行中的两个 OpenSpec change 合并为一个：`qmd-01-engineering-practices` 并入 [`m1-single-window-readonly`](../openspec/changes/m1-single-window-readonly/proposal.md) 并删除其目录。本条只改 OpenSpec 工件的组织方式与若干措辞，不改变任何产品契约、架构决定、阶段范围或验证结论。
+
+- **合并内容。** 原 change 的 `engineering-governance` delta（6 条 ADDED 要求、17 个场景）整体移入 M1 change 的 `specs/engineering-governance/spec.md`，与产品实现侧的 `ui/*`、`engine/*`、`workspace/engineering-gates` 分文件记录；原 proposal/design 的方法来源与效力边界压缩进 M1 的 proposal 与 design §10，原 tasks 的 15 项已完成动作合并为 M1 tasks 第 16 组，范围外的 W 项门为第 17 组。沿用 2026-11-03 并入 `m1-main-window-skeleton` 的先例（[决定 §22](#22-2026-11-03-原型作为原生-ui-的布局参照)）。
+- **效力边界。** QMD-01（[§25](#25-2026-11-05-quiet-md-工程实践采纳qmd-01)）的方法采纳、来源三类标注与 W0～W7 立项门不变；W1～W7 仍逐项另建 change，不因并入被视为已批准。合并没有新增代码、依赖、夹具、自动门禁或平台证据，也未运行 Cargo 测试或 V 项；M1 的任务勾选、验收结论与阶段出口不变，change 仍不归档。
+- **代价与处理。** 治理 delta 原本已具备同步到主规格的条件，并入后须等 M1 实现与平台证据齐备才随同一 change 归档；期间 `openspec/specs/engineering-governance/spec.md` 不含这 6 条要求，查阅以 change 内的 delta 为准，不另建第二份治理 change。
+- **口径校正。** 界面语言人工/原生取证只做中文（[决定 §24](#24-2026-11-03-验证取证只做中文)），zh-CN/en 双语 catalog 的键集合/占位符校验与缺键/漂移反例自动检查保留，不新增英文界面取证任务；`AGENTS.md` 文档地图的"中英文验收"改为"中文界面验收（双语自动校验保留）"。清理 M1 proposal/design 中与已授权 apply、docs 已回填状态矛盾的规划期残留（"本轮为规划""不声称已执行任何实验""本轮不改这些现行文件""阻塞其创建"等），并补齐 `workspace/engineering-gates` capability 清单漏列的第 3 条要求。M1 tasks 顶部把"不包含 commit/push/archive"明确为"三者需用户另行明确指令"。
+
+回写：`AGENTS.md`、[开发流程 §3.1](./development-process.md#31-研究采纳与工程实践落点2026-11-05)、`docs/README.md`、[架构 §14](./v1-architecture.md)、[quiet-md 研究文档](./quiet-md-study.md)、`openspec/CODE_STANDARDS.md` §6、本文件 §3 摘要表与 §25 的治理入口表述，以及 M1 change 的 proposal/design/tasks。校验以合并后实际执行的 `openspec validate --all --strict --no-interactive`、链接/锚点检查、`git diff --check` 与变更范围核对为准；不把结构校验写成 V/AC 通过。
