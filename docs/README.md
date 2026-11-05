@@ -33,7 +33,7 @@ PRD定义产品结果，AGENTS铁律及已确认架构/专项约束实现，验�
 
 ## 研究、历史与资源
 
-- [Zed复核](./zed-notes.md)、[WordCraft调研](./wordcraft-study.md)、[Splat调研](./splat-study.md)是参考研究，不能替代锁定源码核对与Aline实测。
+- [Zed复核](./zed-notes.md)、[WordCraft调研](./wordcraft-study.md)、[Splat调研](./splat-study.md)、[quiet-md调研与采纳方案](./quiet-md-study.md)是参考研究，不能替代锁定源码核对与Aline实测。quiet-md 的 W0～W7 是工作分解，未逐项立项；其不改变产品契约的工程/验证方法已按[决定 QMD-01](./decisions.md#25-2026-11-05-quiet-md-工程实践采纳qmd-01)回写现行规范，并由 OpenSpec change [`qmd-01-engineering-practices`](../openspec/changes/qmd-01-engineering-practices/proposal.md) 记录治理入口，不代表已实施或已验证。
 - [确认归档](./archive/)及[迁移历史证据](./archive/migration-evidence/README.md)保存已确认决定与必要研究来源，不自动取得现行规范效力。
 - [历史原型](./prototype/README.md)为用户已确认长期保留的参考，且是原生 UI 的布局与控件邻接参照（[UI 规范 §4.1](./ui-spec.md#41-原型布局对照实现参照)）；除图标删除与 2026-11-03 语言切换两次记录在案的授权变更外不改历史字节；PROTO-01/03来源/许可事实仍待补证，原型主题不是正式schema 1包。
 - [应用图标](./assets/app-icon/README.md)、[素材来源](./assets/provenance.md)、[架构总览](./assets/v1-architecture.svg)、[模块目录](./assets/v1-modules.svg)分别负责正式资源、来源与规划视图。

@@ -44,6 +44,7 @@
 | 三格式导出；D15、Q-10、PL-01、ED-01 | PDF/.docx/HTML 含当前输入快照；公式/图表允许静态图；PDF 独立页样式；Mermaid 独立 SVG/PNG/图像复制只受自身开关控制 | [PRD EXPORT-01～06](./v1-prd.md)、[插件 §6.3/8.2](./plugin-system.md)、架构 §8.3；AC-14 | V-02/03；后端/离线资源策略未验 |
 | 性能；D04、Q-17 | ≤32KiB 提交 <10ms、≤128KiB <50ms 等为目标；>4MiB 默认 Source 可配置，不等于文件无限接收 | [PRD §7.2](./v1-prd.md)、[架构 §10.2](./v1-architecture.md#102-性能数字的地位)；AC-16 | V-05/06；无 Aline 实测结论 |
 | UI/工程；UI、RS | 菜单/设置/键盘按已确认 UI；逐项 lint、无 panic 输入、unsafe 默认 forbid、有限提交 scope；文案从第一天 t(key) | [UI §10.5/17](./ui-spec.md)、[Rust §20](./rust-style-guide.md#20-待确认问题清单)、AGENTS.md | V-01/07/09 与 M0 工具实验 |
+| 工程/验证方法；QMD-01 | quiet-md 方法采纳：fuzz 确定性复现、性能报告字段、1 秒/10 秒保存恢复分离、IME 核对点、语义 token、中文排版测量门、离屏证据边界；不改产品契约，W0～W7 未立项 | [决定 §25](#25-2026-11-05-quiet-md-工程实践采纳qmd-01)、[开发流程 §3.1](./development-process.md#31-研究采纳与工程实践落点2026-11-05) | V-04/05/07/08/09；治理 change 已建，W 项实施前仍须逐项建档 |
 
 ## 4. 历史时间线与逐条复核
 
@@ -625,3 +626,38 @@ PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02
 已取得的英文观测记录（[验证计划 V-09](./v1-validation-plan.md#v-09--视觉尺寸默认值与平台状态)与 [UI 规范 §14](./ui-spec.md#14-本地化长文本与窗口适配) 的 2026-11-03 记录）是裁决前的历史事实，保留不改写；后续复跑只核对中文。本条不表示 V-09、AC-15 或任何 V/AC 整项通过，也不关闭 Windows/Linux/Intel Mac 等平台缺口。
 
 回写：[验证计划](./v1-validation-plan.md)、[UI 规范 §14/§15](./ui-spec.md#14-本地化长文本与窗口适配)、M1 OpenSpec change 的 proposal/design/tasks 与 `ui/readonly-document`、`workspace/engineering-gates` delta。
+
+## 25. 2026-11-05 quiet-md 工程实践采纳（QMD-01）
+
+用户要求把 [quiet-md 调研与采纳方案](./quiet-md-study.md) 中可迁移的工程实践整合进开发/设计规范，并在后续开发中遵循。quiet-md 是外部参考实现，其快照、证据限制与独立复核见研究文档 §2、§6；本条只把**不改变 Aline 产品契约的工程方法与验证方法**回写到现行规范，不把 quiet-md 的实现、数值或能力当作 Aline 已实现、已冻结或已通过的事实。来源分三类逐项标注：quiet-md 已有机制、Aline 既有规则、Aline 追加/补强；没有直接证据的 quiet-md 行为只作“未确认/仅方向参考”。方法回写的治理入口是 OpenSpec change [`qmd-01-engineering-practices`](../openspec/changes/qmd-01-engineering-practices/proposal.md)；它只记录方法与边界，W1～W7 仍需逐项另建 change。
+
+### 25.1 采纳结论
+
+| 编号 | 结论与边界 | 来源 | 回写位置 | 验证/决策门 |
+|---|---|---|---|---|
+| QMD-01.1 引擎随机不变量 | 采纳为测试机制：确定性 RNG/固定 seed，生成器按 Aline 语法只产出合法或预期拒绝输入；每步检查不变量，周期性保存往返或与全量权威路径差分；失败保留 seed、步号、操作日志与最小输入。不照搬 quiet-md 的操作分支，不新增生产依赖 | quiet-md fuzzer 骨架；Aline 追加：最小输入、完整操作日志、不新增依赖的约束 | [架构规范 R-17-03](./architecture-guide.md#17-测试架构与规则检查)、[Rust S-12-06](./rust-style-guide.md#12-测试组织命名与覆盖)、[引擎 E-T20](./engine-design.md#14-测试策略与需求追踪) | V-07/V-08；W3 立项时确定默认 seed/步数与 CI 预算 |
+| QMD-01.2 性能报告 | 采纳报告字段：环境、源码 commit、锁定构建、样本 SHA-256、方法、冷/热、计时边界、P50/P95、最长停顿、峰值内存、原始日志、复现命令、明确不测量什么。数值门槛仍由 V-05 冻结 | quiet-md 报告结构（环境、源码 commit/锁定构建、方法/操作序列、计时边界、P50/P95/最大、原始日志、复现命令、不测量项）；Aline 既有：冷/热、最长停顿、内存；Aline 追加：样本 SHA-256、峰值内存 | [架构规范 R-11-01](./architecture-guide.md#11-性能规则与反面实证)、[Rust S-14-03](./rust-style-guide.md#14-性能缓存与内存预算)、[架构 §10.2](./v1-architecture.md#102-性能数字的地位)、[V-05](./v1-validation-plan.md) | V-05；不在本条冻结任何毫秒/内存值 |
+| QMD-01.3 保存与恢复 | 采纳故障安全核对表：同目录临时文件 → 写完 → 同步 → 平台受检替换 → 按平台同步目录/处理权限；写前核对磁盘基线；1 秒自动保存与 10 秒恢复快照是独立路径；恢复先入内存、不覆盖磁盘；失败保留原文件、内存与恢复材料；恢复快照写应用管理的独立目标，不以文档旁 `.bak`/`.corrupt-*` 作为恢复手段；原子替换不称跨进程 CAS。不采用 500ms 自动保存、整篇快照撤销、切换/退出静默 flush | quiet-md 原子写/基线骨架（`.bak` 只服务 JSON 索引）；Aline 既有 SAFE-04～08；Aline 明确：平台受检替换、目录同步、文档旁副本不作为恢复手段 | [架构规范 R-15-13](./architecture-guide.md#152-资源恢复路径和关闭)、[架构 §7.3/§7.4](./v1-architecture.md#73-保存外部变化和关闭)、[V-08](./v1-validation-plan.md) | V-08；M2 实施前仍按 V-08 身份/事务方案立项 |
+| QMD-01.4 IME 与输入 | 采纳三个检查点：先等待平台组合完成结果，等待期间保留原上下文，不抢焦点、不丢草稿；实际失焦、切块、切模式或窗口失活时显式结束/清理 marked，不以 Blur 猜平台确认或取消；候选窗位置按元素 frame + 文本布局 + 滚动 + 窗口坐标换算；平台 glyph 索引（GPUI 为 UTF-8 字节偏移）与 UTF-16 端点不得互相冒充或当作字素索引 | quiet-md IME 结构线索（失焦清理未确认）；Aline 补强：等待语义、坐标投影分离 | [引擎 §10.1/§10.2](./engine-design.md#101-组合状态与平台边界)、[UI §6/§13](./ui-spec.md#6-编辑模式滚动与输入连续性)、E-T15 | V-01/V-07；真实输入法行为不能由纯状态机替代 |
+| QMD-01.5 语义 token | 采纳组件只消费语义 token、原始色值集中在 token 模块并注明来源、token 重构不得改变视觉；M1 可先局部 token 化，不改变主题包 schema 与已确认视觉 | Aline 设计要求；quiet-md 仅方向参考 | [UI §3.2](./ui-spec.md#32-排版图标与应用外观边界)、[架构规范 R-9-02](./architecture-guide.md#9-组件形态与复用) | V-09；重构前后截图/像素对比作为审查证据 |
+| QMD-01.6 中文排版 | 采纳“先测量、后决定”的门：全角标点避头尾、合成斜体、CJK 标点字体回退进入 V-04 夹具；quiet-md 的 14° 等数值不写成 Aline 规范值。若确认锁定 gpui-pre 缺口，是否 fork/vendor 三个包另立决定并走依赖准入 | Aline 测量门；quiet-md 数值/补丁仅参考 | [UI §3.2](./ui-spec.md#32-排版图标与应用外观边界)、[V-04](./v1-validation-plan.md) | V-04；M1 是否允许列为已知限制仍待用户裁决 |
+| QMD-01.7 离屏视觉证据 | 采纳为补充证据，不替代真实窗口、IME 与平台证据；引入锁定 GPUI 的 `test-support` feature、`gpui_macos` 平台实现与 `image` dev-dependency 前必须先做能力 spike 与依赖准入；`VisualTestAppContext` 受 macOS + `test-support` 门控，不能假设普通测试开箱可用 | 锁定 GPUI 接口事实；Aline 证据边界；依赖未准入 | [架构 §10.1](./v1-architecture.md#101-测试分层)、[开发流程 §3.1](./development-process.md#31-研究采纳与工程实践落点2026-11-05)、[V-09](./v1-validation-plan.md) | V-09；准入 spike 是否批准仍待用户决定 |
+| QMD-01.8 不采纳清单 | quiet-md 的 block 树/DocxXML 文档模型、整篇 `Document` 快照撤销、500ms 自动保存、文档 `.bak`/`.corrupt-*`、`hash_block` 仅取长度、双主题双渲染、中文 key i18n、静默平台降级、主线程 fsync、整体 vendor/AppKit 注入均不进入 Aline 设计 | quiet-md 反例 | 理由见[研究文档附录 A](./quiet-md-study.md#附录-a不采纳清单带理由) | 不适用；不得以“参考实现如此”绕过 Aline 铁律 |
+
+### 25.2 效力与实施边界
+
+本条是**工程/验证方法采纳**，不改变 PRD、AC、跨模块契约、依赖/架构边界、阶段范围或已确认数值。方法回写本身已建档为 OpenSpec change [`qmd-01-engineering-practices`](../openspec/changes/qmd-01-engineering-practices/proposal.md)，只追认文档与方法边界；W1～W7 仍须逐项另建 change。按[开发流程 §2](./development-process.md#2-openspec-变更流程)，实施时凡新增/升级依赖（如锁定 GPUI 的 `test-support` feature、`image`）、改变验收方式（如 V-04/V-05/V-09 增加夹具或报告字段）、改变跨模块契约（如保存/恢复状态机）或进入 M2/M4 范围，仍须先建对应 OpenSpec change；研究文档的 W0 治理门继续有效，未批准不写代码。
+
+研究文档中的 W0～W7、Q01～Q32 与建议 change 名称是工作分解和证据矩阵，不是已批准任务，也不构成本条之外的新决定。其待确认问题（test-support 准入、vendor 顺序、M1 是否允许中文排版已知限制、token 时点、fuzz 规模、W4/W5 阶段、窗口构造重构）保持待确认，本条不自行裁决；开发流程与架构 §13 表中的阶段落点只是建议，批准对应 change 时才定。
+
+证据边界：本条与 `qmd-01-engineering-practices` 均未写代码、未新增依赖、未运行新测试，change 未归档；不表示任何 V/AC 通过，也不改变 M1 当前状态。后续每次实施仍按[开发流程 §3](./development-process.md#3-单项实现的执行顺序)记录输入、输出、拒绝/失败语义和验证命令。回写文档为：
+
+- [开发流程 §3.1](./development-process.md#31-研究采纳与工程实践落点2026-11-05)
+- [架构 §7.3/§7.4](./v1-architecture.md#73-保存外部变化和关闭)、[§10.1](./v1-architecture.md#101-测试分层)、[§10.2](./v1-architecture.md#102-性能数字的地位)、[§13](./v1-architecture.md)
+- [架构规范 R-11-01](./architecture-guide.md#11-性能规则与反面实证)、[R-15-13](./architecture-guide.md#152-资源恢复路径和关闭)、[R-17-03](./architecture-guide.md#17-测试架构与规则检查)
+- [引擎 §10.1](./engine-design.md#101-组合状态与平台边界)、[§14](./engine-design.md#14-测试策略与需求追踪)
+- [Rust 规范 S-12-06](./rust-style-guide.md#12-测试组织命名与覆盖)、[S-14-03](./rust-style-guide.md#14-性能缓存与内存预算)
+- [UI 规范 §3.2](./ui-spec.md#32-排版图标与应用外观边界)、[§6](./ui-spec.md#6-编辑模式滚动与输入连续性)、[§13](./ui-spec.md#13-键盘焦点与基本无障碍)
+- [验证计划 V-04～V-05、V-07～V-09](./v1-validation-plan.md)
+
+研究文档继续作为证据索引，不是第二份规范；与现行 `docs/` 冲突时以现行规范为准。

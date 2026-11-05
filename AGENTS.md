@@ -28,6 +28,7 @@ Aline —— Typora 式 Markdown 编辑器（Rust + GPUI，无 WebView），macO
 | [docs/zed-notes.md](docs/zed-notes.md) | Zed逐主题复核与完整历史证据入口；旧“照搬”标签不作当前决定，主线与gpui-pre有API代差 | UI / GPUI 实现时仅作机制线索，须核对锁定源码及 V 验证 |
 | [docs/decisions.md](docs/decisions.md) | 决策时间线 + 常设决定清单（含 2026-10-26 复核裁决） | 争议选型查先例 |
 | [docs/wordcraft-study.md](docs/wordcraft-study.md) | WordCraft（storytold/wordcraft @ 0.11.0）调研：手写 markdown 解析的抗退化工程、性能案例库、保真方法论、敌意输入防御；原文实际 21 条提案，W22～W24 缺项，WC-01～WC-07 已确认A，技术验证仍未执行 | 实现自研扫描 pass、文件层/保存、安全上限、formatter 时对照 |
+| [docs/quiet-md-study.md](docs/quiet-md-study.md) | quiet-md 工程实践调研与 Aline 采纳方案（研究文档，非权威）：fuzz/不变量、性能报告、保存/恢复、IME、语义 token、中文排版、离屏证据；QMD-01 已把方法回写规范，治理入口为 change `qmd-01-engineering-practices`，W0～W7 未立项（与 WordCraft W22～W24 不共用编号空间） | 做引擎测试、保存恢复、字体/主题或补强验证证据时对照；实施前按开发流程逐项建档 |
 
 ## 架构铁律（任何代码不得绕过）
 

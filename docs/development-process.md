@@ -41,6 +41,26 @@ OpenSpec 使用仓库根目录 `openspec/` 下的 `spec-driven` schema，所有�
 
 提交使用 Conventional Commits 和 AGENTS.md 的 scope 规则。CodeGraph 用于代码存在后的符号/调用关系探索；重构或新增代码后运行 `codegraph sync`，并在提交前确认 `codegraph status` 无陈旧索引。CodeGraph 索引数据库为本机生成物，不提交。
 
+### 3.1 研究采纳与工程实践落点（2026-11-05）
+
+[决定 QMD-01](./decisions.md#25-2026-11-05-quiet-md-工程实践采纳qmd-01) 已把 [quiet-md 调研](./quiet-md-study.md) 中不改变产品契约的工程/验证方法回写现行规范；治理入口是 OpenSpec change [`qmd-01-engineering-practices`](../openspec/changes/qmd-01-engineering-practices/proposal.md)，它只记录方法与边界，不批准任何 W 项。下列 W0～W7 是**工作分解与建议顺序**，不是已批准任务；实施前按 §2 逐项建 change，W0 未批准不写代码。
+
+| 工作流 | 落点与阶段 | 前置/边界 |
+|---|---|---|
+| W0 治理门 | 每个工作流拆成可独立验收的 OpenSpec change，先写范围、非目标、证据表 | 用户批准对应 change；研究文档不是第二权威 |
+| W1 离屏视觉证据 | M1 补充证据；先做依赖准入与能力 spike | 锁定 GPUI 的 `test-support` feature、`gpui_macos` 平台实现与 `image` 未准入不引入；不替代真实窗口/IME/平台证据 |
+| W2 中文排版与字体 | M1 字体实验与 V-04；先测量后决定是否 vendor | 不直接移植 quiet-md 的 GPUI 0.2.2 补丁，不先 fork 三个 gpui-pre 包 |
+| W3 引擎随机不变量 | M1 可并行；M2/M3 扩展 | 只加测试与确定性 RNG，不加生产依赖；默认 seed/步数按 CI 时间立项 |
+| W4 保存/恢复/外改 | M2；对应 SAFE-04/05/07/08、V-08 | 1 秒自动保存与 10 秒恢复分开；不在 M1 提前实现半套 |
+| W5 IME 与输入 | M2；TA-01/ED-01、V-07 | 真实中文输入法证据不能被纯状态机或模拟替代 |
+| W6 语义 token | M1 小步；M4 完整 | 不改视觉与主题包 schema；不挤占 M1 关键路径 |
+| W7 工程门禁/性能/文档 | 持续；服务 M1 任务 7.1 与 V-05 | 不另建第二套门禁；性能报告字段按 R-11-01/S-14-03 |
+
+- 随机测试失败必须留下可复跑的 seed、步号、操作日志和最小输入；最小输入整理成正式夹具后提交，原始日志只留 `logs/validation/`。不得用测试辅助函数把已知语义丢失规范化后当作通过。
+- 表中“M1/M2/M4”等阶段是建议落点；W4/W5 的阶段归属、W6 时点与其他待确认问题仍以 QMD-01 为准，批准对应 change 时才定。
+- quiet-md 的数值、平台能力、vendor 补丁和测试覆盖只能作为待核对线索，不能直接写成 Aline 设计值或验收证据；引用时标明“参考/待验证”。
+- 工作流若改变验收方式、依赖图、跨模块契约或阶段范围，先更新 OpenSpec change 与相应现行规范，再写依赖该变化的代码；研究文档中的建议 change 名称不自动生效。
+
 ## 4. 当前启动清单
 
 - [x] 初始化 OpenSpec `spec-driven`，工件语言 zh-CN，配置 Codex 工作流技能。
