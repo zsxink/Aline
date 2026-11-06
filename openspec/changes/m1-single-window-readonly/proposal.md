@@ -18,7 +18,7 @@
 |---|---|---|
 | 原始 M1 单窗只读（2026-11-02） | 主范围 | What Changes 前四条、`ui/readonly-document` 与 `engine/*` delta、`workspace/engineering-gates` 的 M1 交接要求、tasks 1～8 组 |
 | `m1-main-window-skeleton`（2026-11-03 并入并删除） | 独立 change 并入，基线提交 `91d2b47f`（决定 §22 只裁决原型参照范围，不是本次并入的依据） | `ui/main-window-layout` delta、tasks 9～15 组、design §9；三段骨架、状态栏统计、几何与统计模块、工具栏品牌区 |
-| 验证取证只做中文（决定 §24） | 文档裁决转写为规格要求，无独立 change | `workspace/engineering-gates` 的 G3、`ui/readonly-document` 键盘基线场景、Acceptance Evidence 双语文案行、`openspec/config.yaml`、tasks 4.3/7.2/14.2 口径 |
+| 验证取证只做中文（决定 §24） | 文档裁决转写为规格要求，无独立 change | `workspace/engineering-gates` 的 G3、`ui/readonly-document` 键盘基线场景、Acceptance Evidence 双语文案行、tasks 4.3/7.2/14.2 口径；`openspec/config.yaml` 的中文取证状态行是 2026-11-06 合并（决定 §26）时的口径同步，不属下表所述「决定 §24 裁决最初的 `docs/` 落地」 |
 | `qmd-01-engineering-practices`（2026-11-06 并入并删除，决定 §26） | 独立治理 change 并入，纯文档/规格、无代码 | `engineering-governance` delta（6 条要求/17 场景，均为 ADDED）、design §10、tasks 16～17 组 |
 
 另有同分支但**不进入本 change 范围**的提交：原型界面语言切换（决定 §23，`docs/prototype/legacy/` 的 DOM 演示）、决定 §24 裁决最初的 `docs/` 落地、quiet-md 方法正文（`docs/quiet-md-study.md` 及现行 `docs/` 回写）。它们只通过现行规范间接约束实现，不新增本 change 的 capability 或任务。中途加入没有引入 QMD-01 相关的 Rust 代码、依赖或自动门禁；W0～W7 仍逐项另建 change。工具栏应用品牌区与 G3 属上述并入范围内的直接规格增补（不单独建 change、也不另立 capability），对应表格第 2、3 行的落点，不单列为独立事件。
@@ -64,7 +64,7 @@
 
 工程约束：CODE_STANDARDS §2～6、engineering-governance 全部适用要求；架构规范 R-1～4、R-6～8、R-10～13、R-16～17；Rust S-2～5、S-7～15/16，重点为最窄可见性、零副作用拒绝、类型化错误、引擎无 panic、所有文案 `t("key")`、布局热路径和生命周期。现有 `gpui-pre =0.3.9`、pulldown-cmark 及依赖准入保持；若原生 feature 激活改变受审子图，须重新审计，不能刷新指纹以掩盖漂移（架构 §3.2、引擎 §18.2）。
 
-实施结果按真实证据回填 `docs/v1-architecture.md` §13、`docs/v1-validation-plan.md` 相关 V 项及受影响的引擎/UI 公共契约；必要决定回填 `docs/decisions.md`。2026-11-03 用户已授权 apply，本 change 依该授权维护现行 docs/config/实现，依赖候选已按 tasks 4.1 与 `docs/decisions.md` §21 获具体裁决。并入的治理范围已于 2026-11-06 完成文档回写与校验（`openspec validate --all --strict --no-interactive` 合并后 8 passed、原独立 change 存在时为 9 passed；链接/锚点检查、`git diff --check`），不含代码或平台验证；原始输出留在未跟踪的 `logs/validation/`。commit/push/archive 仍需用户另行明确指令。
+实施结果按真实证据回填 `docs/v1-architecture.md` §13、`docs/v1-validation-plan.md` 相关 V 项及受影响的引擎/UI 公共契约；必要决定回填 `docs/decisions.md`。2026-11-03 用户已授权 apply，本 change 依该授权维护现行 docs/config/实现，依赖候选已按 tasks 4.1 与 `docs/decisions.md` §21 获具体裁决。并入的治理范围已于 2026-11-06 完成文档回写与校验（`openspec validate --all --strict --no-interactive` 合并后 8 passed、原独立 change 存在时为 9 passed；链接/锚点检查、`git diff --check`），不含代码或平台验证；原始输出留在未跟踪的 `logs/validation/`。commit/push 是版本管理动作，不属于本 change 的任务清单；2026-11-06 两轮梳理已按用户明确 `commit` 指令提交并推送（`d5bbba78`、`21eab9ac`），archive 与最终交付评审仍需用户另行明确指令（决定 §26）。
 
 ### Acceptance Evidence
 
