@@ -1,6 +1,6 @@
 # M1 原生后端准入候选方案
 
-状态：**用户已批准候选方案、三个精确 MPL 包例外（`cbindgen`、`option-ext`、`dwrote`）、`libloading@0.8.9` 的精确 ISC metadata-only 路径例外、原列的 `wasi`/`wasip2` 路径和随后发现的9条精确 `wasip2` metadata 边；也已批准表中7个 M1 GPUI 组合图指纹，M0 值保留为历史。真实 Cargo 准入守卫已在 all、all-features 与五个桌面目标场景通过；完整守卫自测117/117、许可证规则13/13及路径并集14/14通过。**这不代表 native build、窗口、系统语言 GUI 或跨平台构建已验证。**不批准 GPUI 升级、自有 unsafe、未登记的其它包例外或其它指纹变化。**
+状态：**用户已批准候选方案、三个精确 MPL 包例外（`cbindgen`、`option-ext`、`dwrote`）、`libloading@0.8.9` 的精确 ISC metadata-only 路径例外、原列的 `wasi`/`wasip2` 路径和随后发现的9条精确 `wasip2` metadata 边；也已批准表中7个 M1 GPUI 组合图指纹，M0 值保留为历史。真实 Cargo 准入守卫已在 all、all-features 与五个桌面目标场景通过；完整守卫自测117/117、许可证规则13/13及路径并集14/14通过。**这些是 2026-11-02 的依赖准入裁决，本身不等于原生 build/窗口证据；后者在 2026-11-03 Apple Metal 工具可用后已由 tasks 4.2/4.3/4.4 分别取得锁定离线 build、macOS 真实空窗显示/退出、中文界面启动与文件打开/取消/关闭的真实操作证据，design §1 亦已记录。Windows 10/Intel Mac/Linux 的跨平台构建与窗口仍属未测项，不因本裁决或 macOS 首轮结果推断为已验证。**不批准 GPUI 升级、自有 unsafe、未登记的其它包例外或其它指纹变化。**
 
 ## 推荐范围
 
@@ -56,10 +56,12 @@ AppKit、Metal、CoreText、Windows 与 Linux 平台后端及底层 FFI 中的 `
 
 ## 进入原生接线前的验证门
 
+以下 4 条是 2026-11-02 设定的接线前置门；截至 2026-11-03 已全部关闭（见文末「后续状态」），此处保留原门的内容以便追溯，不再表示当前阻塞。
+
 1. 用户已完成 macOS 候选、精确包例外和七场景 hash 裁决。
 2. 策略实现通过精确许可证13/13与完整守卫合成自测117/117；真实依赖守卫 all 与七场景均通过，桌面目标的 `dwrote`/`libloading` target tree 明确检查为不选中。
-3. 在具有 Apple Metal 开发工具的真实 macOS 环境成功编译最小 `Rc<MacPlatform> -> Rc<dyn gpui::Platform>` 消费方；当前环境缺少 `xcrun metal`，故该 build 证据待补。
-4. 之后才接 `Application::with_platform`、主线程窗口与系统 locale 实验。Windows 10、Intel Mac、Linux 和完整跨平台构建继续保留为未测项。
+3. 在具有 Apple Metal 开发工具的真实 macOS 环境成功编译最小 `Rc<MacPlatform> -> Rc<dyn gpui::Platform>` 消费方；设门时当前环境缺少 `xcrun metal`、该 build 证据待补，2026-11-03 Xcode 27.2/Metal Toolchain 可用后已由 tasks 4.2 取得 `cargo build -p aline --locked --offline` 通过的证据，此门关闭。
+4. 之后才接 `Application::with_platform`、主线程窗口与系统 locale 实验；已在 tasks 4.2/4.3/4.4 接通并取得真实空窗、中文界面与文件选择证据。Windows 10、Intel Mac、Linux 和完整跨平台构建继续保留为未测项。
 
 ## 原始审计位置
 
@@ -99,4 +101,8 @@ ravif@0.13.0 --[target=wasm32-unknown-unknown]→ rav1e@0.8.1
 
 独立审查确认完整图从 347 到 435 包，GPUI 闭包从 317 到 325 包；core 包身份、checksum 和自身 features `[]` 未变，新增共享 feature/edge 由后端带入。完整新增 feature/edge 差分与 M0 七场景值保留在本地归一化审计证据中。用户批准保持现行 hash 语义，以表中七场景值作为 M1 组合图新指纹并保留 M0 历史值；不通过过滤共享 features/edges 保住旧 hash。准入策略中的 hash 登记和全场景复跑仍在执行，不能在完成复验前宣称守卫已通过。
 
-2026-11-02 用户已明确批准前述精确 wasi/wasip2 路径及新增9条 `wasip2` metadata 边，并批准表中七场景 M1 指纹；`wasip2` 在任何 desktop target tree 仍必须不选中。用户另批准 `dwrote@0.11.5` 精确 MPL-2.0 与 `libloading@0.8.9` 精确 ISC metadata-only 例外。实现精确完整路径约束后，许可证回归13/13、branched path guard14/14、完整工程合成自测117/117通过；真实 Cargo 准入 all 与七场景通过，五个 desktop target 各自对 dwrote/libloading 检查均不选中。原生窗口接线的准入门已通过；Metal 缺失仍阻断本地 GPUI 原生编译。
+2026-11-02 用户已明确批准前述精确 wasi/wasip2 路径及新增9条 `wasip2` metadata 边，并批准表中七场景 M1 指纹；`wasip2` 在任何 desktop target tree 仍必须不选中。用户另批准 `dwrote@0.11.5` 精确 MPL-2.0 与 `libloading@0.8.9` 精确 ISC metadata-only 例外。实现精确完整路径约束后，许可证回归13/13、branched path guard14/14、完整工程合成自测117/117通过；真实 Cargo 准入 all 与七场景通过，五个 desktop target 各自对 dwrote/libloading 检查均不选中。以上为 2026-11-02 当日结论，当时「原生窗口接线的准入门已通过；Metal 缺失仍阻断本地 GPUI 原生编译」。后续状态以 tasks 4.2/4.3/4.4 与 design §1 为准：Metal 工具就绪后锁定离线 build、真实空窗、中文界面启动与文件选择/取消/关闭均已实测；「Metal 缺失阻断」已不再是当前阻塞，Windows 10/Intel Mac/Linux 跨平台构建与窗口仍属未测。
+
+## 后续状态（2026-11-03 起）
+
+本文「来源、版本与类型身份」「依赖闭包」「进入原生接线前的验证门」「用户批准例外后的守卫复核」各节是 2026-11-02 依赖准入裁决当时的审计快照，其中「缺少 `xcrun metal`」「build 证据待补」「Metal 缺失仍阻断」等均为设门时的事实，不代表现状。此后的进展只回填到 tasks 第 4 组、design §1 与 `docs/v1-validation-plan.md` 的 V-01/V-09 分项，不倒改这些历史审计记录；判断当前状态时应一并阅读上述现行工件。

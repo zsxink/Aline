@@ -10,6 +10,19 @@ Aline 已有八成员 workspace、无头引擎和 `aline-ui/document`，但 `app
 
 2026-11-06 用户决定把 2026-11-05 决定 QMD-01 建立的治理 change `qmd-01-engineering-practices` 并入本变更并删除。该 change 只把 quiet-md 调研中不改变产品契约的工程/验证方法（来源标注、随机不变量与性能证据、保存/恢复分离、IME 清理与坐标、语义 token/中文排版/离屏证据边界、W0～W7 立项门）写成 `engineering-governance` 的增量要求，并校正回写文档的字段与口径；它没有代码、依赖、夹具或平台证据，15 项范围任务与校验均已完成。合并后其 6 条要求/17 个场景整体移入本变更的 `specs/engineering-governance/spec.md`，方法与效力边界不变：W1～W7 仍未立项，实施前逐项另建 change，不因并入而被视为已批准；本合并不改变 M1 的任务勾选、验收结论或阶段出口，也不批准任何 W 项。记录见[决定 §26](../../../docs/decisions.md#26-2026-11-06-合并-qmd-01-治理-change-并校正口径)。
 
+### 范围构成（截至 2026-11-06）
+
+本变更自 2026-11-02 建立后，范围经两次「独立 change 并入」与两次「直接扩张」，仍保持一个 change、一套 tasks、一组 capability delta。下表消除「单窗只读」字面范围与实际工件不一致的读法，不构成新的产品授权，也不改变各段的效力边界。
+
+| 来源 | 性质 | 在本变更的落点 |
+|---|---|---|
+| 原始 M1 单窗只读（2026-11-02） | 主范围 | What Changes 前四条、`ui/readonly-document` 与 `engine/*` delta、`workspace/engineering-gates` 的 M1 交接要求、tasks 1～8 组 |
+| `m1-main-window-skeleton`（2026-11-03 并入并删除） | 独立 change 并入，先例见决定 §22、基线提交 `91d2b47f` | `ui/main-window-layout` delta、tasks 9～15 组、design §9；三段骨架、状态栏统计、几何与统计模块、工具栏品牌区 |
+| 验证取证只做中文（决定 §24） | 文档裁决转写为规格要求，无独立 change | `workspace/engineering-gates` 的 G3、`ui/readonly-document` 键盘基线场景、Acceptance Evidence 双语文案行、`openspec/config.yaml`、tasks 4.3/7.2/14.2 口径 |
+| `qmd-01-engineering-practices`（2026-11-06 并入并删除，决定 §26） | 独立治理 change 并入，纯文档/规格、无代码 | `engineering-governance` delta（6 条要求/17 场景，均为 ADDED）、design §10、tasks 16～17 组 |
+
+另有同分支但**不进入本 change 范围**的提交：原型界面语言切换（决定 §23，`docs/prototype/legacy/` 的 DOM 演示）、决定 §24 裁决最初的 `docs/` 落地、quiet-md 方法正文（`docs/quiet-md-study.md` 及现行 `docs/` 回写）。它们只通过现行规范间接约束实现，不新增本 change 的 capability 或任务。中途加入没有引入 QMD-01 相关的 Rust 代码、依赖或自动门禁；W0～W7 仍逐项另建 change。工具栏应用品牌区与 G3 属上述并入/扩张范围内的直接规格增补，不另立 capability。
+
 ## What Changes
 
 - 原生单窗、单个本地 `.md`/`.MD` 文件的打开、替换、关闭与无文档状态；最小入口为窗口打开按钮、文件菜单及 Cmd/Ctrl+O 的同一文件选择动作。成功后替换当前只读会话，取消/失败保留原会话。拖放、命令行、关联、全应用身份转交留 M5（PRD §5.1 FILE-01～03、§6.3；架构 §13）。
@@ -51,7 +64,7 @@ Aline 已有八成员 workspace、无头引擎和 `aline-ui/document`，但 `app
 
 工程约束：CODE_STANDARDS §2～6、engineering-governance 全部适用要求；架构规范 R-1～4、R-6～8、R-10～13、R-16～17；Rust S-2～5、S-7～15/16，重点为最窄可见性、零副作用拒绝、类型化错误、引擎无 panic、所有文案 `t("key")`、布局热路径和生命周期。现有 `gpui-pre =0.3.9`、pulldown-cmark 及依赖准入保持；若原生 feature 激活改变受审子图，须重新审计，不能刷新指纹以掩盖漂移（架构 §3.2、引擎 §18.2）。
 
-实施结果按真实证据回填 `docs/v1-architecture.md` §13、`docs/v1-validation-plan.md` 相关 V 项及受影响的引擎/UI 公共契约；必要决定回填 `docs/decisions.md`。2026-11-03 用户已授权 apply，本 change 依该授权维护现行 docs/config/实现，依赖候选已按 tasks 4.1 与 `docs/decisions.md` §21 获具体裁决。并入的治理范围已于 2026-11-06 完成文档回写与校验（`openspec validate --all --strict --no-interactive` 9 passed、链接/锚点检查、`git diff --check`），不含代码或平台验证；原始输出留在未跟踪的 `logs/validation/`。commit/push/archive 仍需用户另行明确指令。
+实施结果按真实证据回填 `docs/v1-architecture.md` §13、`docs/v1-validation-plan.md` 相关 V 项及受影响的引擎/UI 公共契约；必要决定回填 `docs/decisions.md`。2026-11-03 用户已授权 apply，本 change 依该授权维护现行 docs/config/实现，依赖候选已按 tasks 4.1 与 `docs/decisions.md` §21 获具体裁决。并入的治理范围已于 2026-11-06 完成文档回写与校验（`openspec validate --all --strict --no-interactive` 合并后 8 passed、原独立 change 存在时为 9 passed；链接/锚点检查、`git diff --check`），不含代码或平台验证；原始输出留在未跟踪的 `logs/validation/`。commit/push/archive 仍需用户另行明确指令。
 
 ### Acceptance Evidence
 
@@ -86,4 +99,4 @@ Aline 已有八成员 workspace、无头引擎和 `aline-ui/document`，但 `app
 - V-07 样例始终保留“现状”与“独立预期”两列。SoftBreak `a\nb` 保留带来源的可见换行；有限 HTML 子集之外的 void 标签显示原始标签，未知非 void 容器整段按原文显示；用户已于 2026-11-03 裁决，独立回归和契约见任务 1.2 证据及引擎 §7/11。已被解析器识别配对却因标签大小写而导航为空是引擎 §12.1 明留 M1 的缺陷，列为修复任务，不能归为正常缺失目标验收。其他样例若不能由 PRD MD-04/07～11 和引擎 §7/11 裁决，列明最小冲突并暂停该语义的实施/通过声明，交用户确认，不以本提案授权任意口径。
 - V-04/V-05/V-09 的字体实际可用性、布局数值、预算/性能门槛留实验收口，不能预填为成绩或降低现行产品目标。
 - 并入的骨架范围没有阻塞实施的问题：统计口径的最终冻结、像素冻结与图标库选型分别归 V-07、V-09 与后续主题/图标决定；按 UI §3.3 与 §4.1 的候选口径执行，遇到不能裁决的呈现细节列入最小冲突并暂停依赖项，不自行扩大产品范围。
-- `openspec/config.yaml` 的 “M0 exit remains open” 与部分 M0 主规格的历史准入措辞仍在；按已明确的 §20 用户风险接受解释为证据未闭合，不重开 M0。本变更不修改 `openspec/config.yaml` 与 M0 主规格的历史表述。
+- 部分 M0 主规格仍保留规划期的历史准入措辞；按已明确的 §20 用户风险接受解释为证据未闭合，不重开 M0，也不改写这些历史表述。`openspec/config.yaml` 的状态行已按 2026-11-06 合并（决定 §26）同步为「M0 验收豁免、证据缺口未闭合，M1 进行中且原生窗口部分实现」，并补入界面语言取证只做中文的口径；本变更不再把该行记为旧措辞，也不改动其它 M0 主规格。
