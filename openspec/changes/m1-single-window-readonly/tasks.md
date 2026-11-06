@@ -6,7 +6,7 @@
 
 组号是范围编号，不是严格执行序号：第 9～15 组须在 8.1 独立复审前完成；8.2 逐项核对与 8.3 交接验证在全部组完成后执行。
 
-Requirement 引用缩写仅用于追踪，不另建编号规格。**编号空间澄清：** 下表 `W1`～`W5` 仅指 `ui/main-window-layout` 的五条主窗布局要求；QMD-01 治理范围的工作分解是另一套 `W0`～`W7`（见第 17 组、`specs/engineering-governance/spec.md` 的 Q6、`docs/development-process.md` §3.1），两套编号同名但互不等价，不互相替换。凡单独写「W 项」「W0～W7」「W1～W7」处均指后者，凡写 `W1`～`W5` 缩写处均指前者。
+Requirement 引用缩写仅用于追踪，不另建编号规格。**编号空间澄清：** 下表与第 9～15 组的 `W1`～`W5` 一律指 `ui/main-window-layout` 的五条主窗布局要求（缩写表与「关联 W1/W3…」均为纯文本，不靠反引号区分）；QMD-01 治理范围的工作分解是另一套 `W0`～`W7`（见第 17 组、`specs/engineering-governance/spec.md` 的 Q6、`docs/development-process.md` §3.1），两套编号同名但互不等价，不互相替换。判据是上下文而非排版：凡出现在「主窗布局」「骨架」「requirement 缩写表」「第 9～15 组关联」语境中的 `W1`～`W5` 均指前者；凡出现在「QMD-01」「W 项」「治理工作分解」「W0～W7 / W1～W7」「第 17 组」「另建 change」语境中的均指后者。第 17 组的两处单写 `W1`/`W2` 已按后者加上「QMD-01」全称限定，不与缩写表混用。
 
 | 缩写 | capability / Requirement |
 |---|---|
@@ -81,7 +81,7 @@ Requirement 引用缩写仅用于追踪，不另建编号规格。**编号空间
 
 - [x] 5.1 接变高块 `list` 与 Source 逻辑行虚拟列表、同内容列宽/外侧滚动槽位，建立带文档/投影/宽度/缩放/字体/换行键的有界高度缓存与源码滚动锚点。先测重排/虚拟复用/过期高度不污染/空闲无刷新环，再实现；验收 `cargo test -p aline-ui --lib native_window::readonly_layout`（12 例，含原布局 5 例）和真实 1 MiB 两视图滚到首尾，记录实例量与缓存规模。macOS arm64 debug 窗口以精确 1,048,576 字节样例实测：Visual 42,800 项、当前帧渲染 10～13 项，Source 42,801 行、当前帧渲染 16 项；两模式高度缓存均未超过 256，首尾截图显示首段/尾部标记，证据 `<evidence>/virtualization/`。这不是 Release 基准或性能门槛，V-05 仍待测。
 - [ ] 5.2 接锁定 TextLayout 像素→局部 DrawnOffset→映射层→核心导航，覆盖 Exact/Aligned/Hidden/Synthetic、实体两侧/多字符、重复文本/空白、中文/emoji/组合字符、软折行/Gap、零可见 HTML、旧点击拒绝。验收 `cargo test -p aline-ui --lib native_window::readonly_hit` 与实际像素点击→切 Source 核对预期锚点；断言 `has_open_block=false`、零 bytes/revision/history，证据 `<evidence>/hit/`，回填 V-07 真实命中分项。**状态：命中链与 9 例内联无头测试已具备（原 `tests/readonly_hit.rs` 迁入 `readonly_hit.rs` 的 `#[cfg(test)]`），验收命令按第 5 组 safety 门禁改用 `--lib`；未勾选仅因真实像素点击证据受 macOS 会话锁定阻塞，不以代码或无头测试代替。**
-- [ ] 5.3 接双视图切换/可取消主动定位及换宽/字体重排恢复，避免同像素复用和陈旧布局；巨块/长行/巨表布局前预算，>4 MiB 默认 Source 原因提示。验收 `cargo test -p aline-ui --lib native_window::readonly_layout` 与 `cargo test -p aline-ui --test readonly_document` 的过期/取消/预算矩阵及真实长文切换；安全回退和 1 MiB 可视化成功分列，证据 `<evidence>/view-switch/`。**状态：布局/锚点恢复与 12 例内联无头测试已具备（原 `tests/readonly_layout.rs` 迁入 `readonly_layout.rs` 的 `#[cfg(test)]`），验收命令按第 5 组 safety 门禁拆分 `--lib` 与既有集成目标；未勾选仅因真实长文切换证据受 macOS 会话锁定阻塞。**
+- [ ] 5.3 接双视图切换/可取消主动定位及换宽/字体重排恢复，避免同像素复用和陈旧布局；巨块/长行/巨表布局前预算，>4 MiB 默认 Source 原因提示。验收 `cargo test -p aline-ui --lib native_window::readonly_layout`（过期/取消/预算矩阵与锚点恢复，均在该源模块 `#[cfg(test)]` 内联）与 `cargo test -p aline-ui --test readonly_document`（DocCore 只读结果/生命周期与旧结果拒绝，非布局矩阵）及真实长文切换；安全回退和 1 MiB 可视化成功分列，证据 `<evidence>/view-switch/`。**状态：布局/锚点恢复与 12 例内联无头测试已具备（原 `tests/readonly_layout.rs` 迁入 `readonly_layout.rs` 的 `#[cfg(test)]`），验收命令按第 5 组 safety 门禁拆分 `--lib` 与既有集成目标；未勾选仅因真实长文切换证据受 macOS 会话锁定阻塞。**
 - [ ] 5.4 更新 `docs/ui-spec.md` §6 与 `docs/v1-architecture.md` §5/9/10 的已实现虚拟化/命中边界和布局候选说明，补 V-05/V-07/V-09 分项；验收 `git diff --check`、引用检查及 CodeGraph 调用链确认 render 不做全篇解析/I/O/统计/物化、调用方不自建映射，不将候选数值写成发布门槛；证据 `<evidence>/layout-review/`。**状态：现行文档已由 15.3 回填骨架实现状态（UI §4.1/§3.3、验证计划 V-09、架构 §13），架构 §4 也记有只读语义树/局部窗口映射的实现边界；但本项要求的 UI §6、架构 §5/9/10 的虚拟化与命中边界回写、CodeGraph render 调用链确认及 V-05/V-07/V-09 分项尚未完成，真实像素命中/长文切换平台证据亦受会话锁定阻塞，故保持未勾选；不与 15.3 的骨架文档回填混记。**
 
 ## 6. Content Navigation and Fonts
@@ -117,7 +117,7 @@ Requirement 引用缩写仅用于追踪，不另建编号规格。**编号空间
 
 - [x] 9.1 在 `crates/aline-ui/src/document/` 建并登记 `statistics` 模块：纯函数 `DocumentStatistics::compute(source: &str) -> DocumentStatistics`，口径为非空白 Unicode 标量值计数与按 LF 的行数（`max(1, LF+1)`）。先写独立预期测试（位于 `crates/aline-ui/src/document/statistics.rs` 的 `#[cfg(test)] mod tests`，不新增 `tests/` 集成目标）覆盖空文本、纯空白、中英文、标点、emoji ZWJ、组合字符、U+FEFF、U+0085、CRLF、孤立 CR、无末尾换行；行数口径与 `aline_buffer::LineIndex::line_count()` 一致。验收 `cargo test -p aline-ui --lib document::statistics`；证据 `<evidence>/statistics/`。
 - [x] 9.2 在 `crates/aline-ui/src/native_window/` 建并登记 `geometry` 模块的几何来源（纯数值、不依赖 GPUI；测试位于同文件 `#[cfg(test)] mod tests`，不使用 safety 门禁禁止的 `#[path]`）：区域高度（工具栏 44 / 状态栏 28）、内容列最大宽 880、水平内边距 56、垂直内边距 40/100、窄窗档位 900（28/30/80）与 600（20/24/60）、字号 16 与行高 28（16×1.75）；纯函数 `content_metrics(window_width, area_width)` 产出档位、列宽与文本宽。`SCROLLBAR_WIDTH`、`MIN_TEXT_WIDTH` 与窄窗收缩规则是本实现的实验候选，注释须与原型像素区分，不得写成原型冻结值。GPUI 元素装配另置 `shell.rs`（任务 10.1），其中不定义第二套数值。先写无头测试（位于 `crates/aline-ui/src/native_window/geometry.rs` 的 `#[cfg(test)] mod tests`，不新增 `tests/` 集成目标）覆盖三档边界值、极窄窗口与列宽下限，并在 `area_width >= SCROLLBAR_WIDTH` 时断言 `column_width + SCROLLBAR_WIDTH <= area_width`；内容区窄于滚动条宽属不可用退化尺寸，只断言列宽为 0、由平台窗口尺寸下限兜底。验收 `cargo test -p aline-ui --lib native_window::geometry`；证据 `<evidence>/geometry/`。
-- [x] 9.3 核对几何来源唯一性：把 `readonly_reader.rs` 自带的 `COLUMN_WIDTH`/`SCROLLBAR_WIDTH`/`FONT_SIZE`/`LINE_HEIGHT` 迁出并删除原常量，确保全文只有 `geometry.rs` 一处出处；用 `rg`/CodeGraph 确认无第二处同值定义。已迁移为 `geometry` 的正文宽/字号/行高/滚动条常量，`cargo test -p aline-ui --lib document::statistics --lib native_window::geometry` 各 5/5 通过，`rg` 输出仅 `geometry.rs` 有定义。证据 `<evidence>/geometry/grep/`。
+- [x] 9.3 核对几何来源唯一性：把 `readonly_reader.rs` 自带的 `COLUMN_WIDTH`/`SCROLLBAR_WIDTH`/`FONT_SIZE`/`LINE_HEIGHT` 迁出并删除原常量，确保全文只有 `geometry.rs` 一处出处；用 `rg`/CodeGraph 确认无第二处同值定义。已迁移为 `geometry` 的正文宽/字号/行高/滚动条常量，`cargo test -p aline-ui --lib document::statistics` 与 `cargo test -p aline-ui --lib native_window::geometry` 各 5/5 通过；原记录把两条误写成单次 `--lib document::statistics --lib native_window::geometry`，cargo 会以「the argument '--lib' cannot be used multiple times」拒绝，此处拆为两次独立调用，不改历史测试结果，`rg` 输出仅 `geometry.rs` 有定义。证据 `<evidence>/geometry/grep/`。
 
 ## 10. 主窗口区域骨架
 
@@ -147,7 +147,7 @@ Requirement 引用缩写仅用于追踪，不另建编号规格。**编号空间
 依赖 9.2 与 10；关联 W4/W5，UI §6/§4.1，V-09；R-3/4/7/10，S-5/8/14。
 
 - [x] 13.1 内容区为单列居中限宽：内容列按 `border-box` 语义取 880（含水平内边距），文本宽 768；首行加 40px 上内边距、末行加 100px 下内边距（窄窗按档位取 30/80 与 24/60），随行号判定。高度缓存记录实测高度，内边距变化不与缓存冲突。**已由 `content_metrics` 与 reader 首末行 padding 实现，并有 5 例几何与 12 例布局测试；真实三档截图归 13.3。**
-- [ ] 13.2 两种只读视图共用同一内容列宽与同一根主纵向滚动条：切换可视化/源码不改变列宽与滚动条位置；`readonly_layout` 的 `LayoutEnvironment` 键语义不变。验收 `cargo test -p aline-ui --lib native_window::readonly_layout --test readonly_document` 与真实双视图往返截图对比列宽；证据 `<evidence>/content-column/`。**无头 12 例与 `readonly_document` 9 例通过；真实双视图往返截图待会话解锁。**
+- [ ] 13.2 两种只读视图共用同一内容列宽与同一根主纵向滚动条：切换可视化/源码不改变列宽与滚动条位置；`readonly_layout` 的 `LayoutEnvironment` 键语义不变。验收 `cargo test -p aline-ui --lib native_window::readonly_layout` 与 `cargo test -p aline-ui --test readonly_document`（拆为两条：单条 `--lib <filter> --test <target>` 会让过滤串同时作用于集成目标，令其用例被静默过滤）、真实双视图往返截图对比列宽；证据 `<evidence>/content-column/`。**无头 12 例与 `readonly_document` 9 例通过；真实双视图往返截图待会话解锁。**
 - [ ] 13.3 窄窗档位：窗口宽 ≤900 与 ≤600 时内边距按档位收缩，内容不横向溢出、不被裁切；验收真实窗口三档宽度截图与既有命中/滚动回归测试通过；证据 `<evidence>/content-column/`。**真实三档截图待会话解锁。**
 
 ## 14. 文案与 i18n
@@ -181,5 +181,5 @@ Requirement 引用缩写仅用于追踪，不另建编号规格。**编号空间
 
 Q6 规定 W0～W7 是工作分解与建议顺序，不是已批准任务；实施前逐项另建可独立验收的 OpenSpec change，W0 未批准不写代码。下列两项保持未勾选，不因本变更归档而视为完成。
 
-- [ ] 17.1 W1 离屏视觉证据：先做依赖准入与能力 spike，另建 change。
-- [ ] 17.2 W2 中文排版与字体、W3 随机不变量、W4 保存/恢复、W5 IME、W6 语义 token、W7 工程门禁：各自按范围另建 change，未批准不写代码。
+- [ ] 17.1 QMD-01 W1 离屏视觉证据：先做依赖准入与能力 spike，另建 change。
+- [ ] 17.2 QMD-01 W2 中文排版与字体、W3 随机不变量、W4 保存/恢复、W5 IME、W6 语义 token、W7 工程门禁：各自按范围另建 change，未批准不写代码。

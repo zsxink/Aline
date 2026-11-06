@@ -2,7 +2,7 @@
 
 ## Why
 
-Aline 已有八成员 workspace、无头引擎和 `aline-ui/document`，但 `app/src/main.rs` 仍是查询应用名后退出的 M0 薄入口，没有原生窗口。按 `docs/v1-architecture.md` §13 和 `docs/development-process.md` §1～3，下一阶段需要把现有源快照、解析与映射接到可检查的原生单文档阅读闭环。
+建档时（2026-11-02）Aline 已有八成员 workspace、无头引擎和 `aline-ui/document`，但 `app/src/main.rs` 仍是查询应用名后退出的 M0 薄入口，没有原生窗口；按 `docs/v1-architecture.md` §13 和 `docs/development-process.md` §1～3，下一阶段需要把现有源快照、解析与映射接到可检查的原生单文档阅读闭环。本变更获授权 apply 后，原生单窗入口已按 tasks 4.2/4.4 接通并取得真实 macOS 空窗、文件选择/取消/关闭证据，此处保留的是立项目的与起点，不代表当前仍无窗口。
 
 2026-11-03 用户裁决：原生 UI 实现按 `docs/prototype/legacy/` 的 HTML/CSS 对照布局、控件邻接与图标语义；逐区域映射与取值口径已回写 `docs/ui-spec.md` §4.1，并在 `docs/decisions.md` §22 记录。并入骨架范围前，`crates/aline-ui/src/native_window.rs` 的 `render` 把文件名、只读说明、打开/关闭按钮和阅读列表竖排在一列，没有工具栏行、没有状态栏行，也没有原型那样限宽居中的内容列。本变更因而一并交付主窗口区域骨架与状态栏统计；原独立变更 `m1-main-window-skeleton` 已按 2026-11-03 决定并入本变更并删除，不再单独存在。
 
@@ -12,16 +12,16 @@ Aline 已有八成员 workspace、无头引擎和 `aline-ui/document`，但 `app
 
 ### 范围构成（截至 2026-11-06）
 
-本变更自 2026-11-02 建立后，范围经两次「独立 change 并入」与两次「直接扩张」，仍保持一个 change、一套 tasks、一组 capability delta。下表消除「单窗只读」字面范围与实际工件不一致的读法，不构成新的产品授权，也不改变各段的效力边界。
+本变更自 2026-11-02 建立后，范围经两次「独立 change 并入」，并在并入/实施过程中加入若干直接规格增补（决定 §24 的中文取证口径、工具栏应用品牌区），仍保持一个 change、一套 tasks、一组 capability delta。下表消除「单窗只读」字面范围与实际工件不一致的读法，不构成新的产品授权，也不改变各段的效力边界。
 
 | 来源 | 性质 | 在本变更的落点 |
 |---|---|---|
 | 原始 M1 单窗只读（2026-11-02） | 主范围 | What Changes 前四条、`ui/readonly-document` 与 `engine/*` delta、`workspace/engineering-gates` 的 M1 交接要求、tasks 1～8 组 |
-| `m1-main-window-skeleton`（2026-11-03 并入并删除） | 独立 change 并入，先例见决定 §22、基线提交 `91d2b47f` | `ui/main-window-layout` delta、tasks 9～15 组、design §9；三段骨架、状态栏统计、几何与统计模块、工具栏品牌区 |
+| `m1-main-window-skeleton`（2026-11-03 并入并删除） | 独立 change 并入，基线提交 `91d2b47f`（决定 §22 只裁决原型参照范围，不是本次并入的依据） | `ui/main-window-layout` delta、tasks 9～15 组、design §9；三段骨架、状态栏统计、几何与统计模块、工具栏品牌区 |
 | 验证取证只做中文（决定 §24） | 文档裁决转写为规格要求，无独立 change | `workspace/engineering-gates` 的 G3、`ui/readonly-document` 键盘基线场景、Acceptance Evidence 双语文案行、`openspec/config.yaml`、tasks 4.3/7.2/14.2 口径 |
 | `qmd-01-engineering-practices`（2026-11-06 并入并删除，决定 §26） | 独立治理 change 并入，纯文档/规格、无代码 | `engineering-governance` delta（6 条要求/17 场景，均为 ADDED）、design §10、tasks 16～17 组 |
 
-另有同分支但**不进入本 change 范围**的提交：原型界面语言切换（决定 §23，`docs/prototype/legacy/` 的 DOM 演示）、决定 §24 裁决最初的 `docs/` 落地、quiet-md 方法正文（`docs/quiet-md-study.md` 及现行 `docs/` 回写）。它们只通过现行规范间接约束实现，不新增本 change 的 capability 或任务。中途加入没有引入 QMD-01 相关的 Rust 代码、依赖或自动门禁；W0～W7 仍逐项另建 change。工具栏应用品牌区与 G3 属上述并入/扩张范围内的直接规格增补，不另立 capability。
+另有同分支但**不进入本 change 范围**的提交：原型界面语言切换（决定 §23，`docs/prototype/legacy/` 的 DOM 演示）、决定 §24 裁决最初的 `docs/` 落地、quiet-md 方法正文（`docs/quiet-md-study.md` 及现行 `docs/` 回写）。它们只通过现行规范间接约束实现，不新增本 change 的 capability 或任务。中途加入没有引入 QMD-01 相关的 Rust 代码、依赖或自动门禁；W0～W7 仍逐项另建 change。工具栏应用品牌区与 G3 属上述并入范围内的直接规格增补（不单独建 change、也不另立 capability），对应表格第 2、3 行的落点，不单列为独立事件。
 
 ## What Changes
 
@@ -86,7 +86,7 @@ Aline 已有八成员 workspace、无头引擎和 `aline-ui/document`，但 `app
 
 ### Risks
 
-结构投影和不开块生命周期是实际 API 缺口；必须先无头测试再接窗口。原生后端/Metal 工具、字体缺字、巨块布局和文件系统阻塞均可能阻塞实测；失败保留源码和原文件，禁止以回退冒充基础语法通过。M0 豁免的缺口可能暴露缺陷，按影响补 M1 必需回归，不倒填 M0 完整验证。
+结构投影和不开块生命周期是建档时的实际 API 缺口，须先无头测试再接窗口（1～3 组已完成）。规划期列出的原生后端/Metal 工具阻塞已按 tasks 4.1/4.2 与 design Context「2026-11-02/03 apply 调查与裁决更新」关闭；字体缺字、巨块布局、文件系统故障及真实窗口/长文证据仍是当前未闭合的实测风险（第 5～8、10～15 组）。失败保留源码和原文件，禁止以回退冒充基础语法通过；M0 豁免的缺口可能暴露缺陷，按影响补 M1 必需回归，不倒填 M0 完整验证。
 
 骨架范围的风险：统计口径未冻结（字符数与行数按 UI §5.4 需在 V-07 用中英文、标点、标记、代码、空白、emoji 与组合字符样本核对，先给可复核定义并标注候选）；内容列宽由 848px 变为 768px、行高由 24px 变为 28px 后，1 MiB 样本的可见项与高度会变，既有实测记录保留为当时事实、新实测另记，不倒改旧证据；M1 工具栏只有编辑模式组，可能显得空，这是阶段能力限制，不得靠置灰占位或范围外入口填补；原型 `icons.js` 的 SVG 图标缺少创作/引用/许可清单（PROTO-03 未补证），控件用文字标签，不把原型 SVG 搬进运行时。
 
