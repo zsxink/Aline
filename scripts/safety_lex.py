@@ -16,8 +16,12 @@ class Token:
     line: int
 
 
-def tokenize(source):
-    """跳过嵌套注释及 Rust 字符串/字符字面量；不把生命周期当字符字面量。"""
+def tokenize(source, preserve_strings=False):
+    """跳过注释/字符，默认跳过字符串；可保留完整字符串 token 供 UI 检查。
+
+    保留模式不解码 Rust 字符串，调用方按自身受检边界解释；字符串里的括号
+    不会参与作用域计算。默认行为保持不变，不把生命周期当字符字面量。
+    """
     result = []
     cursor, line = 0, 1
     while cursor < len(source):
@@ -47,6 +51,8 @@ def tokenize(source):
                 if end < 0:
                     raise ValueError('未闭合原始字符串，行 %s' % start_line)
                 cursor = end + len(terminator)
+                if preserve_strings:
+                    result.append(Token(source[start:cursor], start_line))
             elif source[cursor] == '"' or source.startswith(('b"', 'c"'), cursor):
                 cursor += 1 if source[cursor] == '"' else 2
                 closed = False
@@ -61,6 +67,8 @@ def tokenize(source):
                         cursor += 1
                 if not closed:
                     raise ValueError('未闭合字符串，行 %s' % start_line)
+                if preserve_strings:
+                    result.append(Token(source[start:cursor], start_line))
             else:
                 character = re.match(r"(?:b)?'(?:\\(?:u\{[0-9a-fA-F_]+\}|x[0-9a-fA-F]{2}|.)|[^'\\\n])'", source[cursor:])
                 identifier = re.match(r'(?:r#)?[A-Za-z_][A-Za-z_0-9]*', source[cursor:])

@@ -82,8 +82,12 @@ class OutputDirectoryTests(unittest.TestCase):
     def test_cli_rejects_bad_output_before_running_checks(self):
         bad = ROOT / 'docs' / ('validation-output-must-not-create-' + OUTPUT.name)
         for script in ('check_workspace.py', 'check_engineering.py', 'check_lints.py',
-                       'check_safety.py', 'check_public_api.py'):
-            modes = ([],) if script == 'check_workspace.py' else ([], ['--self-test'])
+                       'check_safety.py', 'check_public_api.py', 'run_m1_readonly.py',
+                       'collect_m1_readonly.py', 'check_ui_tokens.py', 'check_ui_catalog.py',
+                       'check_m1_cjk_typography.py', 'probe_m1_visual_evidence.py',
+                       'sample_m1_performance.py', 'capture_m1_readonly_actions.py',
+                       'run_w1_offscreen.py'):
+            modes = ([], ['--self-test'])
             for mode in modes:
                 with self.subTest(script=script, mode=mode):
                     result = subprocess.run([sys.executable, str(ROOT / 'scripts' / script),
@@ -96,6 +100,18 @@ class OutputDirectoryTests(unittest.TestCase):
                     self.assertEqual(result.returncode, 1)
                     self.assertIn('logs/validation', result.stdout + result.stderr)
                     self.assertFalse(bad.exists())
+
+    def test_performance_worker_rejects_bad_output_before_loading_configuration(self):
+        bad = ROOT / 'docs' / ('validation-worker-must-not-create-' + OUTPUT.name)
+        result = subprocess.run([sys.executable, str(ROOT / 'scripts/sample_m1_performance.py'),
+                                 '--worker', str(bad)], cwd=ROOT,
+                                env=dict(os.environ, PYTHONDONTWRITEBYTECODE='1'),
+                                text=True, capture_output=True)
+        write_text(OUTPUT / 'sample_m1_performance-worker.stdout.log', result.stdout)
+        write_text(OUTPUT / 'sample_m1_performance-worker.stderr.log', result.stderr)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('logs/validation', result.stdout + result.stderr)
+        self.assertFalse(bad.exists())
 
     def test_lint_cli_accepts_workspace_nested_output(self):
         run = output_directory('workspace', OUTPUT / 'workspace-nested')

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""顺序运行 M0 本地及 CI 门禁，分别保留结果，不安装工具或下载依赖。
+"""顺序运行 workspace 本地及 CI 门禁，分别保留结果，不安装工具或下载依赖。
 
 调用方提供预热的隔离 Cargo 缓存；本机可复用已登记的候选缓存。
 每条检查独立执行，即使前一条失败也不伪造后续结果或整体通过。
@@ -40,6 +40,34 @@ def invoke(argv, output, label, env):
     return row, stdout
 
 
+def run_checks(checks, output, env):
+    """执行所有检查；单项失败不跳过后续项，整体结论由全部退出码决定。"""
+    records = []
+    for label, argv in checks:
+        row, _ = invoke(argv, output, label, env)
+        records.append(row)
+    return records
+
+
+def self_test(output):
+    """以真实独立进程证明成功、失败及无法启动均保留证据且不短路。"""
+    output = output_directory('workspace-self-test', output)
+    records = run_checks([
+        ('failure', [sys.executable, '-c', 'raise SystemExit(3)']),
+        ('success-after-failure', [sys.executable, '-c', 'print("continued")']),
+        ('missing-command', [str(output / 'command-that-does-not-exist')]),
+        ('success-after-missing', [sys.executable, '-c', 'print("continued again")']),
+    ], output, dict(os.environ))
+    expected = [3, 0, 127, 0]
+    passed = [row['exit_code'] for row in records] == expected
+    passed = passed and all((output / (label + '.command.json')).is_file()
+                            for label in ('failure', 'success-after-failure',
+                                          'missing-command', 'success-after-missing'))
+    write_json(output / 'summary.json', {'passed': passed, 'expected_exit_codes': expected,
+                                       'results': records})
+    return 0 if passed else 1
+
+
 def run(args):
     output = output_directory('workspace', args.output_dir)
     env = dict(os.environ, CARGO_NET_OFFLINE='true', RUSTUP_TOOLCHAIN=TOOLCHAIN,
@@ -72,6 +100,16 @@ def run(args):
             env['ALINE_M0_TOOLCHAIN_BIN'] = toolchain_bin
     checks = [
         ('output-paths', [sys.executable, str(ROOT / 'scripts/check_validation_output.py'), '--output-dir', str(output / 'output-paths')]),
+        ('workspace-self-test', [sys.executable, str(ROOT / 'scripts/check_workspace.py'), '--self-test', '--output-dir', str(output / 'workspace-self-test')]),
+        ('m1-summary-self-test', [sys.executable, str(ROOT / 'scripts/run_m1_readonly.py'), '--self-test', '--output-dir', str(output / 'm1-summary-self-test')]),
+        ('m1-collector-self-test', [sys.executable, str(ROOT / 'scripts/collect_m1_readonly.py'), '--self-test', '--output-dir', str(output / 'm1-collector-self-test')]),
+        ('m1-performance-sampler-self-test', [sys.executable, str(ROOT / 'scripts/sample_m1_performance.py'), '--self-test', '--output-dir', str(output / 'm1-performance-sampler-self-test')]),
+        ('m1-readonly-actions-self-test', [sys.executable, str(ROOT / 'scripts/capture_m1_readonly_actions.py'), '--self-test', '--output-dir', str(output / 'm1-readonly-actions-self-test')]),
+        ('w1-offscreen-self-test', [sys.executable, str(ROOT / 'scripts/run_w1_offscreen.py'), '--self-test', '--output-dir', str(output / 'w1-offscreen-self-test')]),
+        ('ui-tokens', [sys.executable, str(ROOT / 'scripts/check_ui_tokens.py'), '--output-dir', str(output / 'ui-tokens')]),
+        ('ui-tokens-self-test', [sys.executable, str(ROOT / 'scripts/check_ui_tokens.py'), '--self-test', '--output-dir', str(output / 'ui-tokens-self-test')]),
+        ('ui-catalog', [sys.executable, str(ROOT / 'scripts/check_ui_catalog.py'), '--output-dir', str(output / 'ui-catalog')]),
+        ('ui-catalog-self-test', [sys.executable, str(ROOT / 'scripts/check_ui_catalog.py'), '--self-test', '--output-dir', str(output / 'ui-catalog-self-test')]),
         ('rustc-version', ['rustc', '-Vv']),
         ('cargo-version', ['cargo', '-V']),
         ('fmt-version', ['cargo', 'fmt', '--version']),
@@ -88,9 +126,7 @@ def run(args):
         ('safety-self-test', [sys.executable, str(ROOT / 'scripts/check_safety.py'), '--self-test', '--output-dir', str(output / 'safety-fixtures')]),
         ('public-api', [sys.executable, str(ROOT / 'scripts/check_public_api.py'), '--self-test', '--output-dir', str(output / 'public-api')]),
     ]
-    for label, argv in checks:
-        row, _ = invoke(argv, output, label, env)
-        records.append(row)
+    records.extend(run_checks(checks, output, env))
     passed = all(row['exit_code'] == 0 for row in records)
     summary = {'passed': passed, 'scope': '当前 macOS 主机；目标图解析不等于跨平台构建；CI 是否执行另行记录',
                'catalog': 'cargo test --workspace 实际发现 app-core 正反例与 UI 消费测试',
@@ -104,8 +140,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output-dir', type=Path)
     parser.add_argument('--cargo-home', type=Path)
+    parser.add_argument('--self-test', action='store_true')
     args = parser.parse_args()
     try:
+        if args.self_test:
+            return self_test(args.output_dir)
         return run(args)
     except (OSError, ValueError, KeyError) as error:
         print('检查入口拒绝：' + str(error), file=sys.stderr)

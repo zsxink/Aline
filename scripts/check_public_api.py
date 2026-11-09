@@ -74,10 +74,10 @@ def execute(argv, directory, output, label, env):
 def run(output):
     output = output_directory('public-api', output)
     isolation = json.loads((ROOT / 'scripts/fixtures/isolation.json').read_text())
-    isolated_home = resolve_path(isolation['cargo_home']) or isolation['cargo_home']
+    isolated_home = os.environ.get('CARGO_HOME') or resolve_path(isolation['cargo_home']) or isolation['cargo_home']
     if not Path(isolated_home).is_dir():
         raise ValueError('登记的隔离 Cargo 缓存不存在: ' + isolated_home)
-    env = dict(os.environ, CARGO_HOME=os.environ.get('CARGO_HOME') or isolated_home,
+    env = dict(os.environ, CARGO_HOME=isolated_home,
                RUSTUP_TOOLCHAIN='1.98.1', CARGO_NET_OFFLINE='true', CARGO_TARGET_DIR=str(output / 'cargo-target'))
     setup = '''
 let snapshot = aline_buffer::TextSnapshot::new(String::from("甲😀"), aline_buffer::TextBudget::new(64))?;
