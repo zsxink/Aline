@@ -10,30 +10,7 @@ use std::sync::Arc;
 use gpui::{Div, Image, ImageFormat, ObjectFit, SharedString, div, img, prelude::*, px, rgb};
 
 use super::geometry::{STATUSBAR_HEIGHT, TOOLBAR_HEIGHT};
-
-/// 已确认的画布色（UI §3.1）。
-pub(super) const SURFACE: u32 = 0xFFFFFF;
-
-/// 已确认的正文色（UI §3.1）。
-pub(super) const TEXT: u32 = 0x1F2328;
-
-/// 已确认的次级文字色（UI §3.1）。
-pub(super) const SECONDARY: u32 = 0x59636E;
-
-/// 已确认的边框色（UI §3.1）。
-pub(super) const BORDER: u32 = 0xD1D9E0;
-
-/// 已确认的强调色（UI §3.1）。
-pub(super) const ACCENT: u32 = 0x0969DA;
-
-/// 强调色的弱背景，对应原型 `.icon-btn.active` 的 `--accent-soft`（10% 强调色）。
-pub(super) const ACCENT_SOFT: u32 = 0x0969DA1A;
-
-/// 中性悬停背景，对应原型 `--hover`（5% 黑色）。
-pub(super) const HOVER: u32 = 0x0000000D;
-
-/// 中性提示表面，沿用原型中滚动条槽位已有的浅灰。
-pub(super) const NOTICE_SURFACE: u32 = 0xF6F8FA;
+use super::tokens;
 
 /// 应用内品牌图标；与 `docs/assets/app-icon/aline.png` 同一文件，按目标尺寸缩放。
 const BRAND_ICON: &[u8] = include_bytes!("../../../../docs/assets/app-icon/aline.png");
@@ -52,9 +29,9 @@ pub(super) fn toolbar_row() -> Div {
         .items_center()
         .gap_2()
         .px_3()
-        .bg(rgb(SURFACE))
+        .bg(rgb(tokens::SURFACE))
         .border_b_1()
-        .border_color(rgb(BORDER))
+        .border_color(rgb(tokens::BORDER))
         .overflow_hidden()
 }
 
@@ -78,11 +55,11 @@ pub(super) fn status_row() -> Div {
         .items_center()
         .gap_4()
         .px_3()
-        .bg(rgb(SURFACE))
+        .bg(rgb(tokens::SURFACE))
         .border_t_1()
-        .border_color(rgb(BORDER))
+        .border_color(rgb(tokens::BORDER))
         .text_xs()
-        .text_color(rgb(SECONDARY))
+        .text_color(rgb(tokens::SECONDARY))
         .overflow_hidden()
 }
 
@@ -103,7 +80,7 @@ pub(super) fn brand(icon: Arc<Image>, name: SharedString) -> Div {
             div()
                 .text_size(px(15.0))
                 .font_weight(gpui::FontWeight::SEMIBOLD)
-                .text_color(rgb(TEXT))
+                .text_color(rgb(tokens::TEXT))
                 .child(name),
         )
 }

@@ -4,18 +4,24 @@
 //! 焦点在本层装配。读取和解析在后台完成，render 只读当前状态，不读盘或解析。
 
 mod geometry;
+mod probe;
+mod readonly_content;
+mod readonly_evidence;
 mod readonly_hit;
 mod readonly_layout;
 mod readonly_reader;
 mod shell;
+mod tokens;
 
 /// 原生窗口同源协调器的无窗口回归；真实 chooser/菜单/焦点另作 macOS 实验。
 #[cfg(test)]
 mod tests;
 
 use geometry::content_metrics;
+use readonly_content::{NavigationIntent, navigation_intent};
 use readonly_hit::{HitError, HitTarget, PreparedLayout};
-use readonly_reader::ReaderSurface;
+use readonly_layout::LayoutError;
+use readonly_reader::{ContentCopy, ReaderSurface};
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -31,6 +37,7 @@ use gpui::{
 };
 
 use crate::document::DocumentStatistics;
+use crate::fonts::{FontEnvironment, FontStatus};
 use crate::{
     DocLimits, DocumentId, EditorMode, OpenDisposition, OpenError, OpenRequestId, ReadonlyDocument,
     ReadonlyOpenCompletion, ReadonlyOpenJob, ReadonlyOpenLimits, ReadonlySession,
@@ -55,6 +62,9 @@ gpui::actions!(
 
 #[cfg(debug_assertions)]
 gpui::actions!(m1_debug, [ReportLayout]);
+
+/// M1 不随包分发字体；V-04 取得授权夹具后再在此登记（字族, 静态 TTF/OTF 字节）。
+const BUNDLED_FONTS: &[(&str, &[u8])] = &[];
 
 /// M1 实验预算沿用现有 16 MiB 解析输入上限；不是发布限额。
 const MAX_DOCUMENT_BYTES: usize = 16 * 1024 * 1024;
@@ -215,6 +225,20 @@ fn open_error_key(error: &OpenError) -> &'static str {
     }
 }
 
+/// 布局失败反馈：预算类提示预算，其余归为内部错误，避免把所有失败都写成预算。
+fn layout_error_key(error: LayoutError) -> &'static str {
+    match error {
+        LayoutError::Budget
+        | LayoutError::ItemBytes { .. }
+        | LayoutError::ItemNodes { .. }
+        | LayoutError::TableColumns { .. } => "open_error.budget",
+        LayoutError::InvalidEnvironment
+        | LayoutError::InvalidRange
+        | LayoutError::StaleInput
+        | LayoutError::GenerationExhausted => "open_error.internal",
+    }
+}
+
 /// 取出只读文档冻结的源码文本，作为统计的不可变输入；不含窗口或可变核心。
 fn statistics_source(document: &ReadonlyDocument) -> Option<String> {
     let snapshot = document.parsed().snapshot();
@@ -239,6 +263,7 @@ pub(super) struct NativeWindowCopy {
     source_view: SharedString,
     cancel_navigation: SharedString,
     statistics_pending: SharedString,
+    content: ContentCopy,
     errors: BTreeMap<&'static str, SharedString>,
 }
 
@@ -262,6 +287,8 @@ impl NativeWindowCopy {
             "open_error.dialog",
             "reading.large_source",
             "reading.layout_budget",
+            "font.register_failed",
+            "font.family_missing",
         ] {
             errors.insert(key, text(key)?);
         }
@@ -278,6 +305,18 @@ impl NativeWindowCopy {
             source_view: text("action.source_view")?,
             cancel_navigation: text("action.cancel_navigation")?,
             statistics_pending: text("status.pending")?,
+            content: ContentCopy::new(
+                text("content.front_matter")?,
+                text("content.footnote")?,
+                text("content.toc_empty")?,
+                [
+                    text("content.alert.note")?,
+                    text("content.alert.tip")?,
+                    text("content.alert.important")?,
+                    text("content.alert.warning")?,
+                    text("content.alert.caution")?,
+                ],
+            ),
             errors,
             translator,
         })
@@ -367,6 +406,9 @@ struct NativeDocumentWindow {
     next_reader_generation: u64,
     statistics: Option<(DocumentId, SharedString, SharedString)>,
     statistics_task: Option<(DocumentId, Task<()>)>,
+    fonts: FontEnvironment,
+    probe: Option<probe::ProbeState>,
+    evidence: Option<readonly_evidence::SharedEvidence>,
 }
 
 impl NativeDocumentWindow {
@@ -378,11 +420,23 @@ impl NativeDocumentWindow {
     ) -> Self {
         let focus = cx.focus_handle();
         focus.focus(window, cx);
-        cx.on_release(|this, _| this.state.close_window()).detach();
-        Self {
+        cx.on_release(|this, cx| {
+            this.close_with_evidence(cx);
+            this.state.close_window();
+        })
+        .detach();
+        let mut fonts = FontEnvironment::new();
+        fonts.activate_bundled(cx.text_system().as_ref(), BUNDLED_FONTS);
+        let mut state = NativeOpenCoordinator::new(open_limits());
+        state.feedback = match fonts.status() {
+            FontStatus::RegisterFailed => Some("font.register_failed"),
+            FontStatus::FamilyMissing => Some("font.family_missing"),
+            FontStatus::System | FontStatus::Active => None,
+        };
+        let state = Self {
             copy,
             locale_fallback,
-            state: NativeOpenCoordinator::new(open_limits()),
+            state,
             focus,
             brand: shell::brand_icon(),
             dialog_task: None,
@@ -393,7 +447,34 @@ impl NativeDocumentWindow {
             next_reader_generation: 0,
             statistics: None,
             statistics_task: None,
+            fonts,
+            probe: probe::ProbeState::from_env(),
+            evidence: readonly_evidence::ReadonlyEvidence::from_env(),
+        };
+        if state.probe.is_some() {
+            cx.spawn_in(window, async move |weak, cx| {
+                let mut last = std::time::Instant::now();
+                let mut max_gap_ns = 0u128;
+                loop {
+                    let finished =
+                        weak.update_in(cx, |this, window, cx| this.probe_tick(window, cx));
+                    let again = matches!(finished, Ok(false));
+                    let gap = last.elapsed().as_nanos();
+                    last = std::time::Instant::now();
+                    max_gap_ns = max_gap_ns.max(gap);
+                    if !again {
+                        break;
+                    }
+                    cx.background_executor().timer(probe::PROBE_TICK).await;
+                }
+                eprintln!(
+                    "m1-probe event_loop_gap_ns={max_gap_ns} tick_ns={}",
+                    probe::PROBE_TICK.as_nanos()
+                );
+            })
+            .detach();
         }
+        state
     }
 
     fn open_document(&mut self, _: &OpenDocument, window: &mut Window, cx: &mut Context<Self>) {
@@ -443,19 +524,48 @@ impl NativeDocumentWindow {
     fn start_read(&mut self, job: ReadonlyOpenJob, window: &Window, cx: &mut Context<Self>) {
         // 新候选开始读取即作废当前统计：旧文档的数值不得伴随候选读取继续显示。
         self.invalidate_statistics();
-        let work = cx.background_executor().spawn(async move { job.run() });
+        let dispatch_started = crate::document::StageTimer::start();
+        let work = cx.background_executor().spawn(async move {
+            let dispatch_wait = dispatch_started.finish();
+            let mut completion = job.run();
+            completion.timings.dispatch_wait = dispatch_wait;
+            (completion, crate::document::StageTimer::start())
+        });
         self.read_task = Some(cx.spawn_in(window, async move |weak, cx| {
-            let completion = work.await;
+            let (mut completion, result_wait) = work.await;
             let _ = weak.update_in(cx, |this, window, cx| {
-                this.read_task = None;
+                completion.timings.result_wait = result_wait.finish();
+                let timings = completion.timings;
+                let background = timings;
+                let previous_document = this
+                    .state
+                    .session()
+                    .document()
+                    .map(|document| document.core().document_id().clone());
+                let adopt_started = crate::document::StageTimer::start();
                 let next = this.state.read_finished(completion);
+                let adopt_timing = adopt_started.finish();
+                let applied = this.state.session().document().is_some_and(|document| {
+                    previous_document.as_ref() != Some(document.core().document_id())
+                });
+                if applied
+                    && let (Some(evidence), Some(document)) =
+                        (&this.evidence, this.state.session().document())
+                    && let Err(error) = evidence.borrow_mut().opened(document)
+                {
+                    eprintln!("m1-readonly-evidence open failed: {error}");
+                }
+                this.read_task = None;
                 this.loaded_name = this
                     .state
                     .session()
                     .document()
                     .and_then(|document| document.path().file_name())
                     .map(|name| SharedString::from(name.to_string_lossy().into_owned()));
+                let layout_started = crate::document::StageTimer::start();
                 this.refresh_reader();
+                let layout_timing = layout_started.finish();
+                this.probe_read_finished(background, layout_timing, adopt_timing, applied);
                 if let Some(name) = &this.loaded_name {
                     window.set_window_title(name.as_ref());
                 }
@@ -470,7 +580,7 @@ impl NativeDocumentWindow {
     }
 
     fn close_document(&mut self, _: &CloseDocument, window: &mut Window, cx: &mut Context<Self>) {
-        self.state.close_document();
+        self.close_with_evidence(cx);
         self.loaded_name = None;
         self.reader = None;
         self.invalidate_statistics();
@@ -478,6 +588,31 @@ impl NativeDocumentWindow {
         self.focus.focus(window, cx);
         self.update_menu(cx);
         cx.notify();
+    }
+
+    /// 关闭前捕获当前核心，关闭后在后台读磁盘并只创建证据文件。
+    fn close_with_evidence(&mut self, cx: &mut App) {
+        let packet = match (&self.evidence, self.state.session().document()) {
+            (Some(evidence), Some(document)) => match evidence.borrow_mut().closing(document) {
+                Ok(packet) => Some(packet),
+                Err(error) => {
+                    eprintln!("m1-readonly-evidence close failed: {error}");
+                    None
+                }
+            },
+            _ => None,
+        };
+        self.state.close_document();
+        if let Some(packet) = packet {
+            let closed = self.state.session().document().is_none();
+            cx.background_executor()
+                .spawn(async move {
+                    if packet.write(closed).is_err() {
+                        eprintln!("m1-readonly-evidence write failed");
+                    }
+                })
+                .detach();
+        }
     }
 
     fn refresh_reader(&mut self) {
@@ -494,14 +629,14 @@ impl NativeDocumentWindow {
                 self.state.feedback = Some("open_error.internal");
                 return;
             };
-            match ReaderSurface::new(document, generation) {
+            match ReaderSurface::new(document, generation, self.evidence.clone()) {
                 Ok(reader) => {
                     self.reader = Some(reader);
                     self.next_reader_generation = generation;
                 }
-                Err(_) => {
+                Err(error) => {
                     self.reader = None;
-                    self.state.feedback = Some("open_error.budget");
+                    self.state.feedback = Some(layout_error_key(error));
                 }
             }
         }
@@ -572,10 +707,16 @@ impl NativeDocumentWindow {
 
     fn switch_view(&mut self, mode: EditorMode, cx: &mut Context<Self>) {
         if let Some(document) = self.state.session.document_mut() {
+            let before = document.core().mode();
             if document.switch_mode(mode).is_err() {
                 self.state.feedback = Some("open_error.internal");
-            } else if self.state.feedback == Some("reading.large_source") {
-                self.state.feedback = None;
+            } else {
+                if let Some(evidence) = &self.evidence {
+                    evidence.borrow_mut().switching(before, mode);
+                }
+                if self.state.feedback == Some("reading.large_source") {
+                    self.state.feedback = None;
+                }
             }
             cx.notify();
         }
@@ -595,16 +736,49 @@ impl NativeDocumentWindow {
             .cloned()
             .unwrap_or_default();
         let weak = cx.entity().downgrade();
+        let navigate = cx.entity().downgrade();
         reader.render_row(
             document,
             row,
             failure,
+            &self.copy.content,
             move |target, candidate, prepared, _, cx| {
                 let _ = weak.update(cx, |this, cx| {
                     this.accept_reading_hit(target, candidate, prepared, cx)
                 });
             },
+            move |offset, _, cx| {
+                let _ = navigate.update(cx, |this, cx| this.navigate_to_source(offset, cx));
+            },
         )
+    }
+
+    /// 目录与脚注跳转：先写入只读导航锚点，再把目标行滚到顶部。
+    fn navigate_to_source(&mut self, offset: usize, cx: &mut Context<Self>) {
+        let Some(reader) = &self.reader else {
+            return;
+        };
+        let Some(document) = self.state.session.document_mut() else {
+            return;
+        };
+        let Ok(source) = document.parsed().snapshot().src_offset(offset) else {
+            return;
+        };
+        let Ok(identity) = document.input_identity() else {
+            return;
+        };
+        let Ok(selection) = aline_buffer::SrcSelection::new(source.clone(), source) else {
+            return;
+        };
+        if document.navigate(&identity, &selection).is_err() {
+            return;
+        }
+        if reader.scroll_to_source(document, offset).is_ok()
+            && let Some(evidence) = &self.evidence
+        {
+            evidence.borrow_mut().event("jump");
+        }
+        cx.notify();
     }
 
     fn accept_reading_hit(
@@ -628,7 +802,18 @@ impl NativeDocumentWindow {
             target.navigate_candidate(document, reader.layout_token(), candidate)
         });
         if let Ok(hit) = &outcome {
+            if let Some(evidence) = &self.evidence {
+                evidence.borrow_mut().event("hit");
+            }
             debug_assert_eq!(hit.is_edge_candidate(), expected_edge);
+            let start = hit.source_range().byte_range().start;
+            if let Some(NavigationIntent::Jump { target }) =
+                navigation_intent(document.parsed(), start)
+                && reader.scroll_to_source(document, target.start).is_ok()
+                && let Some(evidence) = &self.evidence
+            {
+                evidence.borrow_mut().event("jump");
+            }
             debug_assert!(match hit.precision() {
                 aline_markdown::MappingPrecision::Exact
                 | aline_markdown::MappingPrecision::Synthetic => hit.source_range().is_empty(),
@@ -672,7 +857,7 @@ impl NativeDocumentWindow {
             .tab_stop(true)
             .role(Role::Button)
             .aria_label(label.clone())
-            .focus(|style| style.border_color(rgb(shell::ACCENT)))
+            .focus(|style| style.border_color(rgb(tokens::ACCENT)))
             .cursor_pointer()
             .flex()
             .items_center()
@@ -680,17 +865,17 @@ impl NativeDocumentWindow {
             .px_3()
             .rounded_md()
             .border_1()
-            .border_color(rgba(0x00000000))
+            .border_color(rgba(tokens::TRANSPARENT_BORDER))
             .text_size(px(13.0))
             .when(active, |button| {
                 button
-                    .bg(rgba(shell::ACCENT_SOFT))
-                    .text_color(rgb(shell::ACCENT))
+                    .bg(rgba(tokens::ACCENT_SOFT))
+                    .text_color(rgb(tokens::ACCENT))
             })
             .when(!active, |button| {
                 button
-                    .text_color(rgb(shell::TEXT))
-                    .hover(|style| style.bg(rgba(shell::HOVER)))
+                    .text_color(rgb(tokens::TEXT))
+                    .hover(|style| style.bg(rgba(tokens::HOVER)))
             })
             .on_click(cx.listener(move |this, _, _, cx| this.switch_view(mode, cx)))
             .on_key_down(cx.listener(move |this, event: &gpui::KeyDownEvent, _, cx| {
@@ -713,6 +898,10 @@ impl NativeDocumentWindow {
 
 impl Render for NativeDocumentWindow {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let probe_ticket = self
+            .probe
+            .as_mut()
+            .and_then(probe::ProbeState::begin_render);
         let phase = self
             .state
             .session()
@@ -723,10 +912,16 @@ impl Render for NativeDocumentWindow {
             });
         let viewport_width = f32::from(window.viewport_size().width);
         let metrics = content_metrics(viewport_width, viewport_width);
+        let mut reader_reset = false;
         if let (Some(reader), Some(document)) = (&mut self.reader, self.state.session().document())
-            && reader.prepare(document, window, metrics).is_err()
         {
-            self.state.feedback = Some("open_error.budget");
+            match reader.prepare(document, window, metrics, &self.fonts) {
+                Ok(reset) => reader_reset = reset,
+                Err(error) => self.state.feedback = Some(layout_error_key(error)),
+            }
+        }
+        if reader_reset && let Some(reader) = &self.reader {
+            reader.schedule_height_hint(window, cx);
         }
         let document_open = self.state.session().document().is_some();
         let mode = self
@@ -769,11 +964,11 @@ impl Render for NativeDocumentWindow {
                 .gap_1()
                 .px_3()
                 .py_2()
-                .bg(rgb(shell::NOTICE_SURFACE))
+                .bg(rgb(tokens::NOTICE_SURFACE))
                 .border_b_1()
-                .border_color(rgb(shell::BORDER))
+                .border_color(rgb(tokens::BORDER))
                 .text_xs()
-                .text_color(rgb(shell::SECONDARY))
+                .text_color(rgb(tokens::SECONDARY))
                 .children(notices)
                 .when(cancel_pending, |banner| {
                     banner.child(
@@ -783,13 +978,13 @@ impl Render for NativeDocumentWindow {
                             .tab_stop(true)
                             .role(Role::Button)
                             .aria_label(self.copy.cancel_navigation.clone())
-                            .focus(|style| style.border_color(rgb(shell::ACCENT)))
+                            .focus(|style| style.border_color(rgb(tokens::ACCENT)))
                             .cursor_pointer()
                             .px_2()
                             .rounded_md()
                             .border_1()
-                            .border_color(rgb(shell::BORDER))
-                            .hover(|style| style.bg(rgba(shell::HOVER)))
+                            .border_color(rgb(tokens::BORDER))
+                            .hover(|style| style.bg(rgba(tokens::HOVER)))
                             .on_click(cx.listener(|this, _, _, cx| {
                                 if let Some(reader) = &this.reader {
                                     reader.cancel_restore();
@@ -816,15 +1011,15 @@ impl Render for NativeDocumentWindow {
             .tab_stop(true)
             .role(Role::Button)
             .aria_label(self.copy.open.clone())
-            .focus(|style| style.border_color(rgb(shell::ACCENT)))
+            .focus(|style| style.border_color(rgb(tokens::ACCENT)))
             .cursor_pointer()
             .px_4()
             .py_2()
             .rounded_md()
             .border_1()
-            .border_color(rgb(shell::BORDER))
+            .border_color(rgb(tokens::BORDER))
             .text_size(px(14.0))
-            .hover(|style| style.bg(rgba(shell::HOVER)))
+            .hover(|style| style.bg(rgba(tokens::HOVER)))
             .on_key_down(cx.listener(|this, event: &gpui::KeyDownEvent, window, cx| {
                 if event.keystroke.key == "enter" || event.keystroke.key == "space" {
                     this.open_document(&OpenDocument, window, cx);
@@ -850,7 +1045,7 @@ impl Render for NativeDocumentWindow {
                     body.child(
                         div()
                             .text_xl()
-                            .text_color(rgb(shell::TEXT))
+                            .text_color(rgb(tokens::TEXT))
                             .child(self.copy.empty.clone()),
                     )
                     .child(open_button)
@@ -883,7 +1078,7 @@ impl Render for NativeDocumentWindow {
                     div()
                         .pl_2()
                         .text_size(px(12.0))
-                        .text_color(rgb(shell::SECONDARY))
+                        .text_color(rgb(tokens::SECONDARY))
                         .child(self.copy.readonly.clone()),
                 )
             });
@@ -922,8 +1117,8 @@ impl Render for NativeDocumentWindow {
         );
         let root = div()
             .size_full()
-            .bg(rgb(shell::SURFACE))
-            .text_color(rgb(shell::TEXT))
+            .bg(rgb(tokens::SURFACE))
+            .text_color(rgb(tokens::TEXT))
             .key_context("M1Window")
             .track_focus(&self.focus)
             .on_action(cx.listener(Self::open_document))
@@ -944,24 +1139,36 @@ impl Render for NativeDocumentWindow {
             .on_action(cx.listener(|this, _: &ReadPageUp, window, cx| {
                 if let Some(reader) = &this.reader {
                     reader.page(-1.0, window.viewport_size().height);
+                    if let Some(evidence) = &this.evidence {
+                        evidence.borrow_mut().event("scroll-key");
+                    }
                     cx.notify();
                 }
             }))
             .on_action(cx.listener(|this, _: &ReadPageDown, window, cx| {
                 if let Some(reader) = &this.reader {
                     reader.page(1.0, window.viewport_size().height);
+                    if let Some(evidence) = &this.evidence {
+                        evidence.borrow_mut().event("scroll-key");
+                    }
                     cx.notify();
                 }
             }))
             .on_action(cx.listener(|this, _: &ReadStart, _, cx| {
                 if let Some(reader) = &this.reader {
                     reader.start();
+                    if let Some(evidence) = &this.evidence {
+                        evidence.borrow_mut().event("scroll-key");
+                    }
                     cx.notify();
                 }
             }))
             .on_action(cx.listener(|this, _: &ReadEnd, _, cx| {
                 if let Some(reader) = &this.reader {
                     reader.end();
+                    if let Some(evidence) = &this.evidence {
+                        evidence.borrow_mut().event("scroll-key");
+                    }
                     cx.notify();
                 }
             }))
@@ -978,6 +1185,19 @@ impl Render for NativeDocumentWindow {
                 reader.report();
             }
         }));
-        root
+        if let Some(serial) = probe_ticket {
+            let submitted = cx.entity().downgrade();
+            // 锁定 GPUI 在同一 window update 中 draw 后调用 present；effect 回调
+            // 因而观察到提交后的虚拟项，但不代表 GPU 完成或屏幕扫描输出。
+            window.defer(cx, move |_, cx| {
+                let _ = submitted.update(cx, |this, _| this.probe_frame(serial));
+            });
+            let laid_out = cx.entity().downgrade();
+            root.on_children_prepainted(move |_, _, cx| {
+                let _ = laid_out.update(cx, |this, _| this.probe_layout(serial));
+            })
+        } else {
+            root
+        }
     }
 }

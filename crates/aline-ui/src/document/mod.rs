@@ -22,6 +22,7 @@ pub use publication::{
 };
 pub use snapshot::CurrentSnapshot;
 
+pub(crate) use readonly_session::{OpenTimings, StageTimer, StageTiming};
 pub(crate) use statistics::DocumentStatistics;
 
 pub use mode::{EditorMode, ModeSwitchOutcome};

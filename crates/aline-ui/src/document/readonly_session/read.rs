@@ -8,7 +8,10 @@ use aline_buffer::SelectionSpec;
 use aline_markdown::parse_with_cancel;
 use aline_source::{DiskVersion, StorageSnapshot, decode};
 
-use super::{DocCore, OpenError, ReadonlyDocument, ReadonlyOpenCompletion, ReadonlyOpenJob};
+use super::{
+    DocCore, OpenError, OpenTimings, ReadonlyDocument, ReadonlyOpenCompletion, ReadonlyOpenJob,
+    StageTimer,
+};
 
 const READ_CHUNK_BYTES: usize = 16 * 1024;
 
@@ -129,17 +132,23 @@ impl ReadonlyOpenJob {
 
     /// 经指定只读适配器执行同一流程；取消/错误均不返回部分文档。
     pub fn read_with(self, files: &impl ReadonlyFileAccess) -> ReadonlyOpenCompletion {
-        let result = self.build_candidate(files);
+        let (result, timings) = match self.build_candidate(files) {
+            Ok((document, timings)) => (Ok(document), timings),
+            Err(error) => (Err(error), OpenTimings::default()),
+        };
         ReadonlyOpenCompletion {
             request: self.request,
             result,
+            timings,
         }
     }
 
+    /// 返回候选文档与三段真实耗时；失败时不产生部分文档，也不报计时。
     fn build_candidate(
         &self,
         files: &impl ReadonlyFileAccess,
-    ) -> Result<ReadonlyDocument, OpenError> {
+    ) -> Result<(ReadonlyDocument, OpenTimings), OpenError> {
+        let read_started = StageTimer::start();
         self.check_cancel()?;
         let mut input = files
             .open(&self.path)
@@ -160,7 +169,9 @@ impl ReadonlyOpenJob {
         let baseline = decode(&storage, self.limits.storage)
             .map_err(OpenError::Decode)?
             .into_baseline();
+        let read_decode = read_started.finish();
         self.check_cancel()?;
+        let snapshot_started = StageTimer::start();
         // 文档文本预算必须在 UI 全文副本与 StringBuffer 行索引分配之前拒绝。
         if baseline.source().len() > self.limits.document.text().max_bytes() {
             return Err(OpenError::BudgetExceeded);
@@ -177,6 +188,8 @@ impl ReadonlyOpenJob {
             .current_snapshot(self.limits.document.text())
             .map_err(OpenError::Document)?;
         let identity = core.begin_document_request().map_err(OpenError::Document)?;
+        let snapshot_timing = snapshot_started.finish();
+        let parse_started = StageTimer::start();
         let parsed = parse_with_cancel(
             snapshot.text(),
             self.limits.config,
@@ -193,12 +206,22 @@ impl ReadonlyOpenJob {
         self.check_cancel()?;
         core.accept_document_result(&identity)
             .map_err(OpenError::Document)?;
-        Ok(ReadonlyDocument {
-            path: self.path.clone(),
-            baseline,
-            core,
-            parsed,
-        })
+        let parse_mapping = parse_started.finish();
+        let timings = OpenTimings {
+            read_decode,
+            snapshot: snapshot_timing,
+            parse_mapping,
+            ..OpenTimings::default()
+        };
+        Ok((
+            ReadonlyDocument {
+                path: self.path.clone(),
+                baseline,
+                core,
+                parsed,
+            },
+            timings,
+        ))
     }
 
     fn read_bounded(&self, reader: &mut impl Read, limit: usize) -> Result<Vec<u8>, OpenError> {

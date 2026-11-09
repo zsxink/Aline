@@ -137,3 +137,34 @@ fn newly_opened_large_document_defaults_source_with_specific_reason() -> Result<
     assert!(!document.core().has_open_block());
     Ok(())
 }
+
+#[test]
+fn layout_failures_distinguish_budget_from_internal_errors() {
+    use super::layout_error_key;
+    use super::readonly_layout::LayoutError;
+    for error in [
+        LayoutError::Budget,
+        LayoutError::ItemBytes {
+            needed: 2,
+            limit: 1,
+        },
+        LayoutError::ItemNodes {
+            needed: 2,
+            limit: 1,
+        },
+        LayoutError::TableColumns {
+            needed: 2,
+            limit: 1,
+        },
+    ] {
+        assert_eq!(layout_error_key(error), "open_error.budget");
+    }
+    for error in [
+        LayoutError::InvalidEnvironment,
+        LayoutError::InvalidRange,
+        LayoutError::StaleInput,
+        LayoutError::GenerationExhausted,
+    ] {
+        assert_eq!(layout_error_key(error), "open_error.internal");
+    }
+}

@@ -19,6 +19,22 @@ cancel_navigation = "取消定位"
 large_source = "文档超过 4 MiB，已默认以源码视图打开；你仍可切换到可视化视图。"
 layout_budget = "此区域超过当前布局预算。源码已保留；切换到源码视图可继续阅读。"
 
+[content]
+front_matter = "Front matter（只读）"
+footnote = "脚注"
+toc_empty = "（文档没有标题）"
+
+[content.alert]
+note = "备注"
+tip = "提示"
+important = "重要"
+warning = "警告"
+caution = "注意"
+
+[font]
+register_failed = "字体数据无法注册；继续使用当前字体，文档与位置未改变。"
+family_missing = "字体已安装但所选字族不可用；继续使用当前字体，未激活新字体。"
+
 [menu]
 file = "文件"
 

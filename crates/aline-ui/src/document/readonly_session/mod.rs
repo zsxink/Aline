@@ -15,7 +15,9 @@ use super::{DocCore, DocError, DocLimits, EditorMode, InputIdentity, ModeSwitchO
 use aline_buffer::SrcSelection;
 
 mod read;
+mod timing;
 pub use read::{ReadonlyFileAccess, ReadonlyFileInput};
+pub(crate) use timing::{StageTimer, StageTiming};
 
 /// 只读打开输入、文档与解析的显式注入预算。
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -187,10 +189,24 @@ impl ReadonlyOpenJob {
     }
 }
 
+/// 后台读取三段的真实起止边界，供验证探针采集分段成本。
+///
+/// 单调耗时与墙钟边界分开捕获，不参与业务判定、不调度线程、不影响失败语义；
+/// 打开失败时各段为零。
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) struct OpenTimings {
+    pub(crate) read_decode: StageTiming,
+    pub(crate) snapshot: StageTiming,
+    pub(crate) parse_mapping: StageTiming,
+    pub(crate) dispatch_wait: StageTiming,
+    pub(crate) result_wait: StageTiming,
+}
+
 /// 后台完成候选；只能由只读 job 产生，必须交回所属会话复验后发布。
 pub struct ReadonlyOpenCompletion {
     request: OpenRequestId,
     result: Result<ReadonlyDocument, OpenError>,
+    pub(crate) timings: OpenTimings,
 }
 
 /// 候选的最终结算；只有 Applied 表示替换成功。

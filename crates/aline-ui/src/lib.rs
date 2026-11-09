@@ -15,6 +15,8 @@ pub use document::{
 use aline_app_core::{CatalogError, Locale, Translator};
 
 #[cfg(target_os = "macos")]
+mod fonts;
+#[cfg(target_os = "macos")]
 mod native;
 #[cfg(target_os = "macos")]
 mod native_window;

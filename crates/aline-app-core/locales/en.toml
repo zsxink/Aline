@@ -19,6 +19,22 @@ cancel_navigation = "Cancel Navigation"
 large_source = "This document exceeds 4 MiB. It opened in Source View by default; you can switch to Rendered View."
 layout_budget = "This region exceeds the current layout budget. The source is preserved; switch to Source View to continue reading."
 
+[content]
+front_matter = "Front matter (read-only)"
+footnote = "Footnote"
+toc_empty = "(No headings)"
+
+[content.alert]
+note = "Note"
+tip = "Tip"
+important = "Important"
+warning = "Warning"
+caution = "Caution"
+
+[font]
+register_failed = "The font data could not be registered; the current font remains in use and the document and position are unchanged."
+family_missing = "The font was installed but the selected family is unavailable; the current font remains in use and the new font is not active."
+
 [menu]
 file = "File"
 
