@@ -82,6 +82,8 @@ Mermaid 护眼模式使用亮色映射；固定主题不跟随应用，主题是
 
 补齐链接协议 allowlist、拒绝/提示行为、本地文件链接和剪贴板纯文本/图片/HTML/富文本行为；不因为剪贴板有 HTML 就引入新的富文本导入范围。
 
+**2026-11-06 M1 内容夹具展示分项（基础夹具，非 V-03 整项通过）：** 在 macOS arm64 真实窗口（debug、中文界面）打开 `content-showcase.md` 与实体对照夹具，Visual 视图实际显示 Front matter 灰色块、两级目录、行内样式（加粗/斜体/删除线/行内代码/链接/有限 HTML/`<mark>`）、嵌套引用、五类 Alerts（中文名称加彩色左边线）、嵌套列表与任务框、三列对齐表格、围栏/缩进代码、公式与 Mermaid 原文回退、图片替代文字与脚注引用/定义；图片未被加载，HTML 未出现脚本行为。无头 `cargo test -p aline-ui --lib native_window::readonly_content` 20 passed。证据 `logs/validation/m1-single-window-readonly/2026-11-06-continue-06/content/`。**未执行：** 图片格式原生解码/动画/SVG 安全、Mermaid/公式渲染后端、链接协议 allowlist 与剪贴板矩阵、Source 视图内容与点击定位、字体/缩放变化。本分项不表示 V-03 整项通过。
+
 时点：M1 建基本夹具，M4 前固化格式与支持契约。对应 MD-05、IMAGE-01～06、PLUGIN-01/04/07/09、PREVIEW-01～04。
 
 ## V-04 · 主题包与原生字体能力
@@ -94,7 +96,25 @@ Mermaid 护眼模式使用亮色映射；固定主题不跟随应用，主题是
 
 **2026-11-05 中文排版与字体测量门（方法采纳，未执行）：**增加全角标点行首/行尾避头尾、标点挤压与字体回退、中英文/emoji 混排、合成斜体（粗/斜/粗斜）及 CJK 标点字体回退夹具，在锁定 gpui-pre 上记录实际换行、字形与回退结果。quiet-md 的 14° 等数值只作参考，不预设 Aline 值。若确认锁定 GPUI 缺陷，先记录能力缺口并决定是否 fork/vendor 三个 gpui-pre 包；vendor 方案另走依赖准入与补丁清单，不在本项直接实施。M1 是否允许把该缺口列为已知限制仍待用户裁决。
 
+**2026-11-06 M1 字体分项（部分验证，真实窗口 + 无头）：** `FontEnvironment` 已接最小启动适配与有效字体代次：注册失败/缺字族保留此前字族与代次，失败映射到 `font.register_failed`/`font.family_missing` 界面提示；字族可见后才推进代次，`font_generation` 进入布局键并有无头 1→2 代次失效断言。`cargo test -p aline-ui --lib fonts::` 5 passed、`native_window::readonly_layout` 15 passed、全 lib 103 passed/1 ignored。真实窗口 `fonts.md` 的 Visual/Source 已核对中文标点、英文标点、Emoji（含 ZWJ 家庭/旗帜）、组合字符、韩文/日文与中英混排，状态栏 `186 字符 12 行`，无字节变化，证据 `logs/validation/m1-single-window-readonly/2026-11-06-continue-06/fonts/`。**未执行：** 有授权静态 TTF/OTF 的真实激活/损坏/缺字族实验与字体变化后的锚点/命中——已自制授权实验 TTF 并临时登记 `BUNDLED_FONTS`，应用启动后会话来锁（`CGSSessionScreenIsLocked=true`），AX 读取 `permission_denied`、截图失败，登记已还原并重建；注册失败/缺字族目前只有无头 FakeBackend 用例。未下载任何第三方字体。本分项不表示 V-04 或字体能力整项通过。
+
+**2026-11-07 M1 字体分项补测（真实窗口，解锁后）：** 上一段的“未执行”项已完成。v1 自制字体虽 `add_fonts` 成功但未生效，根因是锁定 GPUI `gpui-pre-apple-0.3.9/src/text_system.rs` 的 `load_family` 跳过缺少 `m` 字形的字体；新增含 `m` 的 v2 夹具（SHA-256 `9ab780b5…e5e1`）后，真实窗口 A/B/C 显示为自制三角/方块/菱形，中文、中英标点、Emoji（含旗帜）与中英混合行逐字回退正常，初始与加载后均无错误提示。字体激活后 Source↔Visual 往返记录 `m1-anchor restored source=0 … glyph_y=122.5 viewport_y=82.5`，真实像素命中 `precision=Exact source_start=57 edge=false layout_text_matches_projection=true history=0 revision=0`，落在 CCCC 行源码范围 54..68 内。损坏字体初始空窗显示「字体数据无法注册；继续使用当前字体，文档与位置未改变。」，缺字族显示「字体已安装但所选字族不可用；继续使用当前字体，未激活新字体。」；打开文档会清空单槽反馈，故以初始空窗截图取证。实验后已还原 `BUNDLED_FONTS` 为空列表并重建（调试二进制 SHA-256 `45e0aaf8…b68b`），夹具 mtime/SHA 未变，`cargo test -p aline-ui --lib` 103 passed/1 ignored，`cargo fmt --check`/`git diff --check` 无输出，证据 `logs/validation/m1-single-window-readonly/2026-11-07-fonts/`。**边界：** M1 无运行中字体切换 UI，只覆盖启动时激活；仅 macOS arm64、自制字体、单一窗口尺寸，运行中字体重排、三平台、主题包字体与透明度矩阵仍未测。本分项不表示 V-04 或字体能力整项通过。
+
 时点：M1 字体实验；M4 实现前冻结格式和实测限额，M6 完成发布矩阵。对应 THEME-04～09、AC-12～13。
+
+**2026-11-08 QMD W1/W2 补充准备（未完成）：** 离屏 change `m1-visual-evidence-spike` 已核对锁定源码接口；候选 `test-support` 特征图在离线解析时缺 `futures-concurrency`，尚未完成依赖准入或真实离屏截图。中文排版 change `m1-cjk-typography-font-evidence` 已准备夹具与观测完整性检查，正文宽 320/480/768 × 两视图的真实测量和决策仍未完成；不据此判定 V-04 通过。
+
+**2026-11-09 W1 精确隔离准入：** 用户批准仅 W1 验证使用 `gpui_macos=[font-kit,test-support]` 的精确候选图，锁 SHA-256 `6bb7d273edc39dc7153faf6417cac2c697364d0273926c198a06f74f0c94cf06`、macOS arm64 GPUI 指纹 `2dd7f852cdec117c5bd768d3eac1572253a0ffb0f12e9a8aca0402ca73f7f32f`。完整 metadata 507 包、本机选中 357 包；相对生产图新增 72 包（本机新增 23）、9 包 feature/边变化与五条新 GPUI 分支。新增归档 checksum、完整身份/入边/许可证及五引擎隔离已独立复核；不新增生产运行 feature、不替换生产锁或全局准入。`option-ext` 口径纠正见决定 §27。申请在 `logs/validation/m1-single-window-readonly/2026-11-08-finish-01/w1/isolated-audit-final/`，复核在同轮 `review/w1-admission-review.md`。获准不等于离屏运行成功，实际 spike 结果另记。
+
+**2026-11-09 W1 真实离屏完成：** `scripts/run_w1_offscreen.py` 在 logs 独立八成员副本和从已核对归档重建的新缓存中，按固定 `scripts/fixtures/w1-offscreen/{Cargo.lock,approval.json}` 核对完整批准图及逐包准入，显式 `aarch64-apple-darwin` 构建并验证唯一 Cargo 工件/profile/lipo/二进制/源码/锁身份。两个独立进程各连续两次从真实 Metal drawable 读取 RGBA，均逻辑 640×400、scale=2、像素 1280×800，每份 4,096,000 bytes，四份 SHA-256 均为 `233c7ef4035f04f3ec495049a8dede6524713eccd2b278c764234df6a2bb2c00`，内容有两个色块与中文/ASCII 字形、非单色/非全透明。原始 RGBA/PPM 与无损预览保留，主 Agent 已视觉核验。fmt/Clippy（含此隔离场景 all-targets）通过；运行器正反例和独立复审完成。
+
+实际成功记录为 `logs/validation/m1-single-window-readonly/2026-11-08-finish-01/w1/runtime/real-03/summary.json`、`binary-receipt.json` 与 `process-*`；前两轮归档原始 checksum/新 lint 失败保留、不覆盖。此为 debug 的最小场景离屏能力，不是 Aline 产品 UI 全覆盖、真实屏幕呈现、点击/焦点/IME、缩放/锁屏或性能成绩。W1 的限定依赖和完整图绑定仅服务该验证；生产清单、锁、features 及全局策略均未改。能力 spike 完成不改变 V-04/V-09 整项未完成状态。
+
+**2026-11-09 W2 六组合实测：** macOS arm64、锁定 GPUI 0.3.9、Release 中文窗口以正文宽 320/480/768 逻辑像素 × Visual/Source 完成六组合；真实窗口宽分别 372/532/960 pt，截图 scale=2，按 geometry 唯一列宽/槽位/内边距与截图边界交叉核对。六组普通正文连续墨迹行带间距均为 56 物理像素，即 28 逻辑像素，ROI/原始坐标在同轮 `w2/pixel-measurements.json`；完整性检查 `evidence_complete: true`、`capability_passed: null`。
+
+截图确见禁行首闭标点（Visual 320 的 `？`、Visual 768 的 `》`/`；`），Visual 中文斜体直立而 English 倾斜；Source 按 Menlo 请求显示标记和普通文字，本来不渲染 Markdown 粗斜体。`scripts/fixtures/m1-cjk-punctuation-minimal.md` 在 320 正文宽真实复现行首 `？` 与中文/英文斜体差异。实际 fallback font run、glyph advance 与平滑开关 A/B 尚未取证，不从墨迹宽冒推这些数值。用户已选择 M1 内最小核心断点修复准备方向（决定 §28），独立 change `m1-cjk-linebreak-core-fix` 的规划工件已齐备；具体补丁/来源准入、实际字体 run 与修复实测未完成，未接受已知限制，不判 V-04 通过。原始六组合与最小样本截图在同轮 `gui/w2-*`，观测为 `w2/observations.json`。
+
+**2026-11-09 CJK 断点准备覆盖（未通过）：** change `m1-cjk-linebreak-core-fix` 在当前 M1 分支准备独立金样 12 个文本 / 22 个用例（320/480/768），现状 oracle 复刻在 6 个禁则用例失败、1 个超宽簇用例拆簇；私有纯规则 13 个测试通过；锁定 `gpui-pre@0.3.9` 归档 checksum 一致，最小 diff 已接入三个真实折行入口且 `rustfmt --check` 通过。候选本地来源的 metadata/tree/入边/features/许可证/五引擎隔离材料已完成，但未获批准，现行 `check_engineering.py` 实际按“原生路径精确身份/来源/校验和漂移: gpui-pre@0.3.9”失败关闭。覆盖范围仅限合成度量下的断点选择、纯规则与隔离 diff；未编译、未激活、未做真实 shaping/像素/命中/截断或三平台测量，不改变 V-04 未通过状态。证据 `logs/validation/m1-single-window-readonly/2026-11-09-cjk-01/cjk-linebreak/`。
 
 ## V-05 · 性能设备、测量和发布门禁
 
@@ -108,7 +128,23 @@ Mermaid 护眼模式使用亮色映射；固定主题不跟随应用，主题是
 
 **2026-11-05 报告字段（方法采纳，未执行）：**每次 V-05 运行至少记录环境与版本、源码 commit/锁定构建、样本 SHA-256、方法/操作序列、冷热缓存、计时起止、P50/P95、最大停顿、峰值内存、原始日志入口、复现命令及明确不测量项。引擎处理、组提交与端到端呈现分开计时；摘要数字须可追溯到机器可读原始输出。字段模板不冻结任何毫秒/内存门槛，门槛仍按本项实测与 PRD 目标冻结。
 
+**2026-11-08 采集链复核（未完成性能测量）：** 汇总器与收集器补充交叉矩阵、运行身份、计时边界、逐样本指标和实际源码字节的失败关闭检查；探针尚未提供该收集契约、RSS、可信主线程停顿及冷热控制。已有单次 Release 探针烟测不是 20 次矩阵。`first_present` 记录 draw 提交后的 effect，不是屏幕扫描；事件循环间隔含调度抖动，不是精确主线程停顿。真实矩阵、P50/P95 与 V-05 判定仍缺证据。
+
+**2026-11-06 M1 只读虚拟化分项（部分，未执行性能测量）：** `aline-ui` 已实现变高块/逻辑行双视图虚拟化、256 项高度缓存与布局键失效、1,000,000 行上限、64 KiB 单项映射窗口、>4 MiB 默认 Source；无头 `cargo test -p aline-ui --lib` 100 passed/1 ignored（命中 9、布局 15、内容 19、字体 5、阅读渲染 11；含 2026-11-06 复核与独立审查修复回归），1 MiB debug 首尾滚动见任务 5.1。**未执行：** Release 构建、20 次冷/热采样、P50/P95、最长主线程停顿、峰值内存、虚拟实例统计与真实滚动/切换序列（会话锁定阻塞）。**测量入口：** `scripts/run_m1_readonly.py` 已提供 performance/window-baseline/readonly-bytes 三套件与自测；performance 对错误、缺指标、取消、旧运行和不足 20 样本的记录一律非零，合成正例只验证入口逻辑，不是本轮成绩。本分项不构成 V-05 通过或 AC-16 判定。
+
+**2026-11-06 M1 真实窗口滚动/切换补记（仍非性能测量）：** macOS arm64 debug 窗口（960×672）完成 1 MiB 夹具首尾/翻页/轨道滚动、第 24,407 行附近 Visual→Source→Visual 锚点恢复（source=597995）、900/600/900/960 换宽（`max_offset=1198024px` 保持、高度缓存重建、锚点恢复），以及 >4 MiB 默认 Source 分项：5,345,600 字节中文夹具默认 Source 并显示 `reading.large_source`，切 Visual 后提示清除、切回 Source 仍清除；恰好 4,194,304 字节夹具默认 Visual 且无提示。三个 131,072 字节复杂度夹具（长行/巨表/单个巨段）在 Visual 均显示布局预算提示，Source 均完整可读。原 5 MiB dense-entities 夹具因绘制字符数超过 `ParseBudget::m0().max_mapping_points()` 返回 `Mapping(BudgetExceeded)`，真实窗口以 `open_error.internal` 拒绝并保留旧文档；该行为是解析硬预算，不是视图降级，提示归入内部错误而非预算错误。证据 `logs/validation/m1-single-window-readonly/2026-11-06-continue-06/view-switch/`。**仍未执行：** Release 构建、20 次冷/热采样、P50/P95、最长主线程停顿、峰值内存、显示缩放变化与授权字体下的真实字体重排。本补记不构成 V-05/V-06 通过。
+
 时点：M1 建基准，M6 冻结且通过全部发布门禁。对应第 7.2 节、AC-16。
+
+**2026-11-09 M1 Release 部分性能矩阵（未通过 V-05）：** macOS arm64 的 9 类尺寸/复杂度 × 冷/热 ×20 次，共 360 个原生进程均成功采集，形成 126 个分段统计组。每个进程有 PID/起止/原始输出 SHA/事前 fixture SHA/构建工件/完整源码清单收据；墙钟只关联运行时间线，duration 与真实 Instant 起止 offset 同钟精确核对，固定量化反例及 10,000 次实际时钟不变量通过独立复审。冷条件仅为新进程且无同文档预热，启动空窗已触及字形/管线；未清 OS 文件缓存，事前哈希也已读文件。热条件为同进程完整预热后重开，不能称为磁盘热/冷隔离实验。
+
+缓存身份补核：W1 新鲜归档门禁发现 `sys-locale@0.3.2` 旧缓存 raw `.crate` 为本地重打包（含 AppleDouble/Cargo 标记，raw SHA 不同），不能把该 raw 文件当官方归档。后续对 499 个 registry 包共 26,450 个官方归档普通文件与实际 metadata 指向的解包源码逐一核对，缺失/变化/额外源码均为 0（只排除 Cargo 标记）；sys-locale 的 15 个官方文件也完全等价。证据在同轮 `w1/runtime/source-audit/`，原缓存未覆盖。现有生产构建/360 次运行可归属相同依赖源码内容；后续 W1 运行仅在新缓存取锁 checksum 匹配的官方归档，不继承该重打包 raw 身份。
+
+1 MiB 的 parse/mapping P50/P95：冷 27.58/34.84 ms，热 22.66/24.61 ms；首内容布局（render→子元素 prepaint）冷 4.04/6.26 ms，热 3.90/3.99 ms。这些不是端到端首屏呈现。模式切换/滚动到 draw 提交的观察与队列/reader-index 诊断均保留原始边界，不冒称屏幕呈现或精确 UI 停顿。全矩阵进程峰值 RSS 最大 1,041,940,480 bytes，由独立 worker 对唯一原生子进程的 getrusage 高水位取得；热条件包含预热，不是逐阶段峰值。
+
+原始逐次收据、126 组 P50/P95 与方法在 `logs/validation/m1-single-window-readonly/2026-11-08-finish-01/performance/matrix-20/matrix-summary.json`。采样期间文档/tasks/W1 验证脚本有变更，变化清单和前后完整源码身份已保留；Aline 编译输入与运行二进制未改变，数据只归属于采样前冻结清单，不冒用为后续新代码成绩。标准入口仍 exit 1、`passed: false`：缺真正 first_present 和精确 main_thread_stall_ns，不把 draw effect/事件循环间隔或潜在 hang 的空表填成真值。System Trace/Metal Trace 仅取得能力与原生事件表，尚未把逐内容帧关联成可信指标；7.1 与完整 AC-16 保持未完成。
+
+同轮 `performance/trace-bridge-smoke/` 的真实 Metal Trace 可按同 PID 的 command-buffer→frame-number/client surface→displayed-surfaces 表建立原生帧关系，但尚无 Aline 首内容帧到该关系的精确身份桥接。该烟测另记录主线程 Microhang 371,737,530 ns；当时并发 W1 重型构建且有 trace 开销，平台 hang 检测也有阈值，既不并入 360 次矩阵，也不称逐次精确最大停顿。锁定公开接口只返回 draw 提交/回调，profiler 的 Present 仍是 CPU 提交；后续需最小、安全且可审阅的内容帧/command-buffer/drawable 身份桥接及逐样本停顿观察，不能仅用墙钟就近配对。
 
 ## V-06 · 资源上限与可恢复降级
 
@@ -152,6 +188,8 @@ M0 编码基础证据（2026-10-31）：行尾边界金样已固定 CR-X-LF 删�
 
 组 8 输入与组合协议基础证据（2026-10-31）：无窗口 DocCore 已覆盖唯一草稿/最新快照、同块多个 900ms 输入组、提交/关块分离、待定组优先 Undo 与 Redo 选区、组合更新/替换/确认/取消、ED-01 显式发布等待/取消、自动保存组合期延后、独立恢复读取、草稿基线冲突及配置/request/关闭/模式变化后的旧结果拒收。宿主完整登记是资源集合齐备的前提，DocCore 和快照保守强持有登记引用，不自动发现或清理资源。最终局部 UI 原始日志为 109 passed（[实现及失败保留（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-8/followup-2026-10-31/report.md)、[回填与未测清单（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-8/step-8.5/report.md)）；这不替代 workspace 全量门禁。**仍未测/未实现**：真实键盘/焦点/候选窗/marked 绘制/平台 callback、真实双模式视图与选区映射、自动保存计时/目标队列、真实保存/恢复/导出及资源迁移、通用命令消费者与跨块/结构命令、Windows/Linux/Intel Mac。上方各组的未覆盖描述保留其时点；本段只补上述纯状态基础，V-07 与 AC-03/04/05/14 仍未通过。
 
+**2026-11-06 M1 真实像素命中分项（5.2）：** 在 macOS arm64 真实窗口（debug、中文界面、960×672、scale 2）对内容/实体/字体夹具执行像素点击→映射→核心导航：Exact（普通文字与跨隐藏标记的可见文字）、Aligned（`&amp;`/`&lt;`，源码范围 22..27、28..32）、Synthetic（任务标记 `☐` 回指 `[ ]` 起点 508）均得到 `layout_text_matches_projection=true`、`open=false history=0 revision=0`；切 Source 后光标位于 `&amp;` 之前，与 `anchor=22` 一致。Hidden 片段不可由像素命中（`segment_for_drawn` 跳过零宽隐藏段），由无头用例覆盖，属设计行为；夹具 SHA-256 前后不变。该分项只覆盖只读命中/锚点与只读性，不表示 V-07 的编辑/格式化/IME/跨块命令或整项通过。证据见 `logs/validation/m1-single-window-readonly/2026-11-06-continue-06/hit/`。
+
 产物：表格表头/整理的输入输出、跨结构选区命令边界、格式化风格和未知语法/HTML 保护样例；查找按源码、不可见命中定位、环回和退出焦点行为。
 
 脚注、`[toc]`、Front matter 必须用灰色展示区，仅源码模式可编辑；基础展示/导航保留。补齐脚注编号/定义/回跳、目录大小写/重复标题锚点、Front matter 文首/BOM/闭合围栏样例，并验证跨块命令不会绕过只读保护。其他未知语法原文显示。
@@ -179,6 +217,18 @@ M0 编码基础证据（2026-10-31）：行尾边界金样已固定 CR-X-LF 删�
 
 **2026-11-05 随机不变量补充（方法采纳，未执行）：**E-T20 的 fuzz 可作为 V-07 的补充证据：确定性 RNG 驱动 parse/buffer/edit/DocCore，每步检查不变量，周期保存往返或与全量权威路径差分，失败保留 seed、步号、操作日志与最小输入。fuzz 不替代本项的金样、真实 UI 命中、IME、跨块命令与格式化夹具；不能用测试辅助函数把已知语义丢失规范化后视为通过。
 
+**2026-11-06 M1 只读命中分项（部分，真实像素未验证）：** 点击链已接 GPUI 文本布局局部绘制偏移 → `HitTarget`/`Projection::source_at`/`aligned` → 受检源码锚点，覆盖 Exact/Aligned/Hidden/Synthetic、实体两侧、重复文字/空白、中文/emoji/组合字符与软折行/Gap 的内联无头用例（`cargo test -p aline-ui --lib native_window::readonly_hit` 9 passed）；命中不开编辑块，debug 日志输出 `open`/`history`/`revision` 供核对。**未执行：** 真实像素点击→切 Source 核对锚点的平台序列（会话锁定阻塞）；不据此判定 V-07 或 AC-09 通过。
+
+**2026-11-06 M1 内容展示分项（部分，真实窗口）：** Visual 视图对基础行内样式、嵌套列表/引用、五类 Alerts、三列对齐表格、任务框、有限 HTML、灰色 Front matter/脚注/目录、公式/Mermaid/图片原文回退的实际绘制已取得 macOS 真实窗口截图（`logs/validation/m1-single-window-readonly/2026-11-06-continue-06/content/`），无头内容测试 20 passed。**未执行：** 开块编辑与低对比标记、编辑/格式化命令、IME、跨块粘贴、逐类 Source 视图对照与真实点击定位；本分项不表示 V-07 或 AC-09 整项通过。
+
+**2026-11-06 M1 只读导航夹具分项（部分，真实窗口）：** 目录重复标题、脚注引用/定义双向回跳、同一脚注多引用回跳、替换文档后旧导航与键盘激活已取得 macOS 真实窗口操作与截图：两个同名「重复标题」分别定位源码 17/4712；引用 41→定义 56、定义 74→引用 40、引用 49→定义 75、定义 93→引用 47；长文档引用 75→定义 8063、定义→首个引用 52；`navigation-nearby.md` 的 Tab 环包含两个灰色定义行，定义行 Enter 输出 `m1-navigate source=40 row=6 mode=Visual`；长→近→长替换后旧偏移不再生效，重新打开长文档后目录仍定位 4712；打开等待取消后位置/统计不变。所有命中日志 `history=0 revision=0`，状态栏字符/行数不变。空目录显示 `content.toc_empty`、悬空脚注引用无导航条目、重复标签保留全部目标由无头用例覆盖；挂起定位提示条只出现一帧，无法人工点击「取消定位」，取消语义由内联用例覆盖。**未执行：** 无标题文档空目录的真实截图与图片预览状态；本分项不表示 V-07 或 AC-09 整项通过。证据 `logs/validation/m1-single-window-readonly/2026-11-06-continue-06/navigation/`。
+
+**2026-11-09 CJK 软折行语义覆盖（未通过）：** `m1-cjk-linebreak-core-fix` 的金样区分自动软折行与原文开头/显式换行豁免，覆盖中英混排、开闭括号、全角引号（待独立预期，只校验 UTF-8/簇）、ZWJ/旗帜/肤色、组合字符、拉丁连字、仅标点与超宽单簇；现状 oracle 复现行首/行尾禁则和簇内断点。无合法候选与超宽簇的“真实受限结果”契约尚未满足，接口提案待裁决；本轮未编译候选 GPUI、未做真实 shaping/像素命中/截断/IME。覆盖只说明缺陷可复现与规则/隔离 diff 形态，不改变 V-07 未通过状态。
+
+**2026-11-09 W3 随机不变量闭环：** 四引擎 `engine-fuzz-invariants` 使用确定性 RNG/默认 16 seeds ×100 steps，并完成 64×500 扩量，13 项测试通过；每步层内不变量、source 精确解码/编码、buffer 拒绝不变性、edit 合法/预期拒绝及 no-op oracle、markdown 复用/样式/保护/可见映射差分均有落点。失败保留 seed/步号/操作日志/输入；四 crate 的真实字节损失注入各重复两次均预期失败，去注入后通过。独立审查发现的 edit 意外 Err/no-op 静默吞掉已修复；Hidden 全局绘制端点受相邻 Synthetic 锚点影响，不能当块局部双射，仍复验精确性/范围。审查 `logs/validation/m1-single-window-readonly/2026-11-08-finish-01/review/fuzz-final-review.md`、运行同轮 `w3/`，主 Agent 统一 workspace 29 项通过见 `workspace-final-02/summary.json`。随机测试不替代真实 IME、文件故障或 M2 保存恢复。
+
+**2026-11-09 M1 原样本字节观测：** 同轮 `readonly-bytes-02/` 由真实原生窗口逐个打开 BOM、混合行尾、孤立 CR、无尾换行和纯空白五个原始样本，实际滚动输入、像素命中尝试、Visual→Source→Visual、关闭；导出各样本的 opened/source-before/source-after/stored/disk-after 独立字节，磁盘与精确源码均相等，revision 前后 0、无开块/草稿/组合、undo/redo/历史均 0。五个原样本均未完成主动跳转，不能以这些观测关闭 7.3；纯空白点击接受的是空白映射回调，不表述为命中可见字形。用户明确不接受配对夹具替代，原样本和七步标准保持。`observations.json` 的 `all_required_observed: false`、记录器 exit 1 为正确结果，不转换成标准 results.json 的通过记录。
+
 ## V-08 · 文件操作、临时图片与恢复事务
 
 **M0 身份/快照设计准备（2026-10-31，组 8）：** 已有文档/工作版本/快照来源/配置/请求采纳身份、冻结当前输入与已登记资源、组合期显式等待/自动保存延后及独立恢复读取的无头基础。`SnapshotId` 不是版本或内容哈希；宿主须在引用生效前完整登记资源，M0 保守保留而不精确追踪/回收。source create-only 集成用例只证明宿主可保留实际 `Written` 及既有目标拒绝分类，即使派生输入过期/块关闭也不能丢弃已发生写盘事实；它未消费到 DocCore 保存点或真实文件协调器。**未执行**：现有文件安全替换及 metadata 保全、版本竞争/权限/断电、多资源事务、真实手动/自动保存、10 秒恢复与恢复图片可读、另存为迁移/清理、真实平台组合等待、Windows/Linux/Intel Mac。M2 前身份/事务方案及最小安全闭环仍为独立出口，V-08 未通过。证据见[8.5 回填记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-8/step-8.5/report.md)。
@@ -204,6 +254,12 @@ M0 编码基础证据（2026-10-31）：行尾边界金样已固定 CR-X-LF 删�
 **2026-11-03 M1 主窗骨架分项（部分，非 V-09 整项通过）：** 按 UI §4.1 的原型对照实现工具栏行 44px、内容区 `flex_1`、状态栏行 28px 的三段主窗。内容列按 border-box 880（含左右各 56，文本宽 768），首末行垂直留白 40/100，窄窗 ≤900 取 28/30/80、≤600 取 20/24/60，正文 16px/行高 28（16×1.75）；这些仍是实验候选，未冻结。代码侧实际取得：`geometry.rs` 为唯一几何数值源（`rg` 仅一处定义），5 例几何边界、5 例统计口径、12 例只读布局、9 例只读文档测试通过，`cargo test -p aline-ui --lib` 61 passed/1 ignored；完整 workspace 门禁、`check_workspace.py` 与 engineering/lints/safety/public-api 检查全部通过，证据 `logs/validation/m1-single-window-readonly/2026-11-03-continue-04/`。工具栏只渲染品牌区与文档打开时的“编辑模式”组，状态栏只渲染字符数、行数、未就绪占位与模式标签，无文档态不显示统计。**未测边界：** 真实 macOS 窗口的三段顺序截图、模式按钮键盘焦点、统计 A→B 序列与未就绪/零值截图、双视图往返列宽对比、三档窄窗截图、中文界面裁切仍未取得；验证期间多数检查在会话锁定（`CGSSessionScreenIsLocked`）下进行，未尝试解锁或绕过。2026-11-03 会话解锁后仅补做 11.3：无文档态与打开 README 后的窗口品牌区截图、图标资源身份检查通过，证据 `logs/validation/m1-single-window-readonly/2026-11-03-continue-05/brand/`；该截图不替代其余 V-09 项。Windows 10/Intel Mac/Linux、显示缩放与完整主题/字体矩阵未测。本分项不表示 V-09、AC-15 或 AC-20 整项通过。
 
 **2026-11-05 离屏视觉证据边界（方法采纳，未执行）：**若 W1 通过依赖准入与能力 spike，可用锁定 GPUI 的离屏窗口、模拟键鼠和截图补充 V-09；证据须与真实窗口截图分开命名、分目录，并记录 feature/平台/版本。离屏通过只说明离屏渲染路径，不证明真实窗口、IME、显示缩放、锁屏恢复或三平台行为；真实证据受阻时记录阻塞，不以离屏或原型截图替代。
+
+**2026-11-06 M1 内容/导航/字体分项（部分，真实窗口）：** 只读内容行、表格单元格、五类 Alerts、灰色 Front matter/脚注/目录、公式/Mermaid/图片原文回退、目录与脚注主动导航、统一代码行号与常显行号、字体代次与失败反馈已接 GPUI 渲染；无头 `cargo test -p aline-ui --lib` 103 passed/1 ignored（内容 22、命中 9、布局 15、字体 5、阅读渲染 11；含 2026-11-06 复核、独立审查修复、脚注定义行键盘回跳与代码长行编号回归），内容测试在 6.1 复跑为 20 passed、脚注定义行回跳新增后 21 passed、代码长行编号回归后 22 passed。真实窗口已取得：五类内容夹具截图（Front matter/目录/行内样式/引用/列表/任务框/表格/代码/公式/Mermaid/图片/脚注回退）、目录两个同名「重复标题」分别跳转到源码偏移 17 与 4712（状态栏字符/行数不变）、脚注引用↔定义双向回跳与多引用回跳、替换文档后旧导航失效、完整 Tab 环（含两个灰色定义行）与定义行 Enter 回跳、打开等待取消后位置/统计不变；代码夹具另确认 `rust`/未知语言只读标识、行号含空行与两位数单行（修复行号栏宽度后）、长行不换行并在右缘截断、指针在代码块内时主纵向滚动不被困住，证据 `logs/validation/m1-single-window-readonly/2026-11-06-continue-06/content/`、`.../navigation/` 与 `.../code/`。**未执行：** 无标题文档空目录的真实截图、真实横向滚动交互（合成输入未使代码区水平位移；长行不换行/截断已观测，真实横滚留作残余边界）、中文回退/标点/emoji 观测、窄窗三档与双视图往返（会话锁定阻塞；双视图往返与窄窗三档后于 2026-11-06/07 补齐，见任务 13.2 与下段 13.3）；V-09 与 AC-15/20 仍只按分项记录，不整项通过。
+
+**2026-11-07 M1 窄窗三档分项（真实窗口，非 V-09 整项通过）：** 在 960/900/600 × 672 三档窗口上打开 8085 B 长行夹具（与 `navigation-long.md` 逐字节相同，SHA-256 `7d687ddf…0352`），截图 `logs/validation/m1-single-window-readonly/2026-11-07-content-column/00～02-width*-long-line.png`，测量记录 `.../2026-11-06-continue-06/content-column/narrow-3widths.md`。正文左缘实测 90.5/32.5/20.5 pt，与 `content_metrics` 的 90/32/20 相差 0.5 pt（字形 bearing），档位内边距差 56/28/20 一致；600 pt 时长段落在「…来自导」后折行，第二行「航索引。」完整可见，首行右缘 553.5 pt < 正文右缘 568 pt，无横向溢出/裁切；900 与 960 为单行。1 MiB 夹具宽度调整中 `max_offset=1198024px` 不变、锚点 597947/597946/597898/597897 恢复（见 §5.3.3 证据）。回归 `cargo test -p aline-ui --lib --offline native_window::` → 69 passed/0 failed。**边界：** 仅 macOS arm64、scale 2、单一长行夹具与三档宽度；未覆盖显示缩放、主题包字体与跨平台；本分项不表示 V-09/AC-15/AC-16 整项通过。同次会话随后再次锁定（`CGSSessionScreenIsLocked=true`），7.2/15.2 的 14 项窗口基线矩阵未执行；停止前仅捕获无文档态 `logs/validation/m1-single-window-readonly/2026-11-06-continue-06/window-baseline/02-no-document.png`，锁定探测见同目录 `lock-state-2026-11-07.md`。
+
+**2026-11-07 M1 主窗 V-09 十四项矩阵（真实窗口，非 V-09 整项通过）：** 会话解锁后按任务 7.2 执行 `python3 scripts/run_m1_readonly.py --suite window-baseline --output-dir logs/validation/m1-single-window-readonly/2026-11-06-continue-06/window-baseline`，exit 0（`passed: true`，14/14，`failures: []`；观测输入 `window-baseline/observations.json`，结果 `summary.json`/`summary.md`）。覆盖：无文档态（`03`）、5 MiB 加载帧（`12`，60 fps 抓帧第 12 帧「正在读取 Markdown 文档…」）、正常阅读（`05`，2857 字符/42 行）、非 UTF-8 读取失败（`04`/`24`）、打开取消（`11`，焦点归还打开按钮）、>4 MiB 回退源码（`13`，1778400 字符/10401 行与回退原因）、窄窗 900/600（`15`/`16`，实测正文左缘 32.5/20.5 pt，600 pt 折行后「航索引。」完整可见）、高 DPI scale 2 滚动与命中（`06` 与 `../hit/observations.md`）、长英文文件名（`17`，96 字符标题完整、状态栏 91 字符 7 行）、打开/双视图键盘（`07～10`，`m1-anchor restored source=636 row=4`）、大纲/脚注键盘（`18～22`，目录项 Enter `m1-navigate source=17 row=4`，定义行 Enter 回跳 `m1-navigate source=40 row=6`）、反馈键盘（`23`/`24`，错误条「文档不是有效的 UTF-8 文本。」、焦点环留在打开按钮）与中文界面（`catalog-chinese-2026-11-07.log`，`m1_window_catalog` 2 passed）。**边界：** 仅 macOS arm64、scale 2；AX 快照只暴露窗口与「打开 Markdown 文档…」按钮，提示条文本未作为 AX 静态文本暴露，不宣称辅助技术支持；Windows 10/Intel Mac/Linux 与完整设置/菜单/主题矩阵未测。本分项不表示 V-09、AC-15 或 AC-20 整项通过。
 
 产物：主窗口、设置、菜单、对话框和图片预览 tab 的尺寸与状态基准；窗口最小尺寸、侧栏范围、字体/间距、键盘焦点与中文界面裁切检查（界面语言取证按[决定 §24](./decisions.md#24-2026-11-03-验证取证只做中文)只做中文；中英文混排、标点、emoji 与组合字符作为内容排版样本仍保留）。主题预览必须反映实际三模式；验证 outline/filled 两种图标风格的实际覆盖、描边参数与可辨认状态，并记录预览图与实际样式一致。主窗口结构与控件邻接按[UI 规范 §4.1 原型布局对照](./ui-spec.md#41-原型布局对照实现参照)实现，数值以原型取值为测量起点、再由本项实测冻结。数值和平台支持由样本实测确定。
 
@@ -231,3 +287,7 @@ M0 编码基础证据（2026-10-31）：行尾边界金样已固定 CR-X-LF 删�
 | V-08 | 身份/快照与 create-only 原语是设计准备；真实保存/恢复/资源事务未完成 | [M2 前独立出口（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.5/report.md#m2-前独立安全出口)、[8.5（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-8/step-8.5/report.md) | FILE、SAFE、IMAGE 等，见本项 | 未整项通过，2026-10-31 |
 
 完成标准：证据可检查、支持和拒绝边界明确、PRD/专门规范已同步、相关验收通过。范围决定不再重复询问；尚未确定的规范细节由方案和样本收口，不能仅通过归档动作标记验证完成。
+
+**2026-11-09 W6/W7 交付分项：** 语义 token 原值/守卫通过，真实 Visual 字面值控制版与 token 版在相同构建条件、夹具、960×672 pt/2×中文窗口比较。控制版由同一快照反向展开 token 构建、不是历史二进制；初次正文/工具栏/状态栏区域像素差 0，原生标题和滚动条有差异，追加 End/Home 的抓图阅读位置不一致，不能据该对照宣称全窗零差。图、源清单、19 色核对及结果见 `logs/validation/m1-single-window-readonly/2026-11-08-finish-01/w6-before/visual-comparison.json` 及同目录 manifest/method。本轮未覆盖 Source 视觉 A/B、所有语法配色或 M4 主题。W7 的 UI 直接文案/翻译字面首参守卫、正反例及各测量入口自测已接现有 workspace；变量/数组间接 key、宏与动态串仍需人工。真实初窗失败尚无平台收据，完整性能报告仍缺呈现/精确停顿，不因此关闭 W7 2.2/3.1。
+
+**2026-11-09 统一门禁最终记录：** `workspace-final-03/summary.json` 共30项通过（新增W1离屏运行器自测）；包括 `cargo fmt --all --check`、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo test --workspace` 及真实依赖/lint/safety/public-api/catalog/token/输出路径和测量工具正反例。新 CJK 修复规划建档后 OpenSpec strict 16/16，记录在同轮 `final/openspec-strict.*`。独立复核已将 W2 2.1 退回未完成：六组合已证部分保留，回退/平滑未测不能以记录完整布尔值代替。仅 macOS arm64，不将目标图解析当跨平台实测。

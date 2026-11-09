@@ -43,7 +43,7 @@ OpenSpec 使用仓库根目录 `openspec/` 下的 `spec-driven` schema，所有�
 
 ### 3.1 研究采纳与工程实践落点（2026-11-05）
 
-[决定 QMD-01](./decisions.md#25-2026-11-05-quiet-md-工程实践采纳qmd-01) 已把 [quiet-md 调研](./quiet-md-study.md) 中不改变产品契约的工程/验证方法回写现行规范；治理 delta 已并入 OpenSpec change [`m1-single-window-readonly`](../openspec/changes/m1-single-window-readonly/proposal.md)，该部分只记录方法与边界，不批准任何 W 项。下列 W0～W7 是**工作分解与建议顺序**，不是已批准任务；实施前按 §2 逐项建 change，W0 未批准不写代码。
+[决定 QMD-01](./decisions.md#25-2026-11-05-quiet-md-工程实践采纳qmd-01) 已把 [quiet-md 调研](./quiet-md-study.md) 中不改变产品契约的工程/验证方法回写现行规范；治理 delta 已并入 OpenSpec change [`m1-single-window-readonly`](../openspec/changes/m1-single-window-readonly/proposal.md)，该部分只记录方法与边界，不批准任何 W 项。下列 W0～W7 在研究时是**工作分解与建议顺序**；2026-11-08 用户要求继续 W1～W7 实施，现各有独立 change。该实施授权不批准新增依赖、vendor 或降低验收标准；W4/W5 必须等待 M2 前置。
 
 | 工作流 | 落点与阶段 | 前置/边界 |
 |---|---|---|
@@ -56,8 +56,21 @@ OpenSpec 使用仓库根目录 `openspec/` 下的 `spec-driven` schema，所有�
 | W6 语义 token | M1 小步；M4 完整 | 不改视觉与主题包 schema；不挤占 M1 关键路径 |
 | W7 工程门禁/性能/文档 | 持续；服务 M1 任务 7.1 与 V-05 | 不另建第二套门禁；性能报告字段按 R-11-01/S-14-03 |
 
+当前独立 change 索引（不表示任务或平台验证完成）：
+
+| 工作流 | Change |
+|---|---|
+| W1 | [`m1-visual-evidence-spike`](../openspec/changes/m1-visual-evidence-spike/tasks.md) |
+| W2 | [`m1-cjk-typography-font-evidence`](../openspec/changes/m1-cjk-typography-font-evidence/tasks.md) |
+| W3 | [`engine-fuzz-invariants`](../openspec/changes/engine-fuzz-invariants/tasks.md) |
+| W4 | [`qmd-w4-persistence-recovery`](../openspec/changes/qmd-w4-persistence-recovery/tasks.md) |
+| W5 | [`qmd-w5-native-ime-input`](../openspec/changes/qmd-w5-native-ime-input/tasks.md) |
+| W6 | [`m1-ui-semantic-tokens`](../openspec/changes/m1-ui-semantic-tokens/tasks.md) |
+| W7 | [`m1-engineering-evidence-gates`](../openspec/changes/m1-engineering-evidence-gates/tasks.md) |
+
 - 随机测试失败必须留下可复跑的 seed、步号、操作日志和最小输入；最小输入整理成正式夹具后提交，原始日志只留 `logs/validation/`。不得用测试辅助函数把已知语义丢失规范化后当作通过。
-- 表中“M1/M2/M4”等阶段是建议落点；W4/W5 的阶段归属、W6 时点与其他待确认问题仍以 QMD-01 为准，批准对应 change 时才定。
+- W1/W2/W3/W6/W7 当前在 M1 范围推进，W4/W5 已独立建档但必须等待 M1 出口与 M2 前置；M4 完整主题、vendor 或新依赖仍须具体裁决。
+- W2 实测后的最小修复准备另由 [`m1-cjk-linebreak-core-fix`](../openspec/changes/m1-cjk-linebreak-core-fix/tasks.md) 承接；用户方向决定见[决定 §28](./decisions.md#28-2026-11-09-w2-中文断行最小修复准备)，具体来源准入与修复实测尚未完成。
 - quiet-md 的数值、平台能力、vendor 补丁和测试覆盖只能作为待核对线索，不能直接写成 Aline 设计值或验收证据；引用时标明“参考/待验证”。
 - 工作流若改变验收方式、依赖图、跨模块契约或阶段范围，先更新 OpenSpec change 与相应现行规范，再写依赖该变化的代码；研究文档中的建议 change 名称不自动生效。
 

@@ -27,13 +27,14 @@ PRD定义产品结果，AGENTS铁律及已确认架构/专项约束实现，验�
 ## 可复现验证入口
 
 - 单元/集成测试：`crates/*/tests/`及源码旁测试；固定输入/独立预期在各crate的 `tests/fixtures/`。
-- 工程门禁与反例：`scripts/check_workspace.py`、`check_engineering.py`、`check_lints.py`、`check_safety.py`、`check_public_api.py`、`check_validation_output.py`，输入在 `scripts/fixtures/`。
+- 工程门禁与反例：`scripts/check_workspace.py`、`check_engineering.py`、`check_lints.py`、`check_safety.py`、`check_public_api.py`、`check_validation_output.py`、`check_ui_catalog.py`、`check_ui_tokens.py`，输入在 `scripts/fixtures/`。
+- UI 文案守卫检查直接 UI 字面串与翻译调用的字面首参 key（变量/数组间接 key 仍须人工复核）；宏、动态串与别名仍须人工复核，双语键和占位符一致性由 `aline-app-core` 测试覆盖。颜色守卫检查组件生产源码的直接字面色，不代替真实截图。
 - Rust提交仍执行AGENTS列出的fmt/clippy/test；统一入口需要已安装工具链及已核对的隔离Cargo缓存，不自动下载。依赖图解析不代表跨平台构建。
 - 验证运行输出放 `logs/validation/`，换会话只维护一份 `tmp/<任务>-resume.md`，两者不追踪。保留规则见[开发流程 §5](./development-process.md#5-仓库产物与提交边界)。本地输出不得成为复跑必要输入。
 
 ## 研究、历史与资源
 
-- [Zed复核](./zed-notes.md)、[WordCraft调研](./wordcraft-study.md)、[Splat调研](./splat-study.md)、[quiet-md调研与采纳方案](./quiet-md-study.md)是参考研究，不能替代锁定源码核对与Aline实测。quiet-md 的 W0～W7 是工作分解，未逐项立项；其不改变产品契约的工程/验证方法已按[决定 QMD-01](./decisions.md#25-2026-11-05-quiet-md-工程实践采纳qmd-01)回写现行规范，并由 OpenSpec change [`m1-single-window-readonly`](../openspec/changes/m1-single-window-readonly/proposal.md) 记录治理 delta，不代表已实施或已验证。
+- [Zed复核](./zed-notes.md)、[WordCraft调研](./wordcraft-study.md)、[Splat调研](./splat-study.md)、[quiet-md调研与采纳方案](./quiet-md-study.md)是参考研究，不能替代锁定源码核对与Aline实测。quiet-md 的 W0～W7 原为工作分解；2026-11-08 用户要求继续逐项实施，W1～W7 已各有独立 change（见[开发流程 §3.1](./development-process.md#31-研究采纳与工程实践落点2026-11-05)），W4/W5 保留 M2 前置；其不改变产品契约的工程/验证方法已按[决定 QMD-01](./decisions.md#25-2026-11-05-quiet-md-工程实践采纳qmd-01)回写现行规范，并由 OpenSpec change [`m1-single-window-readonly`](../openspec/changes/m1-single-window-readonly/proposal.md) 记录治理 delta，不代表已实施或已验证。
 - [确认归档](./archive/)及[迁移历史证据](./archive/migration-evidence/README.md)保存已确认决定与必要研究来源，不自动取得现行规范效力。
 - [历史原型](./prototype/README.md)为用户已确认长期保留的参考，且是原生 UI 的布局与控件邻接参照（[UI 规范 §4.1](./ui-spec.md#41-原型布局对照实现参照)）；除图标删除与 2026-11-03 语言切换两次记录在案的授权变更外不改历史字节；PROTO-01/03来源/许可事实仍待补证，原型主题不是正式schema 1包。
 - [应用图标](./assets/app-icon/README.md)、[素材来源](./assets/provenance.md)、[架构总览](./assets/v1-architecture.svg)、[模块目录](./assets/v1-modules.svg)分别负责正式资源、来源与规划视图。

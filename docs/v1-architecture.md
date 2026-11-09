@@ -2,7 +2,7 @@
 
 版本：0.8 · 主题决定回写版  
 更新日期：2026-10-30  
-状态：**TA-01～TA-03、RS-01～RS-05、ED-01、UI-01～UI-06、PL-01～PL-03 与 TH-01～TH-10 已确认并回写；截至 2026-11-05，QMD-01 的 W1～W7 依赖准入、时点与规模仍待确认；技术验证尚未完成，不表示实现或验收通过。**
+状态：**TA-01～TA-03、RS-01～RS-05、ED-01、UI-01～UI-06、PL-01～PL-03 与 TH-01～TH-10 已确认并回写；截至 2026-11-08，QMD-01 的 W1～W7 已各自建 change 并获继续实施指令；新增依赖/vendor 仍须具体准入，W4/W5 保留 M2 前置；技术验证尚未完成，不表示实现或验收通过。**
 
 ## 1. 用途、权威关系与阅读顺序
 
@@ -63,7 +63,8 @@
 |---|---|
 | `regex =1.13.1`，及其实现包 `regex-automata =0.4.18`、`regex-syntax =0.8.11` | 只允许 app/aline-ui/aline-plugin 经锁定 GPUI 既有路径消费，包含已审 `GPUI/test-support → proptest =1.12.0 → regex-syntax =0.8.11` 入边；Aline 自有代码禁止直接依赖，五引擎禁止借其它中间包引入（含引擎测试的 proptest）。必须检查所有实际入边及根路径，存在一条合法 GPUI 路径不能掩盖其它非法路径 |
 | `gpui-pre =0.3.9 → getrandom =0.3.4 → wasip2 =1.0.4+wasi-0.2.12` | 仅允许末边条件 `cfg(all(target_arch = "wasm32", target_os = "wasi", target_env = "p2"))`；保留 all-target 图且证明登记桌面目标的实际选包均不包含该绑定。不得加入 WASI 执行宿主、Wasmtime 或动态加载能力 |
-| M1 候选 `aline-ui --[cfg(target_os="macos")]→ gpui-pre-macos@0.3.9 → gpui-pre-apple@0.3.9` | 2026-11-02 用户批准候选及精确直接边，`font-kit` feature；`app → sys-locale@0.3.2` 用于系统首选语言。`cbindgen@0.28.0`、`option-ext@0.2.0` 与 `dwrote@0.11.5` 各自仅在此 macOS 后端闭包获精确 MPL-2.0 例外；后两者仅 metadata-only。`libloading@0.8.9` 获准的精确 ISC 例外锁定完整互斥条件 metadata 路径，不扩大 ISC allowlist。用户已批准 M1 组合图七场景新 fingerprint，旧 M0 值保留历史；all 与七场景准入守卫已通过。2026-11-03 用户配置 Xcode 27.2/Metal Toolchain 后，离线 app build 与首个 macOS 原生空窗已通过；后续阶段及非 macOS 平台仍待验证 |
+| M1 候选 `aline-ui --[cfg(target_os="macos")]→ gpui-pre-macos@0.3.9 → gpui-pre-apple@0.3.9` | 2026-11-02 用户批准候选及精确直接边，`font-kit` feature；`app → sys-locale@0.3.2` 用于系统首选语言。`cbindgen@0.28.0`、`option-ext@0.2.0` 与 `dwrote@0.11.5` 各自仅在此 macOS 后端闭包获精确 MPL-2.0 例外；`dwrote` 仅 metadata-only；2026-11-09 用户纠正 `option-ext` 口径：已批准精确路径可在 macOS tree 选中。`libloading@0.8.9` 获准的精确 ISC 例外锁定完整互斥条件 metadata 路径，不扩大 ISC allowlist。用户已批准 M1 组合图七场景新 fingerprint，旧 M0 值保留历史；all 与七场景准入守卫已通过。2026-11-03 用户配置 Xcode 27.2/Metal Toolchain 后，离线 app build 与首个 macOS 原生空窗已通过；后续阶段及非 macOS 平台仍待验证 |
+| W1 隔离离屏验证（2026-11-09） | 决定 §27 批准固定 `gpui_macos=[font-kit,test-support]` 图（候选锁 `6bb7d273…cf06`、macOS arm64 GPUI 图 `2dd7f852…f32f`）；限定 scripts/fixtures/w1-offscreen 批准资产和 logs 副本，由专用运行器核对完整图/逐包准入。生产清单/锁/features 与全局策略不变；漂移重新审计。真实两进程各两次纹理读取及隔离Clippy已通过，状态见 V-04/V-09，不代表屏幕呈现或其它平台 |
 | M1 `wasi@0.11.1+wasi-snapshot-preview1` 与 `wasip2@1.0.4+wasi-0.2.12` | 用户批准原提案所列路径及9条额外 `wasip2` metadata 边，限精确身份/边/root/target；`wasip2` 可出现在 desktop target-filtered metadata-only，任何 desktop target tree 必须不选中。不得把包身份批准扩大为其它入边许可 |
 
 例外按包身份、来源、归档校验和、依赖边、target 条件、features 和消费方共同约束。正式 workspace 可替换隔离消费方并新增已准入节点，但 GPUI 受审子图变化须重新审计，不能要求整个锁文件与临时候选根字节相等。metadata 过近似路径与实际 Cargo tree 分目标/feature 交叉核对；图解析失败或未解析组合不能判合规。2026-11-02 用户已批准 M1 候选的精确 `wasi@0.11.1`/`wasip2@1.0.4` metadata 路径及9条 `wasip2` 额外边，并批准七场景 M1 组合图 fingerprint；target tree 不选中约束仍有效。实际守卫是否通过以更新后逐边验证为准。未使用的 screen-capture/bench-support/profiler/stacker/inspector 等 features 仍未准入，升级或新路径不自动获得例外。
@@ -469,6 +470,8 @@ Aline/
 
 **2026-11-03 M1 主窗骨架：** 并入的骨架范围已落地：原生主窗改为工具栏行（44px）→ 内容区（`flex_1`）→ 状态栏行（28px）三段，几何取值集中于 `native_window/geometry.rs` 并有边界测试；工具栏只含品牌区与文档打开时的编辑模式组，状态栏在后台执行器计算字符数/行数并按 `DocumentId` 采纳，替换、关闭或晚到结果被丢弃；内容列按原型 880（含 56 水平内边距）/768 文本宽与 900/600 窄窗档位实现。`cargo test -p aline-ui --lib` 61 passed/1 ignored，完整 workspace 门禁、`check_workspace.py` 与 engineering/lints/safety/public-api 检查通过，证据 `logs/validation/m1-single-window-readonly/2026-11-03-continue-04/`。真实窗口中已取得无文档态与打开 README 后的品牌区/三段同屏截图及图标资源身份检查（证据 `logs/validation/m1-single-window-readonly/2026-11-03-continue-05/brand/`），但窄窗截图、键盘焦点与统计序列尚未观测；候选数值未冻结，V-09 与 AC-15/20 仍只按分项回填，M1 出口未完成。
 
+**2026-11-06 M1 只读虚拟阅读与命中边界：** `ReaderSurface` 按 `DocumentId` 持有一个 `ReaderIndex`；`refresh_reader` 只在文档新建或替换时构建内容行索引，`render` 只按 GPUI `list` 的当前视口渲染可见行，不在每帧解析全文、读取文件、计算统计或物化整篇内容。Visual 使用变高块行列表，Source 使用逻辑行列表，两者共用内容列宽与外侧主滚动槽；行数上限 1,000,000，高度缓存容量 256，键含文档/工作版本/快照/投影/解析配置、视图模式、文本宽、缩放、字体代次与换行/字号/行高，键变化即清空并重新测量。点击由 GPUI 文本布局给出局部绘制偏移，经 `HitTarget` 与 `Projection::source_at`/`aligned` 校验后落到源码锚点；UI 不手算块首/行首、不重建 UTF-16 表，命中只写只读导航/选区且不开编辑块。单行/单元格映射窗口预算 64 KiB；>4 MiB 初始进入 Source 并显示原因。2026-11-06 无头验证为 `cargo test -p aline-ui --lib` 100 passed/1 ignored（命中 9、布局 15、内容 19、字体 5、阅读渲染 11；含 2026-11-06 复核与独立审查修复回归）；真实像素点击、长文双视图切换与 900/600 窄窗档位已由 2026-11-06 与 2026-11-07 真实窗口证据覆盖（窄窗三档见任务 13.3）；显示缩放与运行中字体重排仍未测（授权字体启动激活后的锚点/命中已补测，见验证计划 V-04），不能据此判定 V-05/V-07/V-09 通过。
+
 ### 5.2 当前文本与打开块
 
 ```text
@@ -713,6 +716,8 @@ PDF 独立页面样式，A4/A3/Letter/Legal、纵横向、四边独立页边距�
 
 可视化变高块虚拟化，源码逐行虚拟化；巨型单段/单表仍需单独限额或降级。高频输入路径不做全文解析、指纹、统计、序列化或文件 I/O。阻塞读取、恢复复制、导出及资产解码均不得在每帧/按键 UI 回调完成；源 crate 可同步提供原语，调度由 UI 负责。
 
+**2026-11-06 M1 实现状态：** 只读阅读的 `ReaderIndex`/`ContentIndex` 在文档打开或替换时构建一次；每帧 `prepare` 只计算 `LayoutKey`（文档、工作版本、快照、投影、解析配置、模式、文本宽、缩放、字体代次、换行、字号、行高）并在键变化时清空 256 项高度缓存、重置列表，`render` 仅渲染 GPUI `list` 的可见行。统计由后台执行器计算，结果按 `DocumentId` 采纳，替换或关闭后晚到结果丢弃；渲染路径不做全文解析、指纹、序列化、统计或文件 I/O。行数上限 1,000,000、单项映射窗口 64 KiB、>4 MiB 默认 Source 是本轮实验预算/产品策略，硬限额仍待 V-06。命中链与 UI 不手算映射的约束见 §5；真实平台像素、视图切换与 900/600 窄窗证据已于 2026-11-06 与 2026-11-07 补齐（窄窗三档见任务 13.3），显示缩放与运行中字体重排仍未测（授权字体启动激活后的锚点/命中已补测，见验证计划 V-04）。
+
 ### 9.2 可恢复错误与安全
 
 按WC-01/PRD APP-06，领域任务返回结构化诊断，由UI会话服务维护容量受限、按类去重的内存降级汇总并呈现。每条有应用会话/DocumentId/工作版本及类别，不保存正文、IME候选或敏感路径；关闭文档释放对应条目、关闭会话释放集合，版本变化不回填旧结果，容量和状态/布局由V-06/V-09确定。它是派生会话状态，不是文档真源、历史、恢复数据或持久日志，不引入引擎thread-local。按WC-02，V1不新增通用UI命令catch/回滚，既有受检事务与有限资产隔离边界不变。
@@ -741,7 +746,7 @@ HTML 展示忽略注释但保存保留源码，过滤标签按字面显示，不
 | 保真棘轮 | BOM、混合/统一 LF/CRLF、孤立 CR 原字节、空文档、无末尾换行；不编辑/切模式/换主题保存不变；局部改动仅约定区间和行尾例外 | M0–M2，发布必过 |
 | 历史/版本状态机 | 撤销到保存内容、同栈深分支、历史裁剪、保存期间输入、IME 确认/取消、草稿未离开时保存/恢复/导出 | M0–M2；按 TA-01、TA-02 验证输入组与重载边界 |
 | 故障/竞争集成 | 保存队列、同 size/mtime 外改、目标再次变化、权限/磁盘满、资源部分复制/文档写失败、关闭取消、恢复损坏、身份别名与重复进程 | M2 起，M5 全覆盖；V-08 |
-| 随机不变量/fuzz | 确定性 RNG 驱动 parse/buffer/edit/DocCore 的合法与预期拒绝输入；每步不变量、周期保存往返或与全量权威路径差分；失败保留 seed、步号、操作日志与最小输入。不能把已知语义丢失用测试辅助函数规范化 | M1 起（W3 立项后），M2/M3 扩展；E-T20 |
+| 随机不变量/fuzz | 确定性 RNG 驱动 parse/buffer/edit/DocCore 的合法与预期拒绝输入；每步不变量、周期保存往返或与全量权威路径差分；失败保留 seed、步号、操作日志与最小输入。不能把已知语义丢失用测试辅助函数规范化 | M1 的 `engine-fuzz-invariants` 已立项，M2/M3 扩展；E-T20 |
 | 离屏视觉证据（补充） | 锁定 GPUI 的离屏窗口、模拟键鼠与截图；只在依赖准入和能力 spike 通过后使用，不能替代真实窗口、IME 或平台证据 | M1 起；V-09 补充 |
 | GPUI 输入/交互 | 真实命中测试、UTF-16 候选窗、焦点借出/归还、跨块拖选、代码行号/滚动、只读区、连续设置页、中文/英文与键盘 | M1 起，M5 全覆盖 |
 | 真实产物/安装测试 | PDF 阅读器/.docx 应用/离线 HTML、合法/恶意主题包、三平台安装/关联及资源格式矩阵 | M4–M6，V-01～V-04 |
@@ -765,6 +770,8 @@ AC-01～AC-20 全部在第 6 节建立入口追踪；测试任务还需细分到
 V-05 冻结计时起止、设备/系统、分位数、打开/切换/帧率/内存门槛；V-06 冻结极端结构与资源限额。旧“128 KiB 解析约 20ms”“alike <5ms”“一键一帧”“回归 10%”等历史数据/建议不当作 Aline 实测或已冻结发布门禁；可用于设计实验。
 
 V-05 报告至少记录：环境与版本、源码 commit/锁定构建、样本 SHA-256、方法/操作序列、冷热缓存、计时起止、P50/P95、最大停顿、峰值内存、原始日志入口、复现命令，以及明确不测量什么。摘要数字必须能追溯到机器可读原始输出，不能只保留汇总表。
+
+**2026-11-06 M1 分项（非 V-05 执行）：** `cargo test -p aline-ui --lib` 100 passed/1 ignored，其中只读命中 9、布局/锚点 15、内容 19、字体 5、阅读渲染 11 例；含 2026-11-06 复核与独立审查修复回归；CodeGraph 复核 render 调用链未见全篇解析、文件 I/O、统计或整篇物化，UI 映射均经 `Projection`/`Snapshot` API。1 MiB debug 两视图首尾滚动沿用任务 5.1 证据。未执行 Release P50/P95、主线程停顿、峰值内存与真实像素点击/模式切换序列，V-05 仍未执行，V-07/V-09 仅补分项，不冻结任何性能门槛。
 
 ### 10.3 出口检查
 
@@ -834,7 +841,7 @@ cargo test --workspace
 
 **2026-10-31 M0 分项取证记录（组 9）：** 依赖清理后的正式统一门禁在当前 macOS arm64 主机记录 19/19 exit 0、workspace 测试 312 passed，见[9.1 原始证据入口（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.1/report.md)。八成员保留，`aline-plugin` 仍为空骨架；没有消费者的 ui→plugin、plugin→edit、plugin→app-core 边已删除，先前 ui→edit 直接边也已清理。E1 工程、E2 无头 API/预算、E3 展示树 dump、E4 AC-01～04 基础、E5 覆盖/映射、E6 未测清单及 E7 输入协议的证据分别见[9.2（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.2/report.md)、[9.3（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.3/report.md)、[9.4（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.4/report.md)、[9.5（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.5/report.md)；独立复核与记录限制见[9.6（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.6/report.md)。这些是可检查的 M0 分项，不是 M0 出口、AC 或 V 项整项通过声明。
 
-M1 交接仍先取得锁定 GPUI 的原生 macOS 单窗冒烟、V-04 中文字体回退、V-05 Release 基准与真实语法/点击/灰区样本，再按 V-01 顺序补 Windows/Linux；Windows 10、Intel Mac 和最低系统版本目标继续保留。现有源码已装配 macOS 单窗启动和空状态构造，但尚无已编译或真实运行的原生窗口证据；Xcode 27.2 已安装，当前 developer directory 仍选 Command Line Tools，进程级 `DEVELOPER_DIR` 调用 Metal 受未接受的 Apple license 阻拦，Metal Toolchain 状态未确认。真实 IME/焦点/候选窗及其他平台成绩也未取得。M2 前 V-08 身份/事务方案及保存、自动保存、外改重载、10 秒恢复和恢复图片可读的最小安全闭环仍是独立出口，不能由无头快照/资源引用或 create-only 写盘原语代替。交接清单见[9.5（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.5/report.md)。
+M1 交接仍先取得锁定 GPUI 的原生 macOS 单窗冒烟、V-04 中文字体回退、V-05 Release 基准与真实语法/点击/灰区样本，再按 V-01 顺序补 Windows/Linux；Windows 10、Intel Mac 和最低系统版本目标继续保留。截至 2026-11-06，macOS arm64 已完成锁定离线构建、真实单窗显示/退出、文件打开/取消/关闭、品牌区与骨架/工具栏/状态栏截图，以及 1 MiB debug 双视图首尾滚动（该记录早于 Source 片段化与行距调整，需重取）；真实像素点击、当前代码的长文双视图切换/锚点恢复已由 2026-11-06 真实窗口证据覆盖；V-04 中文回退与授权静态字体实验已于 2026-11-07 补测（启动激活、失败提示、锚点与命中，见验证计划 V-04），V-05 Release 20 次采样与 V-09 完整窗口矩阵仍未执行。Windows 10、Intel Mac、Linux 与真实 IME/焦点/候选窗成绩仍未取得。M2 前 V-08 身份/事务方案及保存、自动保存、外改重载、10 秒恢复和恢复图片可读的最小安全闭环仍是独立出口，不能由无头快照/资源引用或 create-only 写盘原语代替。交接清单见[9.5（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.5/report.md)。
 
 | 阶段 | 实施任务与先决依赖 | 可检查的出口（逐目标平台记录） |
 |---|---|---|
@@ -846,7 +853,7 @@ M1 交接仍先取得锁定 GPUI 的原生 macOS 单窗冒烟、V-04 中文字�
 | M5 应用壳 | 标签/多窗/工作区、文件树及拖拽、全应用身份/平台转交、关联/命令行、逐 tab 关闭；按已确认 TA-03 恢复最后工作区偏好；V-01、V-08、V-09 完整操作与平台回归；依赖 M4 | AC-05～AC-07/10/15/18～20；路径变更同步且引用影响可见，拒绝/失败保留源文件与未处理 tab；按 V-01 既定顺序获取平台证据 |
 | M6 收尾 | 所有 PRD 基线、AC 全量回归、V-05、V-06 性能/资源门禁、包与安装/关联、文案/键盘/主题样本；依赖前述出口与已确认决定的落实 | V-01～V-09 发布阻塞产物完成并回填，三平台门禁通过后正式同发；Win10/Intel 实际覆盖；折叠标记增强不计发布阻塞，无旧工期承诺 |
 
-2026-11-05 quiet-md 工程实践的阶段落点（建议，按 W0 逐项立项）：M1 可并行 W3（引擎 fuzz）、W1（离屏证据 spike，先依赖准入）、W2（字体/中文排版测量）与 W7（性能报告模板/门禁）；W6 token 小步且不阻塞 M1 关键路径；W4 保存/恢复与 W5 IME 建议落 M2，不得提前实现半套；M4 完成 W2 最终排版与 W6 完整主题；M5/M6 做多窗口/路径与跨平台性能。以上阶段只是建议落点，W4/W5 的阶段归属与 W6 时点仍属 QMD-01 待确认问题。研究文档与工作流不是已批准任务，实施前按[开发流程 §2](./development-process.md#2-openspec-变更流程)建档，且不能用离屏截图或 fuzz 替代真实窗口、IME、文件故障与性能证据。
+2026-11-05 quiet-md 工程实践的阶段落点（建议，按 W0 逐项立项）：M1 可并行 W3（引擎 fuzz）、W1（离屏证据 spike，先依赖准入）、W2（字体/中文排版测量）与 W7（性能报告模板/门禁）；W6 token 小步且不阻塞 M1 关键路径；W4 保存/恢复与 W5 IME 建议落 M2，不得提前实现半套；M4 完成 W2 最终排版与 W6 完整主题；M5/M6 做多窗口/路径与跨平台性能。2026-11-08 用户已要求按各自 change 继续实施：W4/W5 严守 M2 前置，W6 只交付 M1 的小步 token 化。研究文档本身不是授权，当前独立 change 索引见开发流程 §3.1；后续新增范围仍按[开发流程 §2](./development-process.md#2-openspec-变更流程)建档，且不能用离屏截图或 fuzz 替代真实窗口、IME、文件故障与性能证据。
 
 ## 14. 已确认决定与归档入口
 
@@ -864,9 +871,9 @@ M1 交接仍先取得锁定 GPUI 的原生 macOS 单窗冒烟、V-04 中文字�
 | UI-01～UI-06（A） | 主窗口内设置；主题名称应用/缩略图预览；大纲仅主动跳转；采用 UI 菜单/工具栏/键位表；键盘“移动到…”；关闭工作区保留标签、待恢复根为空 | §7.4/7.5/8.2、[UI §17](./ui-spec.md#17-待确认问题清单)、[确认归档](./archive/2026-10-29-ui-decisions.md)；V-01/V-04/V-07～09仍未执行 |
 | PL-01～PL-03（A） | Mermaid 独立图像操作仅受自身开关控制；关闭高亮回内容主题普通表面、独立配置保留暂停；图片预览再启用恢复仍打开 tab 的原模式/视口并按当前约束重算 | §8、[插件规范 §12](./plugin-system.md#12-待确认问题清单)、[确认归档](./archive/2026-10-29-plugin-decisions.md)；V-02/03/04/09仍未执行 |
 | TH-01～TH-10（A） | schema 1/封闭字段/合并规则、静态 PNG、outline/filled；无覆盖升级/删除按钮，安装不应用，受保护 GitHub 根、磁盘副本保修改，失效身份保留且修复/重启不自动应用 | §8.2、[主题 §14](./theme-package-spec.md#14-待确认问题清单)、[确认归档](./archive/2026-10-29-theme-decisions.md)；数值/原生能力及 V-04/V-06/V-09 仍未验证 |
-| QMD-01（工程方法） | 按用户 2026-11-05 指令，记录 quiet-md 调研启发的随机不变量、性能报告字段、保存/恢复分离、IME 核对点、语义 token、中文排版测量门与离屏证据边界；其中部分为 Aline 既有或追加方法，不整体归为 quiet-md 采纳；不改产品契约，W0～W7 未立项 | [决定 §25](./decisions.md#25-2026-11-05-quiet-md-工程实践采纳qmd-01)、[研究文档](./quiet-md-study.md)、[治理 delta 所在 change](../openspec/changes/m1-single-window-readonly/proposal.md)；实施前按[开发流程 §2](./development-process.md#2-openspec-变更流程)逐项建档 |
+| QMD-01（工程方法） | 按用户 2026-11-05 指令，记录 quiet-md 调研启发的随机不变量、性能报告字段、保存/恢复分离、IME 核对点、语义 token、中文排版测量门与离屏证据边界；其中部分为 Aline 既有或追加方法，不整体归为 quiet-md 采纳；不改产品契约；W1～W7 已分别建独立 change，实施状态见开发流程 §3.1 | [决定 §25](./decisions.md#25-2026-11-05-quiet-md-工程实践采纳qmd-01)、[研究文档](./quiet-md-study.md)、[治理 delta 所在 change](../openspec/changes/m1-single-window-readonly/proposal.md)；实施前按[开发流程 §2](./development-process.md#2-openspec-变更流程)逐项建档 |
 
-产品决定阻塞已解除；输入状态机、重载事务和偏好持久化仍须实现及验收。V-01～V-09 均未整项完成，归档不代表架构全部技术细节冻结或发布门禁通过。QMD-01 是工程/验证方法采纳记录，其 W1 依赖准入、W2 vendor 顺序、W6 时点、fuzz 规模等仍待用户确认，不因本表登记成为架构决定。
+产品决定阻塞已解除；输入状态机、重载事务和偏好持久化仍须实现及验收。V-01～V-09 均未整项完成，归档不代表架构全部技术细节冻结或发布门禁通过。QMD-01 是工程/验证方法采纳记录，其后续独立 change 已按用户指令实施，但 W1 新依赖与 W2 vendor 仍须具体裁决；fuzz 默认规模以 W3 契约为准，不能以本表替代实施或验证证据。
 
 ## 15. 旧架构逐章处置账本
 

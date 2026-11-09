@@ -1,8 +1,8 @@
 # quiet-md 工程实践调研与 Aline 采纳方案
 
-更新日期：2026-11-05 · 修订：2026-11-06（事实与来源校正） · 状态：调研与独立复核完成；工程/验证方法已按[决定 QMD-01](./decisions.md#25-2026-11-05-quiet-md-工程实践采纳qmd-01)回写现行规范，治理 delta 已并入 OpenSpec change [`m1-single-window-readonly`](../openspec/changes/m1-single-window-readonly/proposal.md)，W0～W7 未立项；未修改代码
+更新日期：2026-11-05 · 修订：2026-11-06（事实与来源校正） · 状态：调研与独立复核完成；工程/验证方法已按[决定 QMD-01](./decisions.md#25-2026-11-05-quiet-md-工程实践采纳qmd-01)回写现行规范，治理 delta 已并入 OpenSpec change [`m1-single-window-readonly`](../openspec/changes/m1-single-window-readonly/proposal.md)，W1～W7 已于 2026-11-08 分别建独立 change 并按用户指令继续实施，进度见[开发流程 §3.1](./development-process.md#31-研究采纳与工程实践落点2026-11-05)；本文调研本身不提供实现证据
 
-交付：quiet-md 快照核对、独立复核、采纳矩阵、W0～W7 工作流、证据与决策门。无代码、依赖或实验产物。复核记录为调研过程，不构成独立入库证据。
+研究交付（不含后续独立 change 的实现）：quiet-md 快照核对、独立复核、采纳矩阵、W0～W7 工作流、证据与决策门。无代码、依赖或实验产物。复核记录为调研过程，不构成独立入库证据。
 
 **目标：** 把 quiet-md 中可迁移的工程实践落成 Aline 的可执行工作流，先补 M1 证据与引擎不变量，再服务 M2 保存/IME 与 M4 主题。
 

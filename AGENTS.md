@@ -28,7 +28,7 @@ Aline —— Typora 式 Markdown 编辑器（Rust + GPUI，无 WebView），macO
 | [docs/zed-notes.md](docs/zed-notes.md) | Zed逐主题复核与完整历史证据入口；旧“照搬”标签不作当前决定，主线与gpui-pre有API代差 | UI / GPUI 实现时仅作机制线索，须核对锁定源码及 V 验证 |
 | [docs/decisions.md](docs/decisions.md) | 决策时间线 + 常设决定清单（含 2026-10-26 复核裁决） | 争议选型查先例 |
 | [docs/wordcraft-study.md](docs/wordcraft-study.md) | WordCraft（storytold/wordcraft @ 0.11.0）调研：手写 markdown 解析的抗退化工程、性能案例库、保真方法论、敌意输入防御；原文实际 21 条提案，W22～W24 缺项，WC-01～WC-07 已确认A，技术验证仍未执行 | 实现自研扫描 pass、文件层/保存、安全上限、formatter 时对照 |
-| [docs/quiet-md-study.md](docs/quiet-md-study.md) | quiet-md 工程实践调研与 Aline 采纳方案（研究文档，非权威）：fuzz/不变量、性能报告、保存/恢复、IME、语义 token、中文排版、离屏证据；QMD-01 已把方法回写规范，治理 delta 已并入 change `m1-single-window-readonly`，W0～W7 未立项（与 WordCraft W22～W24 不共用编号空间） | 做引擎测试、保存恢复、字体/主题或补强验证证据时对照；实施前按开发流程逐项建档 |
+| [docs/quiet-md-study.md](docs/quiet-md-study.md) | quiet-md 工程实践调研与 Aline 采纳方案（研究文档，非权威）：fuzz/不变量、性能报告、保存/恢复、IME、语义 token、中文排版、离屏证据；QMD-01 已把方法回写规范，治理 delta 已并入 change `m1-single-window-readonly`，W1～W7 已分别建立独立 change，W4/W5 保留 M2 前置（与 WordCraft W22～W24 不共用编号空间） | 做引擎测试、保存恢复、字体/主题或补强验证证据时对照；实施前按开发流程逐项建档 |
 
 ## 架构铁律（任何代码不得绕过）
 
@@ -60,6 +60,7 @@ cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 
 - **规范是实现约束（不改变上述权威分工）**：按 `openspec/CODE_STANDARDS.md` 和工程治理规格检查职责、依赖、唯一状态所有者及可测试边界；模块行数仅提示复核，不机械拆文件或 crate。相关 change 的 design 必须解释模式解决的问题、最简单可行方案、代价和验证；允许直接使用具体类型/函数，禁止无需求的模式包装。工程规则调整同步本文入口、OpenSpec 与相关现行文档，不能以局部 allow 或 design 绕过铁律。
 - **不写本机绝对路径**：文档、证据与脚本只写仓库内相对路径或 `<repo>`、`<tmp>`、`<home>` 等占位符，不记录本机用户目录、临时目录或仓库外磁盘位置；生成证据的脚本统一经 `scripts/evidence_paths.py` 归一化，读回时用 `resolve_path` 还原。shebang 的解释器行是唯一例外。
+- **W1 隔离验证例外（2026-11-09）**：用户批准决定 §27 的精确 `gpui_macos=[font-kit,test-support]` 测试图，仅限 logs 内 macOS arm64 spike；生产清单/锁/features 不变。精确图、五条分支、72 个新增 metadata 包及 9 包变化以固定批准资产核对，漂移重新审计，不作全包或许可证泛化许可。`option-ext@0.2.0` 的已批准精确路径可在 macOS tree 选中；`dwrote/libloading` 仍不得被 desktop tree 选中。
 - **提交可复现资产，运行产物留本地**：按 [开发流程 §5](docs/development-process.md#5-仓库产物与提交边界)保留代码、单元/集成测试、独立金样、最小失败输入和可复跑脚本；命令记录、stdout/stderr、临时夹具及 Agent 逐轮 report/review 等写 `logs/validation/...`，不因是 `.md` 就提交。换会话只在 `tmp/<任务>-resume.md` 维护一份不追踪的当前交接；必要决定回写规范，平台/手工验证摘要回填验证计划。旧过程材料按需查 Git，不重建报告目录或改写历史。
 - **按里程碑推进**（v1-architecture 第 13 章）：M0 引擎地基 → M1 单文档只读 → M2 可编辑核心（可日用）→ M3 命令与表格 → M4 插件与主题 → M5 应用壳 → M6 收尾。阶段可形成内部预览，验收按三平台分别取证；先 macOS 后 Windows/Linux 验证，正式 V1 三平台同发（PRD §9、V-01）。
 - 新增依赖先对照 engine-design §18.2 和 v1-architecture §3.2 的准入规则，同类功能不得引入第二个库。2026-11-02 起 `scripts/check_engineering.py` 默认执行逐依赖准入检查（用途分组/选包/许可证），传 `--ledger <path>` 时另存逐包账本，失败关闭；实际执行与限制见架构 §3.2 R14 记录，不把策略核对写成法律意见或跨平台构建证明。

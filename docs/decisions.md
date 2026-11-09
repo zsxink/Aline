@@ -672,3 +672,22 @@ PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02
 - **口径校正。** 界面语言人工/原生取证只做中文（[决定 §24](#24-2026-11-03-验证取证只做中文)），zh-CN/en 双语 catalog 的键集合/占位符校验与缺键/漂移反例自动检查保留，不新增英文界面取证任务；`AGENTS.md` 文档地图的"中英文验收"改为"中文界面验收（双语自动校验保留）"。清理 M1 proposal/design 中与已授权 apply、docs 已回填状态矛盾的规划期残留（"本轮为规划""不声称已执行任何实验""本轮不改这些现行文件""阻塞其创建"等），并补齐 `workspace/engineering-gates` capability 清单漏列的第 3 条要求。M1 tasks 顶部把"不包含 commit/push/archive"明确为"三者需用户另行明确指令"。
 
 回写：`AGENTS.md`、[开发流程 §3.1](./development-process.md#31-研究采纳与工程实践落点2026-11-05)、`docs/README.md`、[架构 §14](./v1-architecture.md)、[quiet-md 研究文档](./quiet-md-study.md)、`openspec/CODE_STANDARDS.md` §6、本文件 §3 摘要表与 §25 的治理入口表述，以及 M1 change 的 proposal/design/tasks。校验以合并后实际执行的 `openspec validate --all --strict --no-interactive`、链接/锚点检查、`git diff --check` 与变更范围核对为准；不把结构校验写成 V/AC 通过。
+
+
+## 27. 2026-11-09 W1 精确离屏测试图与 option-ext 口径
+
+用户在具体候选审计及独立复核后批准 W1 继续真实 macOS arm64 spike。最小特性为 `gpui_macos=[font-kit,test-support]`、`default-features=false`；候选锁 SHA-256 为 `6bb7d273edc39dc7153faf6417cac2c697364d0273926c198a06f74f0c94cf06`，macOS arm64 GPUI 图为 `2dd7f852cdec117c5bd768d3eac1572253a0ffb0f12e9a8aca0402ca73f7f32f`。
+
+精确范围包含新增 72 个 metadata 包（本机新增 23）、9 包 features/边变化及 GPUI 的 futures-concurrency/postage/proptest/web-time/zed-scap 五条分支；全部身份、checksum、features、入边与 target 绑定至申请材料，不泛化为生产依赖许可。只在 logs 的隔离验证副本构建，生产运行特性、正式生产锁和 V1 产品范围不变；候选图漂移重新审计。授权不是运行结果，验证状态见 V-04/V-09。
+
+用户同时明确：`option-ext@0.2.0` 已批准精确路径可在 macOS tree 选中。历史实际图已选中，原架构将其与 `dwrote` 一同称为 metadata-only 的文字不准确；本次纠正该口径，`dwrote/libloading` 不得被 desktop tree 选中的约束继续有效。离屏仅作补充，不替代真实窗口、IME、显示缩放或其他平台证据。
+
+原始申请与复核记录位于 `logs/validation/m1-single-window-readonly/2026-11-08-finish-01/w1/isolated-audit-final/` 及同轮 `review/w1-admission-review.md`。正式可复跑资产和最终状态由独立 change `m1-visual-evidence-spike` 追踪。
+
+## 28. 2026-11-09 W2 中文断行最小修复准备
+
+用户采用实测后的修复方向：另建最小 change，在 M1 内处理中文避头尾，优先评估仅锁定 gpui-pre 核心的断点补丁；中文斜体先取实际 fallback run 证据，再判断是否需要合成。准备工作由独立 change [`m1-cjk-linebreak-core-fix`](../openspec/changes/m1-cjk-linebreak-core-fix/proposal.md) 承接，W2 原测量 change 保留。
+
+本次只确定修复方向和准备范围，未批准具体 vendor diff、本地来源、额外特性或平台钩子；实际候选仍须完整身份/差异/依赖图审计和独立审查后取得精确准入。不得插入字符改变源码或另造绘制/命中几何，不默认接受无合法断点时的静默硬断、裁切或溢出；必要接口差异先明确裁决。未接受 M1 中文排版已知限制，也不冻结合成角度或平滑数值。
+
+本轮仅要求 macOS arm64 实测，不改 V1 三平台范围。原 M1 五个保真样本仍须逐个完整七步；用户明确保留缺少真实导航目标所造成的 7.3 阻塞，不以新增操作夹具或程序化定位替代。
