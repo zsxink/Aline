@@ -28,3 +28,23 @@ W2 在 macOS arm64 Release 的 320/480/768 正文逻辑宽 × Visual/Source 六�
 范围外：编辑/IME/保存（M2）、主题包与完整字体机制（M4）、合成斜体、整元素 skew、整篇字体替换、默认接受已知限制、GPUI 升级及生产 test-support 激活。本轮平台只要求 macOS arm64；保留 V1 三平台范围与其他平台未测状态。
 
 风险为极窄/仅标点/超宽字素时无合法候选，以及与 shaping cluster、截断和缓存的交互。不能把未确认的降级/溢出策略写成批准事实；具体补丁必须先通过独立金样、完整图审计和独立评审。验收需重测六组合、断点两侧真实像素命中/源码往返、原 bytes/内存源码/revision/草稿/历史不变及完整工程门禁；旧 W2 观测只证明缺陷存在，不是修复成绩。
+
+## 本轮裁决（2026-11-09-cjk-03，按用户授权的建议）
+
+用户授权按「面向以后功能迭代的最优方案」落定两项裁决。完整记录见
+`logs/validation/m1-single-window-readonly/2026-11-09-cjk-03/cjk-linebreak/decision/recommended-ruling.md`。
+
+- 接口：受限回退选 A1 + A4 受检组合（整簇移下一行 / 无合法候选不硬断报成功 /
+  单簇过宽报告受限），以 `#[non_exhaustive] WrapLimit` 承载可检查的受限结果；
+  **最小公开面**只新增 `WrapLimit` 与 `TextLayout::wrap_limit() -> Option<WrapLimit>`，
+  拒绝 `Boundary.limit` 与公开三元组。不选溢出、不选保留硬断（与 spec delta MUST NOT 冲突）。
+  用户可见提示（B6）本 change 不接线，列为后续 change 待裁决项；这不改变本提案的
+  目标 / 非目标与产品范围。
+- 来源准入：结论为**暂不批准**任何一代候选身份、**暂不允许 3.2 编译**；原因是三代
+  diff / 文件哈希漂移、测试目标引入 `test-support` 依赖、两处未登记隔离编译尝试，
+  按「冲突列入待确认并暂停依赖该决定的实现」处理。收敛后仍需独立评审与具体批准。
+- 规范：spec delta **未改**；既有 requirement / Scenario 已要求「可检查的受限结果并
+  保留原文」，无需放宽。本轮未改生产清单/锁/策略资产，未构建/激活 patched GPUI，
+  未启用 test-support，未勾任何需具体批准的任务（仍 2/12），未提交/推送/归档/改 HEAD。
+- 保留：M0 验收豁免、M1 未过出口、原五样本主动导航缺失造成的 7.3 阻塞、
+  W4/W5 的 M2 前置、V1 三平台范围、只 macOS arm64 实测。

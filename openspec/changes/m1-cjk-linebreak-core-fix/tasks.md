@@ -6,6 +6,9 @@
   - 证据：`logs/validation/m1-single-window-readonly/2026-11-09-cjk-01/cjk-linebreak/golden/`（12 文本、22 用例）；oracle 现状失败 6 个禁则用例 + 1 个拆簇用例、普通英文与显式换行正例通过，见 `commands/oracle-run.log`。
 - [ ] 1.2 明确三个入口的无合法候选与工作上限契约，复跑极窄/长标点用例证明有限终止、原文可达和真实受限反馈。若现有接口无法表达，不实现静默溢出/裁切/硬断，给出最小受检接口 diff 和对应规范冲突后先取得具体裁决；验收正/拒绝场景及接口审阅记录齐全。
   - **阻塞**：有限终止与原文可达成立，但真实受限结果不成立；已产出 `contract.md`、`isolated-diff/interface-proposal.diff`、`isolated-diff/interface-impact.md`，等待接口裁决，未勾选。
+  - **本轮复核（2026-11-09-cjk-02，仍未勾选）**：`../2026-11-09-cjk-02/cjk-linebreak/review/adjudication-questions.md` 问题 1 已逐项列出三入口现有返回类型、四类受限回退视觉/交互语义（A1–A4）与 B1–B7 公开 API 新增 / Aline 提示接线范围的影响与最小替代，不预设答案。独立复核发现磁盘 `minimal.diff` 已含 `WrapLimit` / `Boundary.limit` / 三元组 / `TextLayout::wrap_limit()` 与新增测试目标，与 `contract.md` / 本任务「原硬断 + TODO」描述不一致，列为待确认冲突（`review/independent-review.md` §5）。未答前停在裁决门，未自行取舍、未改 spec delta。
+  - **裁决已落定（2026-11-09-cjk-03，仍未勾选）**：按用户授权的最小公开面方案，受限回退选 A1+A4 受检组合，`#[non_exhaustive] WrapLimit` + `TextLayout::wrap_limit() -> Option<WrapLimit>` 为唯一两个公开新条目；拒绝 `Boundary.limit` 与公开三元组（改私有函数 + 二元组薄封装）；B6 Aline 提示接线另立后续 change；B7 真实 CoreText 簇索引仍开放。见 `../2026-11-09-cjk-03/cjk-linebreak/decision/recommended-ruling.md` 与 `minimal-interface-proposal.diff`（提案，未应用/未编译）。spec delta 未改、未放宽。**仍未勾选**：接口契约文档、三入口真实接线与失败证据依赖 3.1 具体批准与 3.2 真实编译，按实施顺序不得跳过。
+  - **2026-11-09-cjk-04，仍未勾选**：具体批准后已在 logs 重新生成单一自洽代并实现最小公开面（`#[non_exhaustive] WrapLimit`、`Option<WrapLimit>`、`pub(crate) limit`、公开二元组薄封装），13 项静态契约断言全通过；三入口编译与回归 13/13 通过（合成度量）。但 `Some(NoLegalBreak)` / `Some(ClusterWiderThanLine)` 在最小公开面下只在 `pub(crate)` 层，外部 crate 不可读，**三个入口的「真实受限结果」仍不能由本轮证据证明**；第一次尝试的禁则行尾发现见 `../2026-11-09-cjk-04/cjk-linebreak/3_2/first-attempt.md`。独立评审已由两个独立 worker 执行，两份 verdict 均 `pass-with-findings` 且含高 finding（真实受限结果未证明），不支持勾选 1.2，故不勾选。
 
 ## 2. 最小核心补丁候选（CODE_STANDARDS §3～4；R-9/R-10/R-17）
 
@@ -13,20 +16,49 @@
   - 证据：`rule-tests/cjk_soft_break.rs` + `rule-tests/rule_tests.rs`，13 个测试全部通过（`commands/rule-build.log`、`commands/rule-run.log`），源码 `forbid(unsafe_code)`。
 - [ ] 2.2 从锁 checksum 一致的 gpui-pre 0.3.9 原始归档，在 logs 隔离副本形成最小 diff，将同一规则接入 shaped-line wrapping、LineWrapper 普通包装与 wrapped-truncation；保留 StyledText/TextLayout 几何、不改 buffer/projection 字符。验收原始归档/修改文件/diff 的哈希、三个真实消费点及无重复替代路径可复核；具体来源获准前不构建或激活修改后的 GPUI。
   - **部分完成、阻塞**：隔离副本、`minimal.diff`、`hashes.json`、`integration-notes.md` 已就绪（归档 checksum 一致，三入口接入，rustfmt 通过）；无合法候选分支仍是原硬断 + TODO，等待 1.2 接口裁决，未勾选。未构建/未激活。
+  - **本轮复核（2026-11-09-cjk-02，仍未勾选）**：`make_patch.py` 复跑 exit 0，确认 `original/ + minimal.diff` 逐字节得到当前 `patched/`、且 `cjk_soft_break.rs` 与 2.1 同源；但 `hashes.json`（11:16）与磁盘 `minimal.diff`（11:31）分属不同代（见 `../2026-11-09-cjk-02/cjk-linebreak/review/evidence-identity-audit.json`）。磁盘代的无候选分支已不再是「硬断 + TODO」，`integration-notes.md` 的「无重复替代路径」grep 结论针对旧代，须裁决确定代际后复跑，不能沿用。仍未构建/未激活/未批准/未编译。
+  - **2026-11-09-cjk-04，仍未勾选**：三代漂移已收敛为 `single-regenerated-cohort`；`cohort/replay_recipe.py` 修复 cjk-01 配方缺陷并实跑通过（`original/ + minimal.diff` 逐字节回到 `patched/`，私有规则与 2.1 同源），`guards/check_cohort.py` 13 项漂移反例全部拒绝，机器从归档重推哈希与批准记录一致（`review/independent-audit.json`）；单一私有规则模块供三入口共用，无第二套分行逻辑。日志隔离副本编译成功、原 Aline 映射/命中回归通过。**仍未勾选**：具体批准只授权 logs 隔离副本编译，未把该来源准入生产、未激活 patched GPUI 作为生产依赖；独立评审已完成（两份 `pass-with-findings`），但高 finding 未清零、来源未准入生产，故按「只在证据充分时勾选」保留未勾。
 
 ## 3. 精确来源准入与核心集成（AGENTS 依赖规则；R-1/R-17、S-2/S-10）
 
 - [ ] 3.1 形成核心本地来源的完整候选 metadata/tree、原归档与补丁绑定、许可证、全部入边/target/features/本机选包、五引擎隔离与最小性说明；独立评审后取得具体批准。验证未批准来源、checksum/diff/边或附加特性漂移均由现有守卫失败关闭，不套用 W1 隔离图许可；若需连带 Apple/macOS 来源，先重新审阅范围。
   - **材料完成、未获批准**：`admission/admission-request.md`、`policy-draft.json`、`candidate-summary.json`、`candidate-Cargo.lock`、`guard-rejection/`；现行门禁实际拒绝 `原生路径精确身份/来源/校验和漂移: gpui-pre@0.3.9`。未独立评审、未取得具体批准，未勾选。
+  - **本轮复核（2026-11-09-cjk-02，仍未勾选）**：`../2026-11-09-cjk-02/cjk-linebreak/review/adjudication-questions.md` 问题 2 已提出精确来源准入裁决（逐项影响与最小替代）与是否允许 3.2 编译。发现三代身份漂移（申请代 `f3850203…` / `hashes.json` 代 `fc37076b…` / 磁盘代 `a51e6c04…`）、两处未登记隔离 `[patch]` 编译尝试、`make_hashes.py` 复跑配方失效、`candidate-summary.json` repo_state 与当前 HEAD 不一致；均列为待确认，不自行取舍。正式策略资产未改（`local-patch` 出现次数 0），守卫仍失败关闭。
+  - **裁决结论（2026-11-09-cjk-03，仍未勾选）**：**暂不批准** A/B/C 任何一代作为可编译身份，**暂不允许 3.2 编译**。收敛前置（单一自洽代 / 全部文件哈希 / 重算七场景指纹 / 移除 `[[test]] cjk_wrap` 对 test-support 的依赖 / 修复复跑配方 / 处置两处未登记编译尝试 / repo_state 重绑 HEAD / 独立评审 / 具体批准）见裁决文件 §二。范围不扩整包 allowlist、三包 vendor、许可证泛化或 GPUI 升级。本轮未生成第四代身份、未改生产清单/锁/策略资产、未激活 patched GPUI、未启用 test-support。
+  - **2026-11-09-cjk-04，仍未勾选**：具体批准记录已写入 `../2026-11-09-cjk-03/cjk-linebreak/decision/approval.json`，具体批准门真实运行退出 0 / 合成自测 18/18；七场景指纹在受审工作树重算全部匹配（`guards/fingerprints.json`）；`3_2/candidate-summary.json` 的 repo_state 已重绑 HEAD `71ee580b…`；两处未登记编译尝试保留原文并另存 `<tmp>` 归一化只读副本，明确不作编译证据、不重放；现行 `scripts/check_engineering.py` 对候选 `[patch]` 图仍失败关闭；`policy-draft.json` 仍 `applied: false`。**独立评审已完成**：两个独立 `codex` worker 的 verdict 均为 `pass-with-findings`，身份/七场景/守卫子项通过，但生产来源仍被守卫拒绝且两项高 finding 未清零，按「冲突列入待确认并暂停」不勾选 3.1 整项；3.2 在独立评审完成前按用户具体批准先行，顺序偏离经两份评审判定为用户授权下的隔离试编、可接受但不构成 3.1 先行完成，记录在 `../2026-11-09-cjk-04/cjk-linebreak/review/independent-review-request.md`。
 - [ ] 3.2 获准后仅接入最小来源与精确策略资产，编译实际核心补丁并执行三个入口的真实布局/截断/cluster 回归；验收相应核心测试及原 Aline 映射/命中测试，清理试验替代路径，逐项说明与旧独立金样差异，不能凭纯 helper 测试宣称 TextLayout 集成通过。
+  - **2026-11-09-cjk-04，部分完成、仍未勾选**：用户具体批准只授权 `logs-isolated-copy; production Cargo.toml/Cargo.lock/policy assets unchanged`。logs 隔离副本内 `cargo check -p aline-ui` 退出 0（patched 核心实际编译）、三入口回归 13/13（`shape_text` / `wrap_line` / `truncate_wrapped_line`，非纯 helper）、原 `cargo test -p aline-ui --lib` 111 passed / 1 ignored；具体命令与归一化日志见 `../2026-11-09-cjk-04/cjk-linebreak/3_2/commands/`。第一次尝试的两处真实失败（夹具路径、用错合成度量造成的禁则行尾）保留在 `3_2/first-attempt.md`，不写成通过。**不勾选原因**：①具体批准范围禁止生产清单/锁/策略资产变更，故「接入精确策略资产」未执行，来源仍未准入生产；②回归使用合成度量，不是真实 CoreText shaping，不宣称 `TextLayout` 集成通过；③typed 受限结果在最小公开面下外部不可读，三个入口的真实受限契约未证明；④独立评审已完成但含两项高 finding（3.3 维护清单仍未完成）；⑤5.1 的 Release 六组合重测 / 真实像素点击 / 两视图往返全部未执行。
 - [ ] 3.3 更新既有依赖入口与最小补丁维护清单（原版本/来源、差异、复跑/回滚/升级重打、范围及未知项），执行实际准入守卫和最小违例自测；文档不写本机绝对路径或把本地来源例外扩成整包/全局许可。
 
 ## 4. 字体 run 事实取证（W2；V-04；R-9/R-11/R-13）
 
 - [ ] 4.1 在受限 opt-in 验证入口记录 normal/bold/italic/bold-italic 的 requested Font、实际 shaped run FontId/可得 face 与真实 advance，并绑定样本/宽度/模式/字体代次/二进制；Source 明确 Menlo 普通标记显示。验证缺身份/缺真实 run 失败、opaque id 不能伪造字体名、默认 render 不新增写盘/全量工作，执行对应正反例与原字体/布局测试。
+  - **本轮停在平台钩子边界（2026-11-09-cjk-02，仍未勾选）**：`../2026-11-09-cjk-02/cjk-linebreak/font-run/feasibility.md` 盘点锁定 GPUI 公开 API，判定现有 opt-in 入口（`probe.rs` / `readonly_evidence.rs`）不暴露 shaped run，记录四种 requested Font 的实际 FontId / face / advance **必须新增**受限 opt-in 平台诊断钩子；按任务指示「另列最小接口与准入审阅并停下」，只交付最小接口提案 / 准入审阅范围 / 停下结论，不新增钩子、不改生产源码。已交付 `font-run/font_run_record.rs` + `font_run_record_tests.rs`（`forbid(unsafe_code)`，17 个正/负例全部通过：完整记录与诚实受限记录正例、四种 requested Font 覆盖、Source Menlo 正例；缺身份 / 缺真实 run / 缺 advance / opaque id 伪造字体名 / 墨迹宽猜 face / 墨迹宽猜 advance / 字体列表猜 face / 非法二进制身份 / 非法 advance / Source 非 Menlo 均拒绝）。这是证据记录完整性规则，**不是** shaping 观测，未取得任何真实 FontId / face / advance；不凭纯 helper 测试宣称 TextLayout 集成通过。原字体/布局测试 `cargo test -p aline-ui --lib fonts::` 与 `native_window::readonly_layout` 复跑通过（`commands/run-recorded.md`）。
 - [ ] 4.2 用真实 macOS arm64 中英、标点、emoji/组合字符样本解释 CJK 直立与真实 run 的关系，回填 V-04/UI 和 W2 的已证/未知边界。只有确有证据再提出合成斜体/平台钩子的独立最小方案；验收原始 run/advance/截图可核对，不借整元素 skew、换全文字体或未知墨迹宽宣称修复。
+  - **本轮部分推进、仍未勾选（2026-11-09-cjk-02）**：`../2026-11-09-cjk-02/cjk-linebreak/font-run/proven-unknown.md` 用 W2 真实 macOS arm64 六组合样本与两个夹具写「已证 / 未知」边界：已证 Visual 中文直立 / English 倾斜 / Source Menlo 普通标记、行带 56 物理像素、行首闭标点缺陷、无字节变化；实际 fallback run / advance / 平滑 A/B、中文直立的成因、真实 CoreText 簇索引形态均为未知。未取得原始 run/advance/截图，不拿 W2 旧观测充当修复成绩，不借整元素 skew / 换全文字体 / 未知墨迹宽宣称修复；合成斜体 / 整元素 skew / 整篇字体替换 / 平滑数值均未实现。V-04 / UI §3.2 的「已证 / 未知」边界已按实际复核结果回填，保留 V-04 未通过状态。
 
 ## 5. 原生回归与完整交付（V-04/V-07/V-09；R-11/R-17、S-14）
+
+> **裁决状态（2026-11-09-cjk-03，不是新增任务、不勾选）**：用户授权「按面向以后功能迭代的最优建议」落定两项裁决，完整记录见 `../2026-11-09-cjk-03/cjk-linebreak/decision/recommended-ruling.md`（同步写入 proposal.md / design.md）。接口裁决已落定：A1+A4 受检组合、最小公开面（`#[non_exhaustive] WrapLimit` + `TextLayout::wrap_limit() -> Option<WrapLimit>`），拒绝 `Boundary.limit` 与公开三元组，B6 提示接线另立后续 change；spec delta 未改、未放宽。来源准入结论为**暂不批准**任何一代身份、**暂不允许 3.2 编译**（三代哈希漂移 + 测试目标依赖 test-support + 未登记编译尝试，按「冲突列入待确认并暂停」处理），仍需收敛为单一自洽代 + 独立评审 + 具体批准。因此 1.2 / 2.2 / 3.1 / 3.2 / 3.3 / 4.1 / 4.2 / 5.1 / 5.2 / 5.3 仍全部未勾选，不得跳过 3.2 的真实编译/测试直接勾 5.x。本轮与上一轮门禁结果分别见 `../2026-11-09-cjk-03/cjk-linebreak/commands/run-recorded.md` 与 `../2026-11-09-cjk-02/cjk-linebreak/commands/run-recorded.md`，均为**当前未改生产源码的工作树门禁**，不是补丁集成通过。任务总数仍为 12，完成 2。
+
+> **具体批准已给出（2026-11-09-cjk-04，不是新增任务、不勾选）**：用户按 `concrete-approval-gate.md` 默认建议值给出具体批准，授权 3.2 仅在 logs 隔离副本编译、生产清单/锁/策略资产零变更。本轮收敛 `single-regenerated-cohort`、重算七场景指纹、修复复跑配方、处置两处未登记编译尝试、写入 `approval.json` 实际哈希；隔离副本完成真实编译与三入口回归、原 Aline 映射/命中回归。按用户具体批准，3.2 在独立评审完成前先行，顺序偏离已记录。**1.2 / 2.2 / 3.1 / 3.2 / 3.3 / 4.1 / 4.2 / 5.1 / 5.2 / 5.3 仍全部未勾选**，任务总数仍为 12、完成 2：独立评审已完成但两项高 finding 未清零、来源未准入生产、typed 受限结果外部不可读、真实 shaping / 像素 / Release 六组合未取证，不得跳过 3.2 的真实编译/测试直接勾 5.x。完整证据与未测项见 `../2026-11-09-cjk-04/cjk-linebreak/` 与 `docs/decisions.md` §30。
+
+> **H1 裁决（2026-11-09-cjk-04，不是新增任务、不勾选）**：用户「按照你的推荐来」落定**方案 A + R1**——不改公开面、不改已批准的 `minimal.diff` / 8 文件哈希，用受限 opt-in 钩子在真实 Window 的 prepaint 之后读取已有公开 `TextLayout::wrap_limit()`；`wrap_line` 残留按 R1 登记为 crate 内可检查的产品公开面边界。spec delta 未改、未放宽。本轮只在 logs 隔离副本交付：纯记录规则 23/23、钩子在 patched GPUI 上 `cargo check` 0 告警与 8/8 运行验证、准入守卫 13 项反例；生产源码 / 清单 / 锁 / 策略资产零变更，未启用 test-support。**H1 仍未清零**：`Some(NoLegalBreak)` / `Some(ClusterWiderThanLine)` 的真实 macOS arm64 窗口记录未取得（5.1 首次授权范围），钩子未接线到 prepaint 回调与后台 flush，新增钩子的独立复审待执行。H2、B6、M1、5.1 仍待裁决 / 授权；任务总数仍为 12、完成 2。见 `../2026-11-09-cjk-04/cjk-linebreak/decision/h1-ruling.md` 与 `docs/decisions.md` §31。
+
+> **独立评审已执行（2026-11-09-cjk-04，不是新增任务、不勾选）**：用户指令「那就独立评审」，
+> 由两个独立 Orca `codex` worker（`--worktree current`，Run `run_3a2103dfcda0`）分别出具
+> `review/independent-review-patch.md` 与 `independent-review-layout.md`，verdict 均为
+> `pass-with-findings`；统一汇总见 `../2026-11-09-cjk-04/cjk-linebreak/review/independent-review-summary.md`。
+> 共同确认：批准身份/实际字节/最小公开面/候选最小性/守卫失败关闭/几何与真源/命中方边界**无 finding**；
+> 去重后两项高 finding（H1 typed 受限状态外部不可观测导致三入口「真实受限结果」未证明；
+> H2 tasks 3.2「接入精确策略资产」与批准「策略资产零变更」冲突）、一项中 finding（真实
+> CoreText 簇形态 / `ultra-wide` 超宽簇未验证）、三项低 finding（金样严格禁则只覆盖纯 CJK
+> 子集、状态文字需回填、首次失败日志同名覆盖不能当独立原始日志；后两项表述已收紧）。
+> **两份评审均不支持勾选 1.2、3.1 整项、3.2 整项或任何 5.x**，仅支持 3.1 材料子项 /
+> 2.2 布局接线与几何保留 / 3.2 隔离编译与三入口回归的「部分完成」记录；任务总数仍为 12、
+> 完成 2。顺序偏离经判定为用户授权下可接受的隔离试编，但不构成 3.1 先行完成；A 要求任何
+> 生产策略接入前另有一次独立评审后的准入门禁 / 专门裁决。H1 / H2 / M1 与 B6 提示规格、
+> 5.1 取证授权均列为**待用户裁决**，不自行取舍、不静默勾选、不扩 scope。
 
 - [ ] 5.1 用锁定 Release 工件在 macOS arm64 重测 320/480/768 正文逻辑宽 × 两视图，记录每个真实断点/行高及受限场景；在新断点两侧做真实像素点击、两视图往返、换宽/字体失效与源码锚点恢复。验收图片/布局/run/映射身份一致，原 bytes/内存源码/revision/草稿/历史不变；原 M1 五个保真样本七步契约保持，不以本组替代缺失跳转。
 - [ ] 5.2 执行 `cargo fmt --all --check`、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo test --workspace`、适用核心测试、统一工程/准入/安全守卫与正反例、OpenSpec strict，并安排补丁/布局/命中独立复审。验收实际命令与身份/失败记录齐全，重要 finding 清零，CodeGraph 同步且最新；依赖图解析不记为其它平台实测。

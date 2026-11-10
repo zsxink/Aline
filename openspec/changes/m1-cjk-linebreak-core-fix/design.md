@@ -49,6 +49,65 @@
 
 诊断不进入用户默认流程、不在 render 热路径写盘，不输出无关文档内容。斜体先比较 normal/bold/italic/bold-italic 的实际 run；本变更不在 paint 末尾 skew 全元素，也不为未知 face 加合成身份。Source 不应用 Markdown 粗斜体。
 
+### 5. 本轮裁决落定（2026-11-09-cjk-03，按用户授权的建议）
+
+用户授权「裁决的部分按照你的建议来，最优的建议考虑的以后的功能迭代」。完整裁决、
+逐项影响与未决项见 `logs/validation/m1-single-window-readonly/2026-11-09-cjk-03/cjk-linebreak/decision/recommended-ruling.md`
+与 `decision/minimal-interface-proposal.diff`（提案，未应用、未编译、未激活、未批准）。
+
+**接口裁决（已落定）**：受限回退选 A1 + A4 受检组合——有合法候选则在合法字形边界
+软折行；无合法候选不再硬断报成功，保留原文与可达入口并报告 `NoLegalBreak`；单簇过宽
+则整簇移下一行并报告 `ClusterWiderThanLine`。**不选 A2 溢出、不选 A3 保留硬断**，
+两者都与 spec delta 的 MUST NOT 冲突，自行放宽属硬边界禁止项。A3 的「显示受限提示」
+单独列为后续 change 待裁决项，本 change 不接线。
+
+**最小公开面（面向 M2 caret/IME、M3 表格/clamp、M4 双向/竖排、M5 多窗与 GPUI
+升级重打）**：锁定 GPUI 补丁的公开面只新增两个条目——`#[non_exhaustive] WrapLimit`
+与 `TextLayout::wrap_limit() -> Option<WrapLimit>`。`Option` 区分「未测量/不可判定」与
+「已测量且无受限」，去掉提案里的 `unwrap_or_default()`；`WrappedLineLayout.limit` 保持
+`pub(crate)`；`compute_wrap_boundaries` 私有返回类型可变；**拒绝** `Boundary.limit` 与
+`truncate_wrapped_line` 公开三元组，改用私有 `truncate_wrapped_line_with_limit` +
+二元组薄封装，使既有调用点零改动。B6 Aline 提示接线本 change 不做；B7 真实 CoreText
+簇索引形态保持开放，需 3.2 真实 run 证据。
+
+**来源准入（结论：暂不批准）**：不批准申请代 / `hashes.json` 代 / 磁盘代任何一代作为
+可编译身份，暂不允许 3.2 编译。三代 diff 与文件哈希互不相同、磁盘代含需要
+`test-support` 依赖的 `[[test]] cjk_wrap`、两处未登记隔离编译尝试、`make_hashes.py`
+复跑配方失效、`repo_state` 与当前 HEAD 不一致；按「冲突列入待确认并暂停依赖该决定的
+实现」处理。收敛要求（单一自洽代 + 全部文件哈希 + 重算七场景指纹 + 移除测试目标 +
+修复复跑配方 + 独立评审 + 具体批准）见裁决文件 §二。范围仍限核心包、Apache-2.0、
+五引擎隔离、七场景、最小例外；不扩整包 allowlist、三包 vendor、许可证泛化或 GPUI
+升级，W1 隔离图许可不套用。
+
+**规范处置**：spec delta **未改**——既有 requirement 与「不存在合法断点或字形超过宽度」
+Scenario 已要求「有限时间内产生可检查的受限/失败结果并保留原文」，A1 + 类型化状态
+正好满足，无需放宽。按「若规范因此变化，先更新工件并重新评审」：规范未变化，故只
+同步 proposal/design/tasks 并重跑 `openspec validate --strict`；公共 API 变更仍按
+AGENTS.md 路由安排独立复审（只安排、未执行）。
+
+**本轮边界**：未改生产 `Cargo.toml` / `Cargo.lock` / 策略资产，未用 `[patch]` 或本地
+来源构建，未激活 patched GPUI，未启用 test-support，未重新生成候选代（避免第四代身份），
+未新增平台诊断钩子，未取得真实 shaping / 像素 / 命中证据，未勾 3.2 / 5.x。
+
+### 6. H1 裁决落定（2026-11-09-cjk-04，方案 A + R1）
+
+用户「按照你的推荐来」落定独立评审高 finding H1：**不改公开面、不改已批准字节身份**，
+以受限 opt-in 钩子在真实 Window 的 prepaint 之后读取已有公开 `TextLayout::wrap_limit()`；
+`wrap_line` 残留按 R1 登记为 crate 内可检查的产品公开面边界。依据：
+`StyledText::layout()` 公开、`PreparedLayout` 已持有 `TextLayout`，H1 缺的是一次真实
+窗口实测而非缺接口。方案 B 改变全部字节身份、C 因禁止 `test-support` 不可行、
+D 需放宽 spec delta，均不采用。**spec delta 未改、未放宽**；
+完整裁决见 `../2026-11-09-cjk-04/cjk-linebreak/decision/h1-ruling.md` 与[决定 §31](../../docs/decisions.md)。
+
+本轮只在 logs 隔离副本交付：纯记录规则（23/23 正反例、`forbid(unsafe_code)`、无 I/O）、
+opt-in 钩子（四环境变量 gate、唯一状态来源、capture 不写盘、flush `create_new`、
+未来 `#[non_exhaustive]` 变体拒绝）、在 patched GPUI 上 `cargo check` 0 告警与
+8/8 运行验证、准入守卫 13 项反例。已批准 `minimal.diff` / 8 哈希逐字节一致，
+生产源码 / 清单 / 锁 / 策略资产零变更。**H1 未清零**：真实 macOS arm64 窗口的
+`Some(NoLegalBreak)` / `Some(ClusterWiderThanLine)` 记录未取得（5.1 首次授权范围），
+钩子未接线到 prepaint 回调与后台 flush，新增钩子的独立复审待执行。
+H2、B6、M1、5.1 仍待裁决 / 授权；任务仍 2/12。
+
 ## Risks / Trade-offs
 
 - [没有合法断点] → 独立失败用例先行，禁止硬断伪通过；必要受检接口差异先审阅。

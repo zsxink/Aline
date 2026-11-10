@@ -690,6 +690,12 @@ ratex/ratex-svg、mermaid-rs-renderer、usvg、syntect/two-face 属插件/资产
 
 后续实现的主要待验证影响：ED-01 决策阻塞已解除，组合期显式发布的等待/取消与结束后快照须按 V-07/V-08 验证；V-07 同时决定映射算法/有限 HTML/改写/命令金样能否安全开放；V-05/V-06 决定 StringBuffer、巨块与扫描预算是否满足目标；V-03 决定特殊语法后端覆盖；V-08 决定快照/重载/资源能否正确接线。任何一项缺证据，都不能以“旧项目跑过”代替。
 
+**2026-11-09 CJK 断点候选本地来源复核（未准入）：** `m1-cjk-linebreak-core-fix` 的候选 `gpui-pre@0.3.9` 本地补丁身份**未构建、未激活、未批准、未编译**；现行 `scripts/engineering_policy.json` / `scripts/dependency_admission_policy.json` 中 `local-patch` 出现次数为 0，schema 扩展仍是 `policy-draft.json` 草案（`applied: false`）。复核轮 `logs/validation/m1-single-window-readonly/2026-11-09-cjk-02/cjk-linebreak/review/` 发现申请材料 / `hashes.json` / 磁盘 `minimal.diff` 为三代互不相同的身份，且有两处未登记的隔离 `[patch]` 编译尝试，已列为待确认。批准前不新增依赖、不改锁、不启用 `test-support`，不把 W1 隔离图许可扩到本变更；精确来源准入与是否允许 3.2 编译该候选待用户裁决。
+
+**2026-11-09 按授权落定的准入结论（仍为未准入）：** 用户授权按面向以后功能迭代的最优方案落定裁决（见[决定 §29](./decisions.md#29-2026-11-09-按授权落定的接口裁决与来源准入结论)）。结论为**暂不批准** A/B/C 任何一代作为可编译身份、**暂不允许 3.2 编译**：三代 diff / 文件哈希漂移、磁盘代 `[[test]] cjk_wrap` 需 `test-support` 依赖、两处未登记隔离 `[patch]` 编译尝试、`make_hashes.py` 复跑配方失效、`repo_state` 与 HEAD 不一致，按「冲突列入待确认并暂停依赖该决定的实现」处理。收敛需单一自洽代（全部文件哈希 + 重算七场景指纹 + 移除测试目标 + 修复复跑配方 + repo_state 重绑 HEAD）+ 独立评审 + **具体批准**；授权不等同于对精确字节身份的具体批准，因此本节依赖入口不变、`local-patch` schema 扩展仍为草案（`applied: false`），守卫仍失败关闭。范围仍限核心包、Apache-2.0、五引擎隔离、七场景、最小例外；不扩整包 allowlist、三包 vendor、许可证泛化或 GPUI 升级，W1 隔离图许可不覆盖本变更。
+
+**2026-11-09-cjk-04 具体批准（仍为未准入生产）：** 用户给出具体批准，授权 3.2 仅在 logs 隔离副本编译（生产清单/锁/策略资产零变更）。单一自洽代已按锁定归档重生成并由 `check_cohort.py` 13 项漂移反例守卫；现行 `scripts/check_engineering.py` 对候选 `[patch]` 图仍按精确身份失败关闭，`policy-draft.json` 仍 `applied: false`。隔离副本 `cargo check -p aline-ui`、三入口回归 13/13、原 Aline 映射/命中 111 passed / 1 ignored 均为合成度量下的分项证据，**不是**真实 CoreText shaping、字体 run / advance、像素命中或三平台实测；typed 受限状态在最小公开面下只在 `pub(crate)` 层，外部 crate 不可读。`local-patch` schema 扩展仍为草案，生产策略资产未改。独立评审已完成，两份 `pass-with-findings` 且两项高 finding 未清零，不构成生产来源准入，汇总见 `review/independent-review-summary.md`。见 `logs/validation/m1-single-window-readonly/2026-11-09-cjk-04/cjk-linebreak/`。
+
 ### 18.3 参考材料与决定入口
 
 | 材料 | 用途及效力 |

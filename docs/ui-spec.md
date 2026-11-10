@@ -86,6 +86,12 @@ V-09 产物至少逐项记录逻辑尺寸与显示缩放、主题/字体、状�
 
 **2026-11-09 W2 实测边界：** Release/macOS arm64 在 320/480/768 正文逻辑宽 × 两视图已取得六组合真实截图，普通正文墨迹行带间距 56 物理像素（2×，即 28 逻辑像素）。当前换行仍可把闭标点放在行首；Visual 的中文斜体仍直立而 English 倾斜，Source 的 Menlo 普通标记显示不属于该斜体缺陷。最小复现见 `scripts/fixtures/m1-cjk-punctuation-minimal.md`，证据见验证计划 V-04 与 change `m1-cjk-typography-font-evidence`。未抽取实际 fallback font run、glyph advance 或平滑开关 A/B，不据此冻结排版数值、允许缺陷或批准 vendor。
 
+**2026-11-09 CJK 断点修复复核轮（未通过，待裁决）：** 独立 change `m1-cjk-linebreak-core-fix` 在 `logs/validation/m1-single-window-readonly/2026-11-09-cjk-02/cjk-linebreak/` 复核 W2 真实 macOS arm64 样本的「已证 / 未知」边界：Visual 中文斜体直立、English 倾斜、Source 按 Menlo 显示普通标记均为已证外观；四种 requested Font 对应的实际 shaped run opaque `FontId`、可得 face 与真实 advance 仍**未取证**，不据墨迹宽或字体列表猜回退名。记录这些值所需的受限 opt-in 平台诊断钩子按用户指示只列最小接口与准入审阅范围后停下。候选本地来源**未构建、未激活、未批准、未编译**；接口裁决与精确来源准入待用户裁决（见该轮 `review/adjudication-questions.md`）。不实现合成斜体、整元素 skew、整篇字体替换或平滑数值，不冻结排版数值、不接受已知限制、不批准 vendor；V-04 仍未通过。
+
+**2026-11-09 裁决落定（不改变本节的排版测量门）：** 接口裁决按用户授权的最小公开面方案落定（A1+A4 受检组合、`#[non_exhaustive] WrapLimit`、`TextLayout::wrap_limit() -> Option<WrapLimit>`），spec delta 未改；受限状态的用户可见提示的显示形态 / `t("key")` 键与插值 / 呈现位置按面向 M2 IME 与 M5 多窗的考虑另立后续 change 待裁决，本 change 不接线，见[决定 §29](./decisions.md#29-2026-11-09-按授权落定的接口裁决与来源准入结论)。来源准入结论为暂不批准、暂不允许 3.2 编译。中文直立的成因、实际 fallback run / advance / 平滑 A/B 仍为未知，不据墨迹宽或字体列表猜回退名；不实现合成斜体、整元素 skew、整篇字体替换或平滑数值，不冻结排版数值、不接受已知限制、不批准 vendor；V-04 仍未通过。
+
+**2026-11-09-cjk-04 更新：** 用户给出具体批准，授权 3.2 仅在 logs 隔离副本编译（生产清单/锁/策略资产零变更）；本节不改变任何 UI 接线、不新增 `t("key")`，受限状态仍只在 opt-in 验证入口以类型化结果可检查，用户可见提示另立后续 change。隔离副本的 3.2 编译与三入口回归使用合成度量，不产生真实字体 run / advance / 截图或中文排版验收证据；中文直立的成因、实际 fallback run / advance、平滑 A/B 仍为未知。见 `logs/validation/m1-single-window-readonly/2026-11-09-cjk-04/cjk-linebreak/`；V-04 仍未通过。
+
 **2026-11-09 W6 token 实现边界：** shell、reader、window 已只消费私有语义 token，原始 palette 集中且 19 个独立原值通过测试。真实 960×672 pt、2×、中文 Visual 以同一源码快照的字面值控制版与 token 版对照，正文/工具栏/状态栏区域逐像素相同；控制版为反向展开重构，非历史产物。原生标题与动态滚动条不混入颜色等价结论，Source 和其它平台未作本轮视觉 A/B。完整主题、暗色与主题包 schema 仍归 M4。详情与比较文件见验证计划 V-09。
 
 ## 4. 主窗口信息架构与布局

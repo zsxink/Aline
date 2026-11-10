@@ -116,6 +116,12 @@ Mermaid 护眼模式使用亮色映射；固定主题不跟随应用，主题是
 
 **2026-11-09 CJK 断点准备覆盖（未通过）：** change `m1-cjk-linebreak-core-fix` 在当前 M1 分支准备独立金样 12 个文本 / 22 个用例（320/480/768），现状 oracle 复刻在 6 个禁则用例失败、1 个超宽簇用例拆簇；私有纯规则 13 个测试通过；锁定 `gpui-pre@0.3.9` 归档 checksum 一致，最小 diff 已接入三个真实折行入口且 `rustfmt --check` 通过。候选本地来源的 metadata/tree/入边/features/许可证/五引擎隔离材料已完成，但未获批准，现行 `check_engineering.py` 实际按“原生路径精确身份/来源/校验和漂移: gpui-pre@0.3.9”失败关闭。覆盖范围仅限合成度量下的断点选择、纯规则与隔离 diff；未编译、未激活、未做真实 shaping/像素/命中/截断或三平台测量，不改变 V-04 未通过状态。证据 `logs/validation/m1-single-window-readonly/2026-11-09-cjk-01/cjk-linebreak/`。
 
+**2026-11-09 CJK 断点修复复核轮（未通过）：** `logs/validation/m1-single-window-readonly/2026-11-09-cjk-02/cjk-linebreak/` 复核 1.1 金样（12 文本 / 22 用例）、oracle「目标反例失败、普通正例通过」、2.1 的 13 个同源纯规则测试与 `forbid(unsafe_code)`，并给出 4.1/4.2 的「已证 / 未知」边界：W2 真实 macOS arm64 样本只证明 Visual 中文直立、English 倾斜与 Source 的 Menlo 普通标记显示；四种 requested Font 对应的实际 shaped run opaque `FontId`、可得 face 与真实 advance **未取证**，记录这些值所需的受限 opt-in 平台诊断钩子按指示只列最小接口与准入审阅后停下。独立复核发现候选本地来源的 diff / 文件哈希存在三代互不相同的身份，且文档称「未应用」的接口提案已落在磁盘隔离 diff 上，已列为待确认并暂停依赖该决定的实现。本轮**未构建、未激活、未批准、未编译**候选来源，未取得真实 shaping / 像素 / 命中 / 截断证据，不改变 V-04 未整项通过状态；合成斜体角度、标点挤压与平滑数值仍未冻结。
+
+**2026-11-09 裁决落定（不改变 V-04 未通过状态）：** 用户授权按面向以后功能迭代的最优方案落定两项裁决，见[决定 §29](./decisions.md#29-2026-11-09-按授权落定的接口裁决与来源准入结论)与 `logs/validation/m1-single-window-readonly/2026-11-09-cjk-03/cjk-linebreak/decision/recommended-ruling.md`。接口选 A1+A4 受检组合与最小公开面（`#[non_exhaustive] WrapLimit` + `TextLayout::wrap_limit() -> Option<WrapLimit>`）；受限状态的用户可见提示另立后续 change，本 change 不接线；来源准入结论为**暂不批准**任何一代身份、**暂不允许 3.2 编译**，仍需单一自洽代 + 独立评审 + 具体批准。spec delta 未改、未放宽。本轮仍未构建/激活 patched GPUI、未启用 test-support、未取得任何真实 FontId / face / advance / 像素 / 命中 / 截断证据；4.1/4.2 的平台诊断钩子仍按指示停在最小接口与准入审阅阶段。合成斜体、整元素 skew、整篇字体替换、平滑数值仍未实现；V-04 仍未整项通过。
+
+**2026-11-09-cjk-04 具体批准后的隔离编译（不改变 V-04 未通过状态）：** 用户按 `decision/concrete-approval-gate.md` 默认建议值给出具体批准，授权 3.2 **仅在 logs 隔离副本编译**，生产 `Cargo.toml` / `Cargo.lock` / 策略资产零变更。已收敛出 `single-regenerated-cohort`（归档 `34f61c1c…`、`minimal.diff` `aba1c841…`、全部 8 文件哈希）、重算七场景指纹并全部匹配、修复复跑配方、移除候选测试目标、把两处未登记编译尝试归一化为历史；现行守卫对候选 `[patch]` 图仍按精确身份失败关闭。隔离副本内 `cargo check -p aline-ui` 退出 0、三入口回归 13/13、原 `aline-ui` 映射/命中 111 passed / 1 ignored。**这些是合成度量下的编译与布局回归，不是真实 CoreText shaping / FontId / face / advance / 像素 / 命中证据**；`Some(NoLegalBreak)` / `Some(ClusterWiderThanLine)` 在最小公开面下只存在于 `pub(crate)` 层，外部 crate 不可读，需真实 Window（5.1）。独立评审已由两个独立 `codex` worker 执行，两份 verdict 均 `pass-with-findings`（两项高 finding 未清零，见 `review/independent-review-summary.md`），仍无 Release 六组合重测。证据见 `logs/validation/m1-single-window-readonly/2026-11-09-cjk-04/cjk-linebreak/`；V-04 仍未整项通过。
+
 ## V-05 · 性能设备、测量和发布门禁
 
 按 V-01 顺序选择各发布平台代表设备，使用 Release 构建。准备 32/128 KiB、1/4 MiB 及巨型段落/表格、资源密集和错误输入夹具，分别记录冷/热缓存情况。
@@ -229,6 +235,12 @@ M0 编码基础证据（2026-10-31）：行尾边界金样已固定 CR-X-LF 删�
 
 **2026-11-09 M1 原样本字节观测：** 同轮 `readonly-bytes-02/` 由真实原生窗口逐个打开 BOM、混合行尾、孤立 CR、无尾换行和纯空白五个原始样本，实际滚动输入、像素命中尝试、Visual→Source→Visual、关闭；导出各样本的 opened/source-before/source-after/stored/disk-after 独立字节，磁盘与精确源码均相等，revision 前后 0、无开块/草稿/组合、undo/redo/历史均 0。五个原样本均未完成主动跳转，不能以这些观测关闭 7.3；纯空白点击接受的是空白映射回调，不表述为命中可见字形。用户明确不接受配对夹具替代，原样本和七步标准保持。`observations.json` 的 `all_required_observed: false`、记录器 exit 1 为正确结果，不转换成标准 results.json 的通过记录。
 
+**2026-11-09 CJK 断点修复复核轮（未通过）：** `logs/validation/m1-single-window-readonly/2026-11-09-cjk-02/cjk-linebreak/` 只复跑 1.1 / 2.1 的无依赖纯规则与合成度量金样，以及证据记录完整性正/负例；未做真实像素命中、新折行边界两侧点击或两视图往返，未编译或激活候选补丁（`未构建、未激活、未批准、未编译`）。接口裁决与精确来源准入待用户裁决，见该轮 `review/adjudication-questions.md`。原五个保真样本缺主动导航造成的 7.3 阻塞、M0 验收豁免与 W4/W5 的 M2 前置均保留；不改变 V-07 未整项通过状态，也不宣称 AC-09 通过。
+
+**2026-11-09 裁决落定（不改变 V-07 未通过状态）：** 接口裁决已按用户授权的最小公开面方案落定、spec delta 未改；来源准入结论为暂不批准、暂不允许 3.2 编译（见[决定 §29](./decisions.md#29-2026-11-09-按授权落定的接口裁决与来源准入结论)）。真实 CoreText 簇索引形态与 `LineWrapper` 按字符迭代的残余风险仍开放，需 3.2 真实 run 证据；这直接关系 M2 的 IME / 组合字符，不得当已解决。本轮仍无真实像素命中、两视图往返或原 Aline 映射/命中回归，未构建/激活 patched GPUI，不改变 V-07 未整项通过状态，也不宣称 AC-09 通过。
+
+**2026-11-09-cjk-04 隔离编译分项（不改变 V-07 未通过状态）：** 具体批准后仅在 logs 隔离副本编译 patched 核心，`cargo test -p aline-ui --lib` 111 passed / 1 ignored，确认统一像素命中链所依赖的原 Aline 映射/命中测试在该来源下仍通过；三入口回归 13/13（合成度量）。**未执行**真实像素点击、两视图往返、换宽/字体失效与源码锚点恢复，也未取得真实 CoreText 簇索引形态；typed 受限状态在最小公开面下外部不可读，需 5.1 真实 Window 证据。独立评审已完成（两份 `pass-with-findings`，高 finding 未清零）。见 `logs/validation/m1-single-window-readonly/2026-11-09-cjk-04/cjk-linebreak/3_2/` 与 `review/independent-review-request.md`；V-07 与 AC-09 仍不宣称通过。
+
 ## V-08 · 文件操作、临时图片与恢复事务
 
 **M0 身份/快照设计准备（2026-10-31，组 8）：** 已有文档/工作版本/快照来源/配置/请求采纳身份、冻结当前输入与已登记资源、组合期显式等待/自动保存延后及独立恢复读取的无头基础。`SnapshotId` 不是版本或内容哈希；宿主须在引用生效前完整登记资源，M0 保守保留而不精确追踪/回收。source create-only 集成用例只证明宿主可保留实际 `Written` 及既有目标拒绝分类，即使派生输入过期/块关闭也不能丢弃已发生写盘事实；它未消费到 DocCore 保存点或真实文件协调器。**未执行**：现有文件安全替换及 metadata 保全、版本竞争/权限/断电、多资源事务、真实手动/自动保存、10 秒恢复与恢复图片可读、另存为迁移/清理、真实平台组合等待、Windows/Linux/Intel Mac。M2 前身份/事务方案及最小安全闭环仍为独立出口，V-08 未通过。证据见[8.5 回填记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-8/step-8.5/report.md)。
@@ -276,6 +288,12 @@ M0 编码基础证据（2026-10-31）：行尾边界金样已固定 CR-X-LF 删�
 保留标签列表“全部关闭”下横线；V1 范围外入口隐藏，当前状态不可用置灰并说明。确认菜单/工具栏/快捷键名称、插件启停门控以及 PRD 默认值表一致。打字机、拼写检查和 PlantUML 无入口；自动换行和代码换行有真实行为。
 
 时点：M1 主窗口基准，M4～M5 完整交互基准，M6 跨平台验收。对应 APP-01～06、第 5.13 节、第 6 节、AC-15/19～20。
+
+**2026-11-09 CJK 断点修复复核轮（未通过）：** `logs/validation/m1-single-window-readonly/2026-11-09-cjk-02/cjk-linebreak/` 未产生新的六组合真实截图、窗口尺寸或视觉尺寸实测；W2 的 320/480/768 × Visual/Source 六组合仍是既有观测，不充当修复成绩，也不重测真实断点/行高。本轮候选本地来源**未构建、未激活、未批准、未编译**，接口裁决与精确来源准入待用户裁决（见该轮 `review/adjudication-questions.md`）。只 macOS arm64 为本轮范围；Windows 10 / Intel Mac / Linux、显示缩放与完整主题 / 字体矩阵仍未测，V-09 仍只按分项记录、不整项通过。
+
+**2026-11-09 裁决落定（不改变 V-09 未通过状态）：** 受限状态的用户可见提示（显示形态 / `t("key")` 键与插值 / 呈现位置 / 与 WC-01 降级汇总的关系 / 编辑态与只读态差异）按面向 M2 / M5 的考虑**另立后续 change 待裁决**，本 change 不接线，见[决定 §29](./decisions.md#29-2026-11-09-按授权落定的接口裁决与来源准入结论)。本轮未产生新的六组合截图、窗口尺寸或视觉尺寸实测，未重测真实断点/行高，未构建/激活 patched GPUI；不冻结合成斜体角度或平滑数值，V-09 仍只按分项记录、不整项通过。
+
+**2026-11-09-cjk-04 具体批准后的隔离编译（不改变 V-09 未通过状态）：** 用户具体批准只授权 logs 隔离副本的 3.2 编译，未授权 Release 六组合重测或真实窗口取证。本轮三入口回归按 `golden.md` 声明度量重放 320/480/768 宽度，但严格禁则断言只覆盖**受检纯 CJK 子集**（3 个纯中文文本 × 3 宽度 + 1 个禁则集为空样本），**不等于 `cases.tsv` 全量 22 用例禁则通过**；混排文本只做度量无关断言，且使用 `NoopTextSystem` / `ClusterTextSystem` 合成度量，不产生真实断点/行高/截图；第一次尝试用错度量（9.6px 统一前进量配 30px 宽）暴露的「禁则行尾 `《`」观察已如实保留在 `3_2/first-attempt.md`，未被写成通过。用户可见受限提示仍按裁决另立后续 change，本 change 不接线。V-09 仍只按分项记录、不整项通过。
 
 ## 结果记录
 

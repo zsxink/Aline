@@ -691,3 +691,125 @@ PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02
 本次只确定修复方向和准备范围，未批准具体 vendor diff、本地来源、额外特性或平台钩子；实际候选仍须完整身份/差异/依赖图审计和独立审查后取得精确准入。不得插入字符改变源码或另造绘制/命中几何，不默认接受无合法断点时的静默硬断、裁切或溢出；必要接口差异先明确裁决。未接受 M1 中文排版已知限制，也不冻结合成角度或平滑数值。
 
 本轮仅要求 macOS arm64 实测，不改 V1 三平台范围。原 M1 五个保真样本仍须逐个完整七步；用户明确保留缺少真实导航目标所造成的 7.3 阻塞，不以新增操作夹具或程序化定位替代。
+
+## 29. 2026-11-09 按授权落定的接口裁决与来源准入结论
+
+用户授权「裁决的部分按照你的建议来，最优的建议考虑的以后的功能迭代」。完整记录见
+`logs/validation/m1-single-window-readonly/2026-11-09-cjk-03/cjk-linebreak/decision/recommended-ruling.md`；
+已同步进 [`m1-cjk-linebreak-core-fix`](../openspec/changes/m1-cjk-linebreak-core-fix/design.md)
+的 design / proposal / tasks，并重跑 OpenSpec strict。
+
+**接口裁决（已落定）**：受限回退选 A1+A4 受检组合——有合法候选则在合法字形边界软折行；
+无合法候选不硬断报成功、不裁切、不丢字、不溢出，保留原文与可达入口并报告
+`NoLegalBreak`；单簇过宽则整簇移下一行并报告 `ClusterWiderThanLine`。明确不选「允许溢出」
+与「保留硬断」，两者与 spec delta 的 MUST NOT 冲突，自行放宽属硬边界禁止项。以可检查的
+类型化 `WrapLimit` 承载受限结果，**面向 M2 caret/IME、M3 表格/clamp、M4 双向/竖排、
+M5 多窗与锁定 GPUI 升级重打**取最小公开面：只新增 `#[non_exhaustive] WrapLimit` 与
+`TextLayout::wrap_limit() -> Option<WrapLimit>`（`Option` 区分「未测量/不可判定」与
+「已测量且无受限」，去掉 `unwrap_or_default()`）；`WrappedLineLayout.limit` 保持
+`pub(crate)`；拒绝 `Boundary.limit` 与 `truncate_wrapped_line` 公开三元组，改用私有函数 +
+二元组薄封装使既有调用点零改动；B6 Aline 用户可见提示接线本 change 不做，另立后续
+change 待裁决；B7 真实 CoreText 簇索引形态保持开放、需 3.2 真实 run 证据。
+**spec delta 未改、未放宽**；既有 requirement 与「不存在合法断点或字形超过宽度」Scenario
+已要求「有限时间内产生可检查的受限/失败结果并保留原文」。
+
+**来源准入（结论：暂不批准）**：不批准申请代 / `hashes.json` 代 / 磁盘代任何一代作为
+可编译身份，暂不允许 3.2 编译该候选。原因是三代 diff 与文件哈希漂移、磁盘代含需
+`test-support` 依赖的 `[[test]] cjk_wrap`、两处未登记隔离 `[patch]` 编译尝试、
+`make_hashes.py` 复跑配方失效、`candidate-summary.json` repo_state 与当前 HEAD 不一致；
+按「无法解释的冲突列入待确认并暂停依赖该决定的实现，不自行取舍」处理。收敛要求为
+单一自洽代（全部文件哈希 + 重算七场景指纹 + 移除测试目标 + 修复复跑配方 + repo_state
+重绑 HEAD）+ 独立评审 + **具体批准**；授权解决接口设计选择与准入方向，不等于对精确字节
+身份的具体批准，因此 3.2 的编译/激活授权仍缺一次具体裁决。范围仍限核心 `gpui-pre@0.3.9`
+本地补丁、Apache-2.0、五引擎隔离、七场景、最小例外；不扩整包 allowlist、三包 vendor、
+许可证泛化或 GPUI 升级，W1 的 `test-support` 隔离图许可不覆盖本变更。
+
+本轮未改生产 `Cargo.toml` / `Cargo.lock` / `scripts/*.json` 策略资产，未用 `[patch]` 或
+本地来源构建、未激活 patched GPUI、未启用 test-support、未重新生成候选代（避免第四代
+身份）、未新增平台诊断钩子、未取得真实 shaping/像素/命中证据、未勾需具体批准的任务
+（仍 2/12）、未提交/推送/归档/改 HEAD。保留 M0 验收豁免、M1 未过出口、7.3 阻塞、
+W4/W5 的 M2 前置与 V1 三平台范围；V-04/V-07/V-09 均未整项通过。
+
+## 30. 2026-11-09 单一自洽代的具体批准与 logs 隔离编译授权
+
+用户以「按 `decision/concrete-approval-gate.md` 的默认建议值给出具体批准，授权 3.2 在 logs
+隔离副本编译，生产清单/锁/策略资产零变更」给出 §29 所缺的**具体批准**。批准记录见
+`logs/validation/m1-single-window-readonly/2026-11-09-cjk-03/cjk-linebreak/decision/approval.json`
+（含实际生成的 `minimal_diff_sha256` 与全部 8 个 `patched_file_hashes`，不预先编造哈希）。
+
+**批准内容**：`identity_generation = single-regenerated-cohort`（以锁定归档
+`34f61c1c…` 为唯一锚、按 §29 最小公开面重新生成；不批准 A/B/C 任何一代）、
+`fingerprints_recomputed = true`（七场景 `gpui_subtree_sha256` 在受审工作树重算并全部匹配）、
+两处未登记编译尝试保留为历史且归一化为 `<tmp>` 占位符、明确**不作为编译证据/不重放**、
+`authorize_3_2_compile = true`、`approval_scope = logs-isolated-copy; production
+Cargo.toml/Cargo.lock/policy assets unchanged`。具体批准门 `check_approval_gate.py` 真实运行
+退出 0、合成自测 18/18 通过。
+
+**收敛与实测**：`single-regenerated-cohort` 的 `minimal.diff` 为 `aba1c841…`，
+公开面只有 `#[non_exhaustive] WrapLimit` 与 `TextLayout::wrap_limit() -> Option<WrapLimit>`；
+`WrappedLineLayout.limit` / `Boundary.limit` 为 `pub(crate)`，
+`truncate_wrapped_line` 保持公开二元组薄封装；候选移除 `[[test]] cjk_wrap` 与
+`tests/cjk_wrap.rs`，未启用 `test-support`。复跑配方修复后 `original/ + minimal.diff`
+逐字节回到 `patched/`，私有纯规则与 2.1 同源；身份守卫 13 项漂移反例全部被拒绝；
+现行 `scripts/check_engineering.py` 对候选 `[patch]` 图仍按
+`原生路径精确身份/来源/校验和漂移: gpui-pre@0.3.9` 失败关闭。logs 隔离副本内
+`cargo check -p aline-ui` 退出 0、三入口回归 13/13、原 `aline-ui` 映射/命中
+111 passed / 1 ignored。第一次尝试的两处真实失败（夹具 `include_bytes!` 相对路径、
+用错合成度量造成的禁则行尾 `《`）如实保留在
+`logs/validation/m1-single-window-readonly/2026-11-09-cjk-04/cjk-linebreak/3_2/first-attempt.md`，
+不写成通过。
+
+**边界与未决**：生产 `Cargo.toml` / `Cargo.lock` / `scripts/*.json` 策略资产、五引擎
+及 `specs/` 零变更；`[patch.crates-io]` 只写在 logs 副本清单，`policy-draft.json` 仍
+`applied: false`，**不构成生产来源准入**；未激活 patched GPUI 作为生产依赖、未启用
+test-support、未改 HEAD、未提交/推送/归档。三入口回归使用 `NoopTextSystem` /
+`ClusterTextSystem` 合成度量，不是真实 CoreText shaping / FontId / face / advance /
+像素 / 命中证据；`Some(NoLegalBreak)` / `Some(ClusterWiderThanLine)` 在最小公开面下
+只在 `pub(crate)` 层，外部 crate 不可读，需真实 Window（5.1）。**独立评审已执行并结算**：
+两个独立 `codex` worker（Orca `--worktree current`，Run `run_3a2103dfcda0`）分别出具
+`review/independent-review-patch.md` 与 `independent-review-layout.md`，verdict 均为
+`pass-with-findings`，汇总见 `review/independent-review-summary.md`。独立重算的归档 / diff /
+8 个文件哈希与批准值逐项一致，编译副本清单逐字节相同；公开面、候选最小性、守卫失败关闭、
+几何与真源、命中方边界均无 finding。**两项高 finding 未清零**：H1 typed 受限状态外部不可观测，
+三个入口的「真实受限结果」未证明；H2 tasks 3.2「接入精确策略资产」与批准「策略资产零变更」
+冲突，生产来源准入未发生。另有一项中 finding（真实 CoreText 簇形态 / `ultra-wide` 超宽簇
+未验证）与三项低 finding（严格禁则只覆盖纯 CJK 子集、状态文字需回填、首次失败日志同名
+覆盖不能当独立原始日志；表述已收紧）。两份评审均不支持勾选 1.2、3.1 整项、3.2 整项或
+任何 5.x，仅支持子项完成记录，故 3.1 仍不勾选。3.2 在独立评审完成前按用户具体批准先行，
+该顺序偏离经两份评审判定为用户授权下的隔离试编、可接受但不构成 3.1 先行完成，已在
+`logs/validation/m1-single-window-readonly/2026-11-09-cjk-04/cjk-linebreak/review/dispatch-record.md`
+记录；A 要求任何生产策略接入前另有独立评审后的准入门禁 / 专门裁决。B6 用户可见提示仍另立
+后续 change；B7 真实 CoreText 簇索引形态仍开放；
+4.1/4.2 的平台诊断钩子仍停在最小接口与准入审阅阶段。
+
+保留 M0 验收豁免、M1 未过出口、原五样本主动导航缺失造成的 7.3 阻塞、W4/W5 的 M2
+前置与 V1 三平台范围；本轮只要求 macOS arm64 实测。V-04/V-07/V-09 均未整项通过，
+不得跳过 3.2 的真实编译/测试直接勾 5.x；任务仍 2/12。
+
+## 31. 2026-11-09 H1 裁决：方案 A + R1
+
+用户「按照你的推荐来」，落定独立评审高 finding H1 的处置为**方案 A + R1**（完整记录见
+`logs/validation/m1-single-window-readonly/2026-11-09-cjk-04/cjk-linebreak/decision/h1-ruling.md`）。
+**方案 A**：保持 §29 最小公开面与已批准的 `minimal.diff` / 8 文件哈希**不变**，
+用一个受限 opt-in 钩子在真实 Window 的 prepaint 之后读取已有的公开
+`TextLayout::wrap_limit()`，与 4.1/4.2 的 FontRunProbe 合并为同一钩子 / 同一次准入审阅。
+决定性依据：`crates/aline-ui/src/native_window/readonly_hit.rs` 的 `PreparedLayout` 已持有
+`TextLayout`，`StyledText::layout()` 公开且在 `readonly_reader.rs` 4 处使用；H1 缺的是
+一次真实窗口实测，不是缺接口。方案 B（新增公开 accessor）会改变全部字节身份并与 B3
+及两份评审相悖；方案 C（crate 内 `#[cfg(test)]`）因禁止 `test-support` 不可行；
+方案 D 需放宽 spec delta。**R1**：`wrap_line` 的 typed 状态只在 crate 内
+`pub(crate) Boundary.limit` 可检查，且该入口不在 Aline 产品渲染路径，登记为产品公开面
+的已知边界，不改任何东西。**spec delta 未改、未放宽。**
+
+本轮只在 logs 隔离副本实施：纯记录规则 23/23、opt-in 钩子在 patched GPUI 上
+`cargo check` 0 告警、运行验证 8/8、准入守卫 13 项漂移反例全部拒绝；
+`check_cohort.py` 复核已批准字节身份逐字节一致；生产 `Cargo.toml` / `Cargo.lock` /
+策略资产 / `crates` / `app` / `specs` 零变更，未启用 `test-support`，未改 HEAD。
+**H1 未清零**：`TextLayout::default()` 只证明「未测量 = None」，
+`Some(NoLegalBreak)` / `Some(ClusterWiderThanLine)` 的真实 macOS arm64 窗口记录未取得，
+属 5.1 首次授权范围；钩子尚未接线到 prepaint 回调与窗口关闭后的后台 flush，
+新增钩子的独立复审仍待执行。H2、B6、M1 与 5.1 仍待裁决 / 授权。
+
+任务仍 2/12；1.2 / 2.2 / 3.1 / 3.2 / 3.3 / 4.1 / 4.2 / 5.1 / 5.2 / 5.3 全部未勾选，
+不得跳过 3.2 的真实编译/测试直接勾 5.x。V-04/V-07/V-09 未整项通过；M0 验收豁免、
+M1 未过出口、7.3 阻塞、W4/W5 的 M2 前置与 V1 三平台范围继续保留。
