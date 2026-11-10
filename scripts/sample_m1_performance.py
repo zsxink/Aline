@@ -310,8 +310,24 @@ def _kill_pid(pid):
         return
     try:
         os.kill(pid, signal.SIGKILL)
-    except ProcessLookupError:
+    except (ProcessLookupError, PermissionError):
+        # 目标已退出时 macOS 可能返回 EPERM；清理失败不得掩盖原始错误。
         pass
+
+
+def _kill_process_group(process):
+    """终止子进程组并等待回收；清理失败不得掩盖调用方的原始错误。
+
+    进程组 leader 已退出但未被 wait 时，macOS 对 killpg 返回 EPERM；
+    该错误必须在此收敛，否则会顶替掉真正的失败原因。
+    """
+    if process is None or process.poll() is not None:
+        return
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        pass
+    process.wait()
 
 
 def _release_gate(directory, app_pid, trace_argv, marker_timeout=20,
@@ -334,12 +350,7 @@ def _release_gate(directory, app_pid, trace_argv, marker_timeout=20,
         write_text(directory / 'gate', str(time.time_ns()))
         return process
     except BaseException:
-        if process.poll() is None:
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            process.wait()
+        _kill_process_group(process)
         raise
     finally:
         stdout.close()
@@ -397,12 +408,7 @@ def sampled(directory, args, app, app_hash, display_tool):
         trace_process.communicate(timeout=TRACE_TIME_LIMIT + 90)
     except BaseException:
         _kill_pid(app_pid)
-        if trace_process is not None and trace_process.poll() is None:
-            try:
-                os.killpg(trace_process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            trace_process.wait()
+        _kill_process_group(trace_process)
         if worker_process.poll() is None:
             worker_process.kill()
             worker_process.wait()
@@ -743,6 +749,96 @@ def self_test(output):
     else:
         raise AssertionError('错误 trace pid 不得释放 gate')
     check('错误 trace pid 不得释放 gate', not (failed_gate / 'gate').exists())
+    # 进程组已消失时 macOS 对 killpg 返回 EPERM；清理失败不得掩盖原始错误。
+    eperm_dir = output / 'gate-killpg-eperm'
+    eperm_dir.mkdir()
+    eperm_marker = eperm_dir / 'trace.recording.json'
+    # helper 写完 marker 后保持存活，确保进入清理分支。
+    eperm_trace = [sys.executable, '-c',
+                    "import json, sys, time\nfrom pathlib import Path\n"
+                    "Path(sys.argv[1]).write_text(json.dumps({'schema': "
+                    "'aline-m1-trace-recording/v1','pid':9999,'epoch_ns':0}))\n"
+                    "time.sleep(30)\n",
+                    str(eperm_marker)]
+    real_killpg = os.killpg
+    killpg_calls = []
+
+    def deny_killpg(pid, sig):
+        """模拟 macOS：进程组已消失时 killpg 返回 EPERM。
+
+        先真的终止进程组以复现“组已消失”的前提，再抛 EPERM；
+        否则 wait() 会挂住，测试既慢又测不到清理分支。
+        """
+        killpg_calls.append(pid)
+        real_killpg(pid, sig)
+        raise PermissionError(1, 'Operation not permitted')
+
+    os.killpg = deny_killpg
+    try:
+        _release_gate(eperm_dir, 4242, eperm_trace, marker_timeout=2, settle_ns=0)
+    except ValueError as error:
+        check('killpg 权限错误不掩盖原始 marker 错误',
+              'marker' in str(error))
+    except BaseException as error:
+        raise AssertionError('killpg 权限错误掩盖了原始 marker 错误: '
+                             + type(error).__name__ + ': ' + str(error))
+    else:
+        raise AssertionError('killpg 权限错误时不得释放 gate')
+    finally:
+        os.killpg = real_killpg
+    check('killpg 权限错误时仍尝试清理进程组', len(killpg_calls) == 1)
+    check('killpg 权限错误时不释放 gate', not (eperm_dir / 'gate').exists())
+    # 单进程 kill 同理：权限错误不得让清理失败掩盖原始错误。
+    real_kill = os.kill
+
+    def deny_kill(pid, sig):
+        raise PermissionError(1, 'Operation not permitted')
+
+    os.kill = deny_kill
+    try:
+        _kill_pid(4242)
+    except BaseException as error:
+        raise AssertionError('kill 权限错误未在清理阶段收敛: '
+                             + type(error).__name__ + ': ' + str(error))
+    else:
+        check('kill 权限错误在清理阶段收敛', True)
+    finally:
+        os.kill = real_kill
+    _kill_pid(0)
+    check('kill 忽略非法 pid', True)
+    # 进程组清理共用辅助：权限错误必须在此收敛。
+    group_dir = output / 'group-eperm'
+    group_dir.mkdir()
+    group_marker = group_dir / 'trace.recording.json'
+    group_trace = [sys.executable, '-c',
+                   "import json, sys, time\nfrom pathlib import Path\n"
+                   "Path(sys.argv[1]).write_text(json.dumps({'schema': "
+                   "'aline-m1-trace-recording/v1','pid':9999,'epoch_ns':0}))\n"
+                   "time.sleep(30)\n",
+                   str(group_marker)]
+    group_process = subprocess.Popen(group_trace, cwd=ROOT, start_new_session=True)
+    group_calls = []
+
+    def deny_group_killpg(pid, sig):
+        group_calls.append(pid)
+        real_killpg(pid, sig)
+        raise PermissionError(1, 'Operation not permitted')
+
+    os.killpg = deny_group_killpg
+    try:
+        _kill_process_group(group_process)
+    except BaseException as error:
+        raise AssertionError('进程组清理未收敛权限错误: '
+                             + type(error).__name__ + ': ' + str(error))
+    else:
+        check('进程组清理收敛权限错误', True)
+    finally:
+        os.killpg = real_killpg
+        if group_process.poll() is None:
+            group_process.kill()
+            group_process.wait()
+    check('进程组清理确实走到 killpg', len(group_calls) == 1)
+    check('进程组清理后子进程已回收', group_process.poll() is not None)
     ready_dir = output / 'gate-ready-format'
     ready_dir.mkdir()
     ready_file = ready_dir / 'gate.ready'
