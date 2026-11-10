@@ -1266,6 +1266,18 @@ def _repro_command(args, output):
     return " ".join(parts)
 
 
+def case_kind(name):
+    """用例名以否定措辞结尾即“必须拒绝”的反例；记录为结构化 kind 供覆盖矩阵核对。
+
+    约定只覆盖自测用例名，不参与任何验收判定；正例名不得使用这些结尾。
+    """
+    if name.endswith("被拒绝") or name.endswith("拒绝"):
+        return "reject"
+    if "不得通过" in name or "不得计为通过" in name:
+        return "reject"
+    return "accept"
+
+
 class SelfTest:
     """自测记录：每个用例单独留证，失败不影响其他用例继续执行。"""
 
@@ -1276,9 +1288,9 @@ class SelfTest:
     def check(self, name, function):
         try:
             function()
-            self.cases.append({"case": name, "passed": True})
+            self.cases.append({"case": name, "kind": case_kind(name), "passed": True})
         except Exception as error:  # 自测需要收集所有失败，不中断后续用例
-            self.cases.append({"case": name, "passed": False,
+            self.cases.append({"case": name, "kind": case_kind(name), "passed": False,
                                "error": type(error).__name__ + ": " + str(error)})
 
     def expect(self, condition, message):
@@ -1291,6 +1303,9 @@ class SelfTest:
             "passed": passed,
             "generated_utc": _utc_now(),
             "cases": self.cases,
+            "reject_cases": sorted(case["case"] for case in self.cases
+                                   if case["kind"] == "reject"),
+            "synthetic_contract_test_only": True,
         })
         print("self-test: " + ("通过" if passed else "未通过"))
         for case in self.cases:

@@ -40,6 +40,9 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 
+from evidence_paths import write_json
+from validation_output import output_directory, require_validation_path
+
 TRACE_SCHEMA = "aline-m1-trace-metrics/v1"
 TRACE_UNCERTAINTY_NS = 1_000_000
 MAIN_IDENT = re.compile(r"^r\d+_i\d+$")
@@ -644,11 +647,23 @@ def main():
     parser.add_argument("--runloop", type=Path)
     parser.add_argument("--expected", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--output-dir", type=Path,
+                        help="自测/运行证据目录；必须位于仓库 logs/validation 内")
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
+    # 落点校验先于其它参数校验与任何证据读取：坏 --output-dir 必须在建目录前 exit 1。
+    evidence = None
+    try:
+        if args.output_dir is not None:
+            evidence = output_directory("m1-trace-metrics", args.output_dir)
+        elif args.self_test:
+            # 未显式给目录时仍按统一规则新建 run-* 证据目录。
+            evidence = output_directory("m1-trace-metrics", None)
+    except ValueError as error:
+        print("trace-metrics: " + str(error), file=sys.stderr)
+        return 1
     if args.self_test:
-        self_test()
-        return 0
+        return self_test(evidence)
     try:
         for field in ("raw", "toc", "assignment", "request", "display", "runloop",
                       "expected", "output"):
@@ -778,41 +793,63 @@ def _synthetic():
     return raw, toc, tables, expected
 
 
-def self_test():
-    raw, toc, tables, expected = _synthetic()
-    metrics = derive(raw, toc, tables, expected)
-    fp = metrics["first_present"]
-    assert fp["epoch_ns"] - fp["started_epoch_ns"] == fp["duration_ns"]
-    assert fp["content_frame"]["frame_number"] == 4
-    assert fp["content_frame"]["surface_id"] == 1032
-    assert fp["content_frame"]["display_start_trace_ns"] - \
-        fp["content_frame"]["commit_trace_ns"] == \
-        fp["content_frame"]["cpu_to_display_latency_ns"]
-    assert fp["content_frame"]["primary"] is True
-    assert fp["content_frame"]["primary_commit_trace_ns"] == \
-        fp["content_frame"]["commit_trace_ns"]
-    stall = metrics["main_thread_stall"]
-    assert stall["interval_identifier"] == "r18_i1"
-    assert stall["longest_busy_ns"] == 4_456_000
-    assert stall["waiting_ns"] == 1_062_000
-    assert stall["duration_ns"] == stall["longest_busy_ns"]
+def self_test(output=None):
+    """合成 trace 夹具验证推导契约；不是真实录制证据。"""
+    cases = []
+
+    def record(name, kind, function):
+        """按用例留证：kind 区分必须接受的正例与必须拒绝的反例。"""
+        try:
+            function()
+        except Exception as error:  # 自测收集全部失败，不中断后续用例
+            cases.append({"name": name, "kind": kind, "passed": False,
+                          "error": type(error).__name__ + ": " + str(error)})
+        else:
+            cases.append({"name": name, "kind": kind, "passed": True})
+
+    def baseline():
+        raw, toc, tables, expected = _synthetic()
+        metrics = derive(raw, toc, tables, expected)
+        fp = metrics["first_present"]
+        assert fp["epoch_ns"] - fp["started_epoch_ns"] == fp["duration_ns"]
+        assert fp["content_frame"]["frame_number"] == 4
+        assert fp["content_frame"]["surface_id"] == 1032
+        assert fp["content_frame"]["display_start_trace_ns"] - \
+            fp["content_frame"]["commit_trace_ns"] == \
+            fp["content_frame"]["cpu_to_display_latency_ns"]
+        assert fp["content_frame"]["primary"] is True
+        assert fp["content_frame"]["primary_commit_trace_ns"] == \
+            fp["content_frame"]["commit_trace_ns"]
+        stall = metrics["main_thread_stall"]
+        assert stall["interval_identifier"] == "r18_i1"
+        assert stall["longest_busy_ns"] == 4_456_000
+        assert stall["waiting_ns"] == 1_062_000
+        assert stall["duration_ns"] == stall["longest_busy_ns"]
+
+    record("显示链与最长忙碌段基线", "accept", baseline)
 
     def expect_fail(label, mutate):
-        raw2, toc2, tables2, expected2 = _synthetic()
-        mutate(raw2, toc2, tables2, expected2)
-        try:
-            derive(raw2, toc2, tables2, expected2)
-        except (ValueError, KeyError):
-            return
-        raise AssertionError(label + " accepted")
+        def check():
+            raw, toc, tables, expected = _synthetic()
+            mutate(raw, toc, tables, expected)
+            try:
+                derive(raw, toc, tables, expected)
+            except (ValueError, KeyError):
+                return
+            raise AssertionError(label + " accepted")
+
+        record(label, "reject", check)
 
     def expect_ok(label, mutate):
-        raw2, toc2, tables2, expected2 = _synthetic()
-        mutate(raw2, toc2, tables2, expected2)
-        try:
-            derive(raw2, toc2, tables2, expected2)
-        except (ValueError, KeyError) as error:
-            raise AssertionError(label + " rejected: " + str(error))
+        def check():
+            raw, toc, tables, expected = _synthetic()
+            mutate(raw, toc, tables, expected)
+            try:
+                derive(raw, toc, tables, expected)
+            except (ValueError, KeyError) as error:
+                raise AssertionError(label + " rejected: " + str(error))
+
+        record(label, "accept", check)
 
     expect_fail("missing gate", lambda r, t, tb, e: r.pop(1))
     expect_fail("trace starts after gate",
@@ -831,7 +868,7 @@ def self_test():
                     tb["request"][1].update(timestamp=_v("1165558000")),
                     tb["display"][1].update(
                         **{"cpu-to-display-latency": _v("27908333")})))
-    expect_fail("display missing",
+    expect_fail("pseudo present without display evidence",
                 lambda r, t, tb, e: tb["display"].pop(1))
     expect_fail("display frame mismatch",
                 lambda r, t, tb, e: tb["display"][1].update(
@@ -903,35 +940,58 @@ def self_test():
                 lambda r, t, tb, e: r.pop(9))
     expect_fail("wrong sample id",
                 lambda r, t, tb, e: e.update(sample_id=1))
-    # XML 解析正例：schema 顺序 + ref 解析 + sentinel 占位。
-    import tempfile
-    with tempfile.TemporaryDirectory() as directory:
-        path = Path(directory) / "table.xml"
-        path.write_text(
-            '<trace-query-result><node><schema name="x">'
-            '<col><mnemonic>timestamp</mnemonic></col>'
-            '<col><mnemonic>flag</mnemonic></col>'
-            '<col><mnemonic>pid</mnemonic></col>'
-            '</schema><row><start-time id="1" fmt="00:00.001.000">1000</start-time>'
-            '<boolean id="2" fmt="Yes">1</boolean><sentinel /></row>'
-            '<row><start-time ref="1" /><boolean ref="2" />'
-            '<uint64 id="3" fmt="7">7</uint64></row>'
-            '</node></trace-query-result>', encoding="utf-8")
-        table = parse_table(path)
-        assert table["columns"] == ["timestamp", "flag", "pid"]
-        assert table["rows"][0]["timestamp"]["raw"] == "1000"
-        assert table["rows"][0]["flag"]["fmt"] == "Yes"
-        assert table["rows"][0]["pid"]["raw"] == ""
-        assert table["rows"][1]["timestamp"]["raw"] == "1000"
-        assert table["rows"][1]["pid"]["raw"] == "7"
-        path.write_text("<broken>", encoding="utf-8")
-        try:
-            parse_table(path)
-        except ValueError:
-            pass
-        else:
-            raise AssertionError("broken XML accepted")
-    print("trace-metrics self-test: 通过")
+
+    def xml_parsing():
+        # XML 解析正例：schema 顺序 + ref 解析 + sentinel 占位。
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "table.xml"
+            path.write_text(
+                '<trace-query-result><node><schema name="x">'
+                '<col><mnemonic>timestamp</mnemonic></col>'
+                '<col><mnemonic>flag</mnemonic></col>'
+                '<col><mnemonic>pid</mnemonic></col>'
+                '</schema><row><start-time id="1" fmt="00:00.001.000">1000</start-time>'
+                '<boolean id="2" fmt="Yes">1</boolean><sentinel /></row>'
+                '<row><start-time ref="1" /><boolean ref="2" />'
+                '<uint64 id="3" fmt="7">7</uint64></row>'
+                '</node></trace-query-result>', encoding="utf-8")
+            table = parse_table(path)
+            assert table["columns"] == ["timestamp", "flag", "pid"]
+            assert table["rows"][0]["timestamp"]["raw"] == "1000"
+            assert table["rows"][0]["flag"]["fmt"] == "Yes"
+            assert table["rows"][0]["pid"]["raw"] == ""
+            assert table["rows"][1]["timestamp"]["raw"] == "1000"
+            assert table["rows"][1]["pid"]["raw"] == "7"
+            path.write_text("<broken>", encoding="utf-8")
+            try:
+                parse_table(path)
+            except ValueError:
+                pass
+            else:
+                raise AssertionError("broken XML accepted")
+
+    record("XML 表解析（schema 顺序/ref 展开/sentinel）", "accept", xml_parsing)
+
+    passed = all(case["passed"] for case in cases)
+    if output is not None:
+        write_json(Path(output) / "summary.json", {
+            "passed": passed,
+            "cases": cases,
+            "blind_spots": [
+                "合成 trace 夹具只证明推导契约；不是真实 xctrace 录制，也不是性能成绩",
+                "xctrace 录制/导出失败只在真实矩阵期间 fail-closed，本自测不覆盖真实设备",
+                "TOC 起始时间仅毫秒精度，1 ms 单向不确定度只影响窗口包含判断",
+                "结果不外推到 Windows/Linux 或其它 GPU，也不改任何验收口径",
+                "锁屏/显示器睡眠等环境前置属采样器与 display-state 工具，不在本脚本范围",
+            ],
+            "synthetic_contract_test_only": True,
+        })
+    failed = [case for case in cases if not case["passed"]]
+    print("trace-metrics self-test: %d/%d 通过" % (len(cases) - len(failed), len(cases)))
+    for case in failed:
+        print("  - " + case["name"] + ": " + case.get("error", ""))
+    return 0 if passed else 1
 
 
 if __name__ == "__main__":

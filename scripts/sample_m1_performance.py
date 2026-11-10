@@ -653,8 +653,15 @@ def run(args, output):
 def self_test(output):
     """仅验证runner契约；合成子进程不是原生窗口或性能验收证据。"""
     checks = []
+
+    def case_kind(name):
+        """否定措辞的用例名即“必须拒绝”的反例；只用于自测证据，不参与验收判定。"""
+        if "失败关闭" in name or "被拒绝" in name or "不得" in name or "拒绝越界" in name:
+            return "reject"
+        return "accept"
+
     def check(name, condition):
-        checks.append({"name": name, "passed": bool(condition)})
+        checks.append({"name": name, "kind": case_kind(name), "passed": bool(condition)})
         if not condition:
             raise AssertionError(name)
     for size in range(1, 20):
@@ -899,7 +906,9 @@ def self_test(output):
             raise AssertionError('非前台或无在屏窗口不得通过: ' + field)
     check('非前台或无在屏窗口失败关闭', True)
     write_json(output / 'summary.json', {'passed': all(item['passed'] for item in checks),
-                                        'synthetic_contract_test_only': True, 'checks': checks})
+                                        'synthetic_contract_test_only': True, 'checks': checks,
+                                        'reject_cases': sorted(item['name'] for item in checks
+                                                               if item['kind'] == 'reject')})
     print('self-test: ' + str(len(checks)) + ' passed')
     return 0
 

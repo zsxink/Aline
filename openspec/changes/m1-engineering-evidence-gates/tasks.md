@@ -10,6 +10,8 @@
 
 W1 runner 稳定后，同一入口再接 `run_w1_offscreen.py --self-test`，并为普通/自测入口补输出越界反例；局部自测 18 项、输出目录自测 12 项通过，证据在 `logs/validation/m1-single-window-readonly/2026-11-08-finish-01/w7/w1-entry/`。此接线不执行真实离屏构建，不把候选锁或准入配置接入生产图，真实能力结论仍由 W1 负责。
 
+2026-11-10 补充接线：M1 7.1 的三个 external-trace 入口 `m1_trace_metrics.py`、`m1_trace_record.py`、`m1_rederive_performance.py` 的 `--self-test` 已接入同一顺序清单（label `m1-trace-metrics-self-test` / `m1-trace-record-self-test` / `m1-rederive-performance-self-test`，仍单条失败不短路）；输出路径拒绝矩阵同时覆盖三者的普通与自测入口。守卫新增 10 项违规覆盖矩阵（伪 present、缺 present request、display 早于 commit、锁屏/显示器睡眠、run_id/app_sha256/pid 身份漂移、重推跨来源身份不一致、补采编号重复、输出目录越界），要求每项的反例与正例都在对应脚本的结构化自测记录里被标成 reject/accept 并通过，另以桩记录自证矩阵会拒绝缺项与伪造记录；输出路径自测 14 项、workspace 33 项通过。证据 `logs/validation/m1-single-window-readonly/2026-11-10-71-closeout-01/`。该接线只证明校验与拒绝机制，不是性能或 GUI 操作证据；2.2 仍缺真实初窗失败路径，本轮未倒填。
+
 ## 2. 本地化与失败可见
 
 关联 QMD W7、AGENTS 铁律 7、S-7/11；不改变引擎 panic 规则。

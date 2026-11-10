@@ -26,6 +26,8 @@ import collect_m1_readonly
 import m1_trace_metrics
 from m1_trace_record import TABLES
 from run_m1_readonly import CONDITIONS, MIN_SAMPLES, STAGES, TEMPERATURES
+from evidence_paths import normalize_record
+from validation_output import require_validation_path
 
 REQUIRED_FILES = ("raw.tsv", "done", "metadata.json", "spec.txt")
 TRACE_TABLES = tuple(TABLES)
@@ -43,9 +45,11 @@ def sha256(path):
 
 
 def write_json(path, value):
+    """写证据 JSON 前统一规范化，避免 samples-sources.json 等记录本机绝对路径。"""
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    Path(path).write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n",
-                          encoding="utf-8")
+    Path(path).write_text(
+        json.dumps(normalize_record(value), ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8")
 
 
 def read_json(path):
@@ -326,8 +330,9 @@ def build_refill_plan(output, report, source_dirs=()):
 def self_test(output):
     checks = []
 
-    def check(name, condition):
-        checks.append({"name": name, "passed": bool(condition)})
+    def check(name, condition, kind="accept"):
+        """按用例留证：kind 区分必须接受的正例与必须拒绝的反例。"""
+        checks.append({"name": name, "kind": kind, "passed": bool(condition)})
         if not condition:
             raise AssertionError(name)
 
@@ -384,7 +389,8 @@ def self_test(output):
     (broken / "raw.tsv").write_text("x", encoding="utf-8")
     state = rederive_case(broken, True, stub_tools())
     check("缺失证据拒绝且不写入",
-          state["status"] == "unavailable" and not (broken / "measurements.jsonl").exists())
+          state["status"] == "unavailable" and not (broken / "measurements.jsonl").exists(),
+          kind="reject")
 
     failing = root / "c0-cold-02"
     (failing / "memory").mkdir(parents=True, exist_ok=True)
@@ -402,7 +408,7 @@ def self_test(output):
     state = rederive_case(failing, True, stub_tools(fail_derive=True))
     check("推导失败被记录且不落盘",
           state["status"] == "failed" and state.get("error") == "合成推导失败"
-          and not (failing / "measurements.jsonl").exists())
+          and not (failing / "measurements.jsonl").exists(), kind="reject")
 
     export_bad = root / "c0-cold-03"
     (export_bad / "memory").mkdir(parents=True, exist_ok=True)
@@ -414,7 +420,8 @@ def self_test(output):
         write_json(export_bad / "trace" / (name + ".command.json"),
                    {"exit_code": 0 if name != "display" else 1})
     check("导出命令失败即不可用",
-          rederive_case(export_bad, False, stub_tools())["status"] == "unavailable")
+          rederive_case(export_bad, False, stub_tools())["status"] == "unavailable",
+          kind="reject")
 
     matrix = root / "matrix"
     matrix.mkdir(exist_ok=True)
@@ -480,18 +487,41 @@ def self_test(output):
         {"case": "c0-hot-21", "collected": True}]})
     try:
         rebuild_samples(matrix, report, source_dirs=[bad_source])
-        check("跨来源应用身份不一致被拒绝", False)
+        check("跨来源应用身份不一致被拒绝", False, kind="reject")
     except ValueError:
-        check("跨来源应用身份不一致被拒绝", True)
+        check("跨来源应用身份不一致被拒绝", True, kind="reject")
+
+    def drifted_rows(field, value, case="c0-hot-22", sample_id=22):
+        return (json.dumps({"kind": "run", "case": case,
+                            **{**identity, field: value}}) + "\n"
+                + json.dumps({"kind": "sample", "stage": "first_present",
+                              "case": case, "condition": "32KiB",
+                              "temperature": "cold", "sample_id": sample_id}) + "\n")
+
+    for field, value, label in (
+            ("run_id", "other-run", "跨来源 run_id 不一致被拒绝"),
+            ("commit", "d" * 40, "跨来源 commit 不一致被拒绝")):
+        drift = root / ("drift-" + field)
+        (drift / "c0-hot-22").mkdir(parents=True, exist_ok=True)
+        (drift / "c0-hot-22" / "measurements.jsonl").write_text(
+            drifted_rows(field, value), encoding="utf-8")
+        write_json(drift / "progress.json", {"runs": [
+            {"case": "c0-hot-22", "collected": True}]})
+        try:
+            rebuild_samples(matrix, report, source_dirs=[drift])
+            check(label, False, kind="reject")
+        except ValueError:
+            check(label, True, kind="reject")
+
     bad_matrix = root / "bad-matrix"
     bad_matrix.mkdir(exist_ok=True)
     write_json(bad_matrix / "progress.json", {"runs": [
         {"case": "c0-cold-00", "collected": True}]})
     try:
         rebuild_samples(bad_matrix, {"recovered": []})
-        check("缺 measurements 的重建被拒绝", False)
+        check("缺 measurements 的重建被拒绝", False, kind="reject")
     except ValueError:
-        check("缺 measurements 的重建被拒绝", True)
+        check("缺 measurements 的重建被拒绝", True, kind="reject")
     plan_matrix = root / "plan-matrix"
     plan_matrix.mkdir(exist_ok=True)
     runs = []
@@ -514,9 +544,9 @@ def self_test(output):
     write_json(plan_matrix / "progress.json", {"runs": runs[:-1]})
     try:
         build_refill_plan(plan_matrix, {"recovered": []})
-        check("未跑满矩阵拒绝生成补采计划", False)
+        check("未跑满矩阵拒绝生成补采计划", False, kind="reject")
     except ValueError:
-        check("未跑满矩阵拒绝生成补采计划", True)
+        check("未跑满矩阵拒绝生成补采计划", True, kind="reject")
     plan_matrix2 = root / "plan-matrix2"
     plan_matrix2.mkdir(exist_ok=True)
     runs2 = []
@@ -567,12 +597,29 @@ def self_test(output):
     try:
         build_refill_plan(plan_matrix2, {"recovered": []},
                           source_dirs=[source_plan])
-        check("跨来源重复采样编号被拒绝", False)
+        check("跨来源重复采样编号被拒绝", False, kind="reject")
     except ValueError:
-        check("跨来源重复采样编号被拒绝", True)
+        check("跨来源重复采样编号被拒绝", True, kind="reject")
     write_json(output / "rederive-self-test.json", {"checks": checks})
-    print("rederive self-test: 通过（%d 项）" % len(checks))
-    return 0
+    passed = all(item["passed"] for item in checks)
+    Path(output).mkdir(parents=True, exist_ok=True)
+    write_json(Path(output) / "summary.json", {
+        "passed": passed,
+        "cases": checks,
+        "blind_spots": [
+            "合成 trace/measurements 夹具只证明重推与合并契约，不是真实录制或性能成绩",
+            "真实矩阵的补采来源合并只在矩阵跑满后执行，本自测不覆盖真实时序",
+            "跨来源身份比较按 run_id/commit/app_sha256/build_profile/environment，"
+            "不校验采样器内部的 trace 表语义",
+            "重推不填补缺失值，也不改 runner 的验收判定与门槛",
+        ],
+        "synthetic_contract_test_only": True,
+    })
+    failed = [item for item in checks if not item["passed"]]
+    print("rederive self-test: %d/%d 通过" % (len(checks) - len(failed), len(checks)))
+    for item in failed:
+        print("  - " + item["name"])
+    return 0 if passed else 1
 
 
 def main():
@@ -592,6 +639,17 @@ def main():
                         help="矩阵跑满后写出成功样本不足组的补采计划 JSON")
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
+    # 落点校验先于其它参数校验与任何证据读取：越界必须在读 progress.json 前 exit 1。
+    # 矩阵目录必须已存在，故只校验不创建。
+    try:
+        require_validation_path(args.output_dir)
+        for source in args.source_dir:
+            require_validation_path(source)
+        if args.write_refill_plan is not None:
+            require_validation_path(args.write_refill_plan)
+    except ValueError as error:
+        print("rederive: " + str(error), file=sys.stderr)
+        return 1
     if args.self_test:
         return self_test(args.output_dir)
     output = args.output_dir

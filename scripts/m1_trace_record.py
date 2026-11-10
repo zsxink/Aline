@@ -17,6 +17,9 @@ import subprocess
 import sys
 import time
 
+from evidence_paths import write_json as _write_json
+from validation_output import output_directory, require_validation_path
+
 MARKER = "Starting recording"
 TABLES = {
     "assignment": "metal-command-buffer-frame-assignment",
@@ -45,9 +48,9 @@ def sha256(path):
 
 
 def write_json(path, value):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n",
-                    encoding="utf-8")
+    """写证据 JSON：先建父目录，再交给 evidence_paths 规范化，不记录本机绝对路径。"""
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    _write_json(path, value)
 
 
 def _contains(path, text):
@@ -125,10 +128,28 @@ def export_trace(trace, out_dir):
     return paths
 
 
-def self_test():
+def self_test(output=None):
+    """合成子进程验证录制/导出契约；不启动应用，也不声称取得真实 trace。"""
     import tempfile
-    with tempfile.TemporaryDirectory() as directory:
-        root = Path(directory)
+
+    cases = []
+
+    def record_case(name, kind, function):
+        """按用例留证：kind 区分必须接受的正例与必须拒绝的反例。"""
+        try:
+            function()
+        except Exception as error:  # 自测收集全部失败，不中断后续用例
+            cases.append({"name": name, "kind": kind, "passed": False,
+                          "error": type(error).__name__ + ": " + str(error)})
+        else:
+            cases.append({"name": name, "kind": kind, "passed": True})
+
+    def scratch():
+        directory = tempfile.mkdtemp()
+        return Path(directory)
+
+    def recording_success():
+        root = scratch()
         marker, done = root / "marker", root / "done.json"
         stdout, stderr = root / "stdout", root / "stderr"
         fake = [sys.executable, "-c",
@@ -139,13 +160,22 @@ def self_test():
         payload = json.loads(done.read_text())
         assert payload["recording_started"] is True and payload["exit_code"] == 0
         assert payload["stdout_sha256"] == sha256(stdout)
+
+    def recording_without_marker():
+        root = scratch()
+        marker, done = root / "marker", root / "done.json"
+        stdout, stderr = root / "stdout", root / "stderr"
         # 没有 recording 标记的进程即使 exit 0 也不得算成功。
-        marker.unlink()
         silent = [sys.executable, "-c", "print('nothing')"]
         assert record(1, root / "trace", 4, marker, done, stdout, stderr,
                       command=silent) == 1
         assert not marker.exists()
         assert json.loads(done.read_text())["recording_started"] is False
+
+    def recording_failing_after_marker():
+        root = scratch()
+        marker, done = root / "marker", root / "done.json"
+        stdout, stderr = root / "stdout", root / "stderr"
         # 标记已出现但进程失败也不得算成功。
         failing = [sys.executable, "-c",
                    "import sys; print('Starting recording'); sys.exit(2)"]
@@ -153,19 +183,26 @@ def self_test():
                       command=failing) == 1
         assert json.loads(done.read_text())["recording_started"] is True
         assert json.loads(done.read_text())["exit_code"] == 2
-        # 导出正例/反例只验证命令与落盘，不声称真实 trace。
+
+    def export_success():
+        root = scratch()
         xml, err, command = root / "table.xml", root / "table.stderr", root / "cmd.json"
         good = [sys.executable, "-c", "print('<trace-query-result/>')"]
         run_export(good, xml, err, command)
         assert xml.read_text().strip() == "<trace-query-result/>"
         assert json.loads(command.read_text())["exit_code"] == 0
+
+    def export_failure():
+        root = scratch()
+        xml, err, command = root / "table.xml", root / "table.stderr", root / "cmd.json"
         bad = [sys.executable, "-c", "import sys; sys.exit(1)"]
         try:
             run_export(bad, xml, err, command)
         except ValueError:
-            pass
-        else:
-            raise AssertionError("failed export accepted")
+            return
+        raise AssertionError("failed export accepted")
+
+    def command_contract():
         assert build_record_argv(7, "out.trace", 9) == [
             "xcrun", "xctrace", "record", "--attach", "7",
             "--template", "Metal System Trace", "--time-limit", "9s",
@@ -174,7 +211,35 @@ def self_test():
             "xcrun", "xctrace", "export", "--input", "native.trace", "--toc"]
         assert build_export_argv("native.trace", "runloop-events")[-1] == (
             '/trace-toc/run[@number="1"]/data/table[@schema="runloop-events"]')
-    print("trace-record self-test: 通过")
+
+    record_case("录制确认 Starting recording 后写 marker 与收据", "accept",
+                recording_success)
+    record_case("无 recording 标记的 exit 0 不算成功", "reject",
+                recording_without_marker)
+    record_case("标记已出现但进程失败不算成功", "reject",
+                recording_failing_after_marker)
+    record_case("导出成功写入 XML 与命令记录", "accept", export_success)
+    record_case("导出命令非零退出必须拒绝", "reject", export_failure)
+    record_case("录制/导出命令构造", "accept", command_contract)
+
+    passed = all(case["passed"] for case in cases)
+    if output is not None:
+        write_json(Path(output) / "summary.json", {
+            "passed": passed,
+            "cases": cases,
+            "blind_spots": [
+                "合成子进程只验证 marker/收据/导出的失败关闭；不是 xctrace 真实录制",
+                "Metal System Trace 模板、权限与 attach 时序只在真实矩阵期间验证",
+                "本自测不启动应用、不读探针输出，也不把导出结果改写成指标",
+                "真实 trace 表 schema 漂移须由采集器与推导器的真实样本复核发现",
+            ],
+            "synthetic_contract_test_only": True,
+        })
+    failed = [case for case in cases if not case["passed"]]
+    print("trace-record self-test: %d/%d 通过" % (len(cases) - len(failed), len(cases)))
+    for case in failed:
+        print("  - " + case["name"] + ": " + case.get("error", ""))
+    return 0 if passed else 1
 
 
 def main():
@@ -192,9 +257,21 @@ def main():
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
+    # 落点校验先于模式分发：越界必须在建目录或读参数前 exit 1。
+    # 导出目录由 export_trace 以 create_new 语义创建，故只校验不创建。
+    evidence = None
+    try:
+        if args.self_test:
+            evidence = output_directory("m1-trace-record", args.output_dir)
+        elif args.output_dir is not None:
+            require_validation_path(args.output_dir)
+        if args.output is not None:
+            require_validation_path(args.output)
+    except ValueError as error:
+        print("trace-record: " + str(error), file=sys.stderr)
+        return 1
     if args.self_test:
-        self_test()
-        return 0
+        return self_test(evidence)
     try:
         if args.record:
             if None in (args.pid, args.output, args.marker, args.done,
