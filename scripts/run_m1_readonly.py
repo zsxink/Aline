@@ -39,6 +39,10 @@ PERF_SCHEMA = "aline-m1-perf/v1"
 BYTES_SCHEMA = "aline-m1-readonly-bytes/v1"
 BYTES_FIXTURE_SCHEMA = "aline-m1-readonly-bytes-fixtures/v1"
 WINDOW_SCHEMA = "aline-m1-window-baseline/v1"
+TRACE_SCHEMA = "aline-m1-trace-metrics/v1"
+TRACE_UNCERTAINTY_NS = 1_000_000
+STALL_METHOD = "external-trace-runloop-busy"
+TRACE_TABLES = ("assignment.xml", "request.xml", "display.xml", "runloop.xml")
 MIN_SAMPLES = 20
 STAGES = (
     "read_decode",
@@ -164,6 +168,164 @@ def _is_non_negative_int(value):
     return isinstance(value, int) and not isinstance(value, bool) and value >= 0
 
 
+def _epoch_ns(value):
+    """把带时区的 datetime 转成整数 epoch ns；调用方保证 value 非 None。"""
+    delta = value - datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
+    return ((delta.days * 86400 + delta.seconds) * 1_000_000_000
+            + delta.microseconds * 1000)
+
+
+def _iso_epoch_ns(value):
+    """与采集器一致的 ISO-8601 输出：微秒精度、UTC。"""
+    seconds, nanoseconds = divmod(int(value), 1_000_000_000)
+    instant = datetime.datetime.fromtimestamp(
+        seconds, datetime.timezone.utc) + datetime.timedelta(
+            microseconds=nanoseconds // 1000)
+    return instant.isoformat()
+
+
+def _validate_trace_block(trace, pid, started_epoch, finished_epoch, label, failures):
+    """校验外部 trace 的原始证据块；返回 trace 起点（无效时 None）。"""
+    if not isinstance(trace, dict):
+        failures.append(label + " 缺少外部 trace 原始证据")
+        return None
+    if trace.get("schema") != TRACE_SCHEMA:
+        failures.append(label + " trace 证据 schema 不匹配")
+    if trace.get("pid") != pid:
+        failures.append(label + " trace 证据 pid 与原生进程不同")
+    if trace.get("start_uncertainty_ns") != TRACE_UNCERTAINTY_NS:
+        failures.append(label + " trace 起点不确定度不是 1 ms")
+    trace_start = trace.get("start_epoch_ns")
+    trace_end = trace.get("end_epoch_ns")
+    if not _is_non_negative_int(trace_start):
+        failures.append(label + " trace.start_epoch_ns 无效")
+        trace_start = None
+    if not _is_non_negative_int(trace_end):
+        failures.append(label + " trace.end_epoch_ns 无效")
+        trace_end = None
+    if trace_start is not None and trace_end is not None and trace_start >= trace_end:
+        failures.append(label + " trace 起止 epoch 顺序无效")
+        trace_end = None
+    raw = trace.get("raw_sha256")
+    if not isinstance(raw, dict):
+        failures.append(label + " trace 缺少原始表哈希")
+    else:
+        for table in TRACE_TABLES:
+            if not _is_sha256(raw.get(table)):
+                failures.append(label + " trace 原始表哈希无效：" + table)
+    # ISO 时间只保留微秒，样本边界与 trace 边界比较时允许 1 µs 表示误差。
+    if started_epoch is not None and trace_start is not None:
+        if started_epoch + 1000 < trace_start:
+            failures.append(label + " 样本早于 trace 起点")
+    if finished_epoch is not None and trace_end is not None:
+        if finished_epoch > trace_end + 1000:
+            failures.append(label + " 样本晚于 trace 结束")
+    return trace_start
+
+
+def _validate_trace_sample(sample, label, failures):
+    """外部 trace first_present：display 链是唯一计时身份。"""
+    if sample.get("stage") != "first_present":
+        failures.append(label + " 外部 trace 计时只允许 first_present")
+    if sample.get("timing_origin") != "trace-display-chain":
+        failures.append(label + " 外部 trace 计时缺少 display 链身份")
+    if sample.get("timing_clock") != "trace-relative":
+        failures.append(label + " 外部 trace 计时缺少 trace 相对时钟身份")
+    if sample.get("clock_uncertainty_ns") != TRACE_UNCERTAINTY_NS:
+        failures.append(label + " 外部 trace 起点不确定度不是 1 ms")
+    started_epoch = sample.get("started_epoch_ns")
+    finished_epoch = sample.get("finished_epoch_ns")
+    if not _is_non_negative_int(started_epoch):
+        failures.append(label + " 缺少非负整数 started_epoch_ns")
+        started_epoch = None
+    if not _is_non_negative_int(finished_epoch):
+        failures.append(label + " 缺少非负整数 finished_epoch_ns")
+        finished_epoch = None
+    if started_epoch is not None and finished_epoch is not None:
+        if finished_epoch <= started_epoch:
+            failures.append(label + " trace 起止 epoch 顺序无效")
+        elif finished_epoch - started_epoch != sample.get("duration_ns"):
+            failures.append(label + " trace 起止 epoch 与耗时不一致")
+    started_iso = _parse_iso(sample.get("started_utc"))
+    finished_iso = _parse_iso(sample.get("finished_utc"))
+    if started_iso is not None and started_epoch is not None:
+        if abs(_epoch_ns(started_iso) - started_epoch) > 1000:
+            failures.append(label + " started_utc 与 trace epoch 不一致")
+    if finished_iso is not None and finished_epoch is not None:
+        if abs(_epoch_ns(finished_iso) - finished_epoch) > 1000:
+            failures.append(label + " finished_utc 与 trace epoch 不一致")
+    trace = sample.get("trace")
+    trace_start = (trace.get("start_epoch_ns")
+                   if isinstance(trace, dict) else None)
+    if not _is_non_negative_int(trace_start):
+        trace_start = None
+    frame = sample.get("content_frame")
+    if not isinstance(frame, dict):
+        failures.append(label + " 缺少 content_frame display 链")
+        return
+
+    def frame_int(name):
+        value = frame.get(name)
+        if not _is_non_negative_int(value):
+            failures.append(label + " content_frame." + name + " 无效")
+            return None
+        return value
+
+    commit_trace = frame_int("commit_trace_ns")
+    request_trace = frame_int("request_trace_ns")
+    display_trace = frame_int("display_start_trace_ns")
+    latency = frame_int("cpu_to_display_latency_ns")
+    commit_epoch = frame_int("commit_epoch_ns")
+    request_epoch = frame_int("request_epoch_ns")
+    display_epoch = frame_int("display_start_epoch_ns")
+    primary = frame.get("primary")
+    if not isinstance(primary, bool):
+        failures.append(label + " content_frame.primary 必须是布尔值")
+    primary_commit_trace = frame_int("primary_commit_trace_ns")
+    primary_commit_epoch = frame_int("primary_commit_epoch_ns")
+    if None in (commit_trace, request_trace, display_trace, latency,
+                commit_epoch, request_epoch, display_epoch,
+                primary_commit_trace, primary_commit_epoch):
+        return
+    # request 的因果上界是 display 扫描开始；首个内容帧的 CA request 可
+    # 晚于 commit 2–5 ms，不能再用固定 2 ms 上限拒绝真实上屏帧。
+    if not commit_trace < request_trace < display_trace:
+        failures.append(label + " present request 与 commit/display 顺序无效")
+    if display_trace - primary_commit_trace != latency:
+        failures.append(label + " cpu-to-display-latency 与 start-primary_commit 不一致")
+    if isinstance(primary, bool) and primary != (primary_commit_trace == commit_trace):
+        failures.append(label + " content_frame.primary 与 commit 身份不一致")
+    if trace_start is not None:
+        if commit_epoch != trace_start + commit_trace:
+            failures.append(label + " commit epoch 与 trace 起点不一致")
+        if request_epoch != trace_start + request_trace:
+            failures.append(label + " request epoch 与 trace 起点不一致")
+        if display_epoch != trace_start + display_trace:
+            failures.append(label + " display epoch 与 trace 起点不一致")
+        if primary_commit_epoch != trace_start + primary_commit_trace:
+            failures.append(label + " primary commit epoch 与 trace 起点不一致")
+    if finished_epoch is not None and display_epoch != finished_epoch:
+        failures.append(label + " first_present 结束不是 display start")
+    layout_end = sample.get("layout_end_epoch_ns")
+    if not _is_non_negative_int(layout_end):
+        failures.append(label + " 缺少非负整数 layout_end_epoch_ns")
+    else:
+        if commit_epoch + TRACE_UNCERTAINTY_NS < layout_end:
+            failures.append(label + " commit 早于 layout 结束")
+        if request_epoch + TRACE_UNCERTAINTY_NS < layout_end:
+            failures.append(label + " request 早于 layout 结束")
+    # draw 提交回调可能晚于实际上屏，effect_end 只作诊断，不是 display 下界。
+    effect_end = sample.get("effect_end_epoch_ns")
+    if not _is_non_negative_int(effect_end):
+        failures.append(label + " 缺少非负整数 effect_end_epoch_ns")
+    for name in ("frame_number", "surface_id"):
+        if not _is_non_negative_int(frame.get(name)):
+            failures.append(label + " content_frame." + name + " 无效")
+    command_buffer = frame.get("command_buffer")
+    if not isinstance(command_buffer, str) or not command_buffer:
+        failures.append(label + " content_frame.command_buffer 无效")
+
+
 def _display(value):
     """证据表里的缺值显示为短横线，不把 None 伪装成零。"""
     return "-" if value is None else str(value)
@@ -214,52 +376,55 @@ def _sample_label(sample):
     )
 
 
-def _performance_provenance(run, failures):
+def _performance_provenance(run, failures, label=""):
     """所有输入路径共享身份/测量含义校验，直接 JSONL 也不能跳过采集契约。"""
+    def fail(message):
+        failures.append(label + " " + message if label else message)
+
     methods = run.get("measurement_methods")
     if not isinstance(methods, dict):
-        failures.append("缺少 measurement_methods；数值不能替代测量定义")
+        fail("缺少 measurement_methods；数值不能替代测量定义")
     else:
         for field in (*STAGES, "cold", "hot", "main_thread_stall_ns", "peak_rss_bytes"):
             value = methods.get(field)
             if not isinstance(value, str) or not value.strip():
-                failures.append("measurement_methods 缺少 " + field)
+                fail("measurement_methods 缺少 " + field)
         present_method = str(methods.get("first_present", "")).lower()
         if any(word in present_method for word in ("draw-submission", "draw_submission", "effect-callback")):
-            failures.append("平台 draw 提交/effect 回调不能作为 first_present")
+            fail("平台 draw 提交/effect 回调不能作为 first_present")
         stall_method = str(methods.get("main_thread_stall_ns", "")).lower()
         if any(word in stall_method for word in ("event_loop", "event-loop", "timer-gap", "jitter")):
-            failures.append("event-loop/timer 抖动不能作为 main_thread_stall_ns")
+            fail("event-loop/timer 抖动不能作为 main_thread_stall_ns")
     if not _is_sha256(run.get("spec_sha256")):
-        failures.append("缺少有效事前 spec_sha256")
+        fail("缺少有效事前 spec_sha256")
     fixtures = run.get("fixtures")
     if not isinstance(fixtures, dict) or not fixtures:
-        failures.append("缺少事前 fixtures 清单")
+        fail("缺少事前 fixtures 清单")
         fixtures = {}
     for name, fixture in fixtures.items():
         if not isinstance(fixture, dict) or not _is_sha256(fixture.get("sha256")):
-            failures.append("事前 fixture 条目无效：" + str(name))
+            fail("事前 fixture 条目无效：" + str(name))
     receipt = run.get("launch_receipt")
     if not isinstance(receipt, dict):
-        failures.append("缺少实际启动器的 launch_receipt")
+        fail("缺少实际启动器的 launch_receipt")
         return fixtures, None
     if receipt.get("schema") != "aline-m1-launch/v1":
-        failures.append("launch_receipt schema 不匹配")
+        fail("launch_receipt schema 不匹配")
     for field in ("run_id", "app_sha256", "spec_sha256", "fixtures"):
         if receipt.get(field) != run.get(field):
-            failures.append("launch_receipt 与运行身份不一致：" + field)
+            fail("launch_receipt 与运行身份不一致：" + field)
     if not _is_sha256(receipt.get("raw_sha256")):
-        failures.append("launch_receipt 缺少有效原始输出哈希")
+        fail("launch_receipt 缺少有效原始输出哈希")
     if not _is_non_negative_int(receipt.get("pid")) or receipt.get("pid") == 0:
-        failures.append("launch_receipt 缺少实际 pid")
+        fail("launch_receipt 缺少实际 pid")
     if not _is_non_negative_int(receipt.get("exit_code")) or receipt.get("exit_code") != 0:
-        failures.append("launch_receipt 原生进程未成功退出")
+        fail("launch_receipt 原生进程未成功退出")
     started, finished = (_parse_iso(receipt.get(field))
                          for field in ("started_utc", "finished_utc"))
     if started is None or finished is None or finished < started:
-        failures.append("launch_receipt 运行时间无效")
+        fail("launch_receipt 运行时间无效")
     if receipt.get("started_utc") != run.get("run_started_utc"):
-        failures.append("launch_receipt 与运行开始时间不一致")
+        fail("launch_receipt 与运行开始时间不一致")
     return fixtures, finished
 
 
@@ -273,28 +438,68 @@ def analyze_performance(records, require_matrix=False):
     if len(run_ids) != 1:
         failures.append("测量记录必须来自同一个 run_id，实际为 " + ", ".join(run_ids))
     run_records = [record for record in records if record.get("kind") == "run"]
-    if len(run_records) != 1:
-        failures.append("必须且只能有一条 kind=run 的运行元数据")
-    run = run_records[0] if len(run_records) == 1 else {}
-    fixture_manifest, run_finished = _performance_provenance(run, failures)
-    if run:
-        _require(run.get("schema") == PERF_SCHEMA, "运行元数据 schema 不匹配")
+    if not run_records:
+        failures.append("必须至少有一条 kind=run 的运行元数据")
+    runs = []
+    fixture_manifest = {}
+    fixture_conflicts = set()
+    receipt_pids = {}
+    identity = None
+    for index, run in enumerate(run_records):
+        label = "运行记录#" + str(index + 1)
+        fixtures, run_finished = _performance_provenance(run, failures, label)
+        if run.get("schema") != PERF_SCHEMA:
+            failures.append(label + " schema 不匹配")
         for field in ("run_id", "commit", "app_sha256", "build_profile", "run_started_utc"):
             if not run.get(field):
-                failures.append("运行元数据缺少字段 " + field)
+                failures.append(label + " 缺少字段 " + field)
         if not _is_sha256(run.get("app_sha256")):
-            failures.append("运行元数据 app_sha256 不是 64 位小写十六进制")
+            failures.append(label + " app_sha256 不是 64 位小写十六进制")
         if run.get("build_profile") != "release":
-            failures.append("性能测量必须使用 Release 构建")
+            failures.append(label + " 不是 Release 构建")
         if _parse_iso(run.get("run_started_utc")) is None:
-            failures.append("运行开始时间必须是带时区的 ISO-8601")
+            failures.append(label + " 运行开始时间必须是带时区的 ISO-8601")
         environment = run.get("environment")
         if not isinstance(environment, dict):
-            failures.append("运行元数据缺少 environment 对象")
+            failures.append(label + " 缺少 environment 对象")
         else:
             for field in ("os", "arch", "cpu", "gpui"):
                 if not environment.get(field):
-                    failures.append("environment 缺少字段 " + field)
+                    failures.append(label + " environment 缺少字段 " + field)
+        # 同一矩阵的逐次启动共享源码/构建身份；spec 是每次启动的单用例
+        # worker 清单，已由该次 launch_receipt 绑定，跨启动不可比。
+        # 开始/结束时间按每次启动分别记录。
+        current = {field: run.get(field) for field in
+                   ("run_id", "commit", "app_sha256", "build_profile",
+                    "environment")}
+        if identity is None:
+            identity = current
+        else:
+            for field, value in current.items():
+                if value != identity[field]:
+                    failures.append(label + " 的 " + field + " 与首个运行记录不一致")
+        receipt = run.get("launch_receipt")
+        if isinstance(receipt, dict):
+            pid = receipt.get("pid")
+            if _is_non_negative_int(pid) and pid > 0:
+                if pid in receipt_pids:
+                    failures.append("launch_receipt pid 重复：" + str(pid))
+                receipt_pids[pid] = run
+        for name, fixture in fixtures.items():
+            if name in fixture_manifest and fixture_manifest[name] != fixture:
+                fixture_conflicts.add(name)
+            fixture_manifest.setdefault(name, fixture)
+        runs.append({"run": run, "fixtures": fixtures,
+                     "finished": run_finished, "label": label})
+    for name in sorted(fixture_conflicts):
+        failures.append("逐次启动的事前 fixture 条目不一致：" + str(name))
+    run_by_pid = {}
+    for item in runs:
+        receipt = item["run"].get("launch_receipt")
+        if isinstance(receipt, dict):
+            pid = receipt.get("pid")
+            if _is_non_negative_int(pid) and pid > 0:
+                run_by_pid.setdefault(pid, []).append(item)
 
     samples = [record for record in records if record.get("kind") == "sample"]
     if not samples:
@@ -305,8 +510,8 @@ def analyze_performance(records, require_matrix=False):
         if sample.get("schema") != PERF_SCHEMA:
             failures.append(label + " schema 不匹配")
         for field in ("run_id", "condition", "temperature", "stage", "status",
-                      "fixture_sha256", "commit", "build_profile", "started_utc",
-                      "finished_utc"):
+                      "fixture_sha256", "commit", "app_sha256", "native_pid",
+                      "build_profile", "started_utc", "finished_utc"):
             if not sample.get(field):
                 failures.append(label + " 缺少字段 " + field)
         if sample.get("status") != "ok":
@@ -321,38 +526,71 @@ def analyze_performance(records, require_matrix=False):
             failures.append(label + " 冷热标记不是 cold/hot")
         if not _is_sha256(sample.get("fixture_sha256")):
             failures.append(label + " fixture_sha256 不是 64 位小写十六进制")
-        fixture = fixture_manifest.get(sample.get("case"))
+        # 每个样本必须绑定到一次具体启动收据；共享 run_id 不能替代逐次身份。
+        native_pid = sample.get("native_pid")
+        bound = None
+        if not _is_non_negative_int(native_pid) or native_pid == 0:
+            failures.append(label + " 缺少原生 pid，无法绑定启动收据")
+        else:
+            matches = run_by_pid.get(native_pid, [])
+            if len(matches) != 1:
+                failures.append(label + " 未唯一绑定到启动收据 pid=" + str(native_pid))
+            else:
+                bound = matches[0]
+        bound_run = bound["run"] if bound is not None else {}
+        bound_fixtures = bound["fixtures"] if bound is not None else {}
+        bound_finished = bound["finished"] if bound is not None else None
+        if bound is not None:
+            if sample.get("run_id") != bound_run.get("run_id"):
+                failures.append(label + " 的 run_id 与绑定启动收据不一致")
+            if sample.get("app_sha256") != bound_run.get("app_sha256"):
+                failures.append(label + " 的 app_sha256 与绑定启动收据不一致")
+        fixture = bound_fixtures.get(sample.get("case"))
         if not isinstance(fixture, dict):
-            failures.append(label + " case 未绑定事前 fixture 清单")
+            failures.append(label + " case 未绑定到该次启动的事前 fixture 清单")
         else:
             for field in ("condition", "temperature", "sample_id"):
                 if sample.get(field) != fixture.get(field):
                     failures.append(label + " 与事前 fixture 的 " + field + " 不同")
             if fixture.get("suite") != "perf" or fixture.get("sha256") != sample.get("fixture_sha256"):
                 failures.append(label + " 与事前 fixture 的套件或哈希不同")
-        if sample.get("commit") and run.get("commit") and sample.get("commit") != run.get("commit"):
-            failures.append(label + " 的 commit 与运行元数据不一致")
+        if (bound is not None and sample.get("commit")
+                and sample.get("commit") != bound_run.get("commit")):
+            failures.append(label + " 的 commit 与绑定启动收据不一致")
         started = _parse_iso(sample.get("started_utc"))
         finished = _parse_iso(sample.get("finished_utc"))
-        run_started = _parse_iso(run.get("run_started_utc"))
+        run_started = _parse_iso(bound_run.get("run_started_utc"))
         if started is None or finished is None:
             failures.append(label + " 时间戳不是可解析的 ISO-8601")
         else:
             if finished < started:
                 failures.append(label + " 结束时间早于开始时间")
             if run_started is not None and started < run_started:
-                failures.append(label + " 早于本轮运行开始时间，属于旧运行结果")
-            if run_finished is not None and finished > run_finished:
-                failures.append(label + " 晚于本轮原生进程退出时间")
+                failures.append(label + " 早于绑定启动收据开始时间，属于旧运行结果")
+            if bound_finished is not None and finished > bound_finished:
+                failures.append(label + " 晚于绑定原生进程退出时间")
         if not _is_non_negative_int(sample.get("duration_ns")):
             failures.append(label + " 缺少非负整数 duration_ns")
         mono_start, mono_end = sample.get("started_monotonic_ns"), sample.get("finished_monotonic_ns")
-        if sample.get("timing_clock") != "instant-monotonic":
-            failures.append(label + " 缺少单调时钟身份")
-        if not _is_non_negative_int(mono_start) or not _is_non_negative_int(mono_end):
-            failures.append(label + " 缺少真实单调起止边界")
-        elif mono_end < mono_start or mono_end - mono_start != sample.get("duration_ns"):
-            failures.append(label + " 单调起止边界与耗时不一致")
+        # first_present 的屏幕呈现只能来自外部 trace display 链；探针 draw
+        # effect 不得以 Instant 边界冒充该阶段。
+        if sample.get("stage") == "first_present" and (
+                sample.get("timing_origin") != "trace-display-chain"
+                or sample.get("timing_clock") != "trace-relative"):
+            failures.append(label + " first_present 必须是外部 trace display 链")
+        trace_derived = (sample.get("timing_origin") == "trace-display-chain"
+                         or sample.get("timing_clock") == "trace-relative")
+        if trace_derived:
+            _validate_trace_sample(sample, label, failures)
+        else:
+            if sample.get("timing_clock") != "instant-monotonic":
+                failures.append(label + " 缺少单调时钟身份")
+            if not _is_non_negative_int(mono_start) or not _is_non_negative_int(mono_end):
+                failures.append(label + " 缺少真实单调起止边界")
+            elif mono_end < mono_start or mono_end - mono_start != sample.get("duration_ns"):
+                failures.append(label + " 单调起止边界与耗时不一致")
+            if sample.get("timing_origin") != "measured-boundaries":
+                failures.append(label + " 缺少真实阶段起止边界")
         wall_duration = sample.get("wall_duration_ns")
         if not _is_non_negative_int(wall_duration):
             failures.append(label + " 缺少独立墙钟起止差值")
@@ -366,8 +604,13 @@ def analyze_performance(records, require_matrix=False):
         uncertainty = sample.get("clock_uncertainty_ns", 0)
         if not _is_non_negative_int(uncertainty) or uncertainty > 1_000_000:
             failures.append(label + " 墙钟捕获开销无效或超过 1 ms")
-        if sample.get("timing_origin") != "measured-boundaries":
-            failures.append(label + " 缺少真实阶段起止边界")
+        if _is_non_negative_int(sample.get("main_thread_stall_ns")):
+            if sample.get("main_thread_stall_origin") != STALL_METHOD:
+                failures.append(label + " 主线程停顿不是外部 trace runloop 忙碌段")
+            started_epoch = _epoch_ns(started) if started is not None else None
+            finished_epoch = _epoch_ns(finished) if finished is not None else None
+            _validate_trace_block(sample.get("trace"), sample.get("native_pid"),
+                                  started_epoch, finished_epoch, label, failures)
         for field in ("main_thread_stall_ns", "peak_rss_bytes"):
             if not _is_non_negative_int(sample.get(field)):
                 failures.append(label + " 缺少逐样本指标 " + field)
@@ -453,22 +696,30 @@ def analyze_performance(records, require_matrix=False):
     if not peaks:
         failures.append("缺少 peak_rss_bytes，不能报告峰值内存")
 
+    first_run = runs[0]["run"] if runs else {}
+    run_starts = [_parse_iso(item["run"].get("run_started_utc")) for item in runs]
+    run_starts = [value for value in run_starts if value is not None]
+    run_finishes = [item["finished"] for item in runs if item["finished"] is not None]
     summary = {
         "suite": "performance",
         "schema": PERF_SCHEMA,
         "passed": not failures,
         "generated_utc": _utc_now(),
         "run": {
-            "run_id": run.get("run_id"),
-            "commit": run.get("commit"),
-            "build_profile": run.get("build_profile"),
-            "app_sha256": run.get("app_sha256"),
-            "run_started_utc": run.get("run_started_utc"),
-            "environment": run.get("environment"),
-            "measurement_methods": run.get("measurement_methods"),
-            "spec_sha256": run.get("spec_sha256"),
-            "fixtures": run.get("fixtures"),
-            "launch_receipt": run.get("launch_receipt"),
+            "run_id": first_run.get("run_id"),
+            "commit": first_run.get("commit"),
+            "build_profile": first_run.get("build_profile"),
+            "app_sha256": first_run.get("app_sha256"),
+            "run_started_utc": min(run_starts).isoformat() if run_starts else None,
+            "run_finished_utc": max(run_finishes).isoformat() if run_finishes else None,
+            "launch_count": len(runs),
+            "environment": first_run.get("environment"),
+            "measurement_methods": first_run.get("measurement_methods"),
+            "spec_sha256": first_run.get("spec_sha256"),
+            "fixtures": fixture_manifest,
+            "launch_receipt": (runs[0]["run"].get("launch_receipt")
+                               if len(runs) == 1 else None),
+            "launch_receipts": [item["run"].get("launch_receipt") for item in runs],
         },
         "method": {
             "quantile": "nearest-rank，升序第 ceil(p/100*n) 个值",
@@ -497,6 +748,7 @@ def _performance_markdown(summary, input_name, command):
         "- 结果：" + ("通过" if summary["passed"] else "未通过"),
         "- 输入：`" + input_name + "`",
         "- 运行：`" + str(summary["run"].get("run_id")) + "`",
+        "- 启动次数：" + str(summary["run"].get("launch_count")),
         "- commit：`" + str(summary["run"].get("commit")) + "`",
         "- 构建：`" + str(summary["run"].get("build_profile")) + "`",
         "- 应用 SHA-256：`" + str(summary["run"].get("app_sha256")) + "`",
@@ -512,8 +764,15 @@ def _performance_markdown(summary, input_name, command):
         "## 原始测量含义与启动身份",
         "",
         "```json",
-        json.dumps({field: summary["run"].get(field) for field in (
-            "measurement_methods", "spec_sha256", "fixtures", "launch_receipt")},
+        json.dumps(dict(
+            {field: summary["run"].get(field) for field in (
+                "measurement_methods", "spec_sha256", "fixtures")},
+            launch_count=summary["run"].get("launch_count"),
+            launch_receipt_pids=[
+                receipt.get("pid")
+                for receipt in summary["run"].get("launch_receipts", [])
+                if isinstance(receipt, dict)],
+            single_launch_receipt=summary["run"].get("launch_receipt")),
             ensure_ascii=False, indent=2),
         "```",
         "",
@@ -1076,6 +1335,9 @@ def _synthetic_case(condition, temperature, sample_id):
 
 def _sample(run_id, sample_id, duration, stage="first_layout", condition="32KiB",
             temperature="cold", status="ok", **extra):
+    run_start = datetime.datetime(2026, 11, 6, tzinfo=datetime.timezone.utc)
+    run_start_epoch = _epoch_ns(run_start)
+    trace_start = run_start_epoch - 1_000_000_000
     record = {
         "kind": "sample",
         "schema": PERF_SCHEMA,
@@ -1089,9 +1351,11 @@ def _sample(run_id, sample_id, duration, stage="first_layout", condition="32KiB"
         "duration_ns": duration,
         "fixture_sha256": "c" * 64,
         "commit": "a" * 40,
+        "app_sha256": "b" * 64,
+        "native_pid": 1,
         "build_profile": "release",
-        "started_utc": "2026-11-06T00:00:00+00:00",
-        "finished_utc": (datetime.datetime(2026, 11, 6, tzinfo=datetime.timezone.utc)
+        "started_utc": run_start.isoformat(),
+        "finished_utc": (run_start
                          + datetime.timedelta(microseconds=duration / 1000)).isoformat(),
         "timing_origin": "measured-boundaries",
         "timing_clock": "instant-monotonic",
@@ -1099,10 +1363,55 @@ def _sample(run_id, sample_id, duration, stage="first_layout", condition="32KiB"
         "finished_monotonic_ns": duration,
         "wall_duration_ns": round(duration / 1000) * 1000,
         "main_thread_stall_ns": 1000,
+        "main_thread_stall_origin": STALL_METHOD,
         "peak_rss_bytes": 1024,
         "virtual_items": 10,
+        "trace": {
+            "schema": TRACE_SCHEMA, "template": "Metal System Trace",
+            "start_epoch_ns": trace_start, "end_epoch_ns": 10 ** 19,
+            "start_uncertainty_ns": TRACE_UNCERTAINTY_NS, "pid": 1,
+            "raw_sha256": {table: "f" * 64 for table in TRACE_TABLES},
+        },
     }
+    if stage == "first_present":
+        duration = 20_000_000 + duration
+        started_epoch = run_start_epoch + 1_000_000_000
+        display_epoch = started_epoch + duration
+        commit_epoch = started_epoch + 10_000_000
+        request_epoch = commit_epoch + 100_000
+        layout_end = started_epoch + 5_000_000
+        effect_end = layout_end + 1_000_000
+        record.update({
+            "duration_ns": duration,
+            "started_utc": _iso_epoch_ns(started_epoch),
+            "finished_utc": _iso_epoch_ns(display_epoch),
+            "wall_duration_ns": duration,
+            "timing_origin": "trace-display-chain",
+            "timing_clock": "trace-relative",
+            "clock_uncertainty_ns": TRACE_UNCERTAINTY_NS,
+            "started_epoch_ns": started_epoch,
+            "finished_epoch_ns": display_epoch,
+            "layout_end_epoch_ns": layout_end,
+            "effect_end_epoch_ns": effect_end,
+            "content_frame": {
+                "command_buffer": "1", "frame_number": 1, "surface_id": 1,
+                "commit_trace_ns": commit_epoch - trace_start,
+                "commit_epoch_ns": commit_epoch,
+                "request_trace_ns": request_epoch - trace_start,
+                "request_epoch_ns": request_epoch,
+                "display_start_trace_ns": display_epoch - trace_start,
+                "display_start_epoch_ns": display_epoch,
+                "cpu_to_display_latency_ns": display_epoch - commit_epoch,
+                "primary": True,
+                "primary_commit_trace_ns": commit_epoch - trace_start,
+                "primary_commit_epoch_ns": commit_epoch,
+            },
+        })
+        record.pop("started_monotonic_ns")
+        record.pop("finished_monotonic_ns")
     record.update(extra)
+    if isinstance(record.get("trace"), dict):
+        record["trace"]["pid"] = record["native_pid"]
     return record
 
 
@@ -1239,10 +1548,133 @@ def self_test_performance(output):
     draw_present[0]["measurement_methods"]["first_present"] = "platform-draw-submission-effect-callback"
     test.check("draw 提交冒充屏幕呈现被拒绝", lambda: test.expect(
         not analyze_performance(draw_present)["passed"], "draw effect 不能证明屏幕呈现"))
+    fake_present = [_valid_run_record()] + _twenty_samples(stage="first_present")
+    fake_present[1].update(timing_origin="measured-boundaries",
+                           timing_clock="instant-monotonic",
+                           started_monotonic_ns=0,
+                           finished_monotonic_ns=fake_present[1]["duration_ns"])
+    test.check("Instant 边界冒充 first_present 被拒绝", lambda: test.expect(
+        not analyze_performance(fake_present)["passed"],
+        "first_present 必须绑定外部 trace display 链"))
+    no_frame = [_valid_run_record()] + _twenty_samples(stage="first_present")
+    no_frame[1].pop("content_frame")
+    test.check("trace first_present 缺 display 链被拒绝", lambda: test.expect(
+        not analyze_performance(no_frame)["passed"],
+        "first_present 必须带完整 display 链"))
+    bad_latency = [_valid_run_record()] + _twenty_samples(stage="first_present")
+    bad_latency[1]["content_frame"]["cpu_to_display_latency_ns"] += 1
+    test.check("trace display 延迟不一致被拒绝", lambda: test.expect(
+        not analyze_performance(bad_latency)["passed"],
+        "display start 与 commit 的差必须等于记录延迟"))
+    early_display = [_valid_run_record()] + _twenty_samples(stage="first_present")
+    early_display[1]["effect_end_epoch_ns"] = (
+        early_display[1]["content_frame"]["display_start_epoch_ns"] + 1_000_000)
+    test.check("draw 回调晚于上屏仍通过", lambda: test.expect(
+        analyze_performance(early_display)["passed"],
+        "display 是呈现证据，draw 回调不是其下界"))
+    delayed_request = [_valid_run_record()] + _twenty_samples(stage="first_present")
+    delayed_request[1]["content_frame"]["request_trace_ns"] += 3_000_000
+    delayed_request[1]["content_frame"]["request_epoch_ns"] += 3_000_000
+    test.check("CA request 晚于 commit 3 ms 仍有效", lambda: test.expect(
+        analyze_performance(delayed_request)["passed"],
+        "request 的因果上界是 display 扫描开始，不是固定 2 ms"))
+    late_request = [_valid_run_record()] + _twenty_samples(stage="first_present")
+    late_request[1]["content_frame"]["request_trace_ns"] = (
+        late_request[1]["content_frame"]["display_start_trace_ns"])
+    late_request[1]["content_frame"]["request_epoch_ns"] = (
+        late_request[1]["content_frame"]["display_start_epoch_ns"])
+    test.check("present request 不早于 display 被拒绝", lambda: test.expect(
+        not analyze_performance(late_request)["passed"],
+        "present request 必须早于 display 扫描开始"))
+    composite = [_valid_run_record()] + _twenty_samples(stage="first_present")
+    composite_frame = composite[1]["content_frame"]
+    composite_frame["primary"] = False
+    composite_frame["primary_commit_trace_ns"] -= 1_000_000
+    composite_frame["primary_commit_epoch_ns"] -= 1_000_000
+    composite_frame["cpu_to_display_latency_ns"] = (
+        composite_frame["display_start_trace_ns"]
+        - composite_frame["primary_commit_trace_ns"])
+    test.check("复合扫描次要帧被接受", lambda: test.expect(
+        analyze_performance(composite)["passed"],
+        "event-label 列出的次要帧 latency 属于主帧"))
+    primary_mismatch = [_valid_run_record()] + _twenty_samples(stage="first_present")
+    mismatch_frame = primary_mismatch[1]["content_frame"]
+    mismatch_frame["primary_commit_trace_ns"] -= 1_000_000
+    mismatch_frame["primary_commit_epoch_ns"] -= 1_000_000
+    mismatch_frame["cpu_to_display_latency_ns"] = (
+        mismatch_frame["display_start_trace_ns"]
+        - mismatch_frame["primary_commit_trace_ns"])
+    test.check("primary 标记与 commit 身份不符被拒绝", lambda: test.expect(
+        not analyze_performance(primary_mismatch)["passed"],
+        "primary 必须等于 start-latency 命中自身 commit"))
+    fake_stall = [_valid_run_record()] + _twenty_samples()
+    fake_stall[1]["main_thread_stall_origin"] = "event_loop_gap_ns"
+    test.check("逐样本停顿来源伪造被拒绝", lambda: test.expect(
+        not analyze_performance(fake_stall)["passed"],
+        "main_thread_stall 必须来自外部 trace runloop 忙碌段"))
     wrong_receipt = [_valid_run_record()] + _twenty_samples()
     wrong_receipt[0]["launch_receipt"]["app_sha256"] = "f" * 64
     test.check("启动收据应用哈希不一致被拒绝", lambda: test.expect(
         not analyze_performance(wrong_receipt)["passed"], "启动收据必须与运行身份一致"))
+
+    def multi_launch():
+        first = _valid_run_record()
+        second = json.loads(json.dumps(first))
+        second["launch_receipt"]["pid"] = 2
+        # 每次启动的 worker spec 是单用例清单，允许逐次不同；由各自收据绑定。
+        second["spec_sha256"] = "9" * 64
+        second["launch_receipt"]["spec_sha256"] = "9" * 64
+        return [first, second]
+
+    multi = multi_launch()
+    multi_samples = [_sample("run-1", index, index + 1,
+                             native_pid=1 if index < 10 else 2)
+                     for index in range(20)]
+    test.check("逐次启动收据绑定通过", lambda: (
+        test.expect(analyze_performance(multi + multi_samples)["passed"],
+                    "两次启动、各自绑定 10 个样本应通过"),
+        test.expect(analyze_performance(
+            multi + multi_samples)["run"]["launch_count"] == 2,
+            "摘要应记录两次启动"),
+    ))
+    test.check("未绑定启动收据的样本被拒绝", lambda: test.expect(
+        not analyze_performance(
+            [_valid_run_record()] + _twenty_samples()[:19]
+            + [_sample("run-1", 19, 20, native_pid=99)])["passed"],
+        "未知 pid 不得通过"))
+    duplicate_pid = multi_launch()
+    duplicate_pid[1]["launch_receipt"]["pid"] = 1
+    test.check("重复启动 pid 被拒绝", lambda: test.expect(
+        not analyze_performance(duplicate_pid + multi_samples)["passed"],
+        "重复 pid 不能区分两次启动"))
+    drifted = multi_launch()
+    drifted[1]["app_sha256"] = "f" * 64
+    drifted[1]["launch_receipt"]["app_sha256"] = "f" * 64
+    test.check("逐次启动应用哈希漂移被拒绝", lambda: test.expect(
+        not analyze_performance(drifted + multi_samples)["passed"],
+        "不同应用身份不能拼成同一矩阵"))
+    wrong_sample_app = multi + [
+        _sample("run-1", index, index + 1,
+                native_pid=1 if index < 10 else 2,
+                app_sha256="f" * 64 if index == 19 else "b" * 64)
+        for index in range(20)]
+    test.check("样本应用哈希与收据不一致被拒绝", lambda: test.expect(
+        not analyze_performance(wrong_sample_app)["passed"],
+        "样本必须绑定到同一应用身份"))
+    late_receipt = multi_launch()
+    late_receipt[1]["run_started_utc"] = "2026-11-06T01:00:00+00:00"
+    late_receipt[1]["launch_receipt"]["started_utc"] = "2026-11-06T01:00:00+00:00"
+    late_receipt[1]["launch_receipt"]["finished_utc"] = "2026-11-06T02:00:00+00:00"
+    test.check("样本早于绑定收据开始被拒绝", lambda: test.expect(
+        not analyze_performance(late_receipt + multi_samples)["passed"],
+        "绑定收据之外的时间戳不得通过"))
+    fixture_drift = multi_launch()
+    case_name = _synthetic_case("32KiB", "cold", 19)
+    fixture_drift[1]["fixtures"][case_name]["sha256"] = "d" * 64
+    fixture_drift[1]["launch_receipt"]["fixtures"] = fixture_drift[1]["fixtures"]
+    test.check("逐次启动夹具漂移被拒绝", lambda: test.expect(
+        not analyze_performance(fixture_drift + multi_samples)["passed"],
+        "同条件不同夹具不能跨启动混组"))
     wrong_boundary = [_valid_run_record()] + _twenty_samples()
     wrong_boundary[-1]["finished_utc"] = "2026-11-06T00:00:01+00:00"
     test.check("直接 samples 计时边界不一致被拒绝", lambda: test.expect(

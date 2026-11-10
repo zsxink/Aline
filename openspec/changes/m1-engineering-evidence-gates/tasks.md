@@ -25,9 +25,11 @@ W1 runner 稳定后，同一入口再接 `run_w1_offscreen.py --self-test`，并
 
 关联 QMD W7、R-11-01、S-14-03、V-05；合成正例不替代真实报告。
 
-- [ ] 3.1 以 M1 7.1 真实 Release 报告逐字段核对环境、commit/锁定构建、fixture SHA、方法、冷热、真实计时边界、P50/P95、最长 UI 停顿、峰值内存、raw、复现命令和不测量项；更新 V-05 摘要，缺项失败，不冻结新门槛。
+- [x] 3.1 以 M1 7.1 真实 Release 报告逐字段核对环境、commit/锁定构建、fixture SHA、方法、冷热、真实计时边界、P50/P95、最长 UI 停顿、峰值内存、raw、复现命令和不测量项；更新 V-05 摘要，缺项失败，不冻结新门槛。
 - [x] 3.2 运行完整 `check_workspace.py` 与 OpenSpec 严格校验，复核八成员 lint 继承、无第二套门禁/文档正文、证据路径和实际平台限制；统一入口失败不勾选。依赖缓存与真实平台缺口如实记录，不自动安装或下载。
 
 2026-11-09 主 Agent：统一 workspace-final-02 共29项全部通过，OpenSpec strict 15/15；后续 W1 runner 自测已补接，最终复跑单列。UI/catalog 误报文件名已通过翻译调用首参的精确检查修复，未按文件名豁免。W7 3.1 仍未完成：360次部分性能矩阵已采到真实分段/RSS/收据，但缺真正屏幕呈现和精确UI停顿；2.2 仍缺真实初窗失败路径。
 
 2026-11-09 最终统一入口（含W1离屏runner自测）workspace-final-03 的30项全部通过，fmt/Clippy/workspace test/真实依赖及正反例守卫均exit0。首次计时时钟分辨率包络失败与catalog文件名误报保留原日志，修复后通过；不覆盖历史失败。
+
+2026-11-10 W7 3.1 逐字段核对通过：以 `logs/validation/m1-single-window-readonly/2026-11-10-performance-01/performance/summary.md`、`summary.json` 与 `samples.jsonl` 核对环境（macOS 27.2 arm64、32 GiB、`gpui-pre`/`gpui-pre-macos` 0.3.9、rustc/cargo 1.98.1、Xcode 27.2）、commit `1893d4ac…`/Release 构建 `06740b89…`、9 类 fixture SHA-256 与字节数、方法（同钟 Instant 边界；`first_present` 为 Metal System Trace 显示链，`main_thread_stall_ns` 为 runloop 扣除 `waiting_for_events` 的最长连续忙碌段）、冷热定义、trace 相对计时边界与 1 ms 起始不确定度、144 组 P50/P95、最长主线程停顿 93.479 ms、峰值 RSS 1,036,763,136 bytes、raw 入口与逐用例 `raw_sha256`、复现命令、未测项，均无缺项。V-05 已更新（`docs/v1-validation-plan.md` 2026-11-10 条）。未冻结新性能门槛，合成正例未替代真实报告。3.1 勾选只表示字段核对完成，不表示 M1 出口或完整 AC-16；2.2 的真实初窗失败路径仍缺平台证据，保持未完成。

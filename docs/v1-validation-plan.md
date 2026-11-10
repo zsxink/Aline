@@ -152,6 +152,18 @@ Mermaid 护眼模式使用亮色映射；固定主题不跟随应用，主题是
 
 同轮 `performance/trace-bridge-smoke/` 的真实 Metal Trace 可按同 PID 的 command-buffer→frame-number/client surface→displayed-surfaces 表建立原生帧关系，但尚无 Aline 首内容帧到该关系的精确身份桥接。该烟测另记录主线程 Microhang 371,737,530 ns；当时并发 W1 重型构建且有 trace 开销，平台 hang 检测也有阈值，既不并入 360 次矩阵，也不称逐次精确最大停顿。锁定公开接口只返回 draw 提交/回调，profiler 的 Present 仍是 CPU 提交；后续需最小、安全且可审阅的内容帧/command-buffer/drawable 身份桥接及逐样本停顿观察，不能仅用墙钟就近配对。
 
+**2026-11-10 M1 只读性能首轮 Release 矩阵（7.1 分项完成，未冻结门槛）：** macOS arm64（macOS 27.2，32 GiB，Xcode 27.2，rustc/cargo 1.98.1，`gpui-pre`/`gpui-pre-macos` 0.3.9），Release 构建 SHA-256 `06740b89…`，源码 commit `1893d4ac…`；9 类尺寸/复杂度 × 冷/热 × 20 次共 360 个原生进程、每样本 8 个阶段行，144 个（条件×冷热×阶段）组各 20 条成功样本；nearest-rank P50/P95（升序第 ceil(p/100·n) 个值，每组至少 20 样本）。标准入口 `python3 scripts/run_m1_readonly.py --suite performance --output-dir <evidence>/performance --require-matrix` exit 0、`passed: true`、`failures: []`（`summary.json`/`summary.md`）。
+
+方法：`read_decode`/`snapshot`/`parse_mapping`/`main_thread_adopt` 为进程内同钟 Instant 边界；`first_layout` 为首内容 render 入口→根子元素 prepaint；`first_present` 改为 Metal System Trace 的 command buffer→CA client present request→displayed-surfaces-interval 显示链，取屏幕扫描开始（`external-trace-display-chain`），要求主帧 commit 身份、present 因果序与 1 ms trace 起始不确定度；`main_thread_stall_ns` 改为窗口内主线程 `individual_iteration` 扣除 `waiting_for_events` 后的最长连续忙碌段（`external-trace-runloop-busy`）。不再用 draw effect 或事件循环间隔充数。操作序列：每样本真实打开夹具，模式切换与 PageDown 滚动为程序化真实请求；冷=新进程且无同文档预热（不声称 OS 文件缓存冷，事前内容哈希已读取文件），热=同进程完整预热后重开（不声称磁盘热隔离）。计时起止：阶段 duration 与单调起止 offset 同钟，外部呈现链用 trace 相对时间并保留 1 ms 起始不确定度；逐样本原始边界在 `samples.jsonl`。
+
+结果入口：`logs/validation/m1-single-window-readonly/2026-11-10-performance-01/performance/summary.md`（144 组全表）、`samples.jsonl`（2880 样本行 + 360 运行行）、`summary.json`。示例（32KiB 冷/热）：`first_present` P50/P95 64.209/77.297 ms 与 39.573/43.557 ms；`first_layout` 2.943/4.437 与 1.030/1.401 ms。1 MiB 冷 `parse_mapping` P50/P95 48.025/52.083 ms；4 MiB 冷 `first_present` 217.019/231.940 ms。全矩阵最长主线程停顿 93.479 ms；峰值 RSS 1,036,763,136 bytes（worker 唯一原生子进程 `getrusage` 高水位，热条件含预热，非逐阶段）；虚拟实例上限 29。fixture SHA-256：32KiB `d24324b2…`、128KiB `24eebfe0…`、1MiB `10e02e0b…`、4MiB `09f1ea66…`、>4MiB `ead464ec…`、many-short-blocks `24eebfe0…`、single-giant-block `bce86ce2…`、giant-table `fe3e6def…`、dense-entities `0873a671…`（精确字节数见 summary.md）。
+
+证据代与补采：首轮 360 次尝试中 324 次成功；13 例由修正后的 trace 推导从失败证据恢复，9 例失败与 14 例不可用经两轮补采（21+2 条，新编号 20–22）替换；全部 324 条原收集记录用最终推导器统一重推。`rederive-report.json`、`samples-sources.json`、`samples.initial.jsonl`、`progress-reconciled.json` 记录来源目录与逐用例哈希；合并后 360 个启动 PID 唯一、每组 20 条，`check_validation_output.py` 12 项通过。补采与合并未修改 20 次下限、nearest-rank、阶段归属、运行身份/时钟不变量等拒绝规则。
+
+明确不测：编辑/输入法/查找/资源后端时延不适用 M1，未测且不填零；Windows 10、Intel Mac、Linux 未测，不以 macOS arm64 推断；完整设置/菜单/主题矩阵未测；20 次是首轮采样方案，不是新增发布门槛。`first_present` 是屏幕扫描开始的下界，不声称像素已进入人眼；trace 录制本身有开销，阶段值与无 trace 运行不可直接混比。复现命令同上；补采与合并命令见 `tmp/m1-single-window-readonly-resume.md` 与 `rederive-report.json`。
+
+判定：本分项只完成 7.1 的真实 Release 20 次测量与 V-05 字段回填，不冻结新性能门槛、不判完整 AC-16、不声称 M1 出口通过；8.2、7.3、V-09 整项、M0 豁免与 M2 前 V-08 保存闭环保持未关闭。
+
 ## V-06 · 资源上限与可恢复降级
 
 组 9 证据归集（2026-10-31）：预算/取消/非法输入基础已在最终 312 项 workspace 测试中执行，并按四核心公共 API 及原始输出建立[E2 发现清单（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.3/report.md)。本次未扩量性能/资源实验，注入预算与合作取消不冻结发布限额，也不证明第三方长调用可中断；V-06 未通过。

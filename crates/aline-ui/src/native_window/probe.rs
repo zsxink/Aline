@@ -146,6 +146,12 @@ pub(super) struct ProbeState {
     clock_origin: Instant,
     frame_serial: u64,
     frame_scheduled: bool,
+    /// 外部 trace 采集器释放后才进入测量序列；未设置时生产行为不变。
+    gate: Option<PathBuf>,
+    gate_ready: Option<PathBuf>,
+    gate_ready_written: bool,
+    gate_passed: bool,
+    gate_epoch_ns: u128,
 }
 
 #[cfg(test)]
@@ -252,6 +258,11 @@ impl ProbeState {
             clock_origin: Instant::now(),
             frame_serial: 0,
             frame_scheduled: false,
+            gate: std::env::var_os("ALINE_M1_PROBE_GATE").map(PathBuf::from),
+            gate_ready: std::env::var_os("ALINE_M1_PROBE_GATE_READY").map(PathBuf::from),
+            gate_ready_written: false,
+            gate_passed: false,
+            gate_epoch_ns: 0,
         })
     }
 
@@ -410,7 +421,7 @@ impl ProbeState {
             self.lines
                 .push(format!("kind=error\tcase=none\treason={reason}"));
         }
-        self.lines.push("kind=method\tfirst_layout=root-render-through-children-prepaint\tfirst_present=request-through-platform-draw-submission-effect\tscanout_measured=false\tcold_cache_managed_by=external-collector".to_owned());
+        self.lines.push("kind=method\tfirst_layout=root-render-through-children-prepaint\tfirst_present=external-trace-display-chain\tfirst_present_fallback=request-through-platform-draw-submission-effect\tscanout_measured=external-trace\tmain_thread_stall=external-trace-runloop-busy\tcold_cache_managed_by=external-collector".to_owned());
         self.lines.push("kind=done".to_owned());
         let content = self.lines.join("\n") + "\n";
         let written = write_evidence(&self.out, content.as_bytes()).is_ok();
@@ -463,6 +474,35 @@ impl NativeDocumentWindow {
             probe.phase = Phase::Done;
             probe.write_output();
             return true;
+        }
+        if !probe.gate_passed {
+            let gate = probe.gate.clone();
+            if let Some(gate) = gate.as_ref() {
+                if !probe.gate_ready_written {
+                    let ready = probe.gate_ready.clone();
+                    if let Some(ready) = ready.as_ref()
+                        && let Err(error) = write_evidence(
+                            ready,
+                            format!("pid={}\n", std::process::id()).as_bytes(),
+                        )
+                    {
+                        probe.error(format!("gate ready 写出失败 {error}"));
+                    }
+                    probe.gate_ready_written = true;
+                }
+                if !gate.exists() {
+                    return false;
+                }
+            }
+            probe.gate_passed = true;
+            let passed = StageTimer::start().finish();
+            probe.gate_epoch_ns = passed.started_epoch_ns;
+            probe.lines.push(format!(
+                "kind=gate\trun_id={}\tpid={}\tepoch_ns={}",
+                probe.run_id,
+                std::process::id(),
+                probe.gate_epoch_ns,
+            ));
         }
         match probe.phase {
             Phase::Done => true,
@@ -736,6 +776,11 @@ mod tests {
             clock_origin: Instant::now(),
             frame_serial: 0,
             frame_scheduled: false,
+            gate: None,
+            gate_ready: None,
+            gate_ready_written: false,
+            gate_passed: true,
+            gate_epoch_ns: 0,
         }
     }
 
