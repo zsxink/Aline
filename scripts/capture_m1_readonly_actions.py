@@ -43,15 +43,17 @@ def sha(data):
 
 
 REQUIRED_RECEIPT_FIELDS = ("schema", "pid", "exit_code", "raw_sha256",
-                           "started_utc", "finished_utc")
+                           "started_utc", "finished_utc", "driver_exit")
 
 
 def build_results_payload(*, run_id, commit, app_sha256, spec_sha256,
-                          fixtures, cases, receipt):
+                          fixtures, cases, receipt, evidence_root=None):
     """组装标准入口可直接消费的字节结果；收据必须绑定真实原始输出。
 
     ``fixtures`` 是用例名到原始字节的映射，键必须与标准入口登记的用例名一致。
     收据缺字段、pid 非正或退出码非零时直接失败：身份声明本身不构成运行证据。
+    ``evidence_root`` 是本轮证据目录的仓库内相对路径；标准入口据此回读
+    原始字节与回调记录，缺它就只能看到自述，不能判定真实运行。
     """
     if not isinstance(receipt, dict):
         raise ValueError("启动收据必须是对象")
@@ -64,6 +66,12 @@ def build_results_payload(*, run_id, commit, app_sha256, spec_sha256,
         raise ValueError("启动收据缺少实际 pid")
     if receipt["exit_code"] != 0:
         raise ValueError("原生进程未成功退出")
+    # 驱动退出码必须显式为零：驱动失败时收据同样要留下失败状态，
+    # 标准入口据此判定，不能靠「没写」当作成功。
+    if not isinstance(receipt["driver_exit"], int) or isinstance(receipt["driver_exit"], bool):
+        raise ValueError("启动收据缺少驱动退出码")
+    if receipt["driver_exit"] != 0:
+        raise ValueError("真实输入驱动未成功完成全部样本")
     manifest = {}
     for name, data in fixtures.items():
         manifest[name] = {"sha256": sha(data), "bytes": len(data), "suite": "bytes"}
@@ -78,6 +86,8 @@ def build_results_payload(*, run_id, commit, app_sha256, spec_sha256,
         "cases": cases,
         "launch_receipt": dict(receipt),
     }
+    if evidence_root is not None:
+        payload["evidence_root"] = evidence_root
     for field in ("run_id", "app_sha256", "spec_sha256", "fixtures"):
         payload["launch_receipt"][field] = payload[field]
     return payload
@@ -196,17 +206,19 @@ class StateTests(unittest.TestCase):
         }]
         receipt = {
             "schema": "aline-m1-launch/v1", "pid": 42, "exit_code": 0,
-            "raw_sha256": "c" * 64,
+            "raw_sha256": "c" * 64, "raw_output": "driver.stdout", "driver_exit": 0,
             "started_utc": "2026-11-11T00:00:00+00:00",
             "finished_utc": "2026-11-11T00:00:01+00:00",
         }
         payload = build_results_payload(
             run_id="run-1", commit="d" * 40, app_sha256="e" * 64,
-            spec_sha256="f" * 64, fixtures=fixtures, cases=cases, receipt=receipt)
+            spec_sha256="f" * 64, fixtures=fixtures, cases=cases, receipt=receipt,
+            evidence_root="logs/validation/example")
         self.assertEqual(payload["schema"], "aline-m1-readonly-bytes/v1")
         self.assertEqual(payload["build_profile"], "release")
         self.assertEqual(payload["fixtures"]["bom"]["suite"], "bytes")
         self.assertEqual(payload["launch_receipt"]["raw_sha256"], "c" * 64)
+        self.assertEqual(payload["evidence_root"], "logs/validation/example")
         for field in ("run_id", "app_sha256", "spec_sha256", "fixtures"):
             self.assertEqual(payload["launch_receipt"][field], payload[field])
 
@@ -224,7 +236,7 @@ class StateTests(unittest.TestCase):
         # 两条守卫各自都要有反例，不能只靠缺字段的通用反例覆盖。
         base = {
             "schema": "aline-m1-launch/v1", "pid": 42, "exit_code": 0,
-            "raw_sha256": "c" * 64,
+            "raw_sha256": "c" * 64, "raw_output": "driver.stdout", "driver_exit": 0,
             "started_utc": "2026-11-11T00:00:00+00:00",
             "finished_utc": "2026-11-11T00:00:01+00:00",
         }
@@ -236,6 +248,28 @@ class StateTests(unittest.TestCase):
             ("退出码非零", lambda receipt: receipt.update(exit_code=1)),
             ("退出码缺失", lambda receipt: receipt.pop("exit_code")),
             ("schema 不匹配", lambda receipt: receipt.update(schema="aline-m1-launch/v2")),
+        ):
+            receipt = dict(base)
+            mutate(receipt)
+            with self.subTest(label=label), self.assertRaises(ValueError):
+                build_results_payload(
+                    run_id="run-1", commit="d" * 40, app_sha256="e" * 64,
+                    spec_sha256="f" * 64, fixtures={}, cases=[], receipt=receipt)
+
+    def test_results_payload_rejects_a_failed_driver(self):
+        # 驱动退出码必须显式为零：驱动失败时收据要留下失败状态，
+        # 不能靠「没写」或「写了非零」进入标准入口的通过路径。
+        base = {
+            "schema": "aline-m1-launch/v1", "pid": 42, "exit_code": 0,
+            "raw_sha256": "c" * 64, "raw_output": "driver.stdout", "driver_exit": 0,
+            "started_utc": "2026-11-11T00:00:00+00:00",
+            "finished_utc": "2026-11-11T00:00:01+00:00",
+        }
+        for label, mutate in (
+            ("驱动退出码非零", lambda receipt: receipt.update(driver_exit=1)),
+            ("驱动退出码缺失", lambda receipt: receipt.pop("driver_exit")),
+            ("驱动退出码不是整数", lambda receipt: receipt.update(driver_exit="0")),
+            ("驱动退出码是布尔", lambda receipt: receipt.update(driver_exit=True)),
         ):
             receipt = dict(base)
             mutate(receipt)
@@ -348,6 +382,7 @@ def main():
         # 同级，打开面板会把这些文件列进无障碍树，树节点数超过工具上限，
         # 「前往文件夹」的路径输入框被截断，真实打开步骤随后必然失败。
         driver_exit = None
+        driver_failures = []
         try:
             if driver is not None:
                 driver_evidence = output / "driver"
@@ -359,6 +394,19 @@ def main():
                 driver_exit = driver_result.returncode
                 write_text(output / "driver.stdout", driver_result.stdout)
                 write_text(output / "driver.stderr", driver_result.stderr)
+                # 驱动退出码由驱动自己落证（driver/driver-exit.json），本入口只回读核对：
+                # 单一写入方，避免两处各写一份而互相覆盖。驱动没写或写的不一致，
+                # 说明留证不可信，计入失败。
+                driver_receipt = output / "driver" / "driver-exit.json"
+                if not driver_receipt.is_file():
+                    driver_failures.append("驱动未留下退出码留证")
+                else:
+                    try:
+                        recorded = json.loads(driver_receipt.read_text(encoding="utf-8"))
+                    except (OSError, ValueError):
+                        recorded = None
+                    if not isinstance(recorded, dict) or recorded.get("exit_code") != driver_exit:
+                        driver_failures.append("驱动留证的退出码与实际不符")
                 print("驱动退出码：" + str(driver_exit), flush=True)
             stdout, stderr = process.communicate(timeout=60)
         finally:
@@ -380,6 +428,7 @@ def main():
         cases = [inspect_case(path, fixtures) for path in sorted(snapshots.iterdir()) if path.is_dir()]
         seen = [case["fixture"] for case in cases]
         failures = ["缺少完整且唯一的逐样本记录"] if sorted(seen) != sorted(fixtures) else []
+        failures.extend(driver_failures)
         if process.returncode:
             failures.append("原生窗口进程非零退出")
         if driver_exit:
@@ -392,13 +441,20 @@ def main():
         write_json(output / "observations.json", {"launch": meta, "cases": cases,
                    "all_required_observed": not failures, "failures": failures,
                    "boundary": "记录完整性仍须结合真实GUI截图和操作日志独立复核，不替代7.3。"})
-        # 标准入口需要 results.json；收据的 raw_sha256 绑定真实原始输出文件。
-        raw_path = output / "app.stdout"
+        # 标准入口需要 results.json；收据的 raw_sha256 绑定真实原始输出。
+        # 绑定对象必须是**本轮非空**的原始输出：release 原生进程正常退出时
+        # stdout 为空，哈希空文件等于绑定了一个常量，谁都能写出来，等于没绑定。
+        # 因此改绑驱动留证目录：它每轮都有内容，且内容随本轮动作变化。
+        raw_path = output / "driver.stdout"
+        if not raw_path.is_file() or not raw_path.read_bytes().strip():
+            raise ValueError("原始输出留证缺失或为空，收据无法绑定真实运行")
         receipt = {
             "schema": "aline-m1-launch/v1",
             "pid": meta["pid"],
             "exit_code": process.returncode,
             "raw_sha256": sha(raw_path.read_bytes()),
+            "raw_output": "driver.stdout",
+            "driver_exit": driver_exit if driver_exit is not None else -1,
             "started_utc": meta["started_utc"],
             "finished_utc": meta["finished_utc"],
         }
@@ -422,7 +478,8 @@ def main():
             })
         payload = build_results_payload(
             run_id=meta["run_id"], commit=meta["commit"], app_sha256=meta["app_sha256"],
-            spec_sha256=spec_sha256, fixtures=named_fixtures, cases=result_cases, receipt=receipt)
+            spec_sha256=spec_sha256, fixtures=named_fixtures, cases=result_cases,
+            receipt=receipt, evidence_root=display_path(output))
         write_json(output / "results.json", payload)
         print(json.dumps({"cases": len(cases), "failures": failures}, ensure_ascii=False))
         return 1 if failures else 0

@@ -26,6 +26,7 @@ import math
 import os
 from pathlib import Path
 import re
+import shutil
 import sys
 import tempfile
 
@@ -1114,6 +1115,10 @@ def _bytes_provenance(expected_by_name, results, failures):
             failures.append("字节启动收据与结果身份不一致：" + field)
     if not _is_sha256(receipt.get("raw_sha256")):
         failures.append("字节启动收据缺少原始输出哈希")
+    if receipt.get("raw_output") != "driver.stdout":
+        failures.append("字节启动收据的原始输出绑定对象不是 driver.stdout")
+    # 驱动退出码由回读原始留证时核对（见 _bytes_evidence_bindings）：
+    # 那里拿收据与驱动落证的实际退出码比对，是唯一权威判定，此处不重复。
     if not _is_non_negative_int(receipt.get("pid")) or receipt.get("pid") == 0:
         failures.append("字节启动收据缺少实际 pid")
     if not _is_non_negative_int(receipt.get("exit_code")) or receipt.get("exit_code") != 0:
@@ -1121,6 +1126,158 @@ def _bytes_provenance(expected_by_name, results, failures):
     started, finished = (_parse_iso(receipt.get(field)) for field in ("started_utc", "finished_utc"))
     if started is None or finished is None or finished < started:
         failures.append("字节启动收据运行时间无效")
+
+
+def _evidence_state_fields(path):
+    """解析应用自己落盘的 state.tsv；字段重复即拒绝，不取其一。"""
+    fields = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        for item in line.split("\t"):
+            key, value = item.split("=", 1)
+            if key in fields:
+                raise ValueError("重复状态字段：" + key)
+            fields[key] = value
+    return fields
+
+
+def _evidence_steps(fields):
+    """把应用落盘的原始回调序列折叠为标准七步。
+
+    折叠只合并**连续**的滚动事件：一次真实滚轮滚动会产生多条
+    ``scroll-wheel``，它们属于同一步。其余步骤的重复一律保留。
+    """
+    folded = []
+    for step in fields.get("steps", "").split(","):
+        if not step:
+            continue
+        value = "scroll" if step in ("scroll-key", "scroll-wheel") else step
+        if value == "scroll" and folded and folded[-1] == "scroll":
+            continue
+        folded.append(value)
+    return folded
+
+
+def _bytes_evidence_bindings(results, expected_by_name, failures):
+    """回读原始证据目录核对每条自述结论；不看原始证据即不接受任何声明。
+
+    ``results.json`` 只是自述：字段之间自洽不能证明运行真的发生过。本核对
+    直接打开应用落盘的 ``snapshots/case-*/`` 与驱动留证，逐条重算哈希、
+    重新折叠步骤序列，并把收据绑定的进程退出码、驱动退出码与原始输出哈希
+    与实际文件比对。缺目录、缺文件、字段不符一律计入失败。
+    """
+    root = results.get("evidence_root")
+    if not isinstance(root, str) or not root:
+        failures.append("字节结果缺少 evidence_root：无法回读原始证据")
+        return
+    # evidence_root 是仓库内相对路径：只在仓库内解析，绝不接受绝对路径或越界路径。
+    candidate = Path(root)
+    if candidate.is_absolute():
+        failures.append("字节结果的 evidence_root 必须是仓库内相对路径")
+        return
+    evidence = (ROOT / candidate).resolve()
+    try:
+        evidence.relative_to((ROOT / "logs" / "validation").resolve())
+    except ValueError:
+        failures.append("字节结果的 evidence_root 越出仓库 logs/validation")
+        return
+    if not evidence.is_dir():
+        failures.append("字节结果的 evidence_root 不存在：" + str(root))
+        return
+    snapshots = evidence / "snapshots"
+    if not snapshots.is_dir():
+        failures.append("字节证据缺少 snapshots 目录")
+        return
+    directories = sorted(path for path in snapshots.iterdir() if path.is_dir())
+    if len(directories) != len(expected_by_name):
+        failures.append("字节证据的样本目录数与登记用例数不符")
+    # 收据必须绑定真实进程与真实驱动；自报的退出码不与实际留证比对即无意义。
+    receipt = results.get("launch_receipt") or {}
+    driver = evidence / "driver"
+    driver_exit = _read_driver_exit(driver)
+    if driver_exit is None:
+        failures.append("字节证据缺少驱动退出码留证")
+    elif driver_exit != 0:
+        failures.append("字节取证的驱动未成功完成全部样本")
+    receipt_driver_exit = receipt.get("driver_exit")
+    if not _is_non_negative_int(receipt_driver_exit):
+        failures.append("字节启动收据缺少驱动退出码")
+    elif receipt_driver_exit != driver_exit:
+        failures.append("字节启动收据的驱动退出码与实际留证不符")
+    raw = evidence / (receipt.get("raw_output") or "driver.stdout")
+    if not raw.is_file():
+        failures.append("字节证据缺少原始输出文件")
+    elif _sha256_bytes(raw.read_bytes()) != receipt.get("raw_sha256"):
+        failures.append("字节启动收据的原始输出哈希与实际文件不符")
+    for name in expected_by_name:
+        case = results.get("cases")
+        entry = None
+        if isinstance(case, list):
+            for item in case:
+                if isinstance(item, dict) and item.get("name") == name:
+                    entry = item
+                    break
+        if entry is None:
+            continue
+        directory = _evidence_case_directory(snapshots, name)
+        if directory is None:
+            failures.append("字节证据缺少样本原始记录：" + name)
+            continue
+        try:
+            fields = _evidence_state_fields(directory / "state.tsv")
+        except (OSError, ValueError) as error:
+            failures.append("字节样本状态记录不可读：" + name + "：" + str(error))
+            continue
+        steps = _evidence_steps(fields)
+        if tuple(steps) != REQUIRED_STEPS:
+            failures.append(name + " 原始回调序列不是标准七步：" + ",".join(steps))
+        if entry.get("steps") != list(REQUIRED_STEPS):
+            failures.append(name + " 自述步骤与原始回调序列不符")
+        for field, filename in (("disk_sha256_after", "disk-after.bin"),
+                                ("memory_sha256_after", "stored.bin"),
+                                ("source_sha256_before", "source-before.bin"),
+                                ("source_sha256_after", "source-after.bin")):
+            path = directory / filename
+            if not path.is_file():
+                failures.append(name + " 缺少原始字节证据：" + filename)
+                continue
+            if _sha256_bytes(path.read_bytes()) != entry.get(field):
+                failures.append(name + " " + field + " 与原始字节证据不符")
+        if fields.get("has_draft") != "false":
+            failures.append(name + " 原始状态记录出现草稿")
+        if fields.get("history_len") != "0":
+            failures.append(name + " 原始状态记录历史不为空")
+        if fields.get("revision_before") != fields.get("revision_after"):
+            failures.append(name + " 原始状态记录 revision 改变")
+        if fields.get("document_closed") != "true":
+            failures.append(name + " 原始状态记录未确认文档关闭")
+        if fields.get("disk_bytes_equal") != "true":
+            failures.append(name + " 原始状态记录磁盘字节不相等")
+
+
+def _read_driver_exit(driver):
+    """读驱动自身记录的退出码；没有留证时返回 None，绝不默认成功。"""
+    path = driver / "driver-exit.json"
+    if not path.is_file():
+        return None
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    exit_code = value.get("exit_code")
+    return exit_code if _is_non_negative_int(exit_code) else None
+
+
+def _evidence_case_directory(snapshots, name):
+    """按夹具名找到对应的样本目录；一个名字只允许对应一个目录。"""
+    matches = []
+    for directory in sorted(path for path in snapshots.iterdir() if path.is_dir()):
+        opened = directory / "opened.bin"
+        if not opened.is_file():
+            continue
+        expected = BYTES_CASES.get(name)
+        if expected and opened.read_bytes() == expected["bytes"]:
+            matches.append(directory)
+    return matches[0] if len(matches) == 1 else None
 
 
 def analyze_bytes(expected, results):
@@ -1187,6 +1344,7 @@ def analyze_bytes(expected, results):
     for name in actual_by_name:
         if name not in expected_by_name:
             failures.append("未登记的字节用例：" + str(name))
+    _bytes_evidence_bindings(results, expected_by_name, failures)
     summary = {
         "suite": "readonly-bytes",
         "schema": BYTES_SCHEMA,
@@ -1761,9 +1919,53 @@ def _window_ok(output, observations):
     return analyze_window(output, path, observations)["passed"]
 
 
+def _write_synthetic_evidence(root, expected):
+    """造一份**形状与真实取证一致**的合成证据树。
+
+    自测必须走与真实运行相同的回读路径：只有自造一份完整的
+    ``snapshots/case-*/`` 与驱动留证，门禁才会去读原始字节与回调记录，
+    而不是在自述字段上打转。合成件本身不构成任何保真证据。
+    """
+    evidence = root / "synthetic-evidence"
+    snapshots = evidence / "snapshots"
+    # 自测可能复用同一输出目录：先清掉旧合成件，避免残留目录与文件掩盖问题。
+    if evidence.exists():
+        shutil.rmtree(evidence)
+    snapshots.mkdir(parents=True, exist_ok=True)
+    driver = evidence / "driver"
+    driver.mkdir(parents=True, exist_ok=True)
+    write_text(evidence / "driver.stdout", "窗口已可寻址，等待轮次：1\n")
+    write_json(driver / "driver-exit.json", {"exit_code": 0})
+    for index, case in enumerate(expected, 1):
+        directory = snapshots / ("case-%03d" % index)
+        directory.mkdir()
+        data = BYTES_CASES[case["name"]]["bytes"]
+        source = data[3:] if data.startswith(b"\xef\xbb\xbf") else data
+        (directory / "opened.bin").write_bytes(data)
+        (directory / "disk-after.bin").write_bytes(data)
+        (directory / "stored.bin").write_bytes(data)
+        (directory / "source-before.bin").write_bytes(source)
+        (directory / "source-after.bin").write_bytes(source)
+        record = (
+            "has_open_block_before=false\thas_draft_before=false\thas_composition_before=false"
+            "\tundo_depth_before=0\tredo_depth_before=0\thistory_len_before=0\n"
+            "revision_before=0\trevision_after=0\thas_open_block=false\thas_draft=false"
+            "\thas_composition=false\tundo_depth=0\tredo_depth=0\thistory_len=0"
+            "\tsource_bytes_equal=true\n"
+            "document_closed=true\tdisk_bytes_equal=true\tsteps="
+            + ",".join(list(REQUIRED_STEPS[:2]) + ["scroll-wheel", "scroll-wheel"]
+                       + list(REQUIRED_STEPS[2:]))
+            + "\n"
+        )
+        (directory / "state.tsv").write_text(record, encoding="utf-8")
+    return evidence
+
+
 def self_test_bytes(output):
     test = SelfTest(output)
     expected = generate_bytes_fixtures(output)
+    evidence = _write_synthetic_evidence(output, expected)
+    evidence_root = str(evidence.resolve().relative_to(ROOT.resolve()))
     valid = {
         "schema": BYTES_SCHEMA,
         "run_id": "run-1",
@@ -1771,6 +1973,7 @@ def self_test_bytes(output):
         "build_profile": "release",
         "app_sha256": "b" * 64,
         "spec_sha256": "c" * 64,
+        "evidence_root": evidence_root,
         "fixtures": {case["name"]: {"sha256": case["sha256"], "suite": "bytes"} for case in expected},
         "cases": [
             {"name": case["name"], "run_id": "run-1", "steps": list(REQUIRED_STEPS),
@@ -1786,7 +1989,9 @@ def self_test_bytes(output):
     }
     valid["launch_receipt"] = {
         "schema": "aline-m1-launch/v1", "pid": 42, "exit_code": 0,
-        "raw_sha256": "d" * 64, "started_utc": "2026-11-08T00:00:00+00:00",
+        "raw_sha256": _sha256_bytes((evidence / "driver.stdout").read_bytes()),
+        "raw_output": "driver.stdout", "driver_exit": 0,
+        "started_utc": "2026-11-08T00:00:00+00:00",
         "finished_utc": "2026-11-08T00:00:01+00:00",
         **{key: valid[key] for key in ("run_id", "app_sha256", "spec_sha256", "fixtures")},
     }
@@ -1803,6 +2008,15 @@ def self_test_bytes(output):
         ("旧fixture被拒绝", lambda value: value["fixtures"]["bom"].update(sha256="f" * 64)),
         ("失败进程被拒绝", lambda value: value["launch_receipt"].update(exit_code=1)),
         ("跨轮字节用例被拒绝", lambda value: value["cases"][0].update(run_id="old-run")),
+        ("驱动失败被拒绝", lambda value: value["launch_receipt"].update(driver_exit=1)),
+        ("收据缺驱动退出码被拒绝", lambda value: value["launch_receipt"].pop("driver_exit")),
+        ("原始输出绑定对象错误被拒绝",
+         lambda value: value["launch_receipt"].update(raw_output="app.stdout")),
+        ("收据的原始输出哈希与实际文件不符被拒绝",
+         lambda value: value["launch_receipt"].update(raw_sha256="0" * 64)),
+        ("缺少 evidence_root 被拒绝", lambda value: value.pop("evidence_root")),
+        ("evidence_root 越界被拒绝",
+         lambda value: value.update(evidence_root="../../etc")),
     ):
         broken = json.loads(json.dumps(valid))
         mutate(broken)
@@ -1838,6 +2052,51 @@ def self_test_bytes(output):
     no_raw["launch_receipt"].pop("raw_sha256")
     test.check("收据缺原始输出哈希被拒绝", lambda: test.expect(
         not analyze_bytes(expected, no_raw)["passed"], "收据必须绑定真实原始输出"))
+    # 伪造件的关键防线：自述字段全部正确，但没有原始证据目录可回读。
+    forged = json.loads(json.dumps(valid))
+    forged.pop("evidence_root")
+    forged["run_id"] = "totally-made-up"
+    forged["launch_receipt"]["run_id"] = "totally-made-up"
+    test.check("伪造结果缺少原始证据被拒绝", lambda: test.expect(
+        not analyze_bytes(expected, forged)["passed"], "没有原始证据就不能算通过"))
+    # 自述正确但原始字节被改：回读时必须发现。
+    tampered = json.loads(json.dumps(valid))
+    case_dir = sorted((evidence / "snapshots").iterdir())[0]
+    (case_dir / "disk-after.bin").write_bytes(b"tampered")
+    test.check("原始字节被篡改被拒绝", lambda: test.expect(
+        not analyze_bytes(expected, tampered)["passed"], "回读原始字节必须发现篡改"))
+    (case_dir / "disk-after.bin").write_bytes(
+        BYTES_CASES[expected[0]["name"]]["bytes"])
+    # 自述正确但原始回调序列少一步：回读时必须发现。
+    short = json.loads(json.dumps(valid))
+    record = (case_dir / "state.tsv").read_text(encoding="utf-8")
+    (case_dir / "state.tsv").write_text(
+        record.replace("steps=open,scroll,scroll-wheel,scroll-wheel,hit,jump,"
+                       "visual_to_source,source_to_visual,close",
+                       "steps=open,hit,jump,visual_to_source,source_to_visual,close"),
+        encoding="utf-8")
+    test.check("原始回调序列缺步被拒绝", lambda: test.expect(
+        not analyze_bytes(expected, short)["passed"], "回读原始回调必须发现缺步"))
+    (case_dir / "state.tsv").write_text(record, encoding="utf-8")
+    # 驱动退出码留证为非零：即使自述说成功也必须失败。
+    failed_driver = json.loads(json.dumps(valid))
+    write_json(evidence / "driver" / "driver-exit.json", {"exit_code": 1})
+    test.check("驱动留证失败被拒绝", lambda: test.expect(
+        not analyze_bytes(expected, failed_driver)["passed"], "驱动失败必须计入失败"))
+    write_json(evidence / "driver" / "driver-exit.json", {"exit_code": 0})
+    # 收据自述驱动成功、实际留证却是失败：两者不符必须失败。
+    # 这条覆盖「收据与留证交叉核对」，与上一条「留证本身失败」不是同一路径。
+    mismatched = json.loads(json.dumps(valid))
+    write_json(evidence / "driver" / "driver-exit.json", {"exit_code": 1})
+    test.check("收据与驱动留证的退出码不符被拒绝", lambda: test.expect(
+        not analyze_bytes(expected, mismatched)["passed"], "收据与留证必须一致"))
+    write_json(evidence / "driver" / "driver-exit.json", {"exit_code": 0})
+    # 驱动留证缺失：不能默认当作成功。
+    missing_receipt = json.loads(json.dumps(valid))
+    (evidence / "driver" / "driver-exit.json").unlink()
+    test.check("驱动留证缺失被拒绝", lambda: test.expect(
+        not analyze_bytes(expected, missing_receipt)["passed"], "缺驱动留证必须失败"))
+    write_json(evidence / "driver" / "driver-exit.json", {"exit_code": 0})
     return test.finish()
 
 

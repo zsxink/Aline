@@ -137,7 +137,9 @@ def run(args):
                'M1 7.1 新增入口 m1_trace_metrics.py / m1_trace_record.py / m1_rederive_performance.py '
                '的 --self-test 已纳入顺序清单，与其它条目同样单条失败不短路；'
                'M1 7.3 只读真实窗口驱动 drive_m1_readonly_window.py 的合成自测同样纳入清单，'
-               '它只证明驱动判定与等待策略，不证明真实窗口七步',
+               '它只证明驱动判定与等待策略，不证明真实窗口七步；'
+               'M1 7.3 标准入口 readonly-bytes 自测还覆盖门禁回读原始证据的反例，'
+               '合成证据树不构成任何保真证据',
                'catalog': 'cargo test --workspace 实际发现 app-core 正反例与 UI 消费测试',
                'results': records}
     write_json(output / 'summary.json', summary)

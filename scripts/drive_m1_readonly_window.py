@@ -110,7 +110,7 @@ class WindowDriver:
         result = subprocess.run(argv, text=True, capture_output=True)
         return interpret_probe(result.stdout)
 
-    def wait_until_ready(self):
+    def wait_until_ready(self, timeout=STARTUP_TIMEOUT):
         """等窗口登记进无障碍树，再投递第一个动作。
 
         启动竞争是真实存在的：进程刚起来时无障碍树里还没有它，此刻投递
@@ -122,7 +122,7 @@ class WindowDriver:
         """
         started = time.monotonic()
         try:
-            attempts = wait_for_ready(probe=self.probe, timeout=STARTUP_TIMEOUT,
+            attempts = wait_for_ready(probe=self.probe, timeout=timeout,
                                        poll=STARTUP_POLL, monotonic=time.monotonic)
         except DriverError as error:
             write_json(self.evidence / "startup-wait.json",
@@ -154,6 +154,9 @@ class WindowDriver:
         路径**不**通过无障碍树查找输入框：面板列出证据目录时树会被截断，
         输入框不在树里。`type-text` 作用于当前焦点，焦点由 macOS 自行落在
         路径输入框上，因此与树是否被截断无关。
+
+        这条路线的风险是焦点没落在路径框时，路径会被打进别处。该风险由
+        末尾的标题断言兜底：文件名不在窗口标题里即判失败，不会静默通过。
 
         路径输入框里的回车只会收起「前往文件夹」并把面板定位到该文件，
         真正打开文件需要第二次回车（落在「打开」按钮上）。
@@ -297,6 +300,8 @@ def main():
     parser.add_argument("evidence", type=Path, nargs="?", help="证据目录")
     parser.add_argument("--self-test", action="store_true",
                         help="只跑合成自测：不启动窗口、不投递真实输入")
+    parser.add_argument("--startup-timeout", type=float, default=STARTUP_TIMEOUT,
+                        help="等待窗口登记进无障碍树的秒数上限")
     args = parser.parse_args()
     if args.self_test:
         result = unittest.TextTestRunner().run(
@@ -316,13 +321,16 @@ def main():
     try:
         # 第一个动作之前先等窗口登记进无障碍树：进程刚起来时树里还没有它，
         # 此刻投递只会得到 app_not_found，样本会在打开之前就失败。
-        driver.wait_until_ready()
+        driver.wait_until_ready(timeout=args.startup_timeout)
     except DriverError as error:
         failures.append("等待窗口可寻址失败：" + str(error)[:300])
         print("用例失败：等待窗口可寻址：" + str(error)[:300], flush=True)
     if not failures:
         failures.extend(run_cases(driver, args.fixtures.resolve()))
     failures.extend(close_window(driver))
+    # 驱动退出码落证：标准入口回读本目录据此判定驱动是否完成全部样本，
+    # 不采信 results.json 的自述。
+    write_json(evidence / "driver-exit.json", {"exit_code": 1 if failures else 0})
     print(json.dumps({"failures": failures}, ensure_ascii=False))
     return 1 if failures else 0
 
@@ -377,6 +385,24 @@ class DriverTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'logs/validation'):
             require_validation_path(outside)
         self.assertFalse(outside.exists())
+
+    def test_main_writes_the_driver_exit_code_as_evidence(self):
+        # 驱动必须把自己的退出码落证：标准入口回读该留证判定驱动是否完成全部样本，
+        # 不采信 results.json 的自述。走**真实入口**，只测驱动判定本身不足以证明落证。
+        evidence = ROOT / 'logs' / 'validation' / 'm1-single-window-readonly' / 'driver-exit-selftest'
+        result = subprocess.run(
+            [sys.executable, str(Path(__file__).resolve()), '1', str(ROOT), str(evidence),
+             '--startup-timeout', '1'],
+            cwd=ROOT, text=True, capture_output=True)
+        # 进程号 1 不存在，驱动会失败；无论成败都必须留下退出码留证。
+        recorded = evidence / 'driver-exit.json'
+        try:
+            self.assertTrue(recorded.is_file())
+            value = json.loads(recorded.read_text(encoding='utf-8'))
+            self.assertIn(value.get('exit_code'), (0, 1))
+            self.assertEqual(value.get('exit_code'), result.returncode)
+        finally:
+            shutil.rmtree(evidence, ignore_errors=True)
 
     def test_main_rejects_an_evidence_directory_outside_the_repository(self):
         # 反例走**真实入口**：命令行给出仓库外的证据落点时必须拒绝并退出非零。
