@@ -4,7 +4,7 @@
 
 更新日期：2026-10-29
 
-状态：**ED-01 及相关 RS-01～RS-05 已按建议 A 确认并回写，当前无待确认问题；V-01～V-09 均未执行，不表示实现、算法验证或发布验收通过。**
+状态：**ED-01 及相关 RS-01～RS-05 已按建议 A 确认并回写，当前无待确认问题；V-01～V-09 均未整项通过（已执行与未测的分项见[验证计划](./v1-validation-plan.md)），不表示实现、算法验证或发布验收整项通过。**
 
 基线：[PRD 0.9](./v1-prd.md) · [技术架构指引 0.8](./v1-architecture.md) · [Rust 规范 0.2](./rust-style-guide.md) · [验证计划](./v1-validation-plan.md) · [Rust 与引擎问题确认归档](./archive/2026-10-29-rust-style-decisions.md)
 
@@ -719,3 +719,13 @@ Ely 索引中的 `document/{edit,parse,apart,format,block,tables}.rs`、`markdow
 独立样例和无头回归见 `crates/aline-markdown/tests/fixtures/m1/`、`readonly_presentation.rs`、`readonly_mapping.rs`、`navigation.rs`。这些测试证明数据结构、来源映射、预算回退与解析器已识别脚注的标签匹配，不证明 GPUI renderer、真实像素命中或布局软折行，也不能单独证明五类基础内容已在窗口正确展示。SoftBreak、有限 HTML 子集外 void/未支持容器的展示口径已按 2026-11-03 用户裁决冻结；V-07 仍有其他未测样例，AC-09 仅按各自证据报告分项。
 
 **2026-11-02 独立 API 复核修复：** `Projection::window` 的两个最小失败回归已先复现再修复：空窗口现明确返回 `MappingError::InvalidMapping`，纯锚点应在父投影上调用 `source_at` 并保留 affinity，不能以空投影伪造 Exact/空来源；非空窗口仅对单调绘制起点二分，并单独纳入跨起点的可见片段，不再假定允许嵌入可见区间的零宽 Hidden 终点单调。`readonly_mapping` 覆盖实体边界拒绝、内嵌 Hidden、跨窗口及再次局部化，相关 mapping/grapheme 共 33 例和完整 `aline-markdown` 测试已通过。此处记录无头修复，不替代独立复审或真实像素命中验证。
+
+### 19.1 2026-11-11 只读展示机制的真实窗口分项状态
+
+上一段记录的是 2026-11-02 的无头实现状态。以下为之后的真实窗口分项证据，均为**分项**结果，不构成任何 V 项或 AC 的整项通过：
+
+- **保真夹具的真实窗口七步：** 五个保真样本（BOM／混合行尾／孤立 CR／纯空白／无尾换行）在真实原生窗口内依次走完 `open → scroll → hit → jump → visual_to_source → source_to_visual → close`，每例磁盘字节与内存源码逐字节相等，`has_draft=false`、`history_len=0`、`revision_before/after=0`，`document_closed=true`。这是 AC-01 字节保真与 AC-09 只读展示在 macOS arm64 上的**分项**证据；不覆盖编辑、保存/重开（归 M2）与 Windows/Linux。
+- **1 MiB 真实可视化滚动：** 1,048,576 字节夹具在当前 Release 二进制上由像素读滚动条比例（0.0 → 0.0027 → 0.0018 → 1.0）与末尾标记块、回顶 0.0 两条独立位置佐证，并由应用自身回调记录（213 次滚轮 + 2 次键盘事件）互证。滚动比例与缩略块位置仍为**候选**量测方法，未冻结为性能或布局门槛。
+- **未随本节关闭的边界：** 代码块的真实横向滚动交互尚无真实窗口证据（PRD §6.2、UI §7.2 的产品要求仍缺证据）；`Hidden` 命中按设计不可由像素触达，不记为缺口也不记为通过；运行时字体切换在 M1 未接线；性能门槛、几何数值与配色仍为实验候选，未冻结。
+
+分项明细与证据路径见[验证计划](./v1-validation-plan.md)与 `openspec/changes/m1-single-window-readonly/tasks.md`。

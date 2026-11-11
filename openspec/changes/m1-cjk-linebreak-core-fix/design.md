@@ -97,7 +97,7 @@ AGENTS.md 路由安排独立复审（只安排、未执行）。
 `StyledText::layout()` 公开、`PreparedLayout` 已持有 `TextLayout`，H1 缺的是一次真实
 窗口实测而非缺接口。方案 B 改变全部字节身份、C 因禁止 `test-support` 不可行、
 D 需放宽 spec delta，均不采用。**spec delta 未改、未放宽**；
-完整裁决见 `../2026-11-09-cjk-04/cjk-linebreak/decision/h1-ruling.md` 与[决定 §31](../../docs/decisions.md)。
+完整裁决见 `../2026-11-09-cjk-04/cjk-linebreak/decision/h1-ruling.md` 与[决定 §31](../../../docs/decisions.md)。
 
 本轮只在 logs 隔离副本交付：纯记录规则（23/23 正反例、`forbid(unsafe_code)`、无 I/O）、
 opt-in 钩子（四环境变量 gate、唯一状态来源、capture 不写盘、flush `create_new`、

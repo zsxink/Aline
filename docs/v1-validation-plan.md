@@ -35,11 +35,11 @@
 - 矩阵源规格为六项 capability **16R/45S**，治理 delta **1R/2S**，合计 17R/47S；R07 在原 16R/44S 后增加 S36，6.9/S36 不计入原始 46 项任务。核对口径区分测试断言与 Scenario 全部 WHEN/THEN：S11 已覆盖待定 Undo、组合取消/旧身份失效及用户裁决的 redo 分叉分支；有效新输入截支、无效输入拒绝保支与空字符串无变化保支由不同断言核对，但组合状态仍是模拟状态，不代表原生 IME。S13 的旧解析/投影拒收有测试；写盘回执只在测试中检查 `Written.bytes()` 并调用 `into_baseline`，production host coordinator/实际快照结算未接线，仍为部分覆盖。E1/E2/E4/E5/E7 未闭合；E3 限 basic fixture；E6 仅登记未测项。V-01～V-09 仍无整项通过。 2026-11-02 用户验收裁决：E1–E7 与 M0 出口按现有证据记为验收通过；上述未闭合/限 basic/仅登记及 V-01～V-09 未整项通过的事实保留，不写成已执行或已验证。
 - 原始行尾表示、Unicode17 精确准入与 GPUI 指纹批准已迁入[决策记录 §15～17](./decisions.md#15-2026-10-31-原始行尾表示与存储等价确认)，不再依赖临时报告维持契约。
 - 单元/集成验证由 `crates/*/tests/` 和源码旁测试执行，固定输入及独立预期在 `tests/fixtures/`；门禁与正反例在 `scripts/`、`scripts/fixtures/`。统一复跑入口为 `python3 scripts/check_workspace.py --cargo-home <已核对的隔离缓存>`，脚本负责将运行输出写入 `logs/validation/`，不自动安装工具或下载依赖。
-- 真实 GPUI/IME/焦点与窗口、Intel Mac/Windows10/Linux、远端 CI、Release 性能、已有文件替换/协调/多资源事务等仍未验证。以下 V-01～V-09 继续按各自完整出口执行，不由基础测试推定通过。
+- 真实 GPUI/IME/焦点与窗口、Intel Mac/Windows10/Linux、远端 CI、已有文件替换/协调/多资源事务等仍未验证；Release 性能已由 2026-11-10 的 360 样本矩阵按分项完成（V-05 首轮，未冻结门槛）。以下 V-01～V-09 继续按各自完整出口执行，不由基础测试或分项记录推定整项通过。
 
 ## V-01 · 三平台兼容与发布矩阵
 
-2026-10-31 M0 组 9 分项：当前 macOS arm64 的正式 workspace 统一门禁为 19/19 exit 0、312 passed，见[9.1 原始记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.1/report.md)。它只覆盖无窗口工程与纯状态基础；`--all-targets` 和目标依赖图解析不代表其他 OS/架构构建。M1 原生 macOS 冒烟、后续 Windows/Linux、Intel Mac/低系统版本与安装/真实输入仍未执行，V-01 未通过；完整交接见[E6（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.5/report.md)。
+2026-10-31 M0 组 9 分项：当前 macOS arm64 的正式 workspace 统一门禁为 19/19 exit 0、312 passed，见[9.1 原始记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.1/report.md)。它只覆盖无窗口工程与纯状态基础；`--all-targets` 和目标依赖图解析不代表其他 OS/架构构建。**2026-11-11 现状更正：** M1 原生 macOS 冒烟已执行（真实单窗显示/退出、文件打开/取消/关闭、14 项主窗窗口矩阵，见 V-09 段），后续 Windows/Linux、Intel Mac/低系统版本与安装/真实输入仍未执行，**V-01 仍未整项通过**；完整交接见[E6（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.5/report.md)。
 
 2026-11-03 增补：已在 `aline-ui` 源码中装配锁定 GPUI macOS 后端与单个初始空状态窗口，但 `cargo check -p aline --locked --offline`、workspace Clippy 和 workspace test 均在 `gpui-pre-apple` 的 Metal shader build 失败，错误为 `xcrun` 找不到 `metal`。这只证明宿主实现待平台编译，不是原生应用构建或窗口冒烟；macOS 真机打开/关闭及失败退出码仍待实际取证。
 
@@ -53,7 +53,7 @@ M0 兼容目标登记（2026-10-30，目标候选，不代表支持或验证通�
 | Windows 10 | `x86_64`，测试版本候选 22H2；最终最低 build 与 ARM64 是否纳入待确定 | Windows 原生显示环境 | 本次未接入 Windows 10 设备；安装、显示、输入法、系统集成均未取证 |
 | Linux | `x86_64`、`aarch64`；发行版样本候选 Ubuntu 24.04 LTS、Debian 12，最终最低版本待测 | X11、Wayland 为待验证候选 | 本次未接入 Linux 设备/VM；发行版、显示会话与系统集成均未取证 |
 
-目标与设备证据及命令见 [M0 引擎地基验证记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/README.md)。当前仅 macOS `aarch64` 主机环境已实际观察；上述其余 CPU/系统/显示值均为候选或缺口，不能据此推断平台支持。验证顺序为先 macOS，再 Windows/Linux；V-01 仍未执行。
+目标与设备证据及命令见 [M0 引擎地基验证记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/README.md)。当前仅 macOS `aarch64` 主机环境已实际观察；上述其余 CPU/系统/显示值均为候选或缺口，不能据此推断平台支持。验证顺序为先 macOS，再 Windows/Linux；**V-01 仍未整项通过**（macOS 冒烟已按分项执行，Windows 10、Intel Mac、Linux 无任何运行时证据）。
 
 第 1 组已取得隔离 GPUI 核心库的 macOS aarch64 构建和各目标依赖解析证据，见[候选审计（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/admission-2026-10-30/report.md)。系统版本候选用于安排后续取证，不是兼容测试结果；Intel Mac、Windows/Linux 的原生构建/运行、真实 IME 和安装分发均未执行，不能将 `cargo metadata`/`tree` 的成功称为平台已支持。
 
@@ -61,7 +61,7 @@ M0 兼容目标登记（2026-10-30，目标候选，不代表支持或验证通�
 
 时点：M0 确定兼容目标，M1 首轮 macOS 冒烟，M5～M6 按既定顺序完成全平台验证。对应 FILE-02～03、第 7.1 节。
 
-应用图标输入按 [PRD §6.1](./v1-prd.md#61-主窗口与导航)、[UI §3.1](./ui-spec.md#31-应用身份与默认色)及[图标资源说明](./assets/app-icon/README.md)固定：macOS 使用 `aline.icns`，Windows 使用 `aline.ico`，应用内品牌展示与 Linux 使用透明 `aline.png`。验证实际应用包 / 可执行文件 / desktop 配置指向这些资源，在 Dock、Finder、Windows 桌面 / 任务栏及 Linux 启动器按实际可见尺寸检查，覆盖深浅背景、高 DPI 与安装 / 升级后的图标刷新。主体外透明，无原图白色画布、白边、二次圆角或重复留白；不打包原图、预览或旧品牌 PNG。现有文件级透明度与尺寸检查仅作为输入证据，不代表上述安装和显示验证已完成；V-01 仍未执行。
+应用图标输入按 [PRD §6.1](./v1-prd.md#61-主窗口与导航)、[UI §3.1](./ui-spec.md#31-应用身份与默认色)及[图标资源说明](./assets/app-icon/README.md)固定：macOS 使用 `aline.icns`，Windows 使用 `aline.ico`，应用内品牌展示与 Linux 使用透明 `aline.png`。验证实际应用包 / 可执行文件 / desktop 配置指向这些资源，在 Dock、Finder、Windows 桌面 / 任务栏及 Linux 启动器按实际可见尺寸检查，覆盖深浅背景、高 DPI 与安装 / 升级后的图标刷新。主体外透明，无原图白色画布、白边、二次圆角或重复留白；不打包原图、预览或旧品牌 PNG。现有文件级透明度与尺寸检查仅作为输入证据，不代表上述安装和显示验证已完成；**V-01 仍未整项通过**。
 
 ## V-02 · 导出保真矩阵与真实样本
 
@@ -324,9 +324,9 @@ M0 编码基础证据（2026-10-31）：行尾边界金样已固定 CR-X-LF 删�
 
 | 编号 | 当前状态 | 规范/实验/产物证据 | 受影响需求 | 结论及回写日期 |
 |---|---|---|---|---|
-| V-01 | M0 工程/目标登记已有分项；原生发布矩阵未完成 | [E1（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.2/report.md)、[E6/M1 交接（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.5/report.md) | FILE-02～03、第 7.1 节 | 未整项通过，2026-10-31 |
-| V-02～V-05、V-09 | 完整产物/平台/性能/视觉实验未执行；ED-01 等纯协议不代替产物 | [未测与交接清单（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.5/report.md) | 见各条目 | 未整项通过，2026-10-31 |
-| V-06～V-07 | 无头基础分项已执行；限额、真实输入/显示及完整语法命令未完成 | [E2/E3/E5（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.3/report.md)、[E4/E7（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.4/report.md) | SAFE-01～03、EDIT、MD、FORMAT 等，见各条目 | 未整项通过，2026-10-31 |
+| V-01 | M0 工程/目标登记已有分项；M1 macOS arm64 原生冒烟已按分项执行；Windows 10/Intel Mac/Linux 原生发布矩阵未完成 | [E1（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.2/report.md)、[E6/M1 交接（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.5/report.md) | FILE-02～03、第 7.1 节 | 未整项通过，2026-11-11 |
+| V-02～V-05、V-09 | V-03/V-04/V-05/V-09 已按 M1 分项执行（基础夹具、字体分项、Release 360 样本矩阵、14 项主窗窗口矩阵）；完整产物/平台/性能/视觉实验仍未执行；ED-01 等纯协议不代替产物 | [未测与交接清单（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.5/report.md) | 见各条目 | 未整项通过，2026-11-11 |
+| V-06～V-07 | 无头基础分项已执行；V-07 已补 2026-11-06 内容/导航/代码分项与 2026-11-11 五样本七步真实窗口分项；限额、真实输入/显示及完整语法命令未完成 | [E2/E3/E5（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.3/report.md)、[E4/E7（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.4/report.md) | SAFE-01～03、EDIT、MD、FORMAT 等，见各条目 | 未整项通过，2026-11-11 |
 | V-08 | 身份/快照与 create-only 原语是设计准备；真实保存/恢复/资源事务未完成 | [M2 前独立出口（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-9/step-9.5/report.md#m2-前独立安全出口)、[8.5（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-8/step-8.5/report.md) | FILE、SAFE、IMAGE 等，见本项 | 未整项通过，2026-10-31 |
 
 完成标准：证据可检查、支持和拒绝边界明确、PRD/专门规范已同步、相关验收通过。范围决定不再重复询问；尚未确定的规范细节由方案和样本收口，不能仅通过归档动作标记验证完成。

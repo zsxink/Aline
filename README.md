@@ -78,7 +78,7 @@ Aline 是独立开发的项目，规格、门禁与验收口径由人定义，�
 ## 状态与边界
 
 - M0 出口未闭合，V-01～V-09 均未整项通过；工程与无头基础分项不能替代完整验收，见 `docs/v1-validation-plan.md`
-- 无可用界面、无发布产物、无插件运行时
+- 已有 M1 原生单窗口只读界面（macOS arm64 取证），尚无编辑、保存/重开、插件运行时与发布产物
 - CI 见 `.github/workflows/m0.yml`，与 `scripts/` 本地门禁同源
 
 如果只是想看这个项目的方法论而不是代码，从 [docs/development-process.md](docs/development-process.md) 与 `openspec/` 开始更快。

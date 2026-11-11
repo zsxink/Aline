@@ -8,7 +8,7 @@
 
 旧稿针对Zed主线新架构：Window/App分参、平台crate拆分等。Aline固定gpui-pre单一来源、精确锁快照；具体工具链/edition/版本、补丁和API须M0登记、V-01验证。旧`spawn/background_spawn/weak.update`、`handle_input`、`add_fonts`、`on_open_urls`、`set_menus`和测试harness均是检索线索，不是已可编译的Aline接口。
 
-当前结果以[PRD 0.9](./v1-prd.md)为准，模块归属见[架构](./v1-architecture.md)，输入/映射见[引擎](./engine-design.md)，跨层边界见[R/K规范](./architecture-guide.md)，工具/类型纪律见[S/C规范](./rust-style-guide.md)。V-01～V-09均未执行。本文“已有承接”表示当前规范有同类契约，不表示Zed算法被逐字采纳或性能已通过。
+当前结果以[PRD 0.9](./v1-prd.md)为准，模块归属见[架构](./v1-architecture.md)，输入/映射见[引擎](./engine-design.md)，跨层边界见[R/K规范](./architecture-guide.md)，工具/类型纪律见[S/C规范](./rust-style-guide.md)。V-01～V-09均未整项通过。本文“已有承接”表示当前规范有同类契约，不表示Zed算法被逐字采纳或性能已通过。
 
 ## 1. GPUI 本体逐主题映射
 

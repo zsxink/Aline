@@ -6,7 +6,7 @@
 
 Aline —— Typora 式 Markdown 编辑器（Rust + GPUI，无 WebView），macOS / Windows / Linux 三端。技术路线继承 ElyMark 验证过的方案：**源文本是唯一事实来源 → 解析为携带"绘制文本 ↔ 源码字节"双向映射的展示树 → 按块虚拟化渲染 → 同一时刻最多一个块"打开"编辑 → 提交时对源文本做单区间补丁（单步撤销）→ 未编辑字节原样写回**。
 
-当前状态：**已有八成员 workspace、引擎与无头宿主基础，尚无可用原生界面；M0 出口已由用户 2026-11-02 验收裁决通过（验收豁免；逐包人工复核与 E2/E4/E5/E7 整项等未执行项见验证计划，不得写成已验证）。现行规范见 `docs/README.md`，验证状态见 `docs/v1-validation-plan.md`。调研、原型与历史材料不自动取得规范效力；旧过程报告和维护审计已按用户要求清理，必要决定见 `docs/decisions.md`，不恢复整套目录。**
+当前状态：**已有八成员 workspace、引擎与无头宿主基础，以及 M1 的原生单窗口只读界面（打开/渲染/点击映射/滚动，已在 macOS arm64 取证）；尚无编辑、保存/重开、插件运行时与发布产物。M0 出口已由用户 2026-11-02 验收裁决通过（验收豁免；逐包人工复核与 E2/E4/E5/E7 整项等未执行项见验证计划，不得写成已验证）；V-01～V-09 均未整项通过，已执行与未测的分项见 `docs/v1-validation-plan.md`。现行规范见 `docs/README.md`，验证状态见 `docs/v1-validation-plan.md`。调研、原型与历史材料不自动取得规范效力；旧过程报告和维护审计已按用户要求清理，必要决定见 `docs/decisions.md`，不恢复整套目录。**
 
 ## 文档地图（动手前必读）
 
@@ -18,9 +18,9 @@ Aline —— Typora 式 Markdown 编辑器（Rust + GPUI，无 WebView），macO
 | [docs/engine-design.md](docs/engine-design.md) | 当前引擎契约：保真与补丁、解析、坐标映射（§7）、输入组/IME、有限 HTML（§11）、依赖准入（§18.2）；历史逐章处置见 §18.1 | 理解和实现纯逻辑机制前 |
 | [docs/README.md](docs/README.md) | 当前权威关系、文档状态与阅读顺序 | 动手前先读 |
 | [docs/v1-prd.md](docs/v1-prd.md) | V1 产品范围、非目标、行为与 AC-01～AC-20 | 判断一个功能该不该做 |
-| [docs/v1-validation-plan.md](docs/v1-validation-plan.md) | V-01～V-09 实验、样本与阶段依赖，当前均未执行 | 判断技术和验收是否已有证据 |
+| [docs/v1-validation-plan.md](docs/v1-validation-plan.md) | V-01～V-09 实验、样本与阶段依赖；均未整项通过，已执行与未测的分项以本文档为准 | 判断技术和验收是否已有证据 |
 | [docs/plugin-system.md](docs/plugin-system.md) | V1 内置插件的产品行为、设置归属、启停与架构边界 | 设计或实现插件功能和插件设置前 |
-| [docs/ui-spec.md](docs/ui-spec.md) | 产品界面规范：布局/交互/视觉基线、图片只读 tab、菜单/设置/主题、键盘与中文界面验收（决定 §24：人工/原生取证只做中文，双语 catalog 自动校验保留）；§4.1 原型布局对照（实现参照）；UI-01～UI-06 已确认，原问题见 [UI 确认归档](docs/archive/2026-10-29-ui-decisions.md)，V 项仍未执行 | 实现或评审任何面向用户的界面 |
+| [docs/ui-spec.md](docs/ui-spec.md) | 产品界面规范：布局/交互/视觉基线、图片只读 tab、菜单/设置/主题、键盘与中文界面验收（决定 §24：人工/原生取证只做中文，双语 catalog 自动校验保留）；§4.1 原型布局对照（实现参照）；UI-01～UI-06 已确认，原问题见 [UI 确认归档](docs/archive/2026-10-29-ui-decisions.md)，V 项均未整项通过 | 实现或评审任何面向用户的界面 |
 | [docs/theme-package-spec.md](docs/theme-package-spec.md) | 自定义主题包格式、可配置样式字段、继承规则和导入校验 | 设计或实现主题包字段与主题加载前 |
 | [docs/v1-architecture.md](docs/v1-architecture.md) | 实施蓝图：crate 划分、模块骨架、各功能组实现方案、里程碑 M0–M6（历史蓝图处置见 §15） | 实现任何功能前 |
 | [docs/rust-style-guide.md](docs/rust-style-guide.md) | Rust 代码规范：强制/建议/待验证、S/C 规则检查、工具链、坐标分型、错误/panic/unsafe、测试与提交；RS-01～RS-05/ED-01 已确认，原问题见 [确认归档](docs/archive/2026-10-29-rust-style-decisions.md) | 写任何 Rust 代码前 |

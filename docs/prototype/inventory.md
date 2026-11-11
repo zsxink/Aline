@@ -80,7 +80,7 @@
 | 三处 Aline PNG（旧2处、现行1处） | 512×512 RGBA PNG，相同235494字节 | PRD/UI 已采用身份参考；图像为深色 A 与浅色飘带 | 没有可核对授权记录；PROTO-01 |
 | 山丘示意图 | 800×360 SVG，1张 | 自包含 rect/circle/path；两个JS引用，未见作者/许可说明 | 只供历史演示；PROTO-02 |
 | GitHub/Notion/Vue/飞书预览 | 每张960×540 SVG，4×3=12张 | 工具给出生成构图线索及硬编码色表；清单 author=Aline 是自述，不能当权利证明 | 非产品截图/正式PNG预览；来源及继续使用见PROTO-03/05 |
-| 功能图标/公式/流程时序图 | HTML/JS中内嵌SVG/MathML，无独立图片文件 | icons.js/menus.js/interactions.js/showcase.js及HTML内联几何 | 不额外抽取为正式图标库/发布图片；来源PROTO-03；V-03/V-09未执行 |
+| 功能图标/公式/流程时序图 | HTML/JS中内嵌SVG/MathML，无独立图片文件 | icons.js/menus.js/interactions.js/showcase.js及HTML内联几何 | 不额外抽取为正式图标库/发布图片；来源PROTO-03；V-03/V-09 未整项通过 |
 
 未发现字体二进制、独立产品截图、其它HTML页面、主题PNG预览或构建依赖清单；不为缺失资源补造出处。`themes/`共29个有效文件（17 JSON + 12 SVG），另有1个系统文件；单主题7文件，共28，外加索引1。旧生成器的结果与现存清单schema不同，保留工具不证明当前样本可重现。
 
