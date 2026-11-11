@@ -101,28 +101,28 @@ WINDOW_ITEMS = (
 BYTES_CASES = {
     "bom": {
         "file": "bom.md",
-        "bytes": b"\xef\xbb\xbf# BOM\r\n\r\n\xe4\xb8\xad\xe6\x96\x87\xe6\xae\xb5\xe8\x90\xbd\xe3\x80\x82\r\n",
-        "note": "UTF-8 BOM + CRLF 中文正文",
+        "bytes": b"\xef\xbb\xbf# BOM\r\n\r\n[toc]\r\n\r\n\xe4\xb8\xad\xe6\x96\x87\xe6\xae\xb5\xe8\x90\xbd\xe3\x80\x82\r\n",
+        "note": "UTF-8 BOM + CRLF 中文正文；带 [toc] 与标题以便走完主动跳转",
     },
     "mixed-eol": {
         "file": "mixed-eol.md",
-        "bytes": b"first\r\nsecond\nthird\rfourth\r\n",
-        "note": "CRLF/LF/孤立 CR 混合",
+        "bytes": b"# \xe6\xb7\xb7\xe5\x90\x88\r\n\r\n[toc]\n\r\nfirst\r\nsecond\nthird\rfourth\r\n",
+        "note": "CRLF/LF/孤立 CR 混合；带 [toc] 与标题以便走完主动跳转",
     },
     "lone-cr": {
         "file": "lone-cr.md",
-        "bytes": b"alpha\rbeta\rgamma",
-        "note": "仅孤立 CR 分隔",
+        "bytes": b"# \xe5\xad\xa4\xe7\xab\x8b\r\r[toc]\r\ralpha\rbeta\rgamma",
+        "note": "仅孤立 CR 分隔；带 [toc] 与标题以便走完主动跳转",
     },
     "whitespace-only": {
         "file": "whitespace-only.md",
-        "bytes": b"   \n\t\n  \t  \n",
-        "note": "仅空白与空行",
+        "bytes": b"# \xe7\xa9\xba\xe7\x99\xbd\n\n[toc]\n\n   \n\t\n  \t  \n",
+        "note": "仅空白与空行（标题与 [toc] 之外）；带 [toc] 与标题以便走完主动跳转",
     },
     "no-trailing-newline": {
         "file": "no-trailing-newline.md",
-        "bytes": "末尾没有换行".encode("utf-8"),
-        "note": "无尾换行",
+        "bytes": b"# \xe6\x97\xa0\xe5\xb0\xbe\n\n[toc]\n\n\xe6\x9c\xab\xe5\xb0\xbe\xe6\xb2\xa1\xe6\x9c\x89\xe6\x8d\xa2\xe8\xa1\x8c",
+        "note": "无尾换行；带 [toc] 与标题以便走完主动跳转",
     },
 }
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -1823,6 +1823,8 @@ def self_test_bytes(output):
         ("历史非空被拒绝", lambda case: case.update(history_len=1)),
         ("revision 变化被拒绝", lambda case: case.update(revision_after=1)),
         ("步骤缺失被拒绝", lambda case: case.update(steps=["open"])),
+        ("步骤次序错乱被拒绝",
+         lambda case: case.update(steps=list(reversed(REQUIRED_STEPS)))),
     ):
         broken = json.loads(json.dumps(valid))
         mutate(broken["cases"][0])
@@ -1832,6 +1834,10 @@ def self_test_bytes(output):
     missing["cases"].pop()
     test.check("缺少用例被拒绝", lambda: test.expect(
         not analyze_bytes(expected, missing)["passed"], "缺少用例必须失败"))
+    no_raw = json.loads(json.dumps(valid))
+    no_raw["launch_receipt"].pop("raw_sha256")
+    test.check("收据缺原始输出哈希被拒绝", lambda: test.expect(
+        not analyze_bytes(expected, no_raw)["passed"], "收据必须绑定真实原始输出"))
     return test.finish()
 
 

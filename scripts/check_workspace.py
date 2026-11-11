@@ -105,6 +105,7 @@ def run(args):
         ('m1-collector-self-test', [sys.executable, str(ROOT / 'scripts/collect_m1_readonly.py'), '--self-test', '--output-dir', str(output / 'm1-collector-self-test')]),
         ('m1-performance-sampler-self-test', [sys.executable, str(ROOT / 'scripts/sample_m1_performance.py'), '--self-test', '--output-dir', str(output / 'm1-performance-sampler-self-test')]),
         ('m1-readonly-actions-self-test', [sys.executable, str(ROOT / 'scripts/capture_m1_readonly_actions.py'), '--self-test', '--output-dir', str(output / 'm1-readonly-actions-self-test')]),
+        ('m1-readonly-window-driver-self-test', [sys.executable, str(ROOT / 'scripts/drive_m1_readonly_window.py'), '--self-test']),
         ('m1-trace-metrics-self-test', [sys.executable, str(ROOT / 'scripts/m1_trace_metrics.py'), '--self-test', '--output-dir', str(output / 'm1-trace-metrics-self-test')]),
         ('m1-trace-record-self-test', [sys.executable, str(ROOT / 'scripts/m1_trace_record.py'), '--self-test', '--output-dir', str(output / 'm1-trace-record-self-test')]),
         ('m1-rederive-performance-self-test', [sys.executable, str(ROOT / 'scripts/m1_rederive_performance.py'), '--self-test', '--output-dir', str(output / 'm1-rederive-performance-self-test')]),
@@ -134,7 +135,9 @@ def run(args):
     # 只补范围文案：M1 7.1 新增的三个 CLI 自测已纳入本清单，失败仍不短路后续项。
     summary = {'passed': passed, 'scope': '当前 macOS 主机；目标图解析不等于跨平台构建；CI 是否执行另行记录；'
                'M1 7.1 新增入口 m1_trace_metrics.py / m1_trace_record.py / m1_rederive_performance.py '
-               '的 --self-test 已纳入顺序清单，与其它条目同样单条失败不短路',
+               '的 --self-test 已纳入顺序清单，与其它条目同样单条失败不短路；'
+               'M1 7.3 只读真实窗口驱动 drive_m1_readonly_window.py 的合成自测同样纳入清单，'
+               '它只证明驱动判定与等待策略，不证明真实窗口七步',
                'catalog': 'cargo test --workspace 实际发现 app-core 正反例与 UI 消费测试',
                'results': records}
     write_json(output / 'summary.json', summary)
