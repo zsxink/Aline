@@ -106,6 +106,7 @@ def run(args):
         ('m1-performance-sampler-self-test', [sys.executable, str(ROOT / 'scripts/sample_m1_performance.py'), '--self-test', '--output-dir', str(output / 'm1-performance-sampler-self-test')]),
         ('m1-readonly-actions-self-test', [sys.executable, str(ROOT / 'scripts/capture_m1_readonly_actions.py'), '--self-test', '--output-dir', str(output / 'm1-readonly-actions-self-test')]),
         ('m1-readonly-window-driver-self-test', [sys.executable, str(ROOT / 'scripts/drive_m1_readonly_window.py'), '--self-test']),
+        ('m1-scroll-window-self-test', [sys.executable, str(ROOT / 'scripts/capture_m1_scroll_window.py'), '--self-test']),
         ('m1-trace-metrics-self-test', [sys.executable, str(ROOT / 'scripts/m1_trace_metrics.py'), '--self-test', '--output-dir', str(output / 'm1-trace-metrics-self-test')]),
         ('m1-trace-record-self-test', [sys.executable, str(ROOT / 'scripts/m1_trace_record.py'), '--self-test', '--output-dir', str(output / 'm1-trace-record-self-test')]),
         ('m1-rederive-performance-self-test', [sys.executable, str(ROOT / 'scripts/m1_rederive_performance.py'), '--self-test', '--output-dir', str(output / 'm1-rederive-performance-self-test')]),
@@ -139,7 +140,9 @@ def run(args):
                'M1 7.3 只读真实窗口驱动 drive_m1_readonly_window.py 的合成自测同样纳入清单，'
                '它只证明驱动判定与等待策略，不证明真实窗口七步；'
                'M1 7.3 标准入口 readonly-bytes 自测还覆盖门禁回读原始证据的反例，'
-               '合成证据树不构成任何保真证据',
+               '合成证据树不构成任何保真证据；'
+               'M1 8.2 真实窗口滚动入口 capture_m1_scroll_window.py 的合成自测同样纳入清单，'
+               '它只证明截图读数与判定逻辑，不证明真实窗口滚动',
                'catalog': 'cargo test --workspace 实际发现 app-core 正反例与 UI 消费测试',
                'results': records}
     write_json(output / 'summary.json', summary)
