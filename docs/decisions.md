@@ -1218,3 +1218,19 @@ metadata `id` 与 `manifest_path` 必须绑定到 `(repo_root/path).resolve()`�
 - **未改变。** F1 仍为已接受边界（F2/F3 未修复）；4.1c 未完成；2.1c / 2.2b 未勾选；
   真实 CoreText shaping / face / shaped advance 仍未取证；V-04 / V-07 / V-09、AC-09
   与 M1 出口仍未整项通过。
+
+## 39. 2026-11-12 3.1 / 3.2 伞项滚动勾选
+
+确认日期与依据：2026-11-12 依 `m1-cjk-linebreak-core-fix` 的伞项规则（全部子项完成且
+原验收满足，见 tasks.md「任务拆分」注）与[决定 §36](./decisions.md#36-2026-11-12-m1-生产来源准入本地-vendor--守卫扩展)
+的生产准入落地记录。本记录是伞项滚动勾选，不是新增产品或来源裁决。
+
+- **决定。** 勾选 3.1 与 3.2 伞项：3.1a–d、3.2a–e 均已勾选；3.1d / 3.2e 的生产准入
+  已由决定 §36 落地（`vendor/gpui-pre-0.3.9`、`[patch.crates-io]`、`local-patch`
+  守卫身份、准入账本、7 个指纹重导）。
+- **依据边界。** 3.1 的材料/守卫/独立评审与 3.2 的隔离编译、三入口回归、原 Aline
+  映射/命中回归、清理与旧金样差异说明均沿用既有子项证据，本轮未新增实验；生产来源
+  的最终门禁为 `gate-07`、`self-test-03`、`workspace-03`。
+- **未改变。** 勾选不表示真实 CoreText shaping / face / shaped advance 已取证，不表示
+  `TextLayout` 集成整项通过；4.1c / 4.2c / 4.2d 仍未勾选；V-04 / V-07 / V-09、AC-09
+  与 M1 出口仍未整项通过。

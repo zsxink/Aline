@@ -34,7 +34,7 @@
 
 ## 3. 精确来源准入与核心集成（AGENTS 依赖规则；R-1/R-17、S-2/S-10）
 
-- [ ] 3.1 形成核心本地来源的完整候选 metadata/tree、原归档与补丁绑定、许可证、全部入边/target/features/本机选包、五引擎隔离与最小性说明；独立评审后取得具体批准。验证未批准来源、checksum/diff/边或附加特性漂移均由现有守卫失败关闭，不套用 W1 隔离图许可；若需连带 Apple/macOS 来源，先重新审阅范围。
+- [x] 3.1 形成核心本地来源的完整候选 metadata/tree、原归档与补丁绑定、许可证、全部入边/target/features/本机选包、五引擎隔离与最小性说明；独立评审后取得具体批准。验证未批准来源、checksum/diff/边或附加特性漂移均由现有守卫失败关闭，不套用 W1 隔离图许可；若需连带 Apple/macOS 来源，先重新审阅范围。
   - [x] 3.1a 候选材料：完整 metadata/tree、归档/补丁绑定、许可证、全部入边/target/features/本机选包、五引擎隔离与最小性说明；见 `3_2/admission-materials.md`、`candidate-summary.json`、`policy-draft.json`。
   - [x] 3.1b 守卫失败关闭：现行 `scripts/check_engineering.py` 对候选 `[patch]` 图拒绝（`原生路径精确身份/来源/校验和漂移: gpui-pre@0.3.9`）；13/13 漂移反例拒绝，2026-11-11-cjk-05 重跑仍 13/13。
   - [x] 3.1c 独立评审：两个独立 `codex` worker 均 `pass-with-findings`；身份/哈希/公开面/七场景/守卫子项无 finding；见 `review/independent-review-summary.md`。
@@ -44,7 +44,8 @@
   - **本轮复核（2026-11-09-cjk-02，仍未勾选）**：`../2026-11-09-cjk-02/cjk-linebreak/review/adjudication-questions.md` 问题 2 已提出精确来源准入裁决（逐项影响与最小替代）与是否允许 3.2 编译。发现三代身份漂移（申请代 `f3850203…` / `hashes.json` 代 `fc37076b…` / 磁盘代 `a51e6c04…`）、两处未登记隔离 `[patch]` 编译尝试、`make_hashes.py` 复跑配方失效、`candidate-summary.json` repo_state 与当前 HEAD 不一致；均列为待确认，不自行取舍。正式策略资产未改（`local-patch` 出现次数 0），守卫仍失败关闭。
   - **裁决结论（2026-11-09-cjk-03，仍未勾选）**：**暂不批准** A/B/C 任何一代作为可编译身份，**暂不允许 3.2 编译**。收敛前置（单一自洽代 / 全部文件哈希 / 重算七场景指纹 / 移除 `[[test]] cjk_wrap` 对 test-support 的依赖 / 修复复跑配方 / 处置两处未登记编译尝试 / repo_state 重绑 HEAD / 独立评审 / 具体批准）见裁决文件 §二。范围不扩整包 allowlist、三包 vendor、许可证泛化或 GPUI 升级。本轮未生成第四代身份、未改生产清单/锁/策略资产、未激活 patched GPUI、未启用 test-support。
   - **2026-11-09-cjk-04，仍未勾选**：具体批准记录已写入 `../2026-11-09-cjk-03/cjk-linebreak/decision/approval.json`，具体批准门真实运行退出 0 / 合成自测 18/18；七场景指纹在受审工作树重算全部匹配（`guards/fingerprints.json`）；`3_2/candidate-summary.json` 的 repo_state 已重绑 HEAD `71ee580b…`；两处未登记编译尝试保留原文并另存 `<tmp>` 归一化只读副本，明确不作编译证据、不重放；现行 `scripts/check_engineering.py` 对候选 `[patch]` 图仍失败关闭；`policy-draft.json` 仍 `applied: false`。**独立评审已完成**：两个独立 `codex` worker 的 verdict 均为 `pass-with-findings`，身份/七场景/守卫子项通过，但生产来源仍被守卫拒绝且两项高 finding 未清零，按「冲突列入待确认并暂停」不勾选 3.1 整项；3.2 在独立评审完成前按用户具体批准先行，顺序偏离经两份评审判定为用户授权下的隔离试编、可接受但不构成 3.1 先行完成，记录在 `../2026-11-09-cjk-04/cjk-linebreak/review/independent-review-request.md`。
-- [ ] 3.2 获准后仅接入最小来源与精确策略资产，编译实际核心补丁并执行三个入口的真实布局/截断/cluster 回归；验收相应核心测试及原 Aline 映射/命中测试，清理试验替代路径，逐项说明与旧独立金样差异，不能凭纯 helper 测试宣称 TextLayout 集成通过。
+  - **2026-11-12 伞项滚动勾选（决定 §39，不改写上文）**：3.1a–d 四个子项均已勾选（3.1d 的生产准入由决定 §36 落地），材料、守卫失败关闭与独立评审均有据；伞项原验收「metadata/tree、归档与补丁绑定、许可证、入边/target/features、五引擎隔离、具体批准、漂移失败关闭」由子项证据覆盖，3.1 勾选。勾选不表示真实 CoreText shaping / face / shaped advance 已取证，也不表示 M1 出口通过。
+- [x] 3.2 获准后仅接入最小来源与精确策略资产，编译实际核心补丁并执行三个入口的真实布局/截断/cluster 回归；验收相应核心测试及原 Aline 映射/命中测试，清理试验替代路径，逐项说明与旧独立金样差异，不能凭纯 helper 测试宣称 TextLayout 集成通过。
   - [x] 3.2a logs 隔离副本真实编译：`cargo check -p aline-ui` 退出 0；见 `3_2/commands/cargo-check-aline-ui.*.log`。
   - [x] 3.2b 三入口回归：`shape_text` / `wrap_line` / `truncate_wrapped_line` 13/13；见 `3_2/commands/cargo-test-three-entries.*.log`。
   - [x] 3.2c 原 Aline 映射/命中回归：111 passed / 1 ignored；见 `3_2/commands/cargo-test-aline-mapping-hit.*.log`。
@@ -54,6 +55,7 @@
   - **2026-11-11 用户裁决（决定 §34）**：3.2a–d 属于本 change；3.2e 的生产来源准入另立 change / 裁决，本 change 不修改生产 `Cargo.toml` / `Cargo.lock` / 策略资产。3.2e 仍未勾选。
   - **2026-11-12 用户裁决（决定 §35 其一，仍未勾选）**：**M1 接受已知限制，3.2e 本轮不立项。** 不把锁定 GPUI 的 fork 带入生产依赖，vendor 决策推到 M2（出现 caret/IME 后重新评估）。本 change 以 evidence-only 收尾，生产清单/锁/策略资产保持零变更；3.2e 保持未勾，不因「已裁决不做」倒填为完成。
   - **2026-11-09-cjk-04，部分完成、仍未勾选**：用户具体批准只授权 `logs-isolated-copy; production Cargo.toml/Cargo.lock/policy assets unchanged`。logs 隔离副本内 `cargo check -p aline-ui` 退出 0（patched 核心实际编译）、三入口回归 13/13（`shape_text` / `wrap_line` / `truncate_wrapped_line`，非纯 helper）、原 `cargo test -p aline-ui --lib` 111 passed / 1 ignored；具体命令与归一化日志见 `../2026-11-09-cjk-04/cjk-linebreak/3_2/commands/`。第一次尝试的两处真实失败（夹具路径、用错合成度量造成的禁则行尾）保留在 `3_2/first-attempt.md`，不写成通过。**不勾选原因**：①具体批准范围禁止生产清单/锁/策略资产变更，故「接入精确策略资产」未执行，来源仍未准入生产；②回归使用合成度量，不是真实 CoreText shaping，不宣称 `TextLayout` 集成通过；③typed 受限结果在最小公开面下外部不可读，三个入口的真实受限契约未证明；④独立评审已完成但含两项高 finding（3.3 维护清单仍未完成）；⑤5.1 的 Release 六组合重测 / 真实像素点击 / 两视图往返全部未执行。
+  - **2026-11-12 伞项滚动勾选（决定 §39，不改写上文）**：3.2a–e 五个子项均已勾选（3.2e 的生产清单/锁/策略资产接入由决定 §36 落地）；伞项原验收「仅接入最小来源与精确策略资产、编译实际核心补丁、三入口真实布局/截断/cluster 回归、原 Aline 映射/命中测试、清理试验替代路径、逐项说明与旧金样差异」由子项证据覆盖，3.2 勾选。上面 2026-11-09-cjk-04 的「仍未勾选原因 ①–⑤」为当时状态，其中 ①（生产接入）、③（受限状态可观测，2026-11-11 经公开 `TextLayout::wrap_limit()` 取得）、④（3.3 与独立评审）已解除，⑤（5.1）由 run-6/run-7–9 与本轮 5.1b 勾选覆盖；②（合成度量不构成真实 CoreText shaping）仍是勾选边界。勾选仍不宣称真实 CoreText shaping / `TextLayout` 集成整项通过，也不表示 4.1c 或 M1 出口已通过。
 - [x] 3.3 更新既有依赖入口与最小补丁维护清单（原版本/来源、差异、复跑/回滚/升级重打、范围及未知项），执行实际准入守卫和最小违例自测；文档不写本机绝对路径或把本地来源例外扩成整包/全局许可。
   - **2026-11-11-cjk-05 完成**：在 `docs/engine-design.md` §18.2 与 `docs/v1-architecture.md` §3.2 的既有依赖入口写入同一份最小补丁维护清单（原版本/来源、差异、复跑/回滚/升级重打、范围、未知项），架构侧交叉引用引擎侧权威清单；文档只写仓库内相对路径，未写本机绝对路径，未把本地来源例外扩成整包 allowlist、三包 vendor、许可证泛化或全局许可。实际执行：生产图 `python3 scripts/check_engineering.py --output-dir <logs>/3_3/engineering` 退出 0；统一守卫最小违例自测 `python3 scripts/check_engineering.py --self-test --output-dir <logs>/3_3/self-test` 117/117；`guards/check_cohort.py` 身份守卫退出 0（单一自洽代与已批准值逐字节一致），2026-11-11-cjk-05 重跑 13/13 候选特定漂移反例仍全部拒绝。证据见 `logs/validation/m1-single-window-readonly/2026-11-11-cjk-05/cjk-linebreak/3_3/`。**本项只维护候选身份与操作边界，不构成生产准入**；不勾 1.2 / 2.2 / 3.1 / 3.2 / 4.x / 5.x。
 
