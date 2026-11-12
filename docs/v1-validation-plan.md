@@ -135,6 +135,8 @@ Mermaid 护眼模式使用亮色映射；固定主题不跟随应用，主题是
 
 **2026-11-12 六组合平滑对照（V-04 仍未整项通过）：** 在 320/480/768 × Visual/Source 六组合、同一 Release（HEAD `159725ee`、`app_sha256=56323a4c…`）上，以应用偏好域 `defaults write aline AppleFontSmoothing 0`（关）与未设置（系统默认，本机为开）各启动一次真实窗口并逐像素比较：六组合正文 ROI 变化 31,197–66,735 像素、最大通道差 112–165、变化 314–454 行，墨量 +16.25%～+19.22%；偏好跑完恢复为未设置。这补上了 2.1c 的六组合测量，上面单一 372 × Visual 的对照只作历史。**边界：** 开关仍是系统偏好，不是 Aline 产品设置，`crates/` 不调用 `set_text_rendering_mode`；只测两态、仅 macOS arm64；2.2b 的最小失败输入仍未建立，2.1 伞项的观测集仍是 2026-11-09 的「未执行平滑 A/B」记录，V-04 未整项通过。证据 `logs/validation/m1-single-window-readonly/2026-11-12-smoothing-six-combos/`。
 
+**2026-11-12 2.1 观测集跨轮组合勾选（V-04 仍未整项通过）：** 用户接受用既有 2.1a/2.1b 观测 + 2026-11-12 六组合平滑数据组成新的完整六组合观测集。新集 `logs/validation/m1-single-window-readonly/2026-11-12-2_1-cross-round/observations.json` 经 `scripts/check_m1_cjk_typography.py` 返回 `evidence_complete: true`、`capability_passed: null`、`failures: []`，2.1 伞项据此勾选。字段来源：主截图与换行/行高/斜体取 2026-11-09 finish-01/w2（commit `b7fbafaa…`、app `e88bd6fe…`，换行字段为 3.2e 修复前状态），回退/标点位置取 2026-11-11-cjk-06（commit `6ed33f08…`、app `c87400a9…`，logs 隔离 patched Release；六组合 run 用 `m1-5_1a-breakpoints.md` 第 26 行，四字形用固定夹具 visual 960×640），平滑取 2026-11-12 六组合 A/B（HEAD `159725ee`、app `56323a4c…`）。**边界：** 这是测量完整性，不是能力通过；`line_boundaries` 是修复前记录，当前构建未在该字段重测；`fallback` 的 face 身份仍为 `unknown`/`Unknown`，advance 不是 shaped advance；`punctuation_width` 是 `glyph.position.x` 位置间隔；`smoothing` 是系统偏好两态 A/B；2.2b / 2.2c 仍未勾，V-04 / V-07 / V-09 与 M1 出口未整项通过。报告 `logs/validation/m1-single-window-readonly/2026-11-12-2_1-cross-round/report.md`。
+
 
 ## V-05 · 性能设备、测量和发布门禁
 

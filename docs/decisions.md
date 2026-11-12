@@ -1234,3 +1234,38 @@ metadata `id` 与 `manifest_path` 必须绑定到 `(repo_root/path).resolve()`�
 - **未改变。** 勾选不表示真实 CoreText shaping / face / shaped advance 已取证，不表示
   `TextLayout` 集成整项通过；4.1c / 4.2c / 4.2d 仍未勾选；V-04 / V-07 / V-09、AC-09
   与 M1 出口仍未整项通过。
+
+## 40. 2026-11-12 2.1 观测集跨轮组合勾选
+
+确认日期与依据：2026-11-12 用户在「重建 2.1 观测集并勾选」选择中接受选项原文：
+「用既有 2.1a/2.1b 观测 + 本轮六组合平滑数据组成新的完整六组合观测集（明确标注
+跨轮），重跑 check_m1_cjk_typography.py 取得 evidence_complete:true，据此勾选
+2.1 伞项。需你接受跨轮证据组合；不改产品与 vendor。」
+
+- **决定。** 勾选 `m1-cjk-typography-font-evidence` 的 2.1 伞项；2.1a / 2.1b /
+  2.1c 均已勾选。新观测集
+  `logs/validation/m1-single-window-readonly/2026-11-12-2_1-cross-round/observations.json`
+  经 `scripts/check_m1_cjk_typography.py` 返回 `evidence_complete: true`、
+  `capability_passed: null`、`failures: []`，exit 0。
+- **勾选口径：跨轮证据组合，不写成同一轮取证。** 主截图与
+  `line_boundaries`/`line_height`/`italic` 取 2026-11-09 finish-01/w2
+  （commit `b7fbafaa…`、app `e88bd6fe…`；换行字段是 3.2e 修复前状态，当前构建
+  未在该字段重测）；`fallback`/`punctuation_width` 取 2026-11-11-cjk-06
+  （commit `6ed33f08…`、app `c87400a9…`，logs 隔离 patched Release；六组合 run
+  用 `m1-5_1a-breakpoints.md` 第 26 行，四字形用固定夹具 visual 960×640）；
+  `smoothing` 取 2026-11-12 六组合 A/B（HEAD `159725ee`、app `56323a4c…`）。
+  观测集顶层 `commit`/`app_sha256` 描述主截图轮，`identity_note` 与
+  `cross_round_sources` 记录全部轮次。用户裁决接受该组合是唯一依据，不得表述为
+  「同一轮已复验」。
+- **证据边界。** `evidence_complete` 只证明记录、六组合、截图路径与 SHA-256 完整；
+  `capability_passed` 为 `null`。`line_boundaries` 的修复前缺陷、`fallback` 的
+  `unknown`/`Unknown` face 身份、非 shaped advance、`glyph.position.x` 位置间隔、
+  系统偏好两态平滑均已在字段与报告标注。当前构建（HEAD `159725ee`）的换行未在
+  本观测集重测。
+- **未改变。** 2.2b（平滑侧无最小失败输入、CJK 回退侧只有显式未知）与 2.2c
+  （QMD-01.6 四项决策未定）仍未勾；4.1c / 4.2c / 4.2d 未勾；真实 CoreText
+  shaping / face / shaped advance 未取证；V-04 / V-07 / V-09、AC-09 与 M1 出口
+  仍未整项通过。未改产品代码、生产 `Cargo.toml` / `Cargo.lock`、`scripts/*.json`
+  或 `vendor/`。
+- **证据。** `logs/validation/m1-single-window-readonly/2026-11-12-2_1-cross-round/`
+  （`observations.json`、`compose_observations.py`、`report.md`、`checked/summary.json`）。

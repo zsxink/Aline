@@ -41,6 +41,15 @@ M4；平滑侧不做正文开/关对照（属 M4 渲染路径）。
 2026-11-09 的「未执行平滑 A/B」记录而未勾，重建观测集属跨轮组合、需裁决。证据
 `logs/validation/m1-single-window-readonly/2026-11-12-smoothing-six-combos/`。
 
+**2026-11-12 2.1 伞项勾选（跨轮组合，不改写上段）：** 用户接受跨轮证据组合；新观测集
+`logs/validation/m1-single-window-readonly/2026-11-12-2_1-cross-round/observations.json`
+将主截图与换行/行高/斜体（2026-11-09 `b7fbafaa…`）、回退 run 与位置间隔
+（2026-11-11-cjk-06 `c87400a9…`，logs 隔离 patched Release）、平滑六组合 A/B
+（HEAD `159725ee`、app `56323a4c…`）组合为完整六组合记录，核对入口返回
+`evidence_complete: true`。设计口径不变：该布尔值只证明记录/文件身份完整，
+`capability_passed` 保持 `null`；`line_boundaries` 是 3.2e 修复前状态，当前构建
+未重测；face 身份与 shaped advance 未取证；2.2b / 2.2c 仍未勾，V-04 未整项通过。
+
 ## Risks / Trade-offs
 
 - 人工测量存在误差 → 记录 px/pt、scale、截图、方法，保留原始值与不确定性。
