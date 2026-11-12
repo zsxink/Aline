@@ -1545,7 +1545,7 @@ mod tests {
             );
             for pair in rows.windows(2) {
                 assert!(pair[0].source.start <= pair[1].source.start);
-                assert!(pair[0].source.end <= pair[1].source.start.max(pair[0].source.end));
+                assert!(pair[0].source.end <= pair[1].source.start);
             }
         }
         Ok(())

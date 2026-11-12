@@ -89,3 +89,7 @@ W2 在 macOS arm64 Release 的 320/480/768 正文逻辑宽 × Visual/Source 六�
 段写出时的状态；§36 落地后两项已完成，见本文件 §「2026-11-12 追加裁决（决定 §36）」。
 `policy-draft.json` 仍保持 `applied: false`（它描述该草稿自身），两个 `pub(crate)`
 入口的 typed 返回值仍不对外。
+
+**2026-11-12 追加更正（撤销 §35 其四/其二相关表述；不改写上文）：** 上面「5.1b 字体失效接受为已知限制」及其依据「`BUNDLED_FONTS` 为空、无 UI/环境入口」已被[决定 §36](../../../docs/decisions.md#36-2026-11-12-m1-生产来源准入本地-vendor--守卫扩展) 同日的后续裁决撤销：新增验证专用入口 `crates/aline-ui/src/native_window/font_invalidate.rs`，仅在 `ALINE_M1_FONT_INVALIDATE_FAMILY` 与 `ALINE_M1_FONT_INVALIDATE_MARK` 同时设置时生效（`cmd-alt-i` 也只在此时绑定），走既有 `FontEnvironment::activate`。2026-11-12 真实窗口取得触发链：代次 0→1、可见重排、仅触发组写标记；**字体失效分项已取得**，与 `tasks.md` 5.1b 的 2026-11-12 撤销记录一致。**5.1b 仍未勾选**：其余分项与字体失效不在同一轮，是否据此勾选留待裁决；产品仍不发布运行中字体切换。证据 `logs/validation/m1-single-window-readonly/2026-11-12-font-invalidation/`。同文「5.2d 不另安排定向复审」也不再适用：生产准入落地后已对最终补丁安排独立定向复审（`logs/validation/m1-single-window-readonly/2026-11-12-5_2d/`），结论 pass-with-findings，重要 finding 未清零，5.2d 保持未勾。
+
+**2026-11-12 后续裁决（决定 §37，不改写上条）：** F1（高）经用户明确接受为已知边界，F2/F3（中）保留未修，vendor 字节与策略资产零变更；按复审员 A「F1 修复或用户明确接受」的处置口径，5.2d 已勾选、5.2 伞项成立，**不写成 F1 已修复或已清零**。字体失效证据已按修正后的 baseline 重跑，构建回执见 `logs/validation/m1-single-window-readonly/2026-11-12-font-invalidation/report.md` 与 `runs/run-3/`。5.1b 仍未勾选。

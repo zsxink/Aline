@@ -1155,3 +1155,46 @@ metadata `id` 与 `manifest_path` 必须绑定到 `(repo_root/path).resolve()`�
 真实路径比较，外部 id / manifest 探针全部拒绝）。终次门禁 `gate-07`、自测
 `self-test-03` 与完整 `workspace-03` 均在最终脚本修改之后运行并通过。复审代理未返回
 第三次书面闭环结论，因此本节不写成「复审签字通过」。
+
+## 37. 2026-11-12 5.2d 定向复审处置：接受 F1 边界、字体失效证据补跑
+
+用户就 5.2d 定向复审的两份报告作出裁决：补丁方向的高 finding F1 保持 vendor 字节、
+**接受为已知边界**；字体失效证据**重跑对照**（修正 baseline）。执行结果如下。
+
+- **复审结论。** 补丁方向 `pass-with-findings`：H1 按决定 §29 / R1 口径清零（`Boundary.limit`
+  无读者，L3 残余），H2 清零；F1（高）为 `TextLayout::wrap_limit()` 在 shaping 失败时的
+  fail-open 路径，F2/F3（中）为多字形簇宽度与无候选回退禁则语义缺口；F4–F8 低。
+  布局/命中方向 `pass-with-findings`：无 blocker/high；M1（字体失效重置后未补高度提示）
+  已在 Aline 侧修复；M2（baseline 未证明快捷键未绑定）与 M3（权威文档仍写「不可触发」）
+  已按本轮记录更正；L1（恒真断言）、L3（环境判定/写标记测试）已修复，L2/L4/L5 记录为
+  低风险边界或已更正。报告 `logs/validation/m1-single-window-readonly/2026-11-12-5_2d/`。
+- **F1 裁决：保持 vendor 字节。** 不修改 `vendor/gpui-pre-0.3.9`，8 文件身份、全树
+  `tree_sha256`、`[patch.crates-io]`、策略资产与 7 指纹零变更。F1 记为**已知边界**：
+  当前 run-7/8/9 的正向受限记录未被污染（`line_count=0` / `text_len=0` 均为 0），但未来
+  证据不得把 shaping 失败计为「已测量无限制」或「受限」；F2/F3 保留为未修 medium 边界。
+  按复审员 A 的处置口径，「F1 修复或用户明确接受」二者满足其一即可成立 5.2d 的
+  「重要 finding 已处置」；本裁决走后者，**不写成 F1 已修复或已清零**。
+- **5.2d 勾选。** 依上述口径勾选 5.2d；同时 5.2a–e 全部子项已勾选，5.2 伞项成立。
+  勾选只表示复审已执行且重要 finding 按用户裁决处置，不表示 vendor 缺陷已修复、真实
+  CoreText shaping / face / shaped advance 已取证，也不表示 V-04 / V-07 / V-09 或 M1
+  出口整项通过。
+- **字体失效证据补跑。** 按用户裁决重跑：对照组（baseline）先清除继承的
+  `ALINE_M1_FONT_INVALIDATE_*`，并与触发组一样发送 `cmd-alt-i`；结果不写标记、触发前后
+  正文墨迹完全相同（11,090,604 → 11,090,604），证明「未设置变量时快捷键未绑定/无效果」。
+  触发组标记 `family=Menlo status=active outcome=activated before=0 after=1`，正文墨迹
+  11,090,604 → 11,995,523，截图可见一级标题单行变两行。构建回执记录
+  `app_sha256=56323a4c…`、HEAD `d4c6456f…`、工作树 dirty 清单、`Cargo.lock` 摘要与
+  `recorded_at`；二进制包含本轮 M1 修复。证据
+  `logs/validation/m1-single-window-readonly/2026-11-12-font-invalidation/runs/run-3/`
+  （run-1 为修复前历史，run-2 为 `python3 -I` 缺 Pillow 的工具失败，均按原样保留）。
+  5.1b 仍不勾选：本项要求「新断点两侧点击 + 两视图往返 + 换宽 + 字体失效 + 源码锚点恢复」
+  在同一轮完成，其余分项在 run-6，与本次不在同一轮；是否据此勾选留待用户。
+- **本轮命令。** `cargo fmt --all --check`、`cargo clippy --workspace --all-targets --locked
+  --offline -- -D warnings`、`cargo test --workspace --locked --offline`（564 passed /
+  0 failed / 2 ignored；`aline-ui` lib 122 passed / 1 ignored）、
+  `python3 scripts/check_engineering.py --self-test`（117 条）、
+  `python3 scripts/check_engineering.py --scenario all`、`openspec validate --all --strict
+  --no-interactive`（17/17）、`codegraph sync .` / `codegraph status .`（最新）均 exit 0。
+- **边界。** 本裁决不改写 §35 / §36 的历史记录；F1/F2/F3 未修复；L2（命中测试未驱动
+  真实 GPUI 文本布局）仍为低风险边界；字体失效证据只证明触发链，不证明失效后像素点击/
+  锚点/滚动；V-04 / V-07 / V-09 与 M1 出口仍未整项通过。

@@ -716,6 +716,10 @@ ratex/ratex-svg、mermaid-rs-renderer、usvg、syntect/two-face 属插件/资产
 
 **2026-11-12 追加裁决（决定 §36，不改写上文）：** 用户解除「不写生产清单/锁/策略资产」的限制，生产来源准入已按完整链路落地：`vendor/gpui-pre-0.3.9`（发布包 + 8 文件补丁身份）、根 `Cargo.toml` 的 `[patch.crates-io]`、`Cargo.lock` 仅去 source/checksum、守卫新增 `local-patch` 精确身份（全树 + 逐文件摘要）、准入账本登记 `license.local_paths`、7 个 `gpui_subtree_sha256` 按真实图重导。§35 其一/其七中「3.2e 本轮不立项 / 本轮不做生产接入」的执行边界不再适用；历史记录保留，`policy-draft.json` 的 `applied: false` 仍描述该草稿自身，不表示生产图未接入。4.1c / 5.2d 仍未完成，「候选补丁未准入」不再适用于生产图，能力结论不变。
 
+**2026-11-12 追加更正（撤销 §35 其四/其五；不改写上文）：** 上面两行的「字体失效未取得」、2026-11-11 维护清单中的「字体平滑 A/B 为正文 0 变化的负结果」以及本节末尾边界中「运行时字体切换……接受为 M1 已知限制」，均已被[决定 §36](./decisions.md#36-2026-11-12-m1-生产来源准入本地-vendor--守卫扩展) 同日的后续裁决撤销；历史记录保留。**字体失效**：新增验证专用入口 `crates/aline-ui/src/native_window/font_invalidate.rs`，仅两个环境变量齐全时生效（`cmd-alt-i` 也只在此时绑定），走既有 `FontEnvironment::activate`；真实窗口取得代次 0→1、可见重排、仅触发组写标记，证据 `logs/validation/m1-single-window-readonly/2026-11-12-font-invalidation/`。**正文平滑**：旧负结果源于选错开关（argv 参数域只影响 `glyph_dilation_for_color`），改用应用偏好域 `AppleFontSmoothing` 后真实窗口 A/B 取得正文 ROI 变化 17,875 像素、墨迹 +9.75%，证据 `logs/validation/m1-single-window-readonly/2026-11-12-smoothing-ab/`。**边界：** 两者都只是取证入口/系统偏好，不发布产品能力（`BUNDLED_FONTS` 仍为空、产品无运行中字体切换 UI/入口、`crates/` 不调用 `set_text_rendering_mode`）；5.1b / 2.1c / 2.2b 的勾选未因此改变；V-04 / V-07 / V-09 与 M1 出口仍未整项通过。
+
+**2026-11-12 后续裁决（决定 §37，不改写上条）：** 5.2d 已按用户对 F1 的明确接受口径勾选、5.2 伞项成立；vendor 字节与策略资产零变更，**不写成 F1 已修复或已清零**。4.1c 仍未完成。
+
 
 ### 18.3 参考材料与决定入口
 
@@ -748,5 +752,7 @@ Ely 索引中的 `document/{edit,parse,apart,format,block,tables}.rs`、`markdow
 - **保真夹具的真实窗口七步：** 五个保真样本（BOM／混合行尾／孤立 CR／纯空白／无尾换行）在真实原生窗口内依次走完 `open → scroll → hit → jump → visual_to_source → source_to_visual → close`，每例磁盘字节与内存源码逐字节相等，`has_draft=false`、`history_len=0`、`revision_before/after=0`，`document_closed=true`。这是 AC-01 字节保真与 AC-09 只读展示在 macOS arm64 上的**分项**证据；不覆盖编辑、保存/重开（归 M2）与 Windows/Linux。
 - **1 MiB 真实可视化滚动：** 1,048,576 字节夹具在当前 Release 二进制上由像素读滚动条比例（0.0 → 0.0027 → 0.0018 → 1.0）与末尾标记块、回顶 0.0 两条独立位置佐证，并由应用自身回调记录（213 次滚轮 + 2 次键盘事件）互证。滚动比例与缩略块位置仍为**候选**量测方法，未冻结为性能或布局门槛。
 - **未随本节关闭的边界：** 代码块的真实横向滚动交互尚无真实窗口证据（PRD §6.2、UI §7.2 的产品要求仍缺证据）；`Hidden` 命中按设计不可由像素触达，不记为缺口也不记为通过；运行时字体切换在 M1 未接线（2026-11-12 由[决定 §35](./decisions.md#35-2026-11-12-m1-剩余七项裁决与受控失败实验) 裁决**接受为 M1 已知限制**，不为不发布的能力加隔离测试入口）；性能门槛、几何数值与配色仍为实验候选，未冻结。
+
+**追加更正（2026-11-12，不改写上条）：** 上条「运行时字体切换……接受为 M1 已知限制，不为不发布的能力加隔离测试入口」的裁决部分已被[决定 §36](./decisions.md#36-2026-11-12-m1-生产来源准入本地-vendor--守卫扩展) 同日的后续裁决撤销；产品未接线、无 UI/入口的事实不变，新增的只是验证专用入口与触发链证据，见本节 2026-11-12 追加更正。5.1b 勾选与否留待用户。
 
 分项明细与证据路径见[验证计划](./v1-validation-plan.md)与 `openspec/changes/m1-single-window-readonly/tasks.md`。

@@ -72,6 +72,8 @@ OpenSpec 使用仓库根目录 `openspec/` 下的 `spec-driven` schema，所有�
 - W1/W2/W3/W6/W7 当前在 M1 范围推进，W4/W5 已独立建档但必须等待 M1 出口与 M2 前置；M4 完整主题、vendor 或新依赖仍须具体裁决。
 - W2 实测后的最小修复准备另由 [`m1-cjk-linebreak-core-fix`](../openspec/changes/m1-cjk-linebreak-core-fix/tasks.md) 承接；用户方向决定见[决定 §28](./decisions.md#28-2026-11-09-w2-中文断行最小修复准备)，具体来源准入与修复实测尚未完成。
 - 2026-11-12：[决定 §35](./decisions.md#35-2026-11-12-m1-剩余七项裁决与受控失败实验) 对 W2 的「先测量后决定是否 vendor」给出结论——M1 接受中文避头尾已知限制、vendor 推到 M2 出现 caret/IME 后重新评估，`m1-cjk-linebreak-core-fix` 以 evidence-only 收尾。上表 W2 行的「先测量后决定」与「不先 fork 三个 gpui-pre 包」仍然成立；M2 若决定 vendor，仍须重走依赖准入与具体裁决。
+
+- 2026-11-12 追加更正（决定 §36）：上条「`m1-cjk-linebreak-core-fix` 以 evidence-only 收尾、vendor 推到 M2」的执行边界已被决定 §36 推翻——生产树已接入 `vendor/gpui-pre-0.3.9` 与 `[patch.crates-io]`，来源、全树摘要与 8 文件身份由策略资产登记并在每次门禁重算。W2 行的其它原则，以及「变更来源仍须重走依赖准入与具体裁决」不变。
 - quiet-md 的数值、平台能力、vendor 补丁和测试覆盖只能作为待核对线索，不能直接写成 Aline 设计值或验收证据；引用时标明“参考/待验证”。
 - 工作流若改变验收方式、依赖图、跨模块契约或阶段范围，先更新 OpenSpec change 与相应现行规范，再写依赖该变化的代码；研究文档中的建议 change 名称不自动生效。
 

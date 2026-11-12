@@ -761,12 +761,20 @@ impl NativeDocumentWindow {
             f32::from(window.viewport_size().width),
             f32::from(window.viewport_size().width),
         );
-        let error = match (&mut self.reader, self.state.session().document()) {
-            (Some(reader), Some(document)) => {
-                reader.prepare(document, window, metrics, &self.fonts).err()
+        let mut reset = false;
+        let mut error = None;
+        if let (Some(reader), Some(document)) = (&mut self.reader, self.state.session().document())
+        {
+            match reader.prepare(document, window, metrics, &self.fonts) {
+                Ok(reader_reset) => reset = reader_reset,
+                Err(layout_error) => error = Some(layout_error),
             }
-            _ => None,
-        };
+        }
+        // 字体代次变化会重置行高缓存；与 render 路径一致，必须在本帧末给
+        // 未测量行补正文行高提示，否则滚动条比例与 End/PageUp 会低估总高。
+        if reset && let Some(reader) = &self.reader {
+            reader.schedule_height_hint(window, cx);
+        }
         if let Some(error) = error {
             self.state.feedback = Some(layout_error_key(error));
         }

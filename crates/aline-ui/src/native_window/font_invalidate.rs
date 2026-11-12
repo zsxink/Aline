@@ -22,7 +22,7 @@
 
 use std::fs;
 use std::io::{self, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use gpui::SharedString;
 
@@ -45,15 +45,20 @@ pub(super) struct FontInvalidation {
 
 impl FontInvalidation {
     pub(super) fn from_env() -> Option<Self> {
-        let family = std::env::var("ALINE_M1_FONT_INVALIDATE_FAMILY").ok()?;
-        let mark = std::env::var_os("ALINE_M1_FONT_INVALIDATE_MARK")?;
+        Self::from_values(
+            std::env::var("ALINE_M1_FONT_INVALIDATE_FAMILY").ok(),
+            std::env::var_os("ALINE_M1_FONT_INVALIDATE_MARK").map(PathBuf::from),
+        )
+    }
+
+    /// 环境读取与判定分开，便于不操纵进程环境地验证两条拒绝条件。
+    fn from_values(family: Option<String>, mark: Option<PathBuf>) -> Option<Self> {
+        let family = family?;
+        let mark = mark?;
         if family.trim().is_empty() {
             return None;
         }
-        Some(Self {
-            family,
-            mark: PathBuf::from(mark),
-        })
+        Some(Self { family, mark })
     }
 
     /// 推进一次字体代次，并把结果写入标记文件。
@@ -105,14 +110,20 @@ impl FontInvalidation {
 ///
 /// 与 `probe` / `readonly_evidence` 同一条规则：验证产物只能写进仓库证据目录，
 /// 避免把本机绝对路径或任意路径写盘能力带进产品。
-fn write_mark(path: &PathBuf, bytes: &[u8]) -> io::Result<()> {
+fn write_mark(path: &Path, bytes: &[u8]) -> io::Result<()> {
     let root = std::env::current_dir()?
         .join("logs/validation")
         .canonicalize()?;
+    write_mark_in(&root, path, bytes)
+}
+
+/// 根目录可注入，便于在临时目录验证写入、拒绝覆盖与根外拒绝三条路径。
+fn write_mark_in(root: &Path, path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let root = root.canonicalize()?;
     let parent = path
         .parent()
         .ok_or_else(|| io::Error::other("缺少标记目录"))?;
-    if !parent.canonicalize()?.starts_with(root) {
+    if !parent.canonicalize()?.starts_with(&root) {
         return Err(io::Error::other("标记目录不在 logs/validation 内"));
     }
     let mut file = fs::OpenOptions::new()
@@ -212,9 +223,54 @@ mod tests {
     }
 
     #[test]
-    fn empty_family_is_rejected_at_parse_time() {
-        // 空串在 `from_env` 阶段就被拒；这里验证同一判据本身。
-        assert!("   ".trim().is_empty());
-        assert!(!"Menlo".trim().is_empty());
+    fn from_values_requires_both_variables_and_non_empty_family() {
+        use std::path::PathBuf;
+
+        assert!(FontInvalidation::from_values(None, Some(PathBuf::from("mark"))).is_none());
+        assert!(FontInvalidation::from_values(Some("Menlo".to_owned()), None).is_none());
+        assert!(
+            FontInvalidation::from_values(Some("   ".to_owned()), Some(PathBuf::from("mark")))
+                .is_none()
+        );
+        let request =
+            FontInvalidation::from_values(Some("Menlo".to_owned()), Some(PathBuf::from("mark")));
+        assert!(request.is_some(), "两者齐全且 family 非空应生效");
+        if let Some(request) = request {
+            assert_eq!(request.family, "Menlo");
+            assert_eq!(request.mark, PathBuf::from("mark"));
+        }
+    }
+
+    #[test]
+    fn write_mark_writes_new_file_only_inside_root() {
+        use std::fs;
+
+        let base =
+            std::env::temp_dir().join(format!("aline-font-invalidate-{}", std::process::id()));
+        let root = base.join("logs");
+        let inside = root.join("case");
+        assert!(fs::create_dir_all(&inside).is_ok(), "创建临时目录失败");
+        let mark = inside.join("mark.txt");
+
+        assert!(
+            super::write_mark_in(&root, &mark, b"family=Menlo\n").is_ok(),
+            "根内新文件应写入"
+        );
+        assert!(
+            fs::read(&mark).is_ok_and(|bytes| bytes == b"family=Menlo\n"),
+            "读回标记失败"
+        );
+        assert!(
+            super::write_mark_in(&root, &mark, b"again").is_err(),
+            "不得覆盖已有标记"
+        );
+
+        let outside = base.join("outside");
+        assert!(fs::create_dir_all(&outside).is_ok(), "创建根外目录失败");
+        assert!(
+            super::write_mark_in(&root, &outside.join("mark.txt"), b"x").is_err(),
+            "根外路径应拒绝"
+        );
+        let _ = fs::remove_dir_all(&base);
     }
 }

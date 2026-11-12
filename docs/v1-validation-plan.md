@@ -131,6 +131,8 @@ Mermaid 护眼模式使用亮色映射；固定主题不跟随应用，主题是
 
 **2026-11-12 追加裁决（决定 §36，不改写上文）：** 用户解除「不写生产清单/锁/策略资产」的限制，生产来源准入已按完整链路落地：`vendor/gpui-pre-0.3.9`（发布包 + 8 文件补丁身份）、根 `Cargo.toml` 的 `[patch.crates-io]`、`Cargo.lock` 仅去 source/checksum、守卫新增 `local-patch` 精确身份（全树 + 逐文件摘要）、准入账本登记 `license.local_paths`、7 个 `gpui_subtree_sha256` 按真实图重导。§35 其一/其七中「3.2e 本轮不立项 / 本轮不做生产接入」的执行边界不再适用；历史记录保留，`policy-draft.json` 的 `applied: false` 仍描述该草稿自身，不表示生产图未接入。4.1c / 5.2d 仍未完成，「候选补丁未准入」不再适用于生产图，能力结论不变。
 
+**2026-11-12 追加更正（撤销 §35 其四/其五；V-04 仍未整项通过）：** 上文本节关于「字体平滑只有负结果」「正文平滑开/关对照不做」「字体失效不可触发」的表述已被[决定 §36](./decisions.md#36-2026-11-12-m1-生产来源准入本地-vendor--守卫扩展) 同日的后续裁决撤销，历史记录保留、不改写。其五：旧负结果的归因有误——`-AppleFontSmoothing 0` 走 argv 参数域，只影响 GPUI 的 `glyph_dilation_for_color`，而正文在 alpha-only 单通道上下文栅格化，dilation 0 与 1 的位图逐字节相同；真正的开关是 CGContext `allowsFontSmoothing`（应用/全局偏好域）。改用 `defaults write aline AppleFontSmoothing 0` 做真实窗口 A/B 后取得：正文 ROI 变化 17,875 像素、最大通道差 170、变化 256 行、墨迹总量 10,105,439 → 11,090,604（+9.75%）。其四：字体失效分项已由验证专用入口取得触发链（代次 0→1、可见重排、仅触发组写标记），详见 V-07 同日的追加更正。**边界：** 平滑开关是系统偏好、字体失效入口是取证入口，均不是 Aline 产品能力——`crates/` 不调用 `set_text_rendering_mode`，`BUNDLED_FONTS` 仍为空；2.1c / 2.2b / 5.1b 的勾选状态未因本更正改变；V-04、V-07、V-09 与 M1 出口仍未整项通过。平滑证据 `logs/validation/m1-single-window-readonly/2026-11-12-smoothing-ab/`。
+
 
 ## V-05 · 性能设备、测量和发布门禁
 
@@ -282,6 +284,10 @@ M0 编码基础证据（2026-10-31）：行尾边界金样已固定 CR-X-LF 删�
 **2026-11-12 M1 字体失效与来源准入裁决（V-07 仍未整项通过）：** 用户按[决定 §35](./decisions.md#35-2026-11-12-m1-剩余七项裁决与受控失败实验) 裁决：**5.1b 的字体失效接受为已知限制**——`BUNDLED_FONTS` 为空、无 UI/环境入口，M1 不发布运行中字体切换，加隔离测试入口等于为不发布的能力写产品代码，故 5.1 伞项保持不勾；**3.2e 生产来源准入本轮不立项**，vendor 推到 M2，`m1-cjk-linebreak-core-fix` 以 evidence-only 收尾，生产清单/锁/策略资产保持零变更；**5.2d 不另安排定向复审**，H1 已由 5.1 真实窗口经公开 `TextLayout::wrap_limit()` 取得、H2 由 §34 任务拆分消解，5.2d 保持未勾作为「生产准入未推进」的显式边界，不写成已清零。**边界：** 上述是范围与方向裁决，不是能力通过；真实 CoreText shaping / 簇索引形态仍只在 logs 隔离 patched 二进制取证，V-07、AC-09 与 M1 出口仍未整项通过。
 
 **2026-11-12 追加裁决（决定 §36，不改写上文）：** 用户解除「不写生产清单/锁/策略资产」的限制，生产来源准入已按完整链路落地：`vendor/gpui-pre-0.3.9`（发布包 + 8 文件补丁身份）、根 `Cargo.toml` 的 `[patch.crates-io]`、`Cargo.lock` 仅去 source/checksum、守卫新增 `local-patch` 精确身份（全树 + 逐文件摘要）、准入账本登记 `license.local_paths`、7 个 `gpui_subtree_sha256` 按真实图重导。§35 其一/其七中「3.2e 本轮不立项 / 本轮不做生产接入」的执行边界不再适用；历史记录保留，`policy-draft.json` 的 `applied: false` 仍描述该草稿自身，不表示生产图未接入。4.1c / 5.2d 仍未完成，「候选补丁未准入」不再适用于生产图，能力结论不变。
+
+**2026-11-12 追加更正（撤销 §35 其四：字体失效分项取得；V-07 仍未整项通过）：** 上文「5.1b 的字体失效接受为已知限制」（本节 §35 段）与「字体失效不可触发 / 没有 UI·环境入口」（2026-11-11-cjk-06 六组合段）两处表述已被[决定 §36](./decisions.md#36-2026-11-12-m1-生产来源准入本地-vendor--守卫扩展) 同日的后续裁决撤销，历史记录保留、不改写。新增验证专用入口 `crates/aline-ui/src/native_window/font_invalidate.rs`：仅当 `ALINE_M1_FONT_INVALIDATE_FAMILY` 与 `ALINE_M1_FONT_INVALIDATE_MARK` 同时设置时生效，快捷键 `cmd-alt-i` 也只在此时绑定；触发走既有 `FontEnvironment::activate`（注册成功且字族可见 → 字体代次 +1 → 布局缓存键变化 → `prepare` 重置高度缓存并重测），不以「注册失败」制造失效。2026-11-12 在 macOS arm64 真实窗口取得：baseline 不写标记；触发组标记 `family=Menlo status=active outcome=activated before=0 after=1`，截图可见一级标题由单行变为两行换行，`ink_sum` 由 10,729,803 降至 9,277,343。**边界：** 本分项证明的是「触发链」（代次 0→1 → 可见重排 → 仅触发组写标记），不等于失效后的像素点击、两视图往返、换宽与源码锚点恢复已在同一轮复验——后四项在 2026-11-11-cjk-06 run-6 单独取得，与本轮不在同一轮；入口只为取证，`BUNDLED_FONTS` 仍为空，产品无运行中字体切换 UI/入口。5.1b 是否据此勾选留待用户裁决，本次不改写其未勾选状态；V-07、AC-09、V-09 与 M1 出口仍未整项通过。证据 `logs/validation/m1-single-window-readonly/2026-11-12-font-invalidation/`。同段「5.2d 不另安排定向复审」亦因生产准入落地而不再适用：已对最终补丁安排独立定向复审（`logs/validation/m1-single-window-readonly/2026-11-12-5_2d/`），结论为 pass-with-findings，重要 finding 尚未清零，5.2d 保持未勾。
+
+**2026-11-12 后续裁决（决定 §37，不改写上条）：** F1（高）经用户明确接受为已知边界，F2/F3（中）保留未修，vendor 字节与策略资产零变更；按复审员 A「F1 修复或用户明确接受」的处置口径，5.2d 已勾选、5.2 伞项成立，**不写成 F1 已修复或已清零**。字体失效证据已按修正后的 baseline 重跑（对照组同样发送 `cmd-alt-i`，不写标记且墨迹前后相同；触发组代次 0→1），构建回执见 `logs/validation/m1-single-window-readonly/2026-11-12-font-invalidation/report.md` 与 `runs/run-3/`。5.1b 仍未勾选；V-07、AC-09、V-09 与 M1 出口仍未整项通过。
 
 
 ## V-08 · 文件操作、临时图片与恢复事务
