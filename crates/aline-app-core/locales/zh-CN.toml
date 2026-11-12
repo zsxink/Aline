@@ -55,4 +55,5 @@ dialog = "无法打开文件选择器。"
 
 [startup]
 window_failed = "无法打开应用窗口。"
+no_display = "未检测到可用显示器，未显示窗口。"
 language_fallback = "无法检测系统语言，当前使用英语。"

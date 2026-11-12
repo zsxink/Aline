@@ -1,0 +1,43 @@
+{
+  "schema": "aline-vendored-source/v1",
+  "note": "生产依赖来源登记。字节身份不是本文档自称：scripts/engineering_policy.json 的 native_backend.core 与 scripts/dependency_admission_policy.json 的 license.local_paths 在每次门禁运行时按 tree_sha256 与 files 重新核对，漂移即失败关闭。本文档与两份策略的一致性目前由人工维护，未被门禁读取。",
+  "package": "gpui-pre@0.3.9",
+  "crate": "gpui-pre-0.3.9.crate",
+  "crate_sha256": "34f61c1cfd36fc9c436af09308c963822ae27a45a84feb21a77ba5c9e051f1c0",
+  "registry_checksum": "34f61c1cfd36fc9c436af09308c963822ae27a45a84feb21a77ba5c9e051f1c0",
+  "vendor_path": "vendor/gpui-pre-0.3.9",
+  "file_count": 161,
+  "tree_sha256": "583595b2529317b7c578b74396ff500f04899502ab41b4652f9b58424fa1846f",
+  "tree_sha256_rule": "sha256( 按相对路径排序的 '相对路径\\0文件sha256' 以 \\n 连接并追加结尾 \\n )。包含目录下全部常规文件，无排除项；出现符号链接即失败关闭。",
+  "modified_vs_published": [
+    "src/elements/text.rs",
+    "src/text_system.rs",
+    "src/text_system/line.rs",
+    "src/text_system/line_layout.rs",
+    "src/text_system/line_wrapper.rs"
+  ],
+  "added_vs_published": [
+    "src/text_system/cjk_soft_break.rs"
+  ],
+  "unchanged_vs_published": [
+    "Cargo.toml",
+    "LICENSE-APACHE"
+  ],
+  "patched_files": {
+    "Cargo.toml": "43ac0a636d1283313dbb48810ff32c0f6b55737824a886bd9fad37735ec0c56c",
+    "LICENSE-APACHE": "752daf2fb234ca4a1fa372c073fe127f44b7b90fd2529ae44273a64f9d53da7a",
+    "src/elements/text.rs": "0d694cc11c81c09adaefaf60333da74f086c108729dbd7e6fe414f36934e0a58",
+    "src/text_system.rs": "30ca45d4393b626d05cff89db2354e48f67f6ad9250ca7aa6604040c38d56210",
+    "src/text_system/cjk_soft_break.rs": "739526f83e2172f648eca12c5d45c7ce8ef98f3fe664e6c8915003bef7b15b10",
+    "src/text_system/line.rs": "f2cb84c676508b5d4f9bbb09017690d924f37a5800f15812ec19055c6152e504",
+    "src/text_system/line_layout.rs": "80d41a01bc480c0be647a5a0e587e4a5cf1fb8fe9fb38edf2086c2997ade11a1",
+    "src/text_system/line_wrapper.rs": "928a6897e447894629c1e0531e7a3bee0b81c0e2aa14b2a7f2d3909d150f6571"
+  },
+  "patched_files_note": "这 8 项是既有评审记录的逐文件身份锚点。crates.io 发布包本身已含 Cargo.toml 与 LICENSE-APACHE 的上述字节，因此补丁相对发布包实际改动 5 个文件、新增 1 个文件。",
+  "patch_evidence": [
+    "openspec/changes/m1-cjk-linebreak-core-fix/tasks.md 3.2a–3.2d",
+    "logs/validation/m1-single-window-readonly/2026-11-11-cjk-05/cjk-linebreak/3_2/",
+    "logs/validation/m1-single-window-readonly/2026-11-11-cjk-06/cjk-linebreak/1_hook/install.json"
+  ],
+  "limits": "登记只说明来源与字节身份，不说明能力通过；真实 CoreText shaping / face / shaped advance 仍按各验证计划的边界记录。"
+}

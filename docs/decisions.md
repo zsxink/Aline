@@ -640,7 +640,7 @@ PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02
 | QMD-01.3 保存与恢复 | 采纳故障安全核对表：同目录临时文件 → 写完 → 同步 → 平台受检替换 → 按平台同步目录/处理权限；写前核对磁盘基线；1 秒自动保存与 10 秒恢复快照是独立路径；恢复先入内存、不覆盖磁盘；失败保留原文件、内存与恢复材料；恢复快照写应用管理的独立目标，不以文档旁 `.bak`/`.corrupt-*` 作为恢复手段；原子替换不称跨进程 CAS。不采用 500ms 自动保存、整篇快照撤销、切换/退出静默 flush | quiet-md 原子写/基线骨架（`.bak` 只服务 JSON 索引）；Aline 既有 SAFE-04～08；Aline 明确：平台受检替换、目录同步、文档旁副本不作为恢复手段 | [架构规范 R-15-13](./architecture-guide.md#152-资源恢复路径和关闭)、[架构 §7.3/§7.4](./v1-architecture.md#73-保存外部变化和关闭)、[V-08](./v1-validation-plan.md) | V-08；M2 实施前仍按 V-08 身份/事务方案立项 |
 | QMD-01.4 IME 与输入 | 采纳三个检查点：先等待平台组合完成结果，等待期间保留原上下文，不抢焦点、不丢草稿；实际失焦、切块、切模式或窗口失活时显式结束/清理 marked，不以 Blur 猜平台确认或取消；候选窗位置按元素 frame + 文本布局 + 滚动 + 窗口坐标换算；平台 glyph 索引（GPUI 为 UTF-8 字节偏移）与 UTF-16 端点不得互相冒充或当作字素索引 | quiet-md IME 结构线索（失焦清理未确认）；Aline 补强：等待语义、坐标投影分离 | [引擎 §10.1/§10.2](./engine-design.md#101-组合状态与平台边界)、[UI §6/§13](./ui-spec.md#6-编辑模式滚动与输入连续性)、E-T15 | V-01/V-07；真实输入法行为不能由纯状态机替代 |
 | QMD-01.5 语义 token | 采纳组件只消费语义 token、原始色值集中在 token 模块并注明来源、token 重构不得改变视觉；M1 可先局部 token 化，不改变主题包 schema 与已确认视觉 | Aline 设计要求；quiet-md 仅方向参考 | [UI §3.2](./ui-spec.md#32-排版图标与应用外观边界)、[架构规范 R-9-02](./architecture-guide.md#9-组件形态与复用) | V-09；重构前后截图/像素对比作为审查证据 |
-| QMD-01.6 中文排版 | 采纳“先测量、后决定”的门：全角标点避头尾、合成斜体、CJK 标点字体回退进入 V-04 夹具；quiet-md 的 14° 等数值不写成 Aline 规范值。若确认锁定 gpui-pre 缺口，是否 fork/vendor 三个包另立决定并走依赖准入 | Aline 测量门；quiet-md 数值/补丁仅参考 | [UI §3.2](./ui-spec.md#32-排版图标与应用外观边界)、[V-04](./v1-validation-plan.md) | V-04；M1 是否允许列为已知限制仍待用户裁决 |
+| QMD-01.6 中文排版 | 采纳“先测量、后决定”的门：全角标点避头尾、合成斜体、CJK 标点字体回退进入 V-04 夹具；quiet-md 的 14° 等数值不写成 Aline 规范值。若确认锁定 gpui-pre 缺口，是否 fork/vendor 三个包另立决定并走依赖准入 | Aline 测量门；quiet-md 数值/补丁仅参考 | [UI §3.2](./ui-spec.md#32-排版图标与应用外观边界)、[V-04](./v1-validation-plan.md) | V-04；M1 是否允许列为已知限制仍待用户裁决（**2026-11-12 已裁决：M1 接受已知限制、vendor 推到 M2，见[§35](#35-2026-11-12-m1-剩余七项裁决与受控失败实验)**） |
 | QMD-01.7 离屏视觉证据 | 采纳为补充证据，不替代真实窗口、IME 与平台证据；引入锁定 GPUI 的 `test-support` feature、`gpui_macos` 平台实现与 `image` dev-dependency 前必须先做能力 spike 与依赖准入；`VisualTestAppContext` 受 macOS + `test-support` 门控，不能假设普通测试开箱可用 | 锁定 GPUI 接口事实；Aline 证据边界；依赖未准入 | [架构 §10.1](./v1-architecture.md#101-测试分层)、[开发流程 §3.1](./development-process.md#31-研究采纳与工程实践落点2026-11-05)、[V-09](./v1-validation-plan.md) | V-09；准入 spike 是否批准仍待用户决定 |
 | QMD-01.8 不采纳清单 | quiet-md 的 block 树/DocxXML 文档模型、整篇 `Document` 快照撤销、500ms 自动保存、文档 `.bak`/`.corrupt-*`、`hash_block` 仅取长度、双主题双渲染、中文 key i18n、静默平台降级、主线程 fsync、整体 vendor/AppKit 注入均不进入 Aline 设计 | quiet-md 反例 | 理由见[研究文档附录 A](./quiet-md-study.md#附录-a不采纳清单带理由) | 不适用；不得以“参考实现如此”绕过 Aline 铁律 |
 
@@ -648,7 +648,7 @@ PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02
 
 本条是**工程/验证方法采纳**，不改变 PRD、AC、跨模块契约、依赖/架构边界、阶段范围或已确认数值。方法回写本身的治理 delta 已并入 OpenSpec change [`m1-single-window-readonly`](../openspec/changes/m1-single-window-readonly/proposal.md)，只追认文档与方法边界；W1～W7 仍须逐项另建 change。按[开发流程 §2](./development-process.md#2-openspec-变更流程)，实施时凡新增/升级依赖（如锁定 GPUI 的 `test-support` feature、`image`）、改变验收方式（如 V-04/V-05/V-09 增加夹具或报告字段）、改变跨模块契约（如保存/恢复状态机）或进入 M2/M4 范围，仍须先建对应 OpenSpec change；研究文档的 W0 治理门继续有效，未批准不写代码。
 
-研究文档中的 W0～W7、Q01～Q32 与建议 change 名称是工作分解和证据矩阵，不是已批准任务，也不构成本条之外的新决定。其待确认问题（test-support 准入、vendor 顺序、M1 是否允许中文排版已知限制、token 时点、fuzz 规模、W4/W5 阶段、窗口构造重构）保持待确认，本条不自行裁决；开发流程与架构 §13 表中的阶段落点只是建议，批准对应 change 时才定。
+研究文档中的 W0～W7、Q01～Q32 与建议 change 名称是工作分解和证据矩阵，不是已批准任务，也不构成本条之外的新决定。其待确认问题（test-support 准入、vendor 顺序、M1 是否允许中文排版已知限制、token 时点、fuzz 规模、W4/W5 阶段、窗口构造重构）保持待确认，本条不自行裁决；开发流程与架构 §13 表中的阶段落点只是建议，批准对应 change 时才定。其中「M1 是否允许中文排版已知限制」与「vendor 顺序」两项已于 2026-11-12 由[决定 §35](#35-2026-11-12-m1-剩余七项裁决与受控失败实验)裁决（M1 接受已知限制、vendor 推到 M2），本条其余待确认项不变。
 
 证据边界：本条与并入 M1 change 的治理 delta 均未写代码、未新增依赖、未运行新测试；M1 change 未归档，不表示任何 V/AC 通过。后续每次实施仍按[开发流程 §3](./development-process.md#3-单项实现的执行顺序)记录输入、输出、拒绝/失败语义和验证命令。回写文档为：
 
@@ -956,3 +956,202 @@ stderr 为空、无 `diag/`、`records.tsv`、`records.done`，对照设置变�
 仍未准入、face 身份仍未解析、5.1b 字体失效仍未取得、正文平滑仍需新裁决。证据
 `logs/validation/m1-single-window-readonly/2026-11-11-cjk-06/cjk-linebreak/3_5_1a/report-cluster-wider.md`、
 `report-hook-off.md`、`runs/run-8/`、`runs/run-9/`、`hook-off-1/`、`hook-off-2/`。
+
+**2026-11-12 后续指向（追加，不改写上面各段）：** 上两条中仍标「待新裁决」的四项（中文避头尾是否列为 M1 已知限制、vendor 方向、字体失效、正文平滑对照）已由[§35](#35-2026-11-12-m1-剩余七项裁决与受控失败实验)裁决。§34 各段保留当时的「未决」表述作为历史；现行口径以 §35 为准，生产来源仍未准入、V-04 / V-07 / V-09 仍未整项通过。
+
+## 35. 2026-11-12 M1 剩余七项裁决与受控失败实验
+
+用户在 2026-11-12 对 M1 遗留的七项待决问题作出裁决。本节记录裁决语义与执行边界；
+裁决本身不勾选任何任务，勾选仍以实际证据为准。
+
+**其一：QMD-01.6 方向——M1 接受已知限制，vendor 推到 M2。** 中文避头尾缺陷在 M1
+记录为已知限制，不把锁定 GPUI 的 fork 带入生产依赖；3.2e 生产来源准入本轮不立项；
+vendor 决策在 M2 出现 caret/IME 后重新评估。依据：M1 是只读预览，缺陷是断点位置而非
+数据损坏；为只读里程碑把 fork 带进生产，每次 GPUI 升级都要重打并重走准入。
+本 change 以 evidence-only 收尾，生产清单/锁/策略资产保持零变更。
+
+**其二：H1 / H2 高 finding 不另安排定向复审。** 来源不进生产时，H1（typed 受限状态
+外部可读性）已由 5.1 真实窗口经公开 `TextLayout::wrap_limit()` 取得，H2 已由 §34 的
+任务拆分消解；5.2d 保持未勾，作为「生产准入未推进」的显式边界记录，不写成已清零。
+若 M2 决定 vendor，再按 AGENTS 公共面路由安排定向复审。
+
+**其三：4.1c 不新增平台诊断钩子。** 在 patched GPUI 上新增钩子会改变已批准的 8 文件
+字节身份与 `minimal.diff` 哈希，整条准入链需重新批准，代价大于一项只解释、不修复的
+诊断。`resolved_family=unknown` / `face_source=Unknown` 记为显式未知，留到 M4 字体机制。
+
+**其四：5.1b 字体失效接受为已知限制。** `BUNDLED_FONTS` 为空、无 UI/环境入口，M1 不
+发布运行中字体切换；加隔离测试入口等于为不发布的能力写产品代码。5.1 伞项保持不勾。
+
+**其五：正文平滑开/关对照不做。** 进程级 AppKit 参数负结果已证明正文 0 变化；开/关
+对照需改渲染路径，属 M4 主题/字体机制。保留负结果与范围理由，2.1c / 2.2b 不勾。
+
+**其六：批准 engineering 2.2 的受控失败实验。** 以进程外部手段（不注入后门、不改产品
+代码）取得真实 macOS 初窗失败收据；若实际失败点不是「初窗失败」，如实记为不同结论
+并保留缺口。
+
+**其七：本轮不做生产接入、不改 HEAD、不提交/推送/归档。**
+
+**执行结果（2026-11-12，追加事实）：** 受控失败实验已执行并复现两次，得到**负结果**。
+用 `sandbox-exec` 从进程外部剥夺 WindowServer 访问（两条剖面：仅禁 windowserver 服务 /
+禁全部 mach-lookup）后启动同一 Release 二进制（`app_sha256=dbbb3340…`）：进程保持存活、
+窗口数为 0、stderr 无 `startup.window_failed` 文案、不自退。对照基线正常建窗、stderr 为空。
+**结构性依据：** 锁定 `gpui-pre 0.3.9` 的 `Window::new` 全函数唯一可失败点是
+`platform.open_window`，而 `MacPlatform::open_window` 唯一 `Err` 出口是
+`WindowKind::AnchoredPopup`；`MacWindow::open` 返回 `Self` 而非 `Result`。Aline 使用
+`WindowKind::Normal`，因此 `open_initial_window` 的 `Err` 分支在锁定 macOS 后端下
+**结构不可达**。结论：2.2c 的缺口仍在，且在当前后端下无法通过非侵入手段闭合；
+同时观察到「窗口服务不可达时无窗口、无提示、进程不退」是当前实际行为，属待裁决的
+产品质量缺口，本轮不提出实现方案。证据
+`logs/validation/m1-single-window-readonly/2026-11-12-startup-failure/report.md`、
+`run_startup_failure_probe.py`、`runs/run-1`、`runs/run-2`。
+
+**边界（同一执行结果）：** 未改任何产品源码 / 清单 / 锁 / 策略资产；未新增依赖；
+未启用 test-support；`deny-windowserver` 是人为条件，不等于用户真实环境；本轮**未**取得
+初窗失败收据，不把负结果写成通过；V-04 / V-07 / V-09 均未整项通过，M1 出口未通过，
+M0 豁免与 M2 前置不变。
+
+**2026-11-12 追加裁决（伞项 1.2 / 2.2 的复核与勾选）：** 用户就上述负结果与遗留任务给出
+后续指令，选定「复核伞项 1.2 / 2.2 并勾选」「修窗口失败的产品质量缺口」「撤销 §35 其四/其五
+（字体失效 + 平滑对照）」「启动完整生产准入链」四项。本节先记录第一项的执行结果，其余三项
+按依赖顺序另行立项，不在本节预先勾选或预先声明通过。
+
+- **复核方式**：新建只读脚本
+  `logs/validation/m1-single-window-readonly/2026-11-12-closeout/verify_candidate_identity.py`，
+  不引用 `cohort/replay-result.json` 的既有结论，从原始字节重新推导。26 项检查全部通过
+  （`failed: []`，exit 0），机器可读结果 `verify-result.json`、叙述报告 `verify-report.md`。
+- **复核覆盖**：归档 `34f61c1c…` 与 `approval.json` 及脚本常量三方一致；`original/` +
+  `minimal.diff` 经 `patch -p1` 逐字节重建 `patched/`（`differing_files: []`）；`minimal.diff`
+  `aba1c841…` 与记录一致；`hashes.json` 8 文件重算全等；三入口（`compute_wrap_boundaries` /
+  `wrap_line` / `truncate_wrapped_line_with_limit`）函数体内各自调用同一私有规则；
+  `mod cjk_soft_break;` 私有且全树唯一；`Cargo.toml` 与 original 逐字节相同、diff 不含
+  `test-support`；生产 `Cargo.toml` / `Cargo.lock` / `scripts/*.json` 零变更；1.2 契约的返回类型与
+  `pub(crate)` 边界与源码一致。
+- **勾选结论**：`m1-cjk-linebreak-core-fix` 的 1.2 与 2.2 两项**勾选**。解除依据是
+  2026-11-11-cjk-06 run-7/8/9 已在真实 macOS arm64 窗口经公开 `TextLayout::wrap_limit()`
+  取得 `Some(NoLegalBreak)` 与 `Some(ClusterWiderThanLine)`，即 2026-11-09 独立评审 H1
+  「真实受限结果未被测试证明」的阻塞条件已不成立；2.2 的「具体来源获准前不构建或激活」
+  是验收要求而非阻塞条件，现状即未构建、未激活。
+- **勾选不扩张**：两个 `pub(crate)` 入口（`wrap_line` / `truncate_wrapped_line`）的 typed
+  返回值仍不对外，R1 边界不变；3.1d / 3.2e 生产来源准入仍**阻塞**；`policy-draft.json` 仍
+  `applied: false`；真实 CoreText shaping / face / shaped advance 仍未取证；V-04 / V-07 /
+  V-09 与 M1 出口仍未整项通过。
+
+**2026-11-12 追加裁决（撤销 §35 其四 / 其五：字体失效 + 正文平滑对照）：** 用户在同一轮
+指令中选定撤销两项限制。执行结果如下；两项都只补**取证入口**，不发布产品能力。
+
+- **其四撤销：5.1b 字体失效取得。** 新增验证专用入口
+  `crates/aline-ui/src/native_window/font_invalidate.rs`，仅在
+  `ALINE_M1_FONT_INVALIDATE_FAMILY` 与 `ALINE_M1_FONT_INVALIDATE_MARK` 同时设置时生效，
+  快捷键 `cmd-alt-i` 也只在此时绑定。触发路径走既有 `FontEnvironment::activate`：注册成功
+  且字族可见 → 代次 +1 → `LayoutEnvironment.font_generation` 变化 → `prepare` 重置高度
+  缓存并重测。**不用「注册失败」制造失效**：失败按设计不推进代次，不会让布局缓存键变化。
+  真实窗口结果：baseline 不写标记；触发组标记为
+  `family=Menlo status=active outcome=activated before=0 after=1`，截图可见一级标题从
+  单行变为两行换行，ink_sum 由 10,729,803 降至 9,277,343。证据
+  `logs/validation/m1-single-window-readonly/2026-11-12-font-invalidation/`。
+- **其五撤销：正文平滑开/关对照取得，并纠正旧负结果的归因。** 2026-11-11-cjk-06 的
+  「正文 0 变化」不是「平滑不可触发」，而是**选错开关**：它用 argv 参数域
+  `-AppleFontSmoothing 0`，该域只影响 GPUI 的 `glyph_dilation_for_color`，而
+  `gpui-pre-apple 0.3.9` 只在 `dilation > 0` 时调 `set_should_smooth_fonts(true)`，正文又在
+  alpha-only 单通道上下文栅格化。同构 Swift 复现（DeviceGray + alphaOnly，16px / 28px）
+  测得 **dilation 0 与 1 的位图逐字节相同**。真正的开关是 CGContext 的
+  `allowsFontSmoothing` 默认值，来自应用偏好域或全局域。改用
+  `defaults write aline AppleFontSmoothing 0` 做 A/B（跑完恢复原值，原为未设置）后，真实
+  窗口得到：正文 ROI 变化 17,875 像素、最大通道差 170、变化 256 行、墨迹总量
+  10,105,439 → 11,090,604（**+9.75%**）。证据
+  `logs/validation/m1-single-window-readonly/2026-11-12-smoothing-ab/`。
+
+**边界（同一执行结果）：** 字体失效入口与平滑开关都是**取证入口/系统偏好**，不是产品
+能力——`BUNDLED_FONTS` 仍为空，产品无运行中字体切换 UI/入口；`crates/` 仍不调用
+`set_text_rendering_mode`，产品没有正文平滑设置。5.1b 的其余分项（新断点两侧点击、两视图
+往返、换宽、源码锚点恢复）此前已在 run-6 取得，但与本轮字体失效不在同一轮，**是否据此
+勾选 5.1b 留待裁决**。2.2b 的平滑侧已有真实对照，但 CJK 回退的「最小失败输入」仍只有
+face 未解析的显式未知。V-04 / V-07 / V-09 与 M1 出口仍未整项通过；本轮未改生产
+`Cargo.toml` / `Cargo.lock` / `scripts/*.json`，未新增依赖，未引入 `unsafe`。
+
+**2026-11-12 追加裁决（窗口失败反馈独立复审的四项修正）：** 独立复审对
+`m1-startup-window-failure-feedback` 给出 14 条 finding，其中 3 条判为「声称无法由证据
+支撑」，结论是「暂不可作为已完成变更交付」。用户就其中 4 个裁决点给出方向，执行结果如下。
+
+- **铁律 7 口径（finding 4）：判违规。** stderr 实际输出曾是
+  `无法连接到窗口服务，未显示窗口。: no active display after recheck`——中文句号后接
+  冒号再接 Aline 自己写的英文字面量。判为违反 AGENTS 铁律 7「所有面向用户字符串走
+  `t("key")`」。失败出口改为只输出本地化句；既有 `window_failed` 分支同一口径，不再拼接
+  `error.to_string()`。技术诊断需要时另起本地化键，不做英文尾缀。
+- **窗口证据（finding 1、2）：补探针 + 改写表格。** 原 §3 的四列信号表无可复跑探针，
+  沙箱用例的「窗口 0 / 0」是 `(windows or {}).get(..., 0)` 的缺省值而非测量值。新增独立
+  同进程 Swift 探针 `signal-probe/`（源码 + 运行入口 + 三剖面原始输出），表按实测重写；
+  沙箱剖面改为「未执行窗口枚举」（`window_probe_run=false`、`window_absent=null`），
+  不得读作窗口数为 0。探针实测：基线 `CGGetActiveDisplayList=1`、`NSScreen.screens=1`、
+  `occlusionState.visible=false`、`windowNumber=11513`；两条沙箱剖面依次为 `0 / 0 /
+  false / 0`。`occlusionState` 在两态都为 false，确认不可用作判别。
+- **机制断言（finding 3）：两轮报告统一降级。** 首版写作「窗口服务不可达时启动回调根本
+  不会被调用」，并据此论证检测点前移；该断言无埋点支撑，且与上一轮报告 §3 的结构性解释
+  （`NSWindow` 构造成功、窗口未注册）互斥。两轮观测对两种机制都成立。统一改为「无法判定
+  回调是否执行」，检测点前移的理由改为「选一个一定执行得到的检测点」。
+- **用户文案因果（finding 5）：改为中性表述。** `startup.no_display` 由「无法连接到窗口
+  服务，未显示窗口。」改为「未检测到可用显示器，未显示窗口。」（英文
+  "No display was available; no window was shown."）。代码只能观测「活跃显示数为 0」，
+  显示器睡眠、Spaces 切换、远程会话建立初期都可能瞬时为空，归因于窗口服务是错误因果。
+
+**其余按复审建议直接修正：** proposal What Changes 与 design Decisions 2/5 按实际实现改写
+（原写「启动闭包内 / `App::displays()` / `BackgroundExecutor::timer` / 检测放在
+`open_initial_window` 之后」，实现是 `run` 之前 + `std::thread::sleep`）；基线补测首窗
+在屏时刻 0.71 秒（run-3），替换「无额外延迟」的纯路径推断；恒真的 `is_failure` 换成纯函数
+`startup_failure(first, recheck)` 并补编排断言；`window_absent` 未探测时为 `null`；
+交叉引用 `docs/ui-spec.md` §5 → §14；`m1-engineering-evidence-gates` 2.2c 的时态改为
+「本工作区已实现，待该 change 交付」。
+
+**未采纳：** 复审 finding 8（把探针脚本移入 `scripts/` 并接入 `check_workspace.py` 自测）
+属新增范围，本轮不做；改以证据报告 §5 固化两段 `sandbox-exec` profile 正文与预期结果，
+使剖面条件可脱离脚本复现。**探针源码与运行脚本本身仍只在 `logs/` 内、不随仓库提交**，
+该复审项保持未闭合，任务 4.3 保持未勾。
+
+**边界（同一执行结果）：** 本组修正只让「已声称的东西」与证据对齐，不新增产品能力。
+V-09 仍未整项通过；显示枚举非空也不证明窗口服务可用（本检测的漏检方向）；反馈依赖终端
+启动才可见；仅 macOS arm64 实测。未改生产 `Cargo.toml` / `Cargo.lock` / `scripts/*.json`，
+未新增依赖，未引入 `unsafe`。
+
+## 36. 2026-11-12 M1 生产来源准入：本地 vendor + 守卫扩展
+
+用户在同一天追加裁决：**解除「不写生产 `Cargo.toml` / `Cargo.lock` / `scripts/*.json`
+策略资产」的限制，按完整生产准入链落地**。该裁决**推翻** §35 其一「3.2e 本轮不立项、
+vendor 推到 M2」与 §35 其七「本轮不做生产接入」的执行边界，但**不改写** §35 的任何
+历史记录。
+
+**落地内容（2026-11-12）：**
+
+- **来源。** `vendor/gpui-pre-0.3.9` ＝ crates.io 发布包解包 + 已审查的 8 文件补丁身份。
+  `.crate` 的 sha256 为 `34f61c1cfd36fc9c436af09308c963822ae27a45a84feb21a77ba5c9e051f1c0`，
+  与改动前 `Cargo.lock` 的 registry checksum 一致；相对发布包实际改动 5 个文件、
+  新增 1 个文件、2 个锚点文件字节未变。清单见 `vendor/PROVENANCE.json`。
+- **生产清单。** 根 `Cargo.toml` 增加
+  `[patch.crates-io] gpui-pre = { path = "vendor/gpui-pre-0.3.9" }`；`Cargo.lock`
+  只删去 gpui-pre 的 `source` 与 `checksum` 两行。
+- **守卫扩展。** 依赖门禁新增 `local-patch` 精确身份（`path` + `tree_sha256` +
+  8 个 `files`）。每次运行都重新读取磁盘、逐文件核对 8 个锚点并重算全树摘要；
+  符号链接、缺目录、`.` / `..` / 绝对路径一律失败关闭。只有 `native_backend.core`
+  允许本地来源，`root`、`gpui-pre-apple` 旁支与非桌面目标分支仍必须是 registry + checksum。
+- **准入账本。** `dependency_admission_policy.json` 的 `license.local_paths` 登记
+  `gpui-pre@0.3.9`（Apache-2.0、`gpui` 分组、全树与逐文件摘要）。未登记的本地路径包
+  继续被 `forbid_unreviewed_local_paths` 拒绝。
+- **指纹。** 7 个 `gpui_subtree_sha256` 按真实 `cargo metadata` + `cargo tree` 重新
+  导出（gpui-pre 行的 source/checksum 变为 null）。M0 冻结图的历史反例改读
+  `scripts/fixtures/engineering/live-graphs/policy-baseline.json`，不借用新值漂移。
+
+**仍未完成：** 4.1c（四字形 face 身份）仍需在 patched GPUI 内部新增诊断钩子，本轮未做；
+5.2d（H1/H2 清零）需对最终补丁另行安排定向复审，本轮未做，保持未勾。本次落地**不**表示
+真实 CoreText shaping / face / shaped advance 已取证，也不表示 V-04 / V-07 / AC-09 /
+M1 出口通过。
+
+**证据：** `logs/validation/m1-single-window-readonly/2026-11-12-production-admission/`
+（门禁真实运行、自测、指纹重导与独立复审）。
+
+**复审与加严（2026-11-12 追加）：** 独立复审确认来源字节、全树摘要、锁 diff、7 指纹与
+真实图一致，同时指出守卫只做 metadata 路径后缀匹配、且不拒绝祖先目录符号链接。已修复为：
+metadata `id` 与 `manifest_path` 必须绑定到 `(repo_root/path).resolve()`；`<repo>`
+占位符只还原为当前工作树根，其它占位符拒绝；登记路径逐级拒绝符号链接。复审随后复现的
+「不同用户主目录下的 Project/editor/Aline」外部同后缀绕过也已关闭（根特定还原 + `Path`
+真实路径比较，外部 id / manifest 探针全部拒绝）。终次门禁 `gate-07`、自测
+`self-test-03` 与完整 `workspace-03` 均在最终脚本修改之后运行并通过。复审代理未返回
+第三次书面闭环结论，因此本节不写成「复审签字通过」。

@@ -30,7 +30,7 @@ pub fn application_name(locale: Locale) -> Result<gpui::SharedString, CatalogErr
 /// 在已接入的平台上运行单窗口应用；其它平台返回当前 catalog 的未启用说明。
 ///
 /// macOS 调用方必须从进程的 OS 主线程调用；应用入口 `main` 满足该约束。
-/// 初始窗口构造失败时会输出本地化错误及诊断，并以非零状态立即退出。
+/// 初始窗口构造失败或启动期无可用显示器时，只输出本地化文案并以非零状态立即退出。
 pub fn run_application(locale: Locale, fallback_used: bool) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {

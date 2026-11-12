@@ -31,6 +31,7 @@ fn native_window_copy_exists_in_both_catalogs() {
                 "open_error.dialog",
                 "app.platform_unavailable",
                 "startup.window_failed",
+                "startup.no_display",
                 "startup.language_fallback",
                 "reading.large_source",
                 "reading.layout_budget",

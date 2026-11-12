@@ -468,6 +468,8 @@ M2 再立 `m2-save-recovery` 与 `m2-ime-protocol`。
 6. W4/W5 是否严格按 M2 计划，不在 M1 提前实现？
 7. 是否允许为 W1 重构 `native_window` 的窗口构造入口（会触及公共 API 守卫）？
 
+**2026-11-12 状态更新（追加，不改写上面各问）：** 第 2、3 问已由[决定 §35](./decisions.md#35-2026-11-12-m1-剩余七项裁决与受控失败实验)裁决——M1 接受中文避头尾已知限制，不在 M1 vendor 三个 gpui-pre 包，vendor 决策推到 M2 出现 caret/IME 后重新评估；W2 的「先测量、后决定」顺序本身已按此执行完毕。其余问题状态不变；本文仍是参考研究，裁决以决定记录与验证计划为准。
+
 ## 12. 执行交接
 
 本文先作为参考研究落库；2026-11-05 已按决定 QMD-01 把方法回写现行规范，并由 OpenSpec change [`m1-single-window-readonly`](../openspec/changes/m1-single-window-readonly/proposal.md) 记录治理 delta；不改代码、不加依赖。建议下一步：

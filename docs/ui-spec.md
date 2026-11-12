@@ -66,6 +66,8 @@ GitHub 白天模式的下列色值直接来自 PRD §6.2；只限定该模式，
 
 **2026-11-11 中文排版实测记录（不改变本节边界，V-04 未通过）：** logs 隔离 patched Release 的真实 macOS arm64 窗口取得：普通中文段落的 CJK fallback run 请求 `.SystemUIFont`（Visual）/ `Menlo`（Source），`resolved_family=unknown`、`face_source=Unknown`；首字符 TextSystem advance 为 15.875 / 16.000，拉丁 run 为 4.188 / 9.633；真实 `glyph.position.x` 相邻差（Visual Han 15.860、全角冒号 16.078；Source 16.000）。四字形样本中 CJK fallback advance 与 Han/冒号位置间隔不随 normal/bold/italic/bold-italic 改变，全角标点位置间隔在粗体下变化。字体平滑只有负结果：进程级 `-AppleFontSmoothing 0` 仅改变标题带像素，正文像素 0 变化。**边界：** `advance_px` 是首字符 TextSystem advance，不是 shaped advance；fallback face 身份未解析；正文平滑开/关需要渲染路径改动，属新 scope。未选择 vendor、预折行或接受已知限制，未使用合成斜体；数值仍不是 Aline 规范值。证据 `logs/validation/m1-single-window-readonly/2026-11-11-cjk-06/cjk-linebreak/5_m1_typography/`。
 
+**2026-11-12 M1 排版已知限制裁决（不改变本节测量门，V-04 未通过）：** 用户按[决定 §35](./decisions.md#35-2026-11-12-m1-剩余七项裁决与受控失败实验) 裁决：**M1 接受中文避头尾已知限制**，不把锁定 GPUI 的 fork 带入生产依赖，vendor 推到 M2 出现 caret/IME 后重新评估；正文平滑开/关对照不做（属 M4 渲染路径）。CJK fallback 的 `resolved_family=unknown` / `face_source=Unknown` 记为显式未知，不新增平台诊断钩子。**边界：** 裁决是范围与方向，不是能力通过；缺陷仍存在于 M1 只读视图，V-04 未整项通过。上一条 2026-11-11 实测记录中的「未选择 vendor、预折行或接受已知限制」由本条取代，其余边界不变。
+
 功能图标使用一致的形态、描边和状态体系，含义与名称稳定。图标按钮有可理解名称，悬停和键盘访问均能获得说明；可点击区域不得与相邻操作重叠。悬停、焦点、按下、选中、禁用可分别辨认，焦点不依赖鼠标悬停（PRD §6.3）。主题内置图标风格枚举 outline/filled 已按 TH-05 确认，须完整覆盖动作及状态；图标库、具体形状、描边数值和命中尺寸未冻结，归 V-09，不按旧截图“略大”生成数值。
 
 ### 3.3 数值账本与冻结规则
@@ -93,6 +95,8 @@ V-09 产物至少逐项记录逻辑尺寸与显示缩放、主题/字体、状�
 **2026-11-09 裁决落定（不改变本节的排版测量门）：** 接口裁决按用户授权的最小公开面方案落定（A1+A4 受检组合、`#[non_exhaustive] WrapLimit`、`TextLayout::wrap_limit() -> Option<WrapLimit>`），spec delta 未改；受限状态的用户可见提示的显示形态 / `t("key")` 键与插值 / 呈现位置按面向 M2 IME 与 M5 多窗的考虑另立后续 change 待裁决，本 change 不接线，见[决定 §29](./decisions.md#29-2026-11-09-按授权落定的接口裁决与来源准入结论)。来源准入结论为暂不批准、暂不允许 3.2 编译。中文直立的成因、实际 fallback run / advance / 平滑 A/B 仍为未知，不据墨迹宽或字体列表猜回退名；不实现合成斜体、整元素 skew、整篇字体替换或平滑数值，不冻结排版数值、不接受已知限制、不批准 vendor；V-04 仍未通过。
 
 **2026-11-09-cjk-04 更新：** 用户给出具体批准，授权 3.2 仅在 logs 隔离副本编译（生产清单/锁/策略资产零变更）；本节不改变任何 UI 接线、不新增 `t("key")`，受限状态仍只在 opt-in 验证入口以类型化结果可检查，用户可见提示另立后续 change。隔离副本的 3.2 编译与三入口回归使用合成度量，不产生真实字体 run / advance / 截图或中文排版验收证据；中文直立的成因、实际 fallback run / advance、平滑 A/B 仍为未知。见 `logs/validation/m1-single-window-readonly/2026-11-09-cjk-04/cjk-linebreak/`；V-04 仍未通过。
+
+**2026-11-12 排版待决项状态更新：** 上述 2026-11-09 各条中的「不接受已知限制、不批准 vendor、待用户裁决」已由[决定 §35](./decisions.md#35-2026-11-12-m1-剩余七项裁决与受控失败实验)更新：M1 接受中文避头尾已知限制，vendor 推到 M2，不新增平台诊断钩子，正文平滑对照不做。历史记录按原文保留；现行口径以 §35 与 §3.2 的 2026-11-12 条为准，V-04 仍未整项通过。
 
 **2026-11-09 W6 token 实现边界：** shell、reader、window 已只消费私有语义 token，原始 palette 集中且 19 个独立原值通过测试。真实 960×672 pt、2×、中文 Visual 以同一源码快照的字面值控制版与 token 版对照，正文/工具栏/状态栏区域逐像素相同；控制版为反向展开重构，非历史产物。原生标题与动态滚动条不混入颜色等价结论，Source 和其它平台未作本轮视觉 A/B。完整主题、暗色与主题包 schema 仍归 M4。详情与比较文件见验证计划 V-09。
 
@@ -506,6 +510,8 @@ M1 启动由 app 读取操作系统首选语言列表，只检查列表首项：
 按[决定 §24](./decisions.md#24-2026-11-03-验证取证只做中文)，界面语言的人工/原生取证只做中文，不再切换系统首选语言复验英文；双语 catalog 实现与键/占位符自动校验不变。
 
 **2026-11-03 M1 启动观测（裁决前历史）：** macOS 27.2 arm64 全新启动实测 `AppleLanguages=zh-Hans-CN` 显示中文空状态；将系统首选改为 `en-US` 后全新启动显示英文，再恢复中文首选。没有用 `LANG` 或 app 内注入代替系统默认检测。截图与设置记录见 `logs/validation/m1-single-window-readonly/2026-11-03-continue-02/catalog/`。这只验证当前 macOS 首选语言读取/回退语言选择分项，不代表完整 V-09、即时切换设置或 Windows/Linux 本地化验收。
+
+**2026-11-12 启动失败反馈实现（新增，仅 macOS arm64 实测）：** 锁定后端 `gpui-pre-macos 0.3.9` 的 `MacWindow::open` 返回 `Self` 而非 `Result`，`App::open_window` 不返回 `Err`，产品因此曾出现「无窗口、无提示、进程不退」。现于 `Application::run` 之前检查活跃显示数（`Platform::displays()`，其 macOS 实现即 `CGGetActiveDisplayList`）：首查为 0 时延迟 2 秒复检，仍为 0 则输出本地化 `startup.no_display` 并以状态码 1 退出。真实剖面 `deny-windowserver` / `deny-mach` 均在约 2.3 秒自行退出、退出码 1、stderr 出现该文案；基线正常建窗（在屏 1、全部 6）、stderr 为空、0.71 秒内出窗。**失败文案只走 `t("key")`**，不拼接英文技术诊断（铁律 7）；文案为因果中性的「未检测到可用显示器，未显示窗口。」——代码只能观测「活跃显示数为 0」，不能断言窗口服务不可达。**边界：** 2 秒复检只降低显示器睡眠期误判概率，不保证不误判；不处理运行中显示器热插拔或睡眠唤醒后的窗口恢复；显示枚举非空也不证明窗口服务可用，这是本检测的漏检方向；反馈依赖从终端启动（M1 无 `.app` 包）才可见；Windows/Linux 未测；本项不构成真实窗口/像素证据通过。见 [决定 §35](./decisions.md#35-2026-11-12-m1-剩余七项裁决与受控失败实验) 与 `logs/validation/m1-single-window-readonly/2026-11-12-window-failure/report.md`。
 
 | 内容/布局 | 适配与验收规则 |
 |---|---|

@@ -12,7 +12,11 @@
 
 沿用普通函数和显式命令清单，不引入新框架。`check_workspace.py` 继续唯一拥有执行次序/退出码，守卫脚本拥有各自规则；把顺序执行提取为可测函数，用退出 1 后再退出 0 的独立子进程证明失败后不会短路。测试通过当前入口 `--self-test` 执行，产物仍经过 `output_directory` 和 `evidence_paths`。
 
-性能报告继续消费 M1 原生采样与汇总路径，不复制字段解析器或另立门槛；真实矩阵缺 RSS/主线程测量/冷热证据则不能完成 W7 性能验收。catalog 同键/占位符由现有 app-core 测试覆盖；源码可见串扫描仍需独立正反例与消费者范围检查，不能用 catalog 测试代替。当前 `CLAUDE.md` 仅指向 AGENTS，无第二份正文；无 W2 vendor，补丁清单条件不触发。UI 启动已有可见失败/非零退出，panic hook 仅可评估，不能用捕获 panic 放宽引擎禁令。
+性能报告继续消费 M1 原生采样与汇总路径，不复制字段解析器或另立门槛；真实矩阵缺 RSS/主线程测量/冷热证据则不能完成 W7 性能验收。catalog 同键/占位符由现有 app-core 测试覆盖；源码可见串扫描仍需独立正反例与消费者范围检查，不能用 catalog 测试代替。当前 `CLAUDE.md` 仅指向 AGENTS，无第二份正文；无 W2 vendor，补丁清单条件不触发。
+**2026-11-12 追加（决定 §36，不改写上文）：** 生产来源准入落地后，生产树已含
+`vendor/gpui-pre-0.3.9` 与 `[patch.crates-io]` 本地来源；上句「无 W2 vendor」只描述
+本设计写出时的状态。此次 vendor 的补丁身份由 `vendor/PROVENANCE.json` 与两份策略资产
+登记，不由本 change 的补丁清单机制生成。UI 启动已有可见失败/非零退出，panic hook 仅可评估，不能用捕获 panic 放宽引擎禁令。
 
 `check_ui_catalog.py` 复用词法器的可选字符串 token 与测试作用域，检查直接 UI 字面值及可识别的字面 catalog key；宏、动态字符串和数据流仍需人工审查，不能宣称覆盖所有用户可见文案。公共 API 守卫优先使用统一入口显式提供的已有缓存；仅未提供时使用历史登记缓存，避免过期的登记临时路径遮蔽有效输入，缺失仍拒绝。
 
@@ -23,6 +27,8 @@
 获精确批准的 W1 离屏 runner 只把 `--self-test` 接入同一 workspace 清单，普通/自测 CLI 均由现有输出目录拒绝矩阵覆盖；统一门禁不自动启动离屏构建或窗口。W1 候选锁及临时准入配置只供 `logs/validation` 中的隔离工作区使用，不修改生产依赖图；真实离屏执行和证据仍归 W1 change。
 
 只改工程脚本，无产品状态、坐标、依赖和公开 API。执行副作用局限于日志目录及子命令自身既有行为。回滚移除检查接线不删除原始证据。现有缓存不足或平台缺失保留真实失败。
+
+2026-11-12 受控失败实验（追加）：按决定 §35 其六，用 `sandbox-exec` 从进程外部剥夺 WindowServer 访问，对同一 Release 二进制执行两条剖面（仅禁 windowserver 服务 / 禁全部 mach-lookup），并读取只读窗口列表。结果为**负结果**：进程存活、窗口数 0、stderr 无 `startup.window_failed` 文案、不自退；对照基线正常建窗。结构性依据表明 `open_initial_window` 的 `Err` 分支在锁定 macOS 后端（`WindowKind::Normal`）下结构不可达，故 2.2c 缺口无法以非侵入手段闭合。实验不改产品代码、不注入后门、不改清单/锁/策略资产，结论只作负结果记录，不写成平台通过。证据 `logs/validation/m1-single-window-readonly/2026-11-12-startup-failure/`。
 
 ## Risks / Trade-offs
 

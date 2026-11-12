@@ -3,6 +3,7 @@
 //! 窗口持有一个只读会话、一个实际读取及至多一个最新候选；文件选择、任务与
 //! 焦点在本层装配。读取和解析在后台完成，render 只读当前状态，不读盘或解析。
 
+mod font_invalidate;
 mod geometry;
 mod probe;
 mod readonly_content;
@@ -56,7 +57,8 @@ gpui::actions!(
         ReadPageDown,
         ReadStart,
         ReadEnd,
-        CancelNavigation
+        CancelNavigation,
+        InvalidateFont
     ]
 );
 
@@ -370,6 +372,14 @@ pub(crate) fn open_initial_window(
     ]);
     #[cfg(debug_assertions)]
     cx.bind_keys([KeyBinding::new("cmd-alt-l", ReportLayout, Some("M1Window"))]);
+    // 字体失效触发只在两个验证环境变量齐全时绑定；生产没有任何快捷键。
+    if font_invalidate::FontInvalidation::from_env().is_some() {
+        cx.bind_keys([KeyBinding::new(
+            "cmd-alt-i",
+            InvalidateFont,
+            Some("M1Window"),
+        )]);
+    }
     copy.install_menu(cx, false);
     let bounds = Bounds::centered(None, size(px(960.0), px(640.0)), cx);
     cx.open_window(
@@ -409,6 +419,7 @@ struct NativeDocumentWindow {
     fonts: FontEnvironment,
     probe: Option<probe::ProbeState>,
     evidence: Option<readonly_evidence::SharedEvidence>,
+    font_invalidation: Option<font_invalidate::FontInvalidation>,
 }
 
 impl NativeDocumentWindow {
@@ -450,6 +461,7 @@ impl NativeDocumentWindow {
             fonts,
             probe: probe::ProbeState::from_env(),
             evidence: readonly_evidence::ReadonlyEvidence::from_env(),
+            font_invalidation: font_invalidate::FontInvalidation::from_env(),
         };
         if state.probe.is_some() {
             cx.spawn_in(window, async move |weak, cx| {
@@ -720,6 +732,45 @@ impl NativeDocumentWindow {
             }
             cx.notify();
         }
+    }
+
+    /// 验证专用：推进一次字体代次，让布局缓存键失效并重新测量。
+    ///
+    /// 只有 `ALINE_M1_FONT_INVALIDATE_FAMILY` 与 `ALINE_M1_FONT_INVALIDATE_MARK`
+    /// 同时设置时 `font_invalidation` 才存在，快捷键也只在此时绑定；生产路径
+    /// 不会走到这里。触发后显式重测，因为字体代次进入布局缓存键，
+    /// `prepare` 会在下一帧发现键不同并重置高度缓存。
+    fn invalidate_font(&mut self, _: &InvalidateFont, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(request) = &self.font_invalidation else {
+            return;
+        };
+        let invalidated = request.apply(&mut self.fonts, cx.text_system().as_ref());
+        match invalidated {
+            Some(result) => {
+                if let Some(evidence) = &self.evidence {
+                    evidence.borrow_mut().event("font-invalidated");
+                }
+                eprintln!(
+                    "m1-font-invalidate family={} generation={}",
+                    result.family, result.generation
+                );
+            }
+            None => eprintln!("m1-font-invalidate not activated"),
+        }
+        let metrics = content_metrics(
+            f32::from(window.viewport_size().width),
+            f32::from(window.viewport_size().width),
+        );
+        let error = match (&mut self.reader, self.state.session().document()) {
+            (Some(reader), Some(document)) => {
+                reader.prepare(document, window, metrics, &self.fonts).err()
+            }
+            _ => None,
+        };
+        if let Some(error) = error {
+            self.state.feedback = Some(layout_error_key(error));
+        }
+        cx.notify();
     }
 
     fn render_reading_row(&mut self, row: usize, cx: &mut Context<Self>) -> gpui::AnyElement {
@@ -1174,6 +1225,7 @@ impl Render for NativeDocumentWindow {
             }))
             .on_action(cx.listener(|_, _: &FocusNext, window, cx| window.focus_next(cx)))
             .on_action(cx.listener(|_, _: &FocusPrevious, window, cx| window.focus_prev(cx)))
+            .on_action(cx.listener(Self::invalidate_font))
             .flex()
             .flex_col()
             .child(toolbar)

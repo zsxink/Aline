@@ -712,6 +712,11 @@ ratex/ratex-svg、mermaid-rs-renderer、usvg、syntect/two-face 属插件/资产
 
 **2026-11-11-cjk-06 补采（追加，不改写上面两行）：** 同一 patched Release 在真实窗口把正文宽收窄到 108 / 68（窗口 160 / 120，仍高于 `MIN_TEXT_WIDTH=64`），使真实最大单簇 U+FDFD 的 113.644 px 宽于行长，取得 `Some(ClusterWiderThanLine)` 3 条（可视化 108/68、源码 68）；同一窗口 108 宽的源码视图因存在合法候选未触发。上面「`ClusterWiderThanLine` 未观测」由此取代，其余未改变项（生产来源未准入、`advance_px` / `resolved_family` 的语义边界、字体失效未取得、三平台未测）继续成立。另：诊断未启用时同一二进制不写 `diag/`、`records.tsv`、`records.done`，stderr 为空，构成 4.1e 的行为证据。证据 `logs/validation/m1-single-window-readonly/2026-11-11-cjk-06/cjk-linebreak/3_5_1a/report-cluster-wider.md` 与 `report-hook-off.md`。
 
+**2026-11-12 M1 依赖方向裁决（追加，不改写上面三行）：** 按[决定 §35](./decisions.md#35-2026-11-12-m1-剩余七项裁决与受控失败实验)，M1 **接受中文避头尾已知限制**，3.2e 生产来源准入本轮不立项，vendor 推到 M2 出现 caret/IME 后重新评估。候选补丁与本节维护清单在 M1 结束时仍为**候选、未准入**：`policy-draft.json` 保持 `applied: false`，生产 `Cargo.toml` / `Cargo.lock` / 策略资产继续零变更，任何归档 / `minimal.diff` / 哈希 / 指纹 / 锁漂移仍会使既有具体批准失效。该裁决不改写任何身份锚点，也不等于批准或否决 vendor；M2 重新评估时须重走来源准入 + 独立评审 + 具体批准。同轮受控失败实验（`sandbox-exec` 剥夺 WindowServer）得到负结果，属工程失败路径证据，不涉及本节依赖身份。
+
+**2026-11-12 追加裁决（决定 §36，不改写上文）：** 用户解除「不写生产清单/锁/策略资产」的限制，生产来源准入已按完整链路落地：`vendor/gpui-pre-0.3.9`（发布包 + 8 文件补丁身份）、根 `Cargo.toml` 的 `[patch.crates-io]`、`Cargo.lock` 仅去 source/checksum、守卫新增 `local-patch` 精确身份（全树 + 逐文件摘要）、准入账本登记 `license.local_paths`、7 个 `gpui_subtree_sha256` 按真实图重导。§35 其一/其七中「3.2e 本轮不立项 / 本轮不做生产接入」的执行边界不再适用；历史记录保留，`policy-draft.json` 的 `applied: false` 仍描述该草稿自身，不表示生产图未接入。4.1c / 5.2d 仍未完成，「候选补丁未准入」不再适用于生产图，能力结论不变。
+
+
 ### 18.3 参考材料与决定入口
 
 | 材料 | 用途及效力 |
@@ -742,6 +747,6 @@ Ely 索引中的 `document/{edit,parse,apart,format,block,tables}.rs`、`markdow
 
 - **保真夹具的真实窗口七步：** 五个保真样本（BOM／混合行尾／孤立 CR／纯空白／无尾换行）在真实原生窗口内依次走完 `open → scroll → hit → jump → visual_to_source → source_to_visual → close`，每例磁盘字节与内存源码逐字节相等，`has_draft=false`、`history_len=0`、`revision_before/after=0`，`document_closed=true`。这是 AC-01 字节保真与 AC-09 只读展示在 macOS arm64 上的**分项**证据；不覆盖编辑、保存/重开（归 M2）与 Windows/Linux。
 - **1 MiB 真实可视化滚动：** 1,048,576 字节夹具在当前 Release 二进制上由像素读滚动条比例（0.0 → 0.0027 → 0.0018 → 1.0）与末尾标记块、回顶 0.0 两条独立位置佐证，并由应用自身回调记录（213 次滚轮 + 2 次键盘事件）互证。滚动比例与缩略块位置仍为**候选**量测方法，未冻结为性能或布局门槛。
-- **未随本节关闭的边界：** 代码块的真实横向滚动交互尚无真实窗口证据（PRD §6.2、UI §7.2 的产品要求仍缺证据）；`Hidden` 命中按设计不可由像素触达，不记为缺口也不记为通过；运行时字体切换在 M1 未接线；性能门槛、几何数值与配色仍为实验候选，未冻结。
+- **未随本节关闭的边界：** 代码块的真实横向滚动交互尚无真实窗口证据（PRD §6.2、UI §7.2 的产品要求仍缺证据）；`Hidden` 命中按设计不可由像素触达，不记为缺口也不记为通过；运行时字体切换在 M1 未接线（2026-11-12 由[决定 §35](./decisions.md#35-2026-11-12-m1-剩余七项裁决与受控失败实验) 裁决**接受为 M1 已知限制**，不为不发布的能力加隔离测试入口）；性能门槛、几何数值与配色仍为实验候选，未冻结。
 
 分项明细与证据路径见[验证计划](./v1-validation-plan.md)与 `openspec/changes/m1-single-window-readonly/tasks.md`。

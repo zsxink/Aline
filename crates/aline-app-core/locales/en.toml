@@ -55,4 +55,5 @@ dialog = "The file chooser could not be opened."
 
 [startup]
 window_failed = "The application window could not be opened."
+no_display = "No display was available; no window was shown."
 language_fallback = "System language detection failed; using English."

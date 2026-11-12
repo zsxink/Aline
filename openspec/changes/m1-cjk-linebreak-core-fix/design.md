@@ -129,6 +129,44 @@ FontId 映射家族，均不构成 shaped advance / 完整 face 身份；5.1b �
 未清零；V-04/V-07/V-09 与 M1 出口均未整项通过。证据
 `logs/validation/m1-single-window-readonly/2026-11-11-cjk-06/cjk-linebreak/`。
 
+### 8. 本轮收尾裁决（2026-11-12，追加，不改写上面各节）
+
+用户裁决见[决定 §35](../../../docs/decisions.md)。本 change 以 **evidence-only**
+收尾：M1 接受中文避头尾已知限制，3.2e 生产来源准入不立项，vendor 推到 M2；4.1c 不新增
+平台诊断钩子（会改变已批准的 8 文件字节身份与 `minimal.diff` 哈希）；5.1b 字体失效接受
+为已知限制；5.2d 不另安排定向复审，保持未勾作为「生产准入未推进」的显式边界。
+
+裁决不改变本设计的技术结论：最小公开面（`#[non_exhaustive] WrapLimit` +
+`TextLayout::wrap_limit()`）与私有纯规则仍然成立，候选补丁身份锚点不变，
+`policy-draft.json` 仍 `applied: false`，生产清单 / 锁 / 策略资产零变更。若 M2 决定
+vendor，须重走来源准入 + 独立评审 + 具体批准，并重新取得生产策略资产接入的专门裁决。
+
+**2026-11-12 追加裁决（决定 §36，不改写本节）：** 用户解除上述限制，3.2e 已按完整
+生产准入链落地（vendor 来源、`[patch.crates-io]`、`local-patch` 守卫、准入账本、
+7 指纹重导）；本节「不立项 / 零变更」只描述 §35 裁决时的状态。候选补丁身份仍以
+8 文件锚点与 `tree_sha256` 为准，`policy-draft.json` 仍 `applied: false`。4.1c 与
+5.2d 仍未完成。
+
+### 9. 伞项 1.2 / 2.2 复核与勾选（2026-11-12，追加，不改写上面各节）
+
+用户追加裁决见[决定 §35](../../../docs/decisions.md) 末段。新建只读脚本
+`logs/validation/m1-single-window-readonly/2026-11-12-closeout/verify_candidate_identity.py`
+从原始字节重新推导（不引用 `cohort/replay-result.json` 的既有结论），26 项检查全部通过。
+据此勾选 1.2 与 2.2；§6 的「任务仍 2/12」是当时计数，现为 4/12。
+
+勾选的依据是 2026-11-09 独立评审 H1 的阻塞条件已解除：run-7/8/9 已在真实 macOS arm64
+窗口经公开 `TextLayout::wrap_limit()` 取得两种受限状态，评审当时未见该证据。2.2 的
+「具体来源获准前不构建或激活」是验收要求而非阻塞条件，现状即未构建、未激活。
+
+勾选不扩张：两个 `pub(crate)` 入口的 typed 返回值仍不对外（R1 边界不变）；3.1d / 3.2e
+仍阻塞；`policy-draft.json` 仍 `applied: false`；真实 CoreText shaping / face / shaped
+advance 仍未取证；V-04 / V-07 / V-09 与 M1 出口仍未整项通过。
+
+**2026-11-12 追加（决定 §36，不改写上句）：** 上句「3.1d / 3.2e 仍阻塞」描述该段写出时
+的状态；§36 落地后 3.1d / 3.2e 已完成。R1 边界、`policy-draft.json` 的
+`applied: false` 与「真实 CoreText shaping / face / shaped advance 未取证」不变；
+4.1c / 5.2d 仍未完成。
+
 ## Risks / Trade-offs
 
 - [没有合法断点] → 独立失败用例先行，禁止硬断伪通过；必要受检接口差异先审阅。

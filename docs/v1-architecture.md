@@ -63,6 +63,11 @@
 
 **2026-11-11-cjk-06 依赖状态追加（仍为未准入生产）：** 受限 opt-in 诊断钩子已接入 logs 隔离候选副本并完成独立复审（`pass-with-findings`、无阻断项）；同一 patched Release 在真实 macOS arm64 窗口取得 5.1a–d、四字形 run/advance/位置、超宽行真实簇形状与字体平滑负结果。详见 [engine-design §18.2](./engine-design.md#182-依赖准入与未解决实现风险) 的同轮追加条目与 `logs/validation/m1-single-window-readonly/2026-11-11-cjk-06/cjk-linebreak/`。生产 `Cargo.toml` / `Cargo.lock` / 策略资产零变更，`policy-draft.json` 仍 `applied: false`，本追加不改变任何例外、指纹或生产依赖图。
 
+**2026-11-12 M1 依赖方向裁决（追加，不改写上面两行）：** 按[决定 §35](./decisions.md#35-2026-11-12-m1-剩余七项裁决与受控失败实验)，M1 **接受中文避头尾已知限制**，本轮不立项 3.2e 生产来源准入，vendor 决策推到 M2 出现 caret/IME 后重新评估。因此候选补丁与维护清单在 M1 结束时仍为**候选、未准入**状态：`policy-draft.json` 保持 `applied: false`，生产清单 / 锁 / 策略资产继续零变更，`check_engineering.py` 对候选图继续失败关闭；本节不因该裁决改写任何哈希、指纹或例外，也不把「不立项」读成「已批准」或「已否决」。M2 若决定 vendor，须重新走本节的来源准入 + 独立评审 + 具体批准链。
+
+**2026-11-12 追加裁决（决定 §36，不改写上文）：** 用户解除「不写生产清单/锁/策略资产」的限制，生产来源准入已按完整链路落地：`vendor/gpui-pre-0.3.9`（发布包 + 8 文件补丁身份）、根 `Cargo.toml` 的 `[patch.crates-io]`、`Cargo.lock` 仅去 source/checksum、守卫新增 `local-patch` 精确身份（全树 + 逐文件摘要）、准入账本登记 `license.local_paths`、7 个 `gpui_subtree_sha256` 按真实图重导。§35 其一/其七中「3.2e 本轮不立项 / 本轮不做生产接入」的执行边界不再适用；历史记录保留，`policy-draft.json` 的 `applied: false` 仍描述该草稿自身，不表示生产图未接入。4.1c / 5.2d 仍未完成，「候选补丁未准入」不再适用于生产图，能力结论不变。
+
+
 依赖准入以本节和[现行引擎 §18.2](./engine-design.md#182-依赖准入与未解决实现风险)为准；[历史 engine-design §2.12](./archive/migration-evidence/engine-design.md)仅供追溯候选来源，不能覆盖当前禁令、版本登记和 V 验证。第三方版本集中到 workspace；同类功能不引入第二个库。V1 禁 notify、regex、tokio、Wasmtime/WASI、动态插件宿主，完整图中仅允许下列已批准的 GPUI 精确例外；五引擎完整闭包继续无 GPUI、无禁用依赖。禁止把旧 §9.3 的 actor、心跳、WIT、安装目录搬进 M0–M6。后续外部插件接入方向已获用户明确确认，加载协议、执行环境、隔离与权限、兼容策略及交付阶段尚待专项设计；本稿不预建宿主、不确定工期，也不恢复旧 Wasmtime 路线。
 
 #### M0 GPUI 精确准入例外（2026-10-30）
@@ -883,7 +888,7 @@ M1 交接仍先取得锁定 GPUI 的原生 macOS 单窗冒烟、V-04 中文字�
 | TH-01～TH-10（A） | schema 1/封闭字段/合并规则、静态 PNG、outline/filled；无覆盖升级/删除按钮，安装不应用，受保护 GitHub 根、磁盘副本保修改，失效身份保留且修复/重启不自动应用 | §8.2、[主题 §14](./theme-package-spec.md#14-待确认问题清单)、[确认归档](./archive/2026-10-29-theme-decisions.md)；数值/原生能力及 V-04/V-06/V-09 仍未验证 |
 | QMD-01（工程方法） | 按用户 2026-11-05 指令，记录 quiet-md 调研启发的随机不变量、性能报告字段、保存/恢复分离、IME 核对点、语义 token、中文排版测量门与离屏证据边界；其中部分为 Aline 既有或追加方法，不整体归为 quiet-md 采纳；不改产品契约；W1～W7 已分别建独立 change，实施状态见开发流程 §3.1 | [决定 §25](./decisions.md#25-2026-11-05-quiet-md-工程实践采纳qmd-01)、[研究文档](./quiet-md-study.md)、[治理 delta 所在 change](../openspec/changes/m1-single-window-readonly/proposal.md)；实施前按[开发流程 §2](./development-process.md#2-openspec-变更流程)逐项建档 |
 
-产品决定阻塞已解除；输入状态机、重载事务和偏好持久化仍须实现及验收。V-01～V-09 均未整项完成，归档不代表架构全部技术细节冻结或发布门禁通过。QMD-01 是工程/验证方法采纳记录，其后续独立 change 已按用户指令实施，但 W1 新依赖与 W2 vendor 仍须具体裁决；fuzz 默认规模以 W3 契约为准，不能以本表替代实施或验证证据。
+产品决定阻塞已解除；输入状态机、重载事务和偏好持久化仍须实现及验收。V-01～V-09 均未整项完成，归档不代表架构全部技术细节冻结或发布门禁通过。QMD-01 是工程/验证方法采纳记录，其后续独立 change 已按用户指令实施，但 W1 新依赖与 W2 vendor 仍须具体裁决；fuzz 默认规模以 W3 契约为准，不能以本表替代实施或验证证据。**2026-11-12 更新：** W2 的 vendor 方向已由[决定 §35](./decisions.md#35-2026-11-12-m1-剩余七项裁决与受控失败实验)裁决为 M1 接受已知限制、推到 M2 重新评估，`m1-cjk-linebreak-core-fix` 以 evidence-only 收尾；W1 新依赖仍未准入，本条其余内容不变。
 
 ## 15. 旧架构逐章处置账本
 

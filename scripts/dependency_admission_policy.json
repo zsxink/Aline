@@ -2,7 +2,7 @@
   "format": 1,
   "reviewed": true,
   "reviewed_on": "2026-11-02",
-  "review_evidence": "docs/v1-architecture.md#32-栈与依赖的状态; docs/engine-design.md#182-依赖准入与未解决实现风险",
+  "review_evidence": "docs/v1-architecture.md#32-栈与依赖的状态; docs/engine-design.md#182-依赖准入与未解决实现风险; docs/decisions.md §36（2026-11-12 生产来源准入）",
   "purpose": "八成员 workspace 的逐依赖准入分组与许可证策略；分组说明是人工审查结论，包身份、选包、边、features 与校验和由账本自动核对",
   "license": {
     "allowed": [
@@ -27,6 +27,27 @@
     ],
     "legacy_slash_means_or": true,
     "forbid_unreviewed_local_paths": true,
+    "local_paths": [
+      {
+        "package": "gpui-pre@0.3.9",
+        "source": "local-patch",
+        "path": "vendor/gpui-pre-0.3.9",
+        "tree_sha256": "583595b2529317b7c578b74396ff500f04899502ab41b4652f9b58424fa1846f",
+        "files": {
+          "Cargo.toml": "43ac0a636d1283313dbb48810ff32c0f6b55737824a886bd9fad37735ec0c56c",
+          "LICENSE-APACHE": "752daf2fb234ca4a1fa372c073fe127f44b7b90fd2529ae44273a64f9d53da7a",
+          "src/elements/text.rs": "0d694cc11c81c09adaefaf60333da74f086c108729dbd7e6fe414f36934e0a58",
+          "src/text_system.rs": "30ca45d4393b626d05cff89db2354e48f67f6ad9250ca7aa6604040c38d56210",
+          "src/text_system/cjk_soft_break.rs": "739526f83e2172f648eca12c5d45c7ce8ef98f3fe664e6c8915003bef7b15b10",
+          "src/text_system/line.rs": "f2cb84c676508b5d4f9bbb09017690d924f37a5800f15812ec19055c6152e504",
+          "src/text_system/line_layout.rs": "80d41a01bc480c0be647a5a0e587e4a5cf1fb8fe9fb38edf2086c2997ade11a1",
+          "src/text_system/line_wrapper.rs": "928a6897e447894629c1e0531e7a3bee0b81c0e2aa14b2a7f2d3909d150f6571"
+        },
+        "license": "Apache-2.0",
+        "group": "gpui",
+        "basis": "2026-11-12 用户裁决：按完整生产准入链落地。发布包 .crate 的 sha256 与 registry checksum 34f61c1cfd36fc9c436af09308c963822ae27a45a84feb21a77ba5c9e051f1c0 一致；改动为已复审的 8 文件身份（相对发布包：改 5、增 1、未变 2），不新增依赖、不含 unsafe、不含平台诊断钩子。"
+      }
+    ],
     "conclusion": "只准入宽松许可证；SPDX 表达式在允许集合下可满足即视为满足准入策略（OR 选允许分支，AND 全部需允许）。LGPL/GPL/AGPL/MPL 不作为允许原子；r-efi 等以 OR 列出 LGPL 时按 MIT/Apache-2.0 分支选择，不选 LGPL。2026-11-02 用户精确批准 cbindgen@0.28.0、option-ext@0.2.0 与 dwrote@0.11.5 的 MPL-2.0 metadata 闭包例外，以及 libloading@0.8.9 的 ISC 互斥条件 metadata-only 路径例外；不扩展全局 MPL 或 ISC 允许集合。",
     "limits": "这是工程准入策略判定，不是法律意见；未执行许可证全文核对、再分发合规审查或跨平台构建。",
     "exact_exceptions": [

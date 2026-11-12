@@ -230,7 +230,9 @@ def validate(data, tree, lock_path, policy, scenario, admission=None, ledger=Fal
     gpui_full = reachable(nodes, [gpui]) if gpui else set()
     full_outside = reachable(nodes, roots, omit=gpui) if gpui else full
     from engineering_native_paths import check_native_paths
-    native = check_native_paths(packages, nodes, roots, selected, lock, policy, scenario)
+    # 本地来源的字节核对以锁文件所在清单目录为工作树根：生产是仓库根，fixture 是 fixture 根。
+    repo_root = Path(lock_path).resolve().parent
+    native = check_native_paths(packages, nodes, roots, selected, lock, policy, scenario, repo_root=repo_root)
     native_approved = native["forbidden"] | native["sidecars"]
     for identity in full_outside - selected:
         if identity in native_approved:
@@ -289,7 +291,7 @@ def validate(data, tree, lock_path, policy, scenario, admission=None, ledger=Fal
     if admission is not None:
         # 许可证/分组准入是图身份检查之后的独立覆盖缺口；失败同样 fail closed。
         from dependency_admission import check_admission
-        outcome = check_admission(packages, nodes, roots, selected, lock, admission, scenario, ledger)
+        outcome = check_admission(packages, nodes, roots, selected, lock, admission, scenario, ledger, repo_root=repo_root)
         result["admission"] = outcome["summary"]
         if outcome["ledger"] is not None:
             result["_admission_ledger"] = outcome["ledger"]
