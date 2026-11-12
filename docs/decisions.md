@@ -1269,3 +1269,28 @@ metadata `id` 与 `manifest_path` 必须绑定到 `(repo_root/path).resolve()`�
   或 `vendor/`。
 - **证据。** `logs/validation/m1-single-window-readonly/2026-11-12-2_1-cross-round/`
   （`observations.json`、`compose_observations.py`、`report.md`、`checked/summary.json`）。
+
+## 41. 2026-11-12 typography 2.2c 三项接受已知限制
+
+用户指示原文：「2.2c 三项按接受已知限制处理。」本裁决补足 QMD-01.6 在
+`m1-cjk-typography-font-evidence` 2.2c 中要求的四项决策：换行侧已由[§35](#35-2026-11-12-m1-剩余七项裁决与受控失败实验)其一定为 M1 接受已知限制，
+本轮对其余三项（斜体、CJK 回退、字体平滑）一并按接受已知限制处理。
+本裁决不勾选任何等待中的证据任务；2.2c 因四项决策均有具体裁决而勾选。
+
+- **斜体。** Visual 的拉丁 run 正常倾斜；CJK fallback 在 normal/italic 下未解析出
+  新的字体槽位（2026-11-11-cjk-06 同进程 FontId 槽位相同），中文保持直立。M1
+  接受该已知限制：不实现合成斜体、不走整元素 skew、不换全文字体，也不把可见倾斜
+  写成 CJK 斜体已解决。
+- **CJK 回退。** fallback run 的 `resolved_family=unknown`、`face_source=Unknown`，
+  face 身份显式未知；`advance_px` 是首字符 TextSystem advance，不是 shaped
+  advance。M1 接受该已知限制并保留显式未知，不据未知墨迹宽度宣称回退已修复；
+  face 身份留待 M4 字体机制。
+- **字体平滑。** 开关是 macOS 系统偏好，不是 Aline 产品设置；六组合 A/B 证明正文
+  像素可观测变化（正文 ROI 变化 31,197–66,735 像素、最大通道差 112–165、墨量
+  +16.25%～+19.22%），但没有任何输入被证明会因平滑而错排，产品也无平滑
+  UI/环境入口。M1 接受「跟随系统偏好、不提供产品开关」为已知限制。
+- **勾选与边界。** `m1-cjk-typography-font-evidence` 的 2.2c 勾选；2.2b（最小
+  失败输入/实际结果）未因本裁决完成，2.2 伞项仍不勾。接受已知限制不等于缺陷已
+  修复或能力通过：4.1c / 4.2c / 4.2d 仍未勾，真实 CoreText shaping / face /
+  shaped advance 仍未取证，V-04 / V-07 / V-09、AC-09 与 M1 出口仍未整项通过。
+  未改产品代码、生产 `Cargo.toml` / `Cargo.lock`、`scripts/*.json` 或 `vendor/`。

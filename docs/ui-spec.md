@@ -110,6 +110,8 @@ V-09 产物至少逐项记录逻辑尺寸与显示缩放、主题/字体、状�
 
 **2026-11-12 2.1 观测集跨轮组合勾选（不改变本节边界，V-04 未通过）：** 用户接受用既有 2.1a/2.1b 观测 + 2026-11-12 六组合平滑数据组成新的六组合观测集；新集 `logs/validation/m1-single-window-readonly/2026-11-12-2_1-cross-round/observations.json` 经核对入口返回 `evidence_complete: true`、`capability_passed: null`，2.1 伞项据此勾选。上条「2.1 伞项的观测集重建仍未处理」由本条更新。边界：2.1 是测量完整性；`line_boundaries` 是 2026-11-09 构建 `b7fbafaa…` 的修复前换行，当前构建未重测；`fallback` 的 face 身份仍为显式未知、advance 不是 shaped advance；`smoothing` 是系统偏好 A/B；2.2b / 2.2c 仍未勾，V-04 未整项通过。报告 `logs/validation/m1-single-window-readonly/2026-11-12-2_1-cross-round/report.md`。
 
+**2026-11-12 2.2c 决策：三项接受已知限制（不改变本节边界，V-04 未通过）：** 用户指示「2.2c 三项按接受已知限制处理」。斜体侧接受 Visual 的 CJK fallback 直立、拉丁 run 正常倾斜为 M1 已知限制，不实现合成斜体、不走整元素 skew、不换全文字体；CJK 回退侧接受 `unknown`/`Unknown` 的 face 身份显式未知与非 shaped advance，留待 M4 字体机制；平滑侧接受「跟随 macOS 系统偏好、产品不提供平滑 UI/环境入口」。换行侧沿用决定 §35 其一的 M1 已知限制。QMD-01.6 四项决策至此均有具体裁决，2.2c 勾选。**边界：** 接受已知限制不等于排版/字体能力通过；2.2b 与 2.2 伞项仍未勾，V-04 未整项通过。决策记录见 `docs/decisions.md` §41。
+
 **2026-11-09 W6 token 实现边界：** shell、reader、window 已只消费私有语义 token，原始 palette 集中且 19 个独立原值通过测试。真实 960×672 pt、2×、中文 Visual 以同一源码快照的字面值控制版与 token 版对照，正文/工具栏/状态栏区域逐像素相同；控制版为反向展开重构，非历史产物。原生标题与动态滚动条不混入颜色等价结论，Source 和其它平台未作本轮视觉 A/B。完整主题、暗色与主题包 schema 仍归 M4。详情与比较文件见验证计划 V-09。
 
 ## 4. 主窗口信息架构与布局

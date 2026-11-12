@@ -50,6 +50,14 @@ M4；平滑侧不做正文开/关对照（属 M4 渲染路径）。
 `capability_passed` 保持 `null`；`line_boundaries` 是 3.2e 修复前状态，当前构建
 未重测；face 身份与 shaped advance 未取证；2.2b / 2.2c 仍未勾，V-04 未整项通过。
 
+**2026-11-12 2.2c 勾选（三项接受已知限制，不改写上段）：** 用户指示「2.2c 三项按
+接受已知限制处理」。换行侧沿用决定 §35 其一；斜体、CJK 回退、平滑三项分别接受
+「CJK fallback 直立、不实现合成斜体」「face 身份显式未知、advance 不是 shaped
+advance，留 M4」「跟随 macOS 系统偏好、产品不提供平滑开关」为 M1 已知限制。
+QMD-01.6 四项决策至此均有具体裁决，2.2c 勾选。设计口径不变：`evidence_complete`
+只证明记录完整，`capability_passed` 保持 `null`；接受已知限制不写成缺陷已修复或
+能力通过；2.2b 与 2.2 伞项仍不勾，V-04 未整项通过。见 `docs/decisions.md` §41。
+
 ## Risks / Trade-offs
 
 - 人工测量存在误差 → 记录 px/pt、scale、截图、方法，保留原始值与不确定性。

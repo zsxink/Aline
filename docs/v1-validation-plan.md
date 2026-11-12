@@ -137,6 +137,8 @@ Mermaid 护眼模式使用亮色映射；固定主题不跟随应用，主题是
 
 **2026-11-12 2.1 观测集跨轮组合勾选（V-04 仍未整项通过）：** 用户接受用既有 2.1a/2.1b 观测 + 2026-11-12 六组合平滑数据组成新的完整六组合观测集。新集 `logs/validation/m1-single-window-readonly/2026-11-12-2_1-cross-round/observations.json` 经 `scripts/check_m1_cjk_typography.py` 返回 `evidence_complete: true`、`capability_passed: null`、`failures: []`，2.1 伞项据此勾选。字段来源：主截图与换行/行高/斜体取 2026-11-09 finish-01/w2（commit `b7fbafaa…`、app `e88bd6fe…`，换行字段为 3.2e 修复前状态），回退/标点位置取 2026-11-11-cjk-06（commit `6ed33f08…`、app `c87400a9…`，logs 隔离 patched Release；六组合 run 用 `m1-5_1a-breakpoints.md` 第 26 行，四字形用固定夹具 visual 960×640），平滑取 2026-11-12 六组合 A/B（HEAD `159725ee`、app `56323a4c…`）。**边界：** 这是测量完整性，不是能力通过；`line_boundaries` 是修复前记录，当前构建未在该字段重测；`fallback` 的 face 身份仍为 `unknown`/`Unknown`，advance 不是 shaped advance；`punctuation_width` 是 `glyph.position.x` 位置间隔；`smoothing` 是系统偏好两态 A/B；2.2b / 2.2c 仍未勾，V-04 / V-07 / V-09 与 M1 出口未整项通过。报告 `logs/validation/m1-single-window-readonly/2026-11-12-2_1-cross-round/report.md`。
 
+**2026-11-12 2.2c 决策：三项接受已知限制（V-04 仍未整项通过）：** 用户指示「2.2c 三项按接受已知限制处理」，与决定 §35 其一的换行侧裁决合并后，QMD-01.6 四项决策均有具体结论。逐项口径：斜体——Visual 的拉丁 run 正常倾斜，CJK fallback 在 normal/italic 下未解析出新字体槽位、中文保持直立，M1 不实现合成斜体、不走整元素 skew、不换全文字体；CJK 回退——`resolved_family=unknown`、`face_source=Unknown` 的 face 身份显式未知，首字符 TextSystem advance 不是 shaped advance，留待 M4 字体机制；平滑——开关是 macOS 系统偏好，六组合 A/B 只证明像素可观测差异（正文 ROI 变化 31,197–66,735 像素、墨量 +16.25%～+19.22%），没有输入被证明因平滑而错排，产品不提供平滑 UI/环境入口。**边界：** 接受已知限制不等于缺陷已修复或能力通过；2.2b 的最小失败输入/实际结果未因本决策完成，2.2 伞项仍未勾；V-04 / V-07 / V-09 与 M1 出口仍未整项通过。决策记录见 `docs/decisions.md` §41。
+
 
 ## V-05 · 性能设备、测量和发布门禁
 
