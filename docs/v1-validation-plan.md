@@ -289,6 +289,8 @@ M0 编码基础证据（2026-10-31）：行尾边界金样已固定 CR-X-LF 删�
 
 **2026-11-12 后续裁决（决定 §37，不改写上条）：** F1（高）经用户明确接受为已知边界，F2/F3（中）保留未修，vendor 字节与策略资产零变更；按复审员 A「F1 修复或用户明确接受」的处置口径，5.2d 已勾选、5.2 伞项成立，**不写成 F1 已修复或已清零**。字体失效证据已按修正后的 baseline 重跑（对照组同样发送 `cmd-alt-i`，不写标记且墨迹前后相同；触发组代次 0→1），构建回执见 `logs/validation/m1-single-window-readonly/2026-11-12-font-invalidation/report.md` 与 `runs/run-3/`。5.1b 仍未勾选；V-07、AC-09、V-09 与 M1 出口仍未整项通过。
 
+**2026-11-12 后续裁决（决定 §38，不改写上条）：** 5.1b 已按用户指令「5.1b 也勾选」勾选，5.1 伞项随之勾选。勾选口径为**跨轮证据组合**：run-6（`4_5_1bd/`）覆盖新断点两侧真实像素点击、两视图往返、换宽与源码锚点恢复；2026-11-12 字体失效补跑（run-3）覆盖字体失效分项。不写成同一轮取证；字体失效仍只证明触发链，不证明失效后的点击/锚点/滚动。V-07、AC-09、V-09 与 M1 出口仍未整项通过。
+
 
 ## V-08 · 文件操作、临时图片与恢复事务
 
@@ -323,6 +325,8 @@ M0 编码基础证据（2026-10-31）：行尾边界金样已固定 CR-X-LF 删�
 **2026-11-07 M1 主窗 V-09 十四项矩阵（真实窗口，非 V-09 整项通过）：** 会话解锁后按任务 7.2 执行 `python3 scripts/run_m1_readonly.py --suite window-baseline --output-dir logs/validation/m1-single-window-readonly/2026-11-06-continue-06/window-baseline`，exit 0（`passed: true`，14/14，`failures: []`；观测输入 `window-baseline/observations.json`，结果 `summary.json`/`summary.md`）。覆盖：无文档态（`03`）、5 MiB 加载帧（`12`，60 fps 抓帧第 12 帧「正在读取 Markdown 文档…」）、正常阅读（`05`，2857 字符/42 行）、非 UTF-8 读取失败（`04`/`24`）、打开取消（`11`，焦点归还打开按钮）、>4 MiB 回退源码（`13`，1778400 字符/10401 行与回退原因）、窄窗 900/600（`15`/`16`，实测正文左缘 32.5/20.5 pt，600 pt 折行后「航索引。」完整可见）、高 DPI scale 2 滚动与命中（`06` 与 `../hit/observations.md`）、长英文文件名（`17`，96 字符标题完整、状态栏 91 字符 7 行）、打开/双视图键盘（`07～10`，`m1-anchor restored source=636 row=4`）、大纲/脚注键盘（`18～22`，目录项 Enter `m1-navigate source=17 row=4`，定义行 Enter 回跳 `m1-navigate source=40 row=6`）、反馈键盘（`23`/`24`，错误条「文档不是有效的 UTF-8 文本。」、焦点环留在打开按钮）与中文界面（`catalog-chinese-2026-11-07.log`，`m1_window_catalog` 2 passed）。**边界：** 仅 macOS arm64、scale 2；AX 快照只暴露窗口与「打开 Markdown 文档…」按钮，提示条文本未作为 AX 静态文本暴露，不宣称辅助技术支持；Windows 10/Intel Mac/Linux 与完整设置/菜单/主题矩阵未测。本分项不表示 V-09、AC-15 或 AC-20 整项通过。
 
 **2026-11-11-cjk-06 六组合真实窗口分项（V-09 仍未整项通过）：** 同一 logs 隔离 patched Release 在 macOS arm64 真实窗口按正文逻辑宽 320/480/768 × Visual/Source 六组合记录真实断点、文字行高（28.000/32.500/43.000）与受限状态（`Some(NoLegalBreak)` 6 条、`Some(ClusterWiderThanLine)` 0 条）；窗口宽 372/532/960、截图 scale 2。visual 768 第 25 行由同一二进制/钩子的独立 960×640 进程补采（run-7 在 768 只绘制首屏）。六组合第 25 行布局：可视化 `line_width=481.465`、源码 `518.695`，36 簇/36 glyph，`wrap_limit=none`。5.1b 换宽 480/768 后源码锚点恢复与 5.1c 的截图/布局/映射身份见 V-07 同轮条目。**边界：** 字体失效不可触发（`BUNDLED_FONTS` 为空、无 UI/环境入口），显示缩放、主题/字体完整矩阵与 Windows/Intel Mac/Linux 仍未测；本分项不表示 V-09、AC-15/16/20 或 M1 出口整项通过。证据 `logs/validation/m1-single-window-readonly/2026-11-11-cjk-06/cjk-linebreak/3_5_1a/` 与 `5_m1_typography/`。
+
+**2026-11-12 追加更正（决定 §36/§38，不改写上条）：** 上条边界中的「字体失效不可触发」只对生产路径成立；验证专用入口已取得字体失效触发链（见 V-07 同日条目），5.1b 与 5.1 伞项已按[决定 §38](./decisions.md#38-2026-11-12-51b-勾选裁决接受跨轮证据组合并滚动勾选-51) 勾选。V-09 仍未整项通过。
 
 **2026-11-11-cjk-06 补采：窄窗受限状态（V-09 仍未整项通过）：** 同一 patched Release 把真实窗口收窄到 160×640 与 120×640（正文宽 108 / 68，`geometry.rs` 换算为 `available = window − 12`、紧凑档内边距 20），取得 `Some(ClusterWiderThanLine)` 3 条：可视化 108/68 与源码 68。这补上了上面「0 条」的缺口，同时给出窄窗档位的实测：108 与 68 均未触发横向溢出保护之外的行为，正文宽仍高于 `MIN_TEXT_WIDTH=64`。**边界：** 108 / 68 不是产品设计目标，也不在六组合内；`MIN_TEXT_WIDTH` 与窄窗收窄规则仍是实验候选，冻结与否仍由 V-09 裁决；显示缩放、主题/字体完整矩阵与 Windows/Intel Mac/Linux 仍未测。证据 `logs/validation/m1-single-window-readonly/2026-11-11-cjk-06/cjk-linebreak/3_5_1a/report-cluster-wider.md`。
 
