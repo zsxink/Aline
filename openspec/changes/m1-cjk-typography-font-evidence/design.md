@@ -32,6 +32,15 @@ M4；平滑侧不做正文开/关对照（属 M4 渲染路径）。
 撤销，真实开/关对照已取得。`evidence_complete` / `capability_passed` 口径与 2.1c /
 2.2b / 2.2c 未勾选状态不变。
 
+**2026-11-12 六组合平滑对照（不改写上段）：** 2.1c 已按真实窗口 A/B 勾选，覆盖
+320/480/768 × Visual/Source 六组合（HEAD `159725ee`、`app_sha256=56323a4c…`）：
+应用偏好域 `AppleFontSmoothing=0`（关）与未设置（系统默认，本机为开）各启动一次，
+六组合正文 ROI 变化 31,197–66,735 像素、墨量 +16.25%～+19.22%，偏好已恢复。上段
+「2.1c 未勾选状态不变」为当时状态，历史保留。`evidence_complete` 只证明记录完整、
+`capability_passed` 保持 `null`；2.2b / 2.2c 仍未勾选，2.1 伞项因观测集仍是
+2026-11-09 的「未执行平滑 A/B」记录而未勾，重建观测集属跨轮组合、需裁决。证据
+`logs/validation/m1-single-window-readonly/2026-11-12-smoothing-six-combos/`。
+
 ## Risks / Trade-offs
 
 - 人工测量存在误差 → 记录 px/pt、scale、截图、方法，保留原始值与不确定性。

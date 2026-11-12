@@ -133,6 +133,8 @@ Mermaid 护眼模式使用亮色映射；固定主题不跟随应用，主题是
 
 **2026-11-12 追加更正（撤销 §35 其四/其五；V-04 仍未整项通过）：** 上文本节关于「字体平滑只有负结果」「正文平滑开/关对照不做」「字体失效不可触发」的表述已被[决定 §36](./decisions.md#36-2026-11-12-m1-生产来源准入本地-vendor--守卫扩展) 同日的后续裁决撤销，历史记录保留、不改写。其五：旧负结果的归因有误——`-AppleFontSmoothing 0` 走 argv 参数域，只影响 GPUI 的 `glyph_dilation_for_color`，而正文在 alpha-only 单通道上下文栅格化，dilation 0 与 1 的位图逐字节相同；真正的开关是 CGContext `allowsFontSmoothing`（应用/全局偏好域）。改用 `defaults write aline AppleFontSmoothing 0` 做真实窗口 A/B 后取得：正文 ROI 变化 17,875 像素、最大通道差 170、变化 256 行、墨迹总量 10,105,439 → 11,090,604（+9.75%）。其四：字体失效分项已由验证专用入口取得触发链（代次 0→1、可见重排、仅触发组写标记），详见 V-07 同日的追加更正。**边界：** 平滑开关是系统偏好、字体失效入口是取证入口，均不是 Aline 产品能力——`crates/` 不调用 `set_text_rendering_mode`，`BUNDLED_FONTS` 仍为空；2.1c / 2.2b / 5.1b 的勾选状态未因本更正改变；V-04、V-07、V-09 与 M1 出口仍未整项通过。平滑证据 `logs/validation/m1-single-window-readonly/2026-11-12-smoothing-ab/`。
 
+**2026-11-12 六组合平滑对照（V-04 仍未整项通过）：** 在 320/480/768 × Visual/Source 六组合、同一 Release（HEAD `159725ee`、`app_sha256=56323a4c…`）上，以应用偏好域 `defaults write aline AppleFontSmoothing 0`（关）与未设置（系统默认，本机为开）各启动一次真实窗口并逐像素比较：六组合正文 ROI 变化 31,197–66,735 像素、最大通道差 112–165、变化 314–454 行，墨量 +16.25%～+19.22%；偏好跑完恢复为未设置。这补上了 2.1c 的六组合测量，上面单一 372 × Visual 的对照只作历史。**边界：** 开关仍是系统偏好，不是 Aline 产品设置，`crates/` 不调用 `set_text_rendering_mode`；只测两态、仅 macOS arm64；2.2b 的最小失败输入仍未建立，2.1 伞项的观测集仍是 2026-11-09 的「未执行平滑 A/B」记录，V-04 未整项通过。证据 `logs/validation/m1-single-window-readonly/2026-11-12-smoothing-six-combos/`。
+
 
 ## V-05 · 性能设备、测量和发布门禁
 
