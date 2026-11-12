@@ -108,6 +108,27 @@ opt-in 钩子（四环境变量 gate、唯一状态来源、capture 不写盘、
 钩子未接线到 prepaint 回调与后台 flush，新增钩子的独立复审待执行。
 H2、B6、M1、5.1 仍待裁决 / 授权；任务仍 2/12。
 
+### 7. 六项裁决后的执行结果（2026-11-11-cjk-06，追加，不改写上面各节）
+
+用户六项裁决见[决定 §34](../../../docs/decisions.md)。本轮只在 logs 隔离副本执行：
+受限 opt-in 钩子接入 `on_children_prepainted` 与窗口关闭后后台 flush，独立复审
+`pass-with-findings`、无阻断项（`1_hook/review-summary.md`）。同一 patched Release
+（`app_sha256=c87400a9…`，commit `6ed33f08…`）在真实 macOS arm64 窗口取得 5.1a 六组合
+断点/行高/受限状态（`Some(NoLegalBreak)` 6 条）、5.1b 新断点两侧真实像素点击与两视图
+往返/换宽/源码锚点恢复、5.1c 截图与布局/映射身份不变、5.1d 五样本七步契约、四字形真实
+run/位置与超宽行真实簇形状、字体平滑 A/B 负结果。
+
+**补采（追加）：** 把真实窗口收窄到正文宽 108 / 68 后取得 `Some(ClusterWiderThanLine)`
+3 条（可视化 108/68、源码 68），上面 §6 的「`ClusterWiderThanLine` 未取得」由此取代；
+不设诊断环境变量时同一二进制不写盘、不收集（4.1e 行为证据）。
+
+**仍未改变：** 生产来源未准入（生产清单/锁/策略资产零变更，`policy-draft.json` 仍
+`applied: false`）；`advance_px` 是首字符 TextSystem advance、`resolved_family` 是
+FontId 映射家族，均不构成 shaped advance / 完整 face 身份；5.1b 字体失效因
+`BUNDLED_FONTS` 为空不可触发；正文平滑开/关对照需渲染路径改动、属新 scope；H1 / H2
+未清零；V-04/V-07/V-09 与 M1 出口均未整项通过。证据
+`logs/validation/m1-single-window-readonly/2026-11-11-cjk-06/cjk-linebreak/`。
+
 ## Risks / Trade-offs
 
 - [没有合法断点] → 独立失败用例先行，禁止硬断伪通过；必要受检接口差异先审阅。

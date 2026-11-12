@@ -20,6 +20,9 @@ W1 runner 稳定后，同一入口再接 `run_w1_offscreen.py --self-test`，并
 
 - [x] 2.1 补用户可见 UI 源码串/字面 key 的静态检查与正例、最小硬编码/缺 key 反例，接入现有统一入口；现有 catalog 同键/占位符测试继续运行。明确宏和动态串的人工复核边界，更新现有文档入口；验收守卫正反例、实际源码检查及 app-core catalog 测试。
 - [ ] 2.2 核对 UI 启动错误和 panic 最后兜底的实际边界，确认 CLAUDE 仅指向 AGENTS、无 vendor 时不生成补丁清单；必要结论回填现有验证计划，不引入 catch_unwind 放宽引擎限制。验收源码/文档引用复核和真实失败路径所需平台证据，缺证据保留未完成。
+  - [x] 2.2a 源码/文档静态边界复核：2026-11-11 复核 `app/src/main.rs` 普通启动错误走本地化 `eprintln!` + `ExitCode::FAILURE`，`crates/aline-ui/src/native.rs` 初窗失败 `eprintln!` + `exit(1)`；`CLAUDE.md` 仅指向 AGENTS；无 `vendor/`、无 `[patch]` 本地来源、无 `catch_unwind`、无 `panic::set_hook`。静态复核不替代真实失败路径证据。
+  - [x] 2.2b 必要结论回填：`docs/v1-validation-plan.md` 已记录静态边界（初窗失败立即以状态码 1 退出）与「真实初窗失败尚无平台收据」，未把静态结论写成平台通过。
+  - [x] 2.2c 真实 macOS 初窗失败路径平台证据：按 2026-11-11 用户裁决（决定 §34）接受“静态边界证据 + 显式缺口”闭环。静态边界见 2.2a/2.2b；真实 macOS 初窗失败运行收据仍未取得，缺口保留，不把静态结论写成平台通过。本项只关闭记录口径，不证明真实失败路径。
 
 2026-11-08 本轮验证：静态检查补充可访问名称和窗口标题字面量反例，catalog 自测 6 项、实际 app/ui 源码扫描、输出目录自测 11 项、workspace 失败继续执行自测均通过；`cargo test -p aline-app-core --locked --offline` 通过。命令、stdout/stderr 与边界复核在 `logs/validation/m1-single-window-readonly/2026-11-08-finish-01/w7/`。后续已核对 `docs/README.md` 的统一守卫入口、静态扫描盲区和双语测试说明，2.1 关闭。2.2 的真实 macOS 初窗失败路径尚无运行证据；静态确认普通启动错误经本地化 stderr/exit 1，未新增 panic hook/catch_unwind，`CLAUDE.md` 仍仅指向 AGENTS，无 vendor，因此不生成补丁清单。静态结论不替代该项要求的平台失败证据，保持未完成。
 

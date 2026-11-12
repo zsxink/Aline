@@ -696,6 +696,22 @@ ratex/ratex-svg、mermaid-rs-renderer、usvg、syntect/two-face 属插件/资产
 
 **2026-11-09-cjk-04 具体批准（仍为未准入生产）：** 用户给出具体批准，授权 3.2 仅在 logs 隔离副本编译（生产清单/锁/策略资产零变更）。单一自洽代已按锁定归档重生成并由 `check_cohort.py` 13 项漂移反例守卫；现行 `scripts/check_engineering.py` 对候选 `[patch]` 图仍按精确身份失败关闭，`policy-draft.json` 仍 `applied: false`。隔离副本 `cargo check -p aline-ui`、三入口回归 13/13、原 Aline 映射/命中 111 passed / 1 ignored 均为合成度量下的分项证据，**不是**真实 CoreText shaping、字体 run / advance、像素命中或三平台实测；typed 受限状态在最小公开面下只在 `pub(crate)` 层，外部 crate 不可读。`local-patch` schema 扩展仍为草案，生产策略资产未改。独立评审已完成，两份 `pass-with-findings` 且两项高 finding 未清零，不构成生产来源准入，汇总见 `review/independent-review-summary.md`。见 `logs/validation/m1-single-window-readonly/2026-11-09-cjk-04/cjk-linebreak/`。
 
+**最小补丁维护清单（候选，未准入；2026-11-11-cjk-05）：** 下表只维护 `m1-cjk-linebreak-core-fix` 候选补丁的可复核身份与操作边界，**不构成生产准入**。任何归档、`minimal.diff`、文件哈希、候选 lock、七场景指纹或策略资产漂移都会使既有具体批准失效，必须重新审计；生产 `Cargo.toml` / `Cargo.lock` / 策略资产仍不得出现 `[patch]` 或本地来源。
+
+| 维护项 | 当前内容与边界 |
+|---|---|
+| 原版本/来源 | crates.io `gpui-pre@0.3.9`；归档 SHA-256 `34f61c1cfd36fc9c436af09308c963822ae27a45a84feb21a77ba5c9e051f1c0`；上游源快照 Zed `93d745668805029476e6d7fbb19652116fed51de`；Apache-2.0。原始树、补丁与哈希的当轮运行产物在 `logs/validation/m1-single-window-readonly/2026-11-09-cjk-04/cjk-linebreak/cohort/`，运行产物不提交；权威来源锚点是 crates.io 归档校验和，不是磁盘副本 |
+| 差异 | 仅核心包；`minimal.diff` SHA-256 `aba1c841288ff7587497e4a022928d6b940dfe3a6d630cf27859724fe7adb145`；6 个改动文件与 2 个未改动文件的全量哈希见 `cohort/hashes.json`。公开面只新增 `#[non_exhaustive] WrapLimit` 与 `TextLayout::wrap_limit() -> Option<WrapLimit>`；`WrappedLineLayout.limit` 保持 `pub(crate)`；无 `[[test]]`、无新增依赖边、未启用 `test-support`、`enabled_features = []` |
+| 复跑 | 在 `cohort/` 内以 `original/ + minimal.diff` 经 `replay_recipe.py` 重建 `patched/`，要求逐字节一致；`guards/check_cohort.py` 按批准身份核对 diff 与全部 8 文件哈希，13 项候选特定漂移反例全部拒绝。2026-11-09-cjk-04 实跑为 `replay-result.json` 7/7、`cohort-drift-self-test.json` 13/13；2026-11-11-cjk-05 复核身份守卫退出 0，并在新证据目录重跑候选漂移自测 13/13 |
+| 回滚 | 移除生产清单中的 `[patch.crates-io]` / 本地来源，恢复原受审 `Cargo.toml`、`Cargo.lock`、策略资产与七场景指纹后重新构建，并重建派生布局缓存。回滚不改原文件、源码、revision 或历史，也不构成能力通过 |
+| 升级重打 | `gpui-pre` 版本或归档变化即失效，不得复用旧 diff、哈希或批准。需重新取得与锁文件 checksum 一致的归档，在新源码上重放私有禁则规则与最小公开面，重新生成 diff / 全文件哈希 / 候选 lock / 七场景指纹，重跑三入口回归与独立评审，并重新取得具体批准；不自动升级 GPUI，不把旧例外扩到新版本或其它包 |
+| 范围 | 仅核心 `gpui-pre@0.3.9` 本地补丁、Apache-2.0、五引擎 GPUI 隔离、七场景、最小例外；不扩整包 allowlist、三包 vendor、许可证泛化或全局本地来源许可；W1 的 `test-support` 隔离图许可不适用于本变更 |
+| 未知项 | 来源未准入生产（`policy-draft.json` 仍 `applied: false`，现行守卫对候选图失败关闭）；typed 受限状态在最小公开面下外部不可读，真实 `Some(NoLegalBreak)` / `Some(ClusterWiderThanLine)` 未在真实窗口取得；真实 CoreText shaping / 簇索引 / 字体 run / advance 未证明；H1、H2 高 finding 未清零；真实像素点击、两视图往返、Release 六组合与三平台未测；新增 opt-in 钩子未接线到 prepaint 与后台 flush，独立复审未执行 |
+
+**2026-11-11-cjk-06 维护清单状态更新（追加，不改写上表历史行）：** 受限 opt-in 钩子已按决定 §31 / §34 接入 logs 隔离副本的 `on_children_prepainted` 与窗口关闭后后台 flush，独立复审 `pass-with-findings`、无阻断项（`logs/validation/m1-single-window-readonly/2026-11-11-cjk-06/cjk-linebreak/1_hook/review-summary.md`）。同一 patched Release（`app_sha256=c87400a9…`，commit `6ed33f08…`）在真实 macOS arm64 窗口取得：5.1a 六组合真实断点/行高/受限状态（`Some(NoLegalBreak)` 6 条，`Some(ClusterWiderThanLine)` 0 条）、5.1b 新断点两侧真实像素点击/两视图往返/换宽/源码锚点恢复（字体失效因 `BUNDLED_FONTS` 为空不可触发）、5.1c 截图与布局/映射身份不变、5.1d 五样本七步契约；四字形真实 run/advance/位置与超宽行真实簇形状（含 121 簇/241 glyph 多 glyph 簇）；字体平滑 A/B 为正文 0 变化的负结果。**仍未改变：** 生产来源未准入（`policy-draft.json` 仍 `applied: false`，生产 `Cargo.toml` / `Cargo.lock` / 策略资产零变更）；`advance_px` 是首字符 TextSystem advance、`resolved_family` 是 FontId 映射家族，均不构成 shaped advance / 完整 face 身份；字体失效未取得；三平台未测。证据见 `logs/validation/m1-single-window-readonly/2026-11-11-cjk-06/cjk-linebreak/`。
+
+**2026-11-11-cjk-06 补采（追加，不改写上面两行）：** 同一 patched Release 在真实窗口把正文宽收窄到 108 / 68（窗口 160 / 120，仍高于 `MIN_TEXT_WIDTH=64`），使真实最大单簇 U+FDFD 的 113.644 px 宽于行长，取得 `Some(ClusterWiderThanLine)` 3 条（可视化 108/68、源码 68）；同一窗口 108 宽的源码视图因存在合法候选未触发。上面「`ClusterWiderThanLine` 未观测」由此取代，其余未改变项（生产来源未准入、`advance_px` / `resolved_family` 的语义边界、字体失效未取得、三平台未测）继续成立。另：诊断未启用时同一二进制不写 `diag/`、`records.tsv`、`records.done`，stderr 为空，构成 4.1e 的行为证据。证据 `logs/validation/m1-single-window-readonly/2026-11-11-cjk-06/cjk-linebreak/3_5_1a/report-cluster-wider.md` 与 `report-hook-off.md`。
+
 ### 18.3 参考材料与决定入口
 
 | 材料 | 用途及效力 |

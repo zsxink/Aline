@@ -64,6 +64,8 @@ GitHub 白天模式的下列色值直接来自 PRD §6.2；只限定该模式，
 
 **中文排版（2026-11-05 测量门）：**全角标点避头尾、标点挤压与字体回退、合成斜体是否使用锁定 GPUI 能力或需上游修改，均先由 V-04 夹具和真实渲染测量决定；quiet-md 的 14° 等数值只是参考，不写成 Aline 规范值。未实测前不以伪斜体变形冒充合成斜体，也不在 M1 直接 fork/vendor 上游包。
 
+**2026-11-11 中文排版实测记录（不改变本节边界，V-04 未通过）：** logs 隔离 patched Release 的真实 macOS arm64 窗口取得：普通中文段落的 CJK fallback run 请求 `.SystemUIFont`（Visual）/ `Menlo`（Source），`resolved_family=unknown`、`face_source=Unknown`；首字符 TextSystem advance 为 15.875 / 16.000，拉丁 run 为 4.188 / 9.633；真实 `glyph.position.x` 相邻差（Visual Han 15.860、全角冒号 16.078；Source 16.000）。四字形样本中 CJK fallback advance 与 Han/冒号位置间隔不随 normal/bold/italic/bold-italic 改变，全角标点位置间隔在粗体下变化。字体平滑只有负结果：进程级 `-AppleFontSmoothing 0` 仅改变标题带像素，正文像素 0 变化。**边界：** `advance_px` 是首字符 TextSystem advance，不是 shaped advance；fallback face 身份未解析；正文平滑开/关需要渲染路径改动，属新 scope。未选择 vendor、预折行或接受已知限制，未使用合成斜体；数值仍不是 Aline 规范值。证据 `logs/validation/m1-single-window-readonly/2026-11-11-cjk-06/cjk-linebreak/5_m1_typography/`。
+
 功能图标使用一致的形态、描边和状态体系，含义与名称稳定。图标按钮有可理解名称，悬停和键盘访问均能获得说明；可点击区域不得与相邻操作重叠。悬停、焦点、按下、选中、禁用可分别辨认，焦点不依赖鼠标悬停（PRD §6.3）。主题内置图标风格枚举 outline/filled 已按 TH-05 确认，须完整覆盖动作及状态；图标库、具体形状、描边数值和命中尺寸未冻结，归 V-09，不按旧截图“略大”生成数值。
 
 ### 3.3 数值账本与冻结规则

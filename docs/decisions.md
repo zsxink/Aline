@@ -899,3 +899,60 @@ revision 与文档关闭状态；`results.json` 的每条声明都要与原始�
 `ListState::scroll_to()` → `rebase_pending_scroll()` 路径完全不触碰该回调。
 因此 `scroll` 步只可能来自真实滚轮输入，主动跳转（`scroll_to_source`）不会
 贡献 `scroll` 事件。这条依赖 GPUI 的锁定版本行为，升级 `gpui-pre` 时须重新核对。
+
+## 34. 2026-11-11 M1 CJK / 字体 / 工程证据六项裁决与执行边界
+
+用户在 2026-11-11 对 M1 CJK 断点修复、字体证据与工程证据的待决问题给出六项裁决。
+本节记录裁决原文语义与执行边界；裁决本身不勾选任何任务，勾选仍以实际证据为准。
+
+**其一：H1 / 5.1 采纳 R1。** 接受受限 opt-in 钩子方案（决定 §31 的 R1）：不扩大公开面，
+不改变字节身份；授权在 logs 隔离副本用已批准补丁构建 Release 工件，并在真实
+macOS arm64 窗口按 5.1a → 5.1b–d 顺序取证。证据只声明补丁行为，**不构成生产来源准入**。
+
+**其二：H2 的 3.2 边界。** 3.2a–d 属于 `m1-cjk-linebreak-core-fix` 本 change；
+3.2e（生产来源准入）另立 change / 裁决。本 change 不修改生产 `Cargo.toml` /
+`Cargo.lock` / 策略资产，`policy-draft.json` 保持 `applied: false`。
+
+**其三：B6 保持在本 change 之外。** 显示形态 / `t("key")` / 呈现位置在 5.1 之后
+另立后续 change 裁决；本 change 不接线，不把提示文案纳入本次取证。
+
+**其四：M1 簇证据合并。** 真实 CoreText 簇索引形态与超宽簇并入同一钩子与 5.1 证据；
+合成度量只可作补充，不得替代真实簇证据。
+
+**其五：engineering 2.2c 的闭环口径。** 接受「静态边界证据 + 显式缺口」作为 2.2c 的
+闭环：静态边界见 2.2a/2.2b；真实 macOS 初窗失败运行收据仍未取得，缺口保留，不把
+静态结论写成平台通过。该闭环只关闭记录口径，不证明真实失败路径。
+
+**其六：typography 2.1b/c、2.2b/c 的取证与决策顺序。** 同一钩子收集真实 fallback run /
+advance / CoreText 簇形状；平滑 A/B 使用现有截图与墨迹测量工具；取得数据后，
+vendor / 预折行 / 接受已知限制按 QMD-01.6 另行决策。裁决不预选任何一项，也不勾选
+等待中的决定。
+
+**执行结果（2026-11-11-cjk-06，追加事实，不改写历史结论）：** logs 隔离 patched Release
+（`app_sha256=c87400a9…`，commit `6ed33f08…`）完成：钩子接线与独立复审（`pass-with-findings`、
+无阻断项）；5.1a 六组合真实断点/行高/受限状态（`Some(NoLegalBreak)` 6 条，
+`Some(ClusterWiderThanLine)` 0 条）；5.1b 新断点两侧真实像素点击、两视图往返、换宽与
+源码锚点恢复；5.1c 截图/布局/映射身份与不变量；5.1d 五样本七步契约；四字形真实
+run/advance/位置；超宽行真实簇形状（含 121 簇/241 glyph 多 glyph 簇）；字体平滑 A/B
+为正文 0 变化的负结果。证据 `logs/validation/m1-single-window-readonly/2026-11-11-cjk-06/cjk-linebreak/`。
+
+**边界（同一执行结果，不因裁决改变）：** 生产来源仍未准入，生产清单/锁/策略资产零变更；
+`advance_px` 是首字符 TextSystem advance、`resolved_family` 是 FontId 映射家族，不构成
+shaped advance / 完整 fallback face；`ClusterWiderThanLine` 未观测；5.1b 的字体失效因
+`BUNDLED_FONTS` 为空不可触发，该项未取得；正文平滑开/关对照需渲染路径改动，属新 scope；
+V-04 / V-07 / V-09 均未整项通过；M0 豁免保留、M1 出口未通过、M2 前置不变；未提交、
+推送或归档。
+
+**补采追加（2026-11-11-cjk-06 后续，追加事实，不改写上面两条）：** 上面「边界」段中的
+「`ClusterWiderThanLine` 未观测」已被本次补采取代，其余边界仍然成立。同一 patched Release
+在同一夹具上补了两项真实窗口观测。其一，把真实窗口收窄到正文宽 108 / 68（窗口 160 / 120，
+仍高于 `MIN_TEXT_WIDTH=64`），使真实字体栈最大单簇 U+FDFD 的 113.644 px 宽于行长，取得
+`Some(ClusterWiderThanLine)` 3 条：可视化 108 与 68（行宽 113.644）、源码 68（行宽 123.092）；
+同一窗口 108 宽的源码视图因存在合法候选未触发，说明该状态由真实簇宽与真实行长共同决定，
+不是按窗口宽度硬编码。108 / 68 是补采窗口宽度，不计入 5.1a 六组合。其二，不设任何
+`ALINE_M1_DIAG_*` 环境变量时，同一二进制打开夹具、切换视图、滚动、关闭后退出码 0、
+stderr 为空、无 `diag/`、`records.tsv`、`records.done`，对照设置变量即写出记录，
+构成 4.1e「默认 render 不新增写盘」的行为证据。两项都不改变上一条列出的边界：生产来源
+仍未准入、face 身份仍未解析、5.1b 字体失效仍未取得、正文平滑仍需新裁决。证据
+`logs/validation/m1-single-window-readonly/2026-11-11-cjk-06/cjk-linebreak/3_5_1a/report-cluster-wider.md`、
+`report-hook-off.md`、`runs/run-8/`、`runs/run-9/`、`hook-off-1/`、`hook-off-2/`。
