@@ -1294,3 +1294,46 @@ metadata `id` 与 `manifest_path` 必须绑定到 `(repo_root/path).resolve()`�
   修复或能力通过：4.1c / 4.2c / 4.2d 仍未勾，真实 CoreText shaping / face /
   shaped advance 仍未取证，V-04 / V-07 / V-09、AC-09 与 M1 出口仍未整项通过。
   未改产品代码、生产 `Cargo.toml` / `Cargo.lock`、`scripts/*.json` 或 `vendor/`。
+
+## 42. 2026-11-12 M1 剩余四组任务收口与 startup 4.3 授权
+
+用户在一次多选裁决中同时选择四项：「typography 2.2b/2.2 收口」
+「engineering 2.2 收口」「linebreak 4.1c/4.2c/4.2d 收口」「授权 startup 4.3」。
+本裁决按这四项分别落到任务与文档；未选中的项保持未勾（本次四项全部选中）。
+
+- **typography 2.2b / 2.2 收口。** 实际结果已取齐：平滑侧六组合 A/B 与行带
+  不变性（六组合开/关行带数量相同、下缘逐值相同，仅上缘 1 px 前移，768 source
+  一例 3 px）；CJK 回退侧 fallback run、首字符 TextSystem advance、`glyph_xs`
+  位置观察与四字形槽位已记录。**没有最小失败输入**——没有任何输入被证明会因平滑
+  错排；CJK 回退侧只有 face 身份显式未知，不是可复现缺陷。按
+  [§41](#41-2026-11-12-typography-22c-三项接受已知限制)的已知限制口径勾选
+  2.2b 与 2.2 伞项；「无最小失败输入」不写成缺陷已修复或能力通过。
+- **engineering 2.2 收口。** 2.2a / 2.2b / 2.2c 均已勾选；真实初窗失败收据在
+  锁定 `gpui-pre 0.3.9` 的 macOS 后端下结构不可达（`Window::new` 唯一可失败点为
+  `platform.open_window`，`MacPlatform::open_window` 唯一 `Err` 出口为
+  `WindowKind::AnchoredPopup`，Aline 使用 `WindowKind::Normal`），[§35](#35-2026-11-12-m1-剩余七项裁决与受控失败实验)
+  其六的受控实验亦为负结果。按「静态边界 + 显式缺口」勾选 2.2 伞项；缺口保留，
+  不写成平台通过。
+- **linebreak 4.1c / 4.2c / 4.2d 收口。** 沿用 §41 与 §35 其三：四字形真实
+  FontId 槽位、首字符 TextSystem advance、`glyph_xs` 与截图已取得；face 身份
+  显式未知、`advance_px` 不是 shaped advance；不新增平台诊断钩子，不提出合成
+  斜体、整元素 skew、换全文字体或平台钩子方案。按已知限制勾选 4.1c、4.2c、
+  4.2d 及 4.1、4.2 伞项；4.2c 的「解释 CJK 直立全部成因」不因勾选成立，显式
+  记为未知。
+- **startup 4.3 授权。** 授权把 `run_window_failure_probe.py` /
+  `run_signal_probe.py` 及其必要 Swift 输入移入 `scripts/`，为两者增加合成自测并
+  接入 `check_workspace.py` 顺序清单；迁移不改变既有真实实验结论，自测只证明
+  分类/解释逻辑，不执行真实沙箱或窗口实验。迁移与自测落地并复核后勾选 4.3。
+- **未改变。** V-04 / V-07 / V-09、AC-09 与 M1 出口仍未整项通过；真实 CoreText
+  shaping / face / shaped advance 仍未取证；M0 验收豁免保持；M2 前 V-08 保存
+  闭环仍未关闭。
+
+**收口复核（2026-11-12，不改写上文本体）：** startup 4.3 的独立复审结论为
+`pass-with-findings`，4 条中级 findings 已修复：窗口探针 baseline 与 case 的
+`window_probe_run` 语义统一并新增 `window_probe_ok`，字段缺失或类型不符不再默认成
+0 窗口；自测绑定实际 locale 文件与剖面独立字面量并固定用例名单（窗口 32 例、
+信号 11 例）；真实模式原始 stdout/stderr、excerpt 与 `results.json` 统一经
+`evidence_paths` 规范化；迁移文件随本次提交纳入 git。修复后复跑
+`check_workspace.py` 37/37、`check_validation_output.py` 14/14、窗口自测 32/32、
+信号自测 11/11。自测仍不执行真实沙箱或窗口实验，既有真实实验结论与各 V 项边界
+不变；复跑证据 `logs/validation/m1-single-window-readonly/2026-11-12-startup-4_3-r2/`。

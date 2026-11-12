@@ -58,6 +58,12 @@ QMD-01.6 四项决策至此均有具体裁决，2.2c 勾选。设计口径不变
 只证明记录完整，`capability_passed` 保持 `null`；接受已知限制不写成缺陷已修复或
 能力通过；2.2b 与 2.2 伞项仍不勾，V-04 未整项通过。见 `docs/decisions.md` §41。
 
+**2026-11-12 2.2b/2.2 勾选（已知限制收口，不改写上段）：** 用户裁决（决定 §42）勾选
+2.2b 与 2.2 伞项。实际结果已取齐（平滑六组合 A/B 与行带不变性、CJK 回退 fallback
+run / 首字符 TextSystem advance / `glyph_xs`）；**没有最小失败输入**。设计口径不变：
+`evidence_complete` 只证明记录完整，`capability_passed` 保持 `null`；接受已知限制
+不写成缺陷已修复或能力通过；V-04 未整项通过。
+
 ## Risks / Trade-offs
 
 - 人工测量存在误差 → 记录 px/pt、scale、截图、方法，保留原始值与不确定性。

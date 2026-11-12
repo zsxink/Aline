@@ -86,3 +86,5 @@ GPUI 已把它包装成 `App::displays()`，其 macOS 实现 `MacDisplay::all()`
 先加 catalog 键与测试，再改 `native.rs`，最后跑 fmt/Clippy/test/守卫并做真实窗口复核：
 正常启动应无提示、无额外延迟；`deny-windowserver` 剖面应出现本地化提示且退出码为 1。
 失败在本地修复；不改引擎、不改生产清单/锁/策略资产（本变更不涉及依赖变更）。
+
+**2026-11-12 4.3 落地（决定 §42，不改写上文）：** 探针脚本与必要 Swift 源迁入 `scripts/` 并新增合成自测，接入统一门禁；`check_workspace.py` 37/37 exit 0、`check_validation_output.py` 14/14。独立复审结论 `pass-with-findings`，4 条中级 findings 已修复并复跑（窗口自测 32 例、信号自测 11 例）；自测不执行真实沙箱或窗口实验，迁移不改变上文实验结论与边界；真实初窗 `Err` 可达性仍是静态边界加显式缺口。复跑证据 `logs/validation/m1-single-window-readonly/2026-11-12-startup-4_3-r2/`。

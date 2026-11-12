@@ -55,6 +55,8 @@
 - [x] 4.1 proposal 的 What Changes 与 design 的 Decisions 2/5 按实际实现改写，说明否决
   闭包方案的依据与「回调是否执行不可判定」的结论（复审 finding 6）。
 - [x] 4.2 交叉引用 `docs/ui-spec.md` §5 → §14（复审 finding 11）。
-- [ ] 4.3 复审 finding 8：把 `run_window_failure_probe.py` / `run_signal_probe.py` 移入
+- [x] 4.3 复审 finding 8：把 `run_window_failure_probe.py` / `run_signal_probe.py` 移入
   `scripts/` 并接入 `check_workspace.py` 自测。**未完成**：属新增范围，本轮以证据目录
   `report.md` §5 的「最小输入 + 预期结果」固化复跑，不移动脚本。
+  - **2026-11-12 用户裁决与落地（决定 §42）**：授权新增范围。`scripts/run_window_failure_probe.py` / `scripts/run_signal_probe.py` 已迁入，必要 Swift 源 `scripts/window_list.swift` / `scripts/signal_probe.swift` 一并移入；两者新增 `--self-test`（窗口侧 17 例、信号侧 8 例）并接入 `check_workspace.py` 顺序清单与 `check_validation_output.py` 输出路径拒绝矩阵。门禁 `check_workspace.py --cargo-home <隔离缓存> --output-dir <logs>` 37/37 全部 exit 0；`check_validation_output.py` 14/14。自测只证明文案分类/信号解析与证据解释逻辑，不执行真实沙箱或窗口实验；既有真实收据结论不变。证据 `logs/validation/m1-single-window-readonly/2026-11-12-startup-4_3/`。
+  - **2026-11-12 独立复审与修复（不改写上句）**：独立复审结论 `pass-with-findings`；4 条中级 findings 已修复：窗口探针 baseline 与 case 的 `window_probe_run` 语义统一并新增 `window_probe_ok`，字段缺失或类型不符不再默认成 0 窗口；自测绑定实际 locale 文件与剖面独立字面量，并固定用例名单（自测增至窗口 32 例、信号 11 例），删除或新增用例而不更新名单会失败；真实模式原始 stdout/stderr、excerpt 与 `results.json` 统一经 `evidence_paths` 规范化；两个 Python 入口与两个 Swift 源随本次提交纳入 git。复审另指出低severity 项已一并处理（进程清理 `finally`、`SystemExit` 改 `ValueError`、Swift 注释与信号 profile 摘要、输出目录唯一性说明）。修复后复跑：`check_workspace.py` 37/37、`check_validation_output.py` 14/14、窗口自测 32/32、信号自测 11/11。复跑证据 `logs/validation/m1-single-window-readonly/2026-11-12-startup-4_3-r2/`。自测仍不执行真实沙箱或窗口实验，既有真实收据结论不变。

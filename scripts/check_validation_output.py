@@ -263,7 +263,8 @@ class OutputDirectoryTests(unittest.TestCase):
                        'check_m1_cjk_typography.py', 'probe_m1_visual_evidence.py',
                        'sample_m1_performance.py', 'capture_m1_readonly_actions.py',
                        'run_w1_offscreen.py', 'm1_trace_metrics.py',
-                       'm1_trace_record.py', 'm1_rederive_performance.py'):
+                       'm1_trace_record.py', 'm1_rederive_performance.py',
+                       'run_window_failure_probe.py', 'run_signal_probe.py'):
             modes = ([], ['--self-test'])
             for mode in modes:
                 with self.subTest(script=script, mode=mode):
@@ -367,7 +368,8 @@ class OutputDirectoryTests(unittest.TestCase):
         escape_root.mkdir(parents=True)
         bad = ROOT / 'docs' / ('matrix-escape-must-not-create-' + OUTPUT.name)
         for script in ('m1_trace_metrics.py', 'm1_trace_record.py',
-                       'm1_rederive_performance.py'):
+                       'm1_rederive_performance.py', 'run_window_failure_probe.py',
+                       'run_signal_probe.py'):
             for mode in ([], ['--self-test']):
                 result = subprocess.run([sys.executable, str(ROOT / 'scripts' / script),
                                          '--output-dir', str(bad)] + mode, cwd=ROOT,

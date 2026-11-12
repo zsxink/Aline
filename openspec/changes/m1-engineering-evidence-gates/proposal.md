@@ -25,3 +25,5 @@ QMD-01 W7 要求工程检查只有一个入口，性能报告和失败必须可�
 ## Impact
 
 影响 `scripts/check_workspace.py`、`scripts/check_validation_output.py`、`scripts/check_public_api.py`、`scripts/safety_lex.py`、UI 字面用法检查器和本 change；不改 Cargo/生产源码/API。公共 API 守卫使用显式提供的隔离缓存，未提供时才查询登记缓存，失效缓存仍失败关闭。遵循 CODE_STANDARDS §2～6、R-11/R-17、S-2/S-7/S-14。验收为实际检查与正反例、统一入口执行结果、OpenSpec 严格校验；真实性能由 M1 7.1/V-05 取证，跨平台未测栏保留。风险为新增脚本未完整接线或错误后续检查被跳过，采用显式检查清单及失败继续执行验证。
+
+**2026-11-12 用户裁决（决定 §42，勾选 2.2 伞项，不改写上文）：** 2.2a / 2.2b / 2.2c 均已勾选；真实初窗失败收据在锁定 `gpui-pre 0.3.9` 的 macOS 后端下结构不可达（`Window::new` 唯一可失败点为 `platform.open_window`，`MacPlatform::open_window` 唯一 `Err` 出口为 `WindowKind::AnchoredPopup`，Aline 使用 `WindowKind::Normal`），§35 其六受控实验为负结果。2.2 按「静态边界 + 显式缺口」勾选；缺口保留，不写成平台通过，V-09 与 M1 出口仍未整项通过。工程门禁清单同期加入 startup 4.3 的两个探针自测（授权与细节见 startup change tasks 4.3 与决定 §42），全量 37 项 exit 0，证据 `logs/validation/m1-single-window-readonly/2026-11-12-startup-4_3/`。

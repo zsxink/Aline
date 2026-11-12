@@ -57,3 +57,5 @@
 （默认私有，不新增公开面）、AGENTS 铁律 7/9。风险：显示器睡眠期误判导致启动即退出——
 用延迟复检缓解，并在证据中记录该边界。平台结果只适用于实际取证的 macOS arm64，
 Windows/Linux 保留未测。
+
+**2026-11-12 用户裁决与落地（决定 §42，授权新增范围）：** 4.3 已落地：`scripts/run_window_failure_probe.py` / `scripts/run_signal_probe.py` 与必要 Swift 源 `scripts/window_list.swift` / `scripts/signal_probe.swift` 迁入 `scripts/`，两者新增 `--self-test` 并接入 `check_workspace.py` 顺序清单与 `check_validation_output.py` 输出路径拒绝矩阵。独立复审结论 `pass-with-findings`，4 条中级 findings 已修复并复跑（窗口自测 32 例、信号自测 11 例，门禁 37/37、守卫 14/14）。自测只证明文案分类/信号解析与证据解释逻辑，不执行真实沙箱或窗口实验；本变更前述真实实验结论与边界不变。证据 `logs/validation/m1-single-window-readonly/2026-11-12-startup-4_3/` 与复审后复跑 `.../2026-11-12-startup-4_3-r2/`。

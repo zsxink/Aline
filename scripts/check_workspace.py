@@ -107,6 +107,8 @@ def run(args):
         ('m1-readonly-actions-self-test', [sys.executable, str(ROOT / 'scripts/capture_m1_readonly_actions.py'), '--self-test', '--output-dir', str(output / 'm1-readonly-actions-self-test')]),
         ('m1-readonly-window-driver-self-test', [sys.executable, str(ROOT / 'scripts/drive_m1_readonly_window.py'), '--self-test']),
         ('m1-scroll-window-self-test', [sys.executable, str(ROOT / 'scripts/capture_m1_scroll_window.py'), '--self-test']),
+        ('window-failure-probe-self-test', [sys.executable, str(ROOT / 'scripts/run_window_failure_probe.py'), '--self-test', '--output-dir', str(output / 'window-failure-probe-self-test')]),
+        ('signal-probe-self-test', [sys.executable, str(ROOT / 'scripts/run_signal_probe.py'), '--self-test', '--output-dir', str(output / 'signal-probe-self-test')]),
         ('m1-trace-metrics-self-test', [sys.executable, str(ROOT / 'scripts/m1_trace_metrics.py'), '--self-test', '--output-dir', str(output / 'm1-trace-metrics-self-test')]),
         ('m1-trace-record-self-test', [sys.executable, str(ROOT / 'scripts/m1_trace_record.py'), '--self-test', '--output-dir', str(output / 'm1-trace-record-self-test')]),
         ('m1-rederive-performance-self-test', [sys.executable, str(ROOT / 'scripts/m1_rederive_performance.py'), '--self-test', '--output-dir', str(output / 'm1-rederive-performance-self-test')]),
@@ -142,7 +144,10 @@ def run(args):
                'M1 7.3 标准入口 readonly-bytes 自测还覆盖门禁回读原始证据的反例，'
                '合成证据树不构成任何保真证据；'
                'M1 8.2 真实窗口滚动入口 capture_m1_scroll_window.py 的合成自测同样纳入清单，'
-               '它只证明截图读数与判定逻辑，不证明真实窗口滚动',
+               '它只证明截图读数与判定逻辑，不证明真实窗口滚动；'
+               'M1 startup 4.3 的窗口失败复查 run_window_failure_probe.py 与启动信号探针 '
+               'run_signal_probe.py 的自测同样纳入清单，它们只证明文案分类/信号解析与证据'
+               '解释逻辑，不执行真实沙箱或窗口实验',
                'catalog': 'cargo test --workspace 实际发现 app-core 正反例与 UI 消费测试',
                'results': records}
     write_json(output / 'summary.json', summary)

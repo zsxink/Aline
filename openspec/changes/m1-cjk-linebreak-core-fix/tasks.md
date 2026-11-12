@@ -63,23 +63,25 @@
 
 ## 4. 字体 run 事实取证（W2；V-04；R-9/R-11/R-13）
 
-- [ ] 4.1 在受限 opt-in 验证入口记录 normal/bold/italic/bold-italic 的 requested Font、实际 shaped run FontId/可得 face 与真实 advance，并绑定样本/宽度/模式/字体代次/二进制；Source 明确 Menlo 普通标记显示。验证缺身份/缺真实 run 失败、opaque id 不能伪造字体名、默认 render 不新增写盘/全量工作，执行对应正反例与原字体/布局测试。
+- [x] 4.1 在受限 opt-in 验证入口记录 normal/bold/italic/bold-italic 的 requested Font、实际 shaped run FontId/可得 face 与真实 advance，并绑定样本/宽度/模式/字体代次/二进制；Source 明确 Menlo 普通标记显示。验证缺身份/缺真实 run 失败、opaque id 不能伪造字体名、默认 render 不新增写盘/全量工作，执行对应正反例与原字体/布局测试。
   - [x] 4.1a 受限 opt-in 记录规则：requested Font、actual FontId/face/advance、样本/宽度/模式/字体代次/二进制绑定；17 个正/负例通过；见 `2026-11-09-cjk-02/cjk-linebreak/font-run/`。
   - [x] 4.1b 最小平台诊断接口与准入审阅范围：已交付 `feasibility.md`、最小接口提案与停下结论；未新增钩子、未改生产源码。
-  - [ ] 4.1c 真实 macOS arm64 四字形 run 观测：normal/bold/italic/bold-italic 的实际 FontId/face/advance；**阻塞**于平台诊断钩子批准。
+  - [x] 4.1c 真实 macOS arm64 四字形 run 观测：normal/bold/italic/bold-italic 的实际 FontId/face/advance；**阻塞**于平台诊断钩子批准。
   - **2026-11-12 用户裁决（决定 §35 其三，仍未勾选）**：**不新增平台诊断钩子**。在 patched GPUI 上新增钩子会改变已批准的 8 文件字节身份与 `minimal.diff` 哈希，整条准入链需重新批准，代价大于一项只解释、不修复的诊断。`resolved_family=unknown` / `face_source=Unknown` 记为显式未知，留到 M4 字体机制；4.1c 保持未勾。
+  - **2026-11-12 用户裁决（决定 §42，勾选 4.1c 与 4.1 伞项）**：沿用 §41 与 §35 其三的已知限制口径。四字形真实 FontId 槽位、首字符 TextSystem advance、`glyph_xs` 与截图已取得（2026-11-11-cjk-06）；face 身份显式未知（`resolved_family=unknown`、`face_source=Unknown`），`advance_px` 不是 shaped advance。不新增平台诊断钩子——新增会改变已批准的 8 文件字节身份与 `minimal.diff` 哈希。4.1c 按显式未知勾选，4.1 伞项随之勾选；不写成 face 身份已解析或真实 shaped run 已取证，V-04 仍未整项通过。
   - **2026-11-11-cjk-06 证据（仍未勾选）**：受限 opt-in 钩子已按 §31 / §34 批准接入 logs 隔离副本的 `on_children_prepainted` 与窗口关闭后后台 flush，独立复审 `1_hook/review-summary.md` 为 `pass-with-findings`、无阻断项。真实四字形记录见 `logs/validation/m1-single-window-readonly/2026-11-11-cjk-06/cjk-linebreak/5_m1_typography/four-styles/`：已取得实际 FontId 槽位、首字符 TextSystem advance、`glyph_xs` 与截图；CJK fallback run 的 `resolved_family=unknown`、`face_source=Unknown`，face 身份未解析，故 4.1c 仍未勾选。
   - [x] 4.1d Source 普通标记显示 Menlo：W2 真实样本已证；见 `font-run/proven-unknown.md`。
   - [x] 4.1e 默认 render 不新增写盘/全量工作：2026-11-11-cjk-06 追加取证。同一 patched Release 在不设 `ALINE_M1_DIAG_*` / `ALINE_M1_PROBE_*` / `ALINE_M1_READONLY_EVIDENCE_DIR` 的情况下打开夹具、切换视图、滚动、关闭文档与窗口，退出码 0、stderr 为空、运行目录无 `diag/`、`records.tsv`、`records.done`；对照 run-8 / run-9 在同一二进制上设置诊断变量即写出 records 与 done。源码侧 `m1_diag::Diagnostics::from_env()` 缺变量返回 `None`，`probe_runs` / `probe_layout` 由 `Option::map` 惰性门控，`flush_diagnostics` 在 `None` 上直接返回。见 `3_5_1a/report-hook-off.md`、`hook-off-1/checks.json`、`hook-off-2/checks.json`。本项只证明默认路径不写盘、不收集；不证明启用诊断时的运行时开销，也不构成性能测量。
   - **本轮停在平台钩子边界（2026-11-09-cjk-02，仍未勾选）**：`../2026-11-09-cjk-02/cjk-linebreak/font-run/feasibility.md` 盘点锁定 GPUI 公开 API，判定现有 opt-in 入口（`probe.rs` / `readonly_evidence.rs`）不暴露 shaped run，记录四种 requested Font 的实际 FontId / face / advance **必须新增**受限 opt-in 平台诊断钩子；按任务指示「另列最小接口与准入审阅并停下」，只交付最小接口提案 / 准入审阅范围 / 停下结论，不新增钩子、不改生产源码。已交付 `font-run/font_run_record.rs` + `font_run_record_tests.rs`（`forbid(unsafe_code)`，17 个正/负例全部通过：完整记录与诚实受限记录正例、四种 requested Font 覆盖、Source Menlo 正例；缺身份 / 缺真实 run / 缺 advance / opaque id 伪造字体名 / 墨迹宽猜 face / 墨迹宽猜 advance / 字体列表猜 face / 非法二进制身份 / 非法 advance / Source 非 Menlo 均拒绝）。这是证据记录完整性规则，**不是** shaping 观测，未取得任何真实 FontId / face / advance；不凭纯 helper 测试宣称 TextLayout 集成通过。原字体/布局测试 `cargo test -p aline-ui --lib fonts::` 与 `native_window::readonly_layout` 复跑通过（`commands/run-recorded.md`）。
-- [ ] 4.2 用真实 macOS arm64 中英、标点、emoji/组合字符样本解释 CJK 直立与真实 run 的关系，回填 V-04/UI 和 W2 的已证/未知边界。只有确有证据再提出合成斜体/平台钩子的独立最小方案；验收原始 run/advance/截图可核对，不借整元素 skew、换全文字体或未知墨迹宽宣称修复。
+- [x] 4.2 用真实 macOS arm64 中英、标点、emoji/组合字符样本解释 CJK 直立与真实 run 的关系，回填 V-04/UI 和 W2 的已证/未知边界。只有确有证据再提出合成斜体/平台钩子的独立最小方案；验收原始 run/advance/截图可核对，不借整元素 skew、换全文字体或未知墨迹宽宣称修复。
   - [x] 4.2a 真实 macOS arm64 中英/标点/emoji/组合字符样本的原始 run/advance/截图：2026-11-11-cjk-06 已取得；中英/标点/emoji/`é` 见 `5_m1_typography/four-styles/` 显示行 16/18/20/22 与 `driver/step-010.png`，组合字符多 glyph 簇见 `3_5_1a` 显示行 9（121 簇 / 241 glyph）。原始 run 记录、`glyph_xs` 与截图可核对；fallback face 仍未解析，不据此宣称 face 身份。
   - [x] 4.2b 已证/未知边界回填：`font-run/proven-unknown.md` 已回填 V-04/UI §3.2 与 W2，保留未通过状态。
-  - [ ] 4.2c 解释 CJK 直立与真实 run 的关系：实际 fallback run/advance 未知，**未证明**。
+  - [x] 4.2c 解释 CJK 直立与真实 run 的关系：实际 fallback run/advance 未知，**未证明**。
   - **2026-11-11-cjk-06 部分证据（仍未勾选）**：四字形记录显示 CJK fallback run 的 `resolved_family=unknown`、`resolved_weight/style=unknown`、`face_source=Unknown`，Han 与全角冒号的 `glyph_xs` 相邻差在 normal/bold/italic/bold-italic 下相同；全角逗号/句号/括号的位置间隔在粗体下变化、斜体单独不改变；拉丁 run 明确解析 `.SystemUIFont` 的 400/700 与 Normal/Italic。该关系支持“CJK fallback run 未随 italic 改变、face 身份未知”的观察，但不能单独解释 CJK 直立的全部原因，故不勾选。
   - **2026-11-11-cjk-06 追加观察（同进程 FontId 槽位，仍未勾选）**：同一进程内 CJK fallback 的 `font_id` 在正常/斜体两行同为 28、在粗体/粗斜体两行同为 32；拉丁 run 四种样式各占不同槽位（0 / 12 / 1 / 13）。即斜体没有为 CJK fallback 解析出新的字体槽位，而拉丁路径明确区分 weight 与 style。这是“斜体样式未替换 CJK fallback 字体”的可核对事实，仍不能说明槽位对应的 PostScript face、是否同一 face 的变体或合成加粗；4.2c 继续不勾选。见 `5_m1_typography/report-4_2c.md`。
-  - [ ] 4.2d 合成斜体/平台钩子的独立最小方案：只有确有证据才提出；当前未提出，**阻塞**。
+  - [x] 4.2d 合成斜体/平台钩子的独立最小方案：只有确有证据才提出；当前未提出，**阻塞**。
   - **本轮部分推进、仍未勾选（2026-11-09-cjk-02）**：`../2026-11-09-cjk-02/cjk-linebreak/font-run/proven-unknown.md` 用 W2 真实 macOS arm64 六组合样本与两个夹具写「已证 / 未知」边界：已证 Visual 中文直立 / English 倾斜 / Source Menlo 普通标记、行带 56 物理像素、行首闭标点缺陷、无字节变化；实际 fallback run / advance / 平滑 A/B、中文直立的成因、真实 CoreText 簇索引形态均为未知。未取得原始 run/advance/截图，不拿 W2 旧观测充当修复成绩，不借整元素 skew / 换全文字体 / 未知墨迹宽宣称修复；合成斜体 / 整元素 skew / 整篇字体替换 / 平滑数值均未实现。V-04 / UI §3.2 的「已证 / 未知」边界已按实际复核结果回填，保留 V-04 未通过状态。
+  - **2026-11-12 用户裁决（决定 §42，勾选 4.2c / 4.2d 与 4.2 伞项）**：CJK fallback 在同进程 normal/italic 下未解析出新字体槽位、拉丁 run 正常区分 weight/style，这是可核对观察；但「解释 CJK 直立全部成因」仍不成立，显式记为未知。合成斜体/平台钩子方案在无 face 身份且已接受已知限制的前提下不提出，4.2d 以「未提出」收口。4.2c、4.2d 与 4.2 伞项按已知限制勾选；不借整元素 skew、换全文字体或未知墨迹宽宣称修复，V-04 仍未整项通过。
 
 ## 5. 原生回归与完整交付（V-04/V-07/V-09；R-11/R-17、S-14）
 
