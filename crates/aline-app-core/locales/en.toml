@@ -17,6 +17,8 @@ cancel_navigation = "Cancel Navigation"
 
 [reading]
 large_source = "This document exceeds 4 MiB. It opened in Source View by default; you can switch to Rendered View."
+parse_budget_fallback = "This document exceeds the Markdown parsing limit. You can read the original text in Source View."
+parse_raw_fallback = "This document could not be parsed. You can read the original text in Source View."
 layout_budget = "This region exceeds the current layout budget. The source is preserved; switch to Source View to continue reading."
 
 [content]

@@ -11,6 +11,8 @@ use aline_buffer::{Affinity, LineIndex, LineIndexBudget, SnapshotId, SrcOffset, 
 use aline_markdown::{MappingBudget, Parsed, Projection, ProjectionId};
 
 const SOURCE_FRAGMENT_BYTES: usize = 4096;
+// 在 UTF-8 字符内部截断时，非末片最多回退三个字节。
+const MIN_FULL_SOURCE_FRAGMENT_BYTES: usize = SOURCE_FRAGMENT_BYTES - 3;
 const DEFAULT_SOURCE_THRESHOLD: usize = 4 * 1024 * 1024;
 
 pub(super) fn initial_view(source_bytes: usize) -> (EditorMode, Option<&'static str>) {
@@ -88,6 +90,12 @@ impl ReaderIndex {
         let text = document.baseline().source();
         let lines = LineIndex::build(text, LineIndexBudget::new(max_rows))
             .map_err(|_| LayoutError::Budget)?;
+        // 每个逻辑行占至少一项，额外项只来自先前已切下的完整分片。
+        // 打开阶段已限制全文字节数，因此分片开销随该上限有界。
+        let max_source_rows = lines
+            .line_count()
+            .checked_add(text.len() / MIN_FULL_SOURCE_FRAGMENT_BYTES)
+            .ok_or(LayoutError::Budget)?;
         let mut source = Vec::new();
         for line in 0..lines.line_count() {
             let range = lines.line_range(line).ok_or(LayoutError::InvalidRange)?;
@@ -102,7 +110,7 @@ impl ReaderIndex {
                 if src_end < src_start || (src_end == src_start && src_start != range.end) {
                     return Err(LayoutError::InvalidRange);
                 }
-                if source.len() >= max_rows {
+                if source.len() >= max_source_rows {
                     return Err(LayoutError::Budget);
                 }
                 source.try_reserve(1).map_err(|_| LayoutError::Budget)?;
@@ -1222,6 +1230,30 @@ mod tests {
                     .is_ok()
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn source_item_budget_counts_fragments_beyond_the_logical_line_cap()
+    -> Result<(), Box<dyn Error>> {
+        // 三条 5000 字节的逻辑行恰用满 3 行预算，分片后是 6 个虚拟项。
+        let line = "a".repeat(5000);
+        let text = format!("{line}\n{line}\n{line}");
+        let session = session(text.as_bytes())?;
+        let document = session.document().ok_or("document")?;
+        let index = ReaderIndex::new(document, 3)?;
+        assert_eq!(index.row_count(EditorMode::Source), 6);
+        let mut restored = String::new();
+        for row in 0..index.row_count(EditorMode::Source) {
+            let source = index.source_range(document.parsed(), EditorMode::Source, row)?;
+            assert!(source.len_bytes() <= 4096);
+            restored.push_str(
+                index
+                    .projection(document.parsed(), EditorMode::Source, row, 4096)?
+                    .drawn_text(),
+            );
+        }
+        assert_eq!(restored, text.replace('\n', ""));
         Ok(())
     }
 }

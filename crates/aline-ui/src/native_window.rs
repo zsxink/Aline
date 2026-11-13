@@ -30,14 +30,14 @@ use std::sync::Arc;
 
 use aline_app_core::Translator;
 use aline_buffer::{HistoryBudget, LineIndexBudget, TextBudget};
-use aline_markdown::{ParseBudget, ParseConfig};
+use aline_markdown::{DiagnosticKind, ParseBudget, ParseConfig, Parsed};
 use aline_source::StorageBudget;
 use gpui::{
     App, Bounds, Context, FocusHandle, Image, KeyBinding, Menu, MenuItem, PathPromptOptions, Role,
     SharedString, Task, Window, WindowBounds, WindowOptions, div, prelude::*, px, rgb, rgba, size,
 };
 
-use crate::document::DocumentStatistics;
+use crate::document::{DocumentStatistics, StageTimer, StageTiming};
 use crate::fonts::{FontEnvironment, FontStatus};
 use crate::{
     DocLimits, DocumentId, EditorMode, OpenDisposition, OpenError, OpenRequestId, ReadonlyDocument,
@@ -158,27 +158,40 @@ impl NativeOpenCoordinator {
         }
     }
 
-    pub(super) fn read_finished(
+    fn read_finished<T>(
         &mut self,
         completion: ReadonlyOpenCompletion,
-    ) -> Option<ReadonlyOpenJob> {
+        prepare: impl FnOnce(&ReadonlyDocument) -> Result<T, LayoutError>,
+    ) -> (Option<ReadonlyOpenJob>, Option<T>) {
         self.reading = false;
-        match self.session.accept_open(completion) {
-            OpenDisposition::Failed(error) => self.feedback = Some(open_error_key(&error)),
-            OpenDisposition::Applied => {
-                if let Some(document) = self.session.document_mut() {
-                    let (mode, reason) =
-                        readonly_layout::initial_view(document.parsed().snapshot().len_bytes());
-                    if document.switch_mode(mode).is_err() {
-                        self.feedback = Some("open_error.internal");
-                    } else {
-                        self.feedback = reason;
-                    }
-                }
+        let result = self.session.accept_open_with(completion, |document| {
+            let parsed = document.parsed();
+            let (mut mode, reason) = readonly_layout::initial_view(parsed.snapshot().len_bytes());
+            if parse_fallback_key(parsed).is_some() {
+                mode = EditorMode::Source;
             }
-            OpenDisposition::Cancelled | OpenDisposition::Stale => {}
-        }
-        self.take_next_read()
+            document
+                .switch_mode(mode)
+                .map_err(|_| "open_error.internal")?;
+            let prepared = prepare(document).map_err(layout_error_key)?;
+            Ok((prepared, reason))
+        });
+        let prepared = match result {
+            Ok((_, Some((prepared, reason)))) => {
+                self.feedback = reason;
+                Some(prepared)
+            }
+            Ok((OpenDisposition::Failed(error), None)) => {
+                self.feedback = Some(open_error_key(&error));
+                None
+            }
+            Err(key) => {
+                self.feedback = Some(key);
+                None
+            }
+            Ok((_, None)) => None,
+        };
+        (self.take_next_read(), prepared)
     }
 
     fn take_next_read(&mut self) -> Option<ReadonlyOpenJob> {
@@ -224,6 +237,25 @@ fn open_error_key(error: &OpenError) -> &'static str {
         | OpenError::Document(_)
         | OpenError::Parse(_)
         | OpenError::Allocation(_) => "open_error.internal",
+    }
+}
+
+/// 整篇原文回退没有重写映射，原因始终随当前文档显示。
+fn parse_fallback_key(parsed: &Parsed) -> Option<&'static str> {
+    if parsed.rewrite_map().is_some() {
+        return None;
+    }
+    parsed
+        .diagnostics()
+        .first()
+        .map(|diagnostic| parse_fallback_message(diagnostic.kind()))
+}
+
+/// 整源回退的两个原因各自对应一条双语文案。
+fn parse_fallback_message(kind: DiagnosticKind) -> &'static str {
+    match kind {
+        DiagnosticKind::BudgetExceeded => "reading.parse_budget_fallback",
+        DiagnosticKind::RawFallback => "reading.parse_raw_fallback",
     }
 }
 
@@ -288,6 +320,8 @@ impl NativeWindowCopy {
             "open_error.internal",
             "open_error.dialog",
             "reading.large_source",
+            "reading.parse_budget_fallback",
+            "reading.parse_raw_fallback",
             "reading.layout_budget",
             "font.register_failed",
             "font.family_missing",
@@ -536,30 +570,52 @@ impl NativeDocumentWindow {
     fn start_read(&mut self, job: ReadonlyOpenJob, window: &Window, cx: &mut Context<Self>) {
         // 新候选开始读取即作废当前统计：旧文档的数值不得伴随候选读取继续显示。
         self.invalidate_statistics();
-        let dispatch_started = crate::document::StageTimer::start();
+        let dispatch_started = StageTimer::start();
         let work = cx.background_executor().spawn(async move {
             let dispatch_wait = dispatch_started.finish();
             let mut completion = job.run();
             completion.timings.dispatch_wait = dispatch_wait;
-            (completion, crate::document::StageTimer::start())
+            (completion, StageTimer::start())
         });
         self.read_task = Some(cx.spawn_in(window, async move |weak, cx| {
             let (mut completion, result_wait) = work.await;
             let _ = weak.update_in(cx, |this, window, cx| {
                 completion.timings.result_wait = result_wait.finish();
-                let timings = completion.timings;
-                let background = timings;
-                let previous_document = this
-                    .state
-                    .session()
-                    .document()
-                    .map(|document| document.core().document_id().clone());
-                let adopt_started = crate::document::StageTimer::start();
-                let next = this.state.read_finished(completion);
-                let adopt_timing = adopt_started.finish();
-                let applied = this.state.session().document().is_some_and(|document| {
-                    previous_document.as_ref() != Some(document.core().document_id())
+                let background = completion.timings;
+                let generation = this.next_reader_generation.checked_add(1);
+                let mut layout_timing = StageTiming::default();
+                let mut adopt_started = None;
+                let (next, prepared) = this.state.read_finished(completion, |document| {
+                    let generation = generation.ok_or(LayoutError::GenerationExhausted)?;
+                    let viewport_width = f32::from(window.viewport_size().width);
+                    let metrics = content_metrics(viewport_width, viewport_width);
+                    let layout_started = StageTimer::start();
+                    let result = ReaderSurface::new(document, generation, this.evidence.clone())
+                        .and_then(|mut reader| {
+                            reader.prepare(document, window, metrics, &this.fonts)?;
+                            Ok((reader, generation))
+                        });
+                    layout_timing = layout_started.finish();
+                    adopt_started = Some(StageTimer::start());
+                    result
                 });
+                let applied = prepared.is_some();
+                if let Some((reader, generation)) = prepared {
+                    reader.schedule_height_hint(window, cx);
+                    this.reader = Some(reader);
+                    this.next_reader_generation = generation;
+                    this.loaded_name = this
+                        .state
+                        .session()
+                        .document()
+                        .and_then(|document| document.path().file_name())
+                        .map(|name| SharedString::from(name.to_string_lossy().into_owned()));
+                    if let Some(name) = &this.loaded_name {
+                        window.set_window_title(name.as_ref());
+                    }
+                }
+                let adopt_timing =
+                    adopt_started.map_or_else(StageTiming::default, StageTimer::finish);
                 if applied
                     && let (Some(evidence), Some(document)) =
                         (&this.evidence, this.state.session().document())
@@ -568,19 +624,7 @@ impl NativeDocumentWindow {
                     eprintln!("m1-readonly-evidence open failed: {error}");
                 }
                 this.read_task = None;
-                this.loaded_name = this
-                    .state
-                    .session()
-                    .document()
-                    .and_then(|document| document.path().file_name())
-                    .map(|name| SharedString::from(name.to_string_lossy().into_owned()));
-                let layout_started = crate::document::StageTimer::start();
-                this.refresh_reader();
-                let layout_timing = layout_started.finish();
                 this.probe_read_finished(background, layout_timing, adopt_timing, applied);
-                if let Some(name) = &this.loaded_name {
-                    window.set_window_title(name.as_ref());
-                }
                 match next {
                     Some(job) => this.start_read(job, window, cx),
                     None => this.refresh_statistics(window, cx),
@@ -624,33 +668,6 @@ impl NativeDocumentWindow {
                     }
                 })
                 .detach();
-        }
-    }
-
-    fn refresh_reader(&mut self) {
-        let Some(document) = self.state.session().document() else {
-            self.reader = None;
-            return;
-        };
-        if self
-            .reader
-            .as_ref()
-            .is_none_or(|reader| !reader.matches(document))
-        {
-            let Some(generation) = self.next_reader_generation.checked_add(1) else {
-                self.state.feedback = Some("open_error.internal");
-                return;
-            };
-            match ReaderSurface::new(document, generation, self.evidence.clone()) {
-                Ok(reader) => {
-                    self.reader = Some(reader);
-                    self.next_reader_generation = generation;
-                }
-                Err(error) => {
-                    self.reader = None;
-                    self.state.feedback = Some(layout_error_key(error));
-                }
-            }
         }
     }
 
@@ -1003,6 +1020,15 @@ impl Render for NativeDocumentWindow {
         if let Some(message) = self
             .state
             .feedback_key()
+            .and_then(|key| self.copy.errors.get(key))
+        {
+            notices.push(message.clone());
+        }
+        if let Some(message) = self
+            .state
+            .session()
+            .document()
+            .and_then(|document| parse_fallback_key(document.parsed()))
             .and_then(|key| self.copy.errors.get(key))
         {
             notices.push(message.clone());

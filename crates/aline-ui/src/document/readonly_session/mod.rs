@@ -337,21 +337,34 @@ impl ReadonlySession {
 
     /// 仅发布仍存活会话的最新 Loading 候选；失败/取消/旧结果都保留原文档。
     pub fn accept_open(&mut self, completion: ReadonlyOpenCompletion) -> OpenDisposition {
+        match self.accept_open_with(completion, |_| Ok::<(), std::convert::Infallible>(())) {
+            Ok((disposition, _)) => disposition,
+            Err(never) => match never {},
+        }
+    }
+
+    /// 复验请求后准备宿主所需的派生状态。准备失败时结算请求并保留当前文档。
+    pub(crate) fn accept_open_with<T, E>(
+        &mut self,
+        completion: ReadonlyOpenCompletion,
+        prepare: impl FnOnce(&mut ReadonlyDocument) -> Result<T, E>,
+    ) -> Result<(OpenDisposition, Option<T>), E> {
         if !self.alive
             || !self.pending.as_ref().is_some_and(|pending| {
                 pending.id == completion.request && pending.phase == ReadonlyOpenPhase::Loading
             })
         {
-            return OpenDisposition::Stale;
+            return Ok((OpenDisposition::Stale, None));
         }
         self.pending = None;
         match completion.result {
-            Ok(document) => {
+            Ok(mut document) => {
+                let prepared = prepare(&mut document)?;
                 self.document = Some(document);
-                OpenDisposition::Applied
+                Ok((OpenDisposition::Applied, Some(prepared)))
             }
-            Err(OpenError::Cancelled) => OpenDisposition::Cancelled,
-            Err(error) => OpenDisposition::Failed(error),
+            Err(OpenError::Cancelled) => Ok((OpenDisposition::Cancelled, None)),
+            Err(error) => Ok((OpenDisposition::Failed(error), None)),
         }
     }
 

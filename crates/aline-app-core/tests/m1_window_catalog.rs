@@ -34,6 +34,8 @@ fn native_window_copy_exists_in_both_catalogs() {
                 "startup.no_display",
                 "startup.language_fallback",
                 "reading.large_source",
+                "reading.parse_budget_fallback",
+                "reading.parse_raw_fallback",
                 "reading.layout_budget",
                 "action.cancel_navigation",
                 // 带 `{count}` 插值的键由下方插值测试单独覆盖。

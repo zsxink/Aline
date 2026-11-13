@@ -398,7 +398,6 @@ type HitCallback = dyn Fn(
 type NavigateCallback = dyn Fn(usize, &mut Window, &mut App);
 
 pub(super) struct ReaderSurface {
-    document: DocumentId,
     generation: u64,
     index: ReaderIndex,
     list: ListState,
@@ -435,7 +434,6 @@ impl ReaderSurface {
             scroll_restores.borrow_mut().cancel_current();
         });
         Ok(Self {
-            document: document.core().document_id().clone(),
             generation,
             index,
             list,
@@ -450,9 +448,6 @@ impl ReaderSurface {
             alive: Rc::new(Cell::new(true)),
             hint_width: Rc::new(Cell::new(None)),
         })
-    }
-    pub(super) fn matches(&self, document: &ReadonlyDocument) -> bool {
-        &self.document == document.core().document_id()
     }
     /// 准备当前布局键；返回是否重建了列表（调用方需在帧末补未测量行高度提示）。
     pub(super) fn prepare(
@@ -477,7 +472,8 @@ impl ReaderSurface {
         let mut reset = false;
         if !self.heights.borrow().matches_key(&key) {
             reset = true;
-            let anchor = if self.heights.borrow().token().is_some() {
+            let has_layout = self.heights.borrow().token().is_some();
+            let anchor = if has_layout {
                 self.restores
                     .borrow()
                     .pending()
@@ -492,7 +488,10 @@ impl ReaderSurface {
             // 或滚动条拖动会跨过整段未测量区跳到首个已测量块。这里先重置，
             // 由调用方在帧末调用 `schedule_height_hint` 给未测量行补正文行高
             // 提示；该提示会被实际测量高度替换，且只影响像素跳转与滚动条比例。
-            self.list.reset(self.index.row_count(mode));
+            // 新阅读面已按初始模式构建列表，第一次校验布局键时无需重建。
+            if has_layout || self.mode != mode {
+                self.list.reset(self.index.row_count(mode));
+            }
             if let Some(anchor) = anchor {
                 let target = self
                     .index

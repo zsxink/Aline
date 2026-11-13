@@ -17,6 +17,8 @@ cancel_navigation = "取消定位"
 
 [reading]
 large_source = "文档超过 4 MiB，已默认以源码视图打开；你仍可切换到可视化视图。"
+parse_budget_fallback = "文档超过当前 Markdown 解析上限。可在源码视图中阅读原文。"
+parse_raw_fallback = "无法解析此文档。可在源码视图中阅读原文。"
 layout_budget = "此区域超过当前布局预算。源码已保留；切换到源码视图可继续阅读。"
 
 [content]
