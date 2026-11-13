@@ -4,7 +4,7 @@
 
 ## 1. 开发阶段
 
-按架构指引 §13 的 `M0 → M1 → M2 → M3 → M4 → M5 → M6` 顺序推进。当前从 M0 开始。各阶段的范围和出口完全沿用架构指引 §13；不得因 OpenSpec 变更归档或实现任务关闭而推定阶段出口通过。
+按架构指引 §13 的 `M0 → M1 → M2 → M3 → M4 → M5 → M6` 顺序推进。当前处于 M1 单文档只读的交付复核阶段；阶段出口仍按架构指引 §13 与验证计划逐项核对，不能因 OpenSpec 任务完成或变更归档而推定通过。各阶段的范围和出口完全沿用架构指引 §13。
 
 | 阶段 | 范围 | 交接要求 |
 |---|---|---|
@@ -43,7 +43,7 @@ OpenSpec 使用仓库根目录 `openspec/` 下的 `spec-driven` schema，所有�
 
 ### 3.1 研究采纳与工程实践落点（2026-11-05）
 
-[决定 QMD-01](./decisions.md#25-2026-11-05-quiet-md-工程实践采纳qmd-01) 已把 [quiet-md 调研](./quiet-md-study.md) 中不改变产品契约的工程/验证方法回写现行规范；治理 delta 已并入 OpenSpec change [`m1-single-window-readonly`](../openspec/changes/m1-single-window-readonly/proposal.md)，该部分只记录方法与边界，不批准任何 W 项。下列 W0～W7 在研究时是**工作分解与建议顺序**；2026-11-08 用户要求继续 W1～W7 实施，现各有独立 change。该实施授权不批准新增依赖、vendor 或降低验收标准；W4/W5 必须等待 M2 前置。
+[决定 QMD-01](./decisions.md#25-2026-11-05-quiet-md-工程实践采纳qmd-01) 已把 [quiet-md 调研](./quiet-md-study.md) 中不改变产品契约的工程/验证方法回写现行规范；治理 delta 已并入已归档（2026-11-13）的 OpenSpec change [`m1-single-window-readonly`](../openspec/changes/archive/2026-11-13-m1-single-window-readonly/proposal.md)，该部分只记录方法与边界，不批准任何 W 项。下列 W0～W7 在研究时是**工作分解与建议顺序**；2026-11-08 用户要求继续 W1～W7 实施，W1/W2/W3/W6/W7 已完成并归档，W4/W5 仍待 M2 前置。该实施授权不批准新增依赖、vendor 或降低验收标准；W4/W5 必须等待 M2 前置。
 
 | 工作流 | 落点与阶段 | 前置/边界 |
 |---|---|---|
@@ -56,21 +56,21 @@ OpenSpec 使用仓库根目录 `openspec/` 下的 `spec-driven` schema，所有�
 | W6 语义 token | M1 小步；M4 完整 | 不改视觉与主题包 schema；不挤占 M1 关键路径 |
 | W7 工程门禁/性能/文档 | 持续；服务 M1 任务 7.1 与 V-05 | 不另建第二套门禁；性能报告字段按 R-11-01/S-14-03 |
 
-当前独立 change 索引（不表示任务或平台验证完成）：
+当前独立 change 索引（不表示任务或平台验证完成）；W1/W2/W3/W6/W7 已于 2026-11-13 归档，W4/W5 仍为进行中：
 
 | 工作流 | Change |
 |---|---|
-| W1 | [`m1-visual-evidence-spike`](../openspec/changes/m1-visual-evidence-spike/tasks.md) |
-| W2 | [`m1-cjk-typography-font-evidence`](../openspec/changes/m1-cjk-typography-font-evidence/tasks.md) |
-| W3 | [`engine-fuzz-invariants`](../openspec/changes/engine-fuzz-invariants/tasks.md) |
+| W1 | [`m1-visual-evidence-spike`](../openspec/changes/archive/2026-11-13-m1-visual-evidence-spike/tasks.md) |
+| W2 | [`m1-cjk-typography-font-evidence`](../openspec/changes/archive/2026-11-13-m1-cjk-typography-font-evidence/tasks.md) |
+| W3 | [`engine-fuzz-invariants`](../openspec/changes/archive/2026-11-13-engine-fuzz-invariants/tasks.md) |
 | W4 | [`qmd-w4-persistence-recovery`](../openspec/changes/qmd-w4-persistence-recovery/tasks.md) |
 | W5 | [`qmd-w5-native-ime-input`](../openspec/changes/qmd-w5-native-ime-input/tasks.md) |
-| W6 | [`m1-ui-semantic-tokens`](../openspec/changes/m1-ui-semantic-tokens/tasks.md) |
-| W7 | [`m1-engineering-evidence-gates`](../openspec/changes/m1-engineering-evidence-gates/tasks.md) |
+| W6 | [`m1-ui-semantic-tokens`](../openspec/changes/archive/2026-11-13-m1-ui-semantic-tokens/tasks.md) |
+| W7 | [`m1-engineering-evidence-gates`](../openspec/changes/archive/2026-11-13-m1-engineering-evidence-gates/tasks.md) |
 
 - 随机测试失败必须留下可复跑的 seed、步号、操作日志和最小输入；最小输入整理成正式夹具后提交，原始日志只留 `logs/validation/`。不得用测试辅助函数把已知语义丢失规范化后当作通过。
-- W1/W2/W3/W6/W7 当前在 M1 范围推进，W4/W5 已独立建档但必须等待 M1 出口与 M2 前置；M4 完整主题、vendor 或新依赖仍须具体裁决。
-- W2 实测后的最小修复准备另由 [`m1-cjk-linebreak-core-fix`](../openspec/changes/m1-cjk-linebreak-core-fix/tasks.md) 承接；用户方向决定见[决定 §28](./decisions.md#28-2026-11-09-w2-中文断行最小修复准备)，具体来源准入与修复实测尚未完成。
+- W1/W2/W3/W6/W7 已在 M1 范围完成并归档（2026-11-13），W4/W5 已独立建档但必须等待 M1 出口与 M2 前置；M4 完整主题、vendor 或新依赖仍须具体裁决。
+- W2 实测后的最小修复准备另由 [`m1-cjk-linebreak-core-fix`](../openspec/changes/archive/2026-11-13-m1-cjk-linebreak-core-fix/tasks.md) 承接；用户方向决定见[决定 §28](./decisions.md#28-2026-11-09-w2-中文断行最小修复准备)，具体来源准入与修复实测尚未完成。
 - 2026-11-12：[决定 §35](./decisions.md#35-2026-11-12-m1-剩余七项裁决与受控失败实验) 对 W2 的「先测量后决定是否 vendor」给出结论——M1 接受中文避头尾已知限制、vendor 推到 M2 出现 caret/IME 后重新评估，`m1-cjk-linebreak-core-fix` 以 evidence-only 收尾。上表 W2 行的「先测量后决定」与「不先 fork 三个 gpui-pre 包」仍然成立；M2 若决定 vendor，仍须重走依赖准入与具体裁决。
 
 - 2026-11-12 追加更正（决定 §36）：上条「`m1-cjk-linebreak-core-fix` 以 evidence-only 收尾、vendor 推到 M2」的执行边界已被决定 §36 推翻——生产树已接入 `vendor/gpui-pre-0.3.9` 与 `[patch.crates-io]`，来源、全树摘要与 8 文件身份由策略资产登记并在每次门禁重算。W2 行的其它原则，以及「变更来源仍须重走依赖准入与具体裁决」不变。

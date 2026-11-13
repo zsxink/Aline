@@ -589,7 +589,7 @@ PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02
 
 用户批准 M1 macOS 后端候选：crates.io `gpui-pre-macos@0.3.9`，关闭默认 features、只开 `font-kit`，由 `aline-ui` 以 `cfg(target_os="macos")` 依赖；系统默认语言检测使用 `sys-locale@0.3.2`。用户批准三个且仅三个精确 MPL-2.0 包例外：`cbindgen@0.28.0`、`option-ext@0.2.0` 与 `dwrote@0.11.5`，严格锁定来源、checksum、后端 root 与入边；`dwrote` 只在目标条件矛盾的完整 metadata 路径出现，所有桌面 target tree 不得选中。用户也批准 `libloading@0.8.9` 的精确 ISC metadata-only 路径例外（checksum `d7c4b02199fee7c5d21a5ae7d8cfa79a6ef5bb2fc834d6e9058e89c825efdc55`），完整路径逐节点身份、checksum、alias、target/kind 锁定；不扩大全局 ISC/MPL 允许集，五个登记桌面 target tree 均不得选中。用户批准准入提案中原列的 `wasi@0.11.1+wasi-snapshot-preview1` metadata-only 路径，以及 `wasip2@1.0.4+wasi-0.2.12` 的原5条与新增9条精确路径边；同一 wasip2 可在 desktop target-filtered metadata 出现，macOS/Windows/Linux target tree 必须不选中。所有边仍只限已登记 package/version/source/checksum、alias、target 和 root。
 
-用户已批准保持原有 hash 算法并为 M1 组合图登记7个具体 GPUI 子图新 fingerprint；M0 hash 保留历史值。候选值见[准入提案](../openspec/changes/m1-single-window-readonly/native-admission-proposal.md)。真实依赖准入 all/all-features 与 macOS ARM/Intel、Windows x64、Linux x64/ARM 共7场景通过；合成完整自测117/117、路径并集14/14、精确许可证回归13/13通过。五个登记 desktop target 对 dwrote/libloading 的 tree 检查均不选中。规则仍按精确 package identity/path/target 检查，不能按包名扩大例外或修改指纹算法。Metal 构建工具当前缺失，真实原生构建及窗口尚未验证。
+用户已批准保持原有 hash 算法并为 M1 组合图登记7个具体 GPUI 子图新 fingerprint；M0 hash 保留历史值。候选值见[准入提案](../openspec/changes/archive/2026-11-13-m1-single-window-readonly/native-admission-proposal.md)。真实依赖准入 all/all-features 与 macOS ARM/Intel、Windows x64、Linux x64/ARM 共7场景通过；合成完整自测117/117、路径并集14/14、精确许可证回归13/13通过。五个登记 desktop target 对 dwrote/libloading 的 tree 检查均不选中。规则仍按精确 package identity/path/target 检查，不能按包名扩大例外或修改指纹算法。Metal 构建工具当前缺失，真实原生构建及窗口尚未验证。
 
 2026-11-03 更新：Xcode 27.2/Metal Toolchain 可用后，锁定离线构建与真实 macOS 单窗显示/退出已由 tasks 4.2 记录；该结果属于 M1 分项，不改写本条当时的“尚未验证”事实。
 
@@ -629,7 +629,7 @@ PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02
 
 ## 25. 2026-11-05 quiet-md 工程实践采纳（QMD-01）
 
-用户要求把 [quiet-md 调研与采纳方案](./quiet-md-study.md) 中可迁移的工程实践整合进开发/设计规范，并在后续开发中遵循。quiet-md 是外部参考实现，其快照、证据限制与独立复核见研究文档 §2、§6；本条只把**不改变 Aline 产品契约的工程方法与验证方法**回写到现行规范，不把 quiet-md 的实现、数值或能力当作 Aline 已实现、已冻结或已通过的事实。来源分三类逐项标注：quiet-md 已有机制、Aline 既有规则、Aline 追加/补强；没有直接证据的 quiet-md 行为只作“未确认/仅方向参考”。方法回写的治理 delta 是 OpenSpec change [`m1-single-window-readonly`](../openspec/changes/m1-single-window-readonly/proposal.md) 中 `engineering-governance` 的增量规格；该部分只记录方法与边界，W1～W7 仍需逐项另建 change。
+用户要求把 [quiet-md 调研与采纳方案](./quiet-md-study.md) 中可迁移的工程实践整合进开发/设计规范，并在后续开发中遵循。quiet-md 是外部参考实现，其快照、证据限制与独立复核见研究文档 §2、§6；本条只把**不改变 Aline 产品契约的工程方法与验证方法**回写到现行规范，不把 quiet-md 的实现、数值或能力当作 Aline 已实现、已冻结或已通过的事实。来源分三类逐项标注：quiet-md 已有机制、Aline 既有规则、Aline 追加/补强；没有直接证据的 quiet-md 行为只作“未确认/仅方向参考”。方法回写的治理 delta 是 OpenSpec change [`m1-single-window-readonly`](../openspec/changes/archive/2026-11-13-m1-single-window-readonly/proposal.md) 中 `engineering-governance` 的增量规格；该部分只记录方法与边界，W1～W7 仍需逐项另建 change。
 
 ### 25.1 采纳结论
 
@@ -646,7 +646,7 @@ PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02
 
 ### 25.2 效力与实施边界
 
-本条是**工程/验证方法采纳**，不改变 PRD、AC、跨模块契约、依赖/架构边界、阶段范围或已确认数值。方法回写本身的治理 delta 已并入 OpenSpec change [`m1-single-window-readonly`](../openspec/changes/m1-single-window-readonly/proposal.md)，只追认文档与方法边界；W1～W7 仍须逐项另建 change。按[开发流程 §2](./development-process.md#2-openspec-变更流程)，实施时凡新增/升级依赖（如锁定 GPUI 的 `test-support` feature、`image`）、改变验收方式（如 V-04/V-05/V-09 增加夹具或报告字段）、改变跨模块契约（如保存/恢复状态机）或进入 M2/M4 范围，仍须先建对应 OpenSpec change；研究文档的 W0 治理门继续有效，未批准不写代码。
+本条是**工程/验证方法采纳**，不改变 PRD、AC、跨模块契约、依赖/架构边界、阶段范围或已确认数值。方法回写本身的治理 delta 已并入 OpenSpec change [`m1-single-window-readonly`](../openspec/changes/archive/2026-11-13-m1-single-window-readonly/proposal.md)，只追认文档与方法边界；W1～W7 仍须逐项另建 change。按[开发流程 §2](./development-process.md#2-openspec-变更流程)，实施时凡新增/升级依赖（如锁定 GPUI 的 `test-support` feature、`image`）、改变验收方式（如 V-04/V-05/V-09 增加夹具或报告字段）、改变跨模块契约（如保存/恢复状态机）或进入 M2/M4 范围，仍须先建对应 OpenSpec change；研究文档的 W0 治理门继续有效，未批准不写代码。
 
 研究文档中的 W0～W7、Q01～Q32 与建议 change 名称是工作分解和证据矩阵，不是已批准任务，也不构成本条之外的新决定。其待确认问题（test-support 准入、vendor 顺序、M1 是否允许中文排版已知限制、token 时点、fuzz 规模、W4/W5 阶段、窗口构造重构）保持待确认，本条不自行裁决；开发流程与架构 §13 表中的阶段落点只是建议，批准对应 change 时才定。其中「M1 是否允许中文排版已知限制」与「vendor 顺序」两项已于 2026-11-12 由[决定 §35](#35-2026-11-12-m1-剩余七项裁决与受控失败实验)裁决（M1 接受已知限制、vendor 推到 M2），本条其余待确认项不变。
 
@@ -664,7 +664,7 @@ PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02
 
 ## 26. 2026-11-06 合并 QMD-01 治理 change 并校正口径
 
-用户决定把进行中的两个 OpenSpec change 合并为一个：`qmd-01-engineering-practices` 并入 [`m1-single-window-readonly`](../openspec/changes/m1-single-window-readonly/proposal.md) 并删除其目录。本条只改 OpenSpec 工件的组织方式与若干措辞，不改变任何产品契约、架构决定、阶段范围或验证结论。
+用户决定把进行中的两个 OpenSpec change 合并为一个：`qmd-01-engineering-practices` 并入 [`m1-single-window-readonly`](../openspec/changes/archive/2026-11-13-m1-single-window-readonly/proposal.md) 并删除其目录。本条只改 OpenSpec 工件的组织方式与若干措辞，不改变任何产品契约、架构决定、阶段范围或验证结论。
 
 - **合并内容。** 原 change 的 `engineering-governance` delta（6 条 ADDED 要求、17 个场景）整体移入 M1 change 的 `specs/engineering-governance/spec.md`，与产品实现侧的 `ui/*`、`engine/*`、`workspace/engineering-gates` 分文件记录；原 proposal/design 的方法来源与效力边界压缩进 M1 的 proposal 与 design §10，原 tasks 的 15 项已完成动作合并为 M1 tasks 第 16 组，范围外的 W 项门为第 17 组。沿用 2026-11-03 并入 `m1-main-window-skeleton` 的先例（[决定 §22](#22-2026-11-03-原型作为原生-ui-的布局参照)）。
 - **效力边界。** QMD-01（[§25](#25-2026-11-05-quiet-md-工程实践采纳qmd-01)）的方法采纳、来源三类标注与 W0～W7 立项门不变；W1～W7 仍逐项另建 change，不因并入被视为已批准。合并没有新增代码、依赖、夹具、自动门禁或平台证据，也未运行 Cargo 测试或 V 项；M1 的任务勾选、验收结论与阶段出口不变，change 仍不归档。
@@ -686,7 +686,7 @@ PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02
 
 ## 28. 2026-11-09 W2 中文断行最小修复准备
 
-用户采用实测后的修复方向：另建最小 change，在 M1 内处理中文避头尾，优先评估仅锁定 gpui-pre 核心的断点补丁；中文斜体先取实际 fallback run 证据，再判断是否需要合成。准备工作由独立 change [`m1-cjk-linebreak-core-fix`](../openspec/changes/m1-cjk-linebreak-core-fix/proposal.md) 承接，W2 原测量 change 保留。
+用户采用实测后的修复方向：另建最小 change，在 M1 内处理中文避头尾，优先评估仅锁定 gpui-pre 核心的断点补丁；中文斜体先取实际 fallback run 证据，再判断是否需要合成。准备工作由独立 change [`m1-cjk-linebreak-core-fix`](../openspec/changes/archive/2026-11-13-m1-cjk-linebreak-core-fix/proposal.md) 承接，W2 原测量 change 保留。
 
 本次只确定修复方向和准备范围，未批准具体 vendor diff、本地来源、额外特性或平台钩子；实际候选仍须完整身份/差异/依赖图审计和独立审查后取得精确准入。不得插入字符改变源码或另造绘制/命中几何，不默认接受无合法断点时的静默硬断、裁切或溢出；必要接口差异先明确裁决。未接受 M1 中文排版已知限制，也不冻结合成角度或平滑数值。
 
@@ -696,7 +696,7 @@ PROTO-01/03保留内部参考并补来源/许可，事实尚待补证；PROTO-02
 
 用户授权「裁决的部分按照你的建议来，最优的建议考虑的以后的功能迭代」。完整记录见
 `logs/validation/m1-single-window-readonly/2026-11-09-cjk-03/cjk-linebreak/decision/recommended-ruling.md`；
-已同步进 [`m1-cjk-linebreak-core-fix`](../openspec/changes/m1-cjk-linebreak-core-fix/design.md)
+已同步进 [`m1-cjk-linebreak-core-fix`](../openspec/changes/archive/2026-11-13-m1-cjk-linebreak-core-fix/design.md)
 的 design / proposal / tasks，并重跑 OpenSpec strict。
 
 **接口裁决（已落定）**：受限回退选 A1+A4 受检组合——有合法候选则在合法字形边界软折行；

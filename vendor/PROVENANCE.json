@@ -35,7 +35,7 @@
   },
   "patched_files_note": "这 8 项是既有评审记录的逐文件身份锚点。crates.io 发布包本身已含 Cargo.toml 与 LICENSE-APACHE 的上述字节，因此补丁相对发布包实际改动 5 个文件、新增 1 个文件。",
   "patch_evidence": [
-    "openspec/changes/m1-cjk-linebreak-core-fix/tasks.md 3.2a–3.2d",
+    "openspec/changes/archive/2026-11-13-m1-cjk-linebreak-core-fix/tasks.md 3.2a–3.2d",
     "logs/validation/m1-single-window-readonly/2026-11-11-cjk-05/cjk-linebreak/3_2/",
     "logs/validation/m1-single-window-readonly/2026-11-11-cjk-06/cjk-linebreak/1_hook/install.json"
   ],

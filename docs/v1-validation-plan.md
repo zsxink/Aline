@@ -1,6 +1,6 @@
 # Aline V1 实现前验证清单
 
-更新日期：2026-11-03
+更新日期：2026-11-13
 需求依据：[V1 PRD 0.9](./v1-prd.md)  
 评审记录：[产品问题批阅归档](./archive/2026-10-28-v1-open-questions.md) · [架构问题确认归档](./archive/2026-10-29-v1-architecture-decisions.md) · [Rust 与引擎问题确认归档](./archive/2026-10-29-rust-style-decisions.md) · [UI 问题确认归档](./archive/2026-10-29-ui-decisions.md) · [插件问题确认归档](./archive/2026-10-29-plugin-decisions.md) · [主题决定归档](./archive/2026-10-29-theme-decisions.md)
 
@@ -10,9 +10,9 @@
 
 **2026-11-03 验证取证语言范围：** 用户裁决以后验证不需要双语验证，只需要验证中文（见[决定 §24](./decisions.md#24-2026-11-03-验证取证只做中文)）。界面语言的人工/原生取证只做中文，不再切换系统首选语言复验英文；catalog 的 zh-CN/en 键与占位符自动校验、缺键/漂移反例继续保留。2026-11-03 已取得的英文启动记录保留为裁决前的事实，后续复跑只核对中文。本条不改变 APP-04 产品范围，也不表示任何 V 项整项通过。
 
-## 当前 M0 状态与复跑入口
+## M1 分项状态与复跑入口
 
-**2026-11-02 M1 apply 进度：** OpenSpec `m1-single-window-readonly` 已开始实施。夹具、Markdown 只读语义/映射/脚注目标、DocCore 只读边界与只读文件会话已完成无头分项；映射空窗口/Hidden 边界及 FIFO 阻塞/文本预算顺序修复有独立审查和回归。M0 豁免缺证仍保留。用户已批准原生后端候选 `gpui-pre-macos@0.3.9` + `sys-locale@0.3.2`、`cbindgen@0.28.0`/`option-ext@0.2.0`/`dwrote@0.11.5` 三个精确 MPL 例外、`libloading@0.8.9` 的精确 ISC metadata-only 完整路径例外、`wasi@0.11.1`/`wasip2@1.0.4` 原列及新增9条精确 metadata 边，以及七场景 M1 GPUI 组合图指纹。工程准入 all/all-features、macOS ARM/Intel、Windows x64、Linux x64/ARM 七场景已通过；完整自测117/117、path union14/14、许可证自测13/13通过，五个桌面 target tree 均不选中 dwrote/libloading。当前环境没有 `xcrun metal`，原生依赖编译不能越过 shader build；尚未创建/验证窗口、未执行系统语言 GUI 观测、未做 1 MiB 可视化滚动。Windows 10、Intel Mac、Linux 仍未做真实平台实验，不能声明 AC-16 或 V-01/V-05/V-07/V-09 整项通过。证据见 [M1 原生准入候选方案](../openspec/changes/m1-single-window-readonly/native-admission-proposal.md)及 `logs/validation/m1-single-window-readonly/2026-11-02-apply/`。
+**2026-11-02 M1 apply 进度：** OpenSpec `m1-single-window-readonly` 已开始实施。夹具、Markdown 只读语义/映射/脚注目标、DocCore 只读边界与只读文件会话已完成无头分项；映射空窗口/Hidden 边界及 FIFO 阻塞/文本预算顺序修复有独立审查和回归。M0 豁免缺证仍保留。用户已批准原生后端候选 `gpui-pre-macos@0.3.9` + `sys-locale@0.3.2`、`cbindgen@0.28.0`/`option-ext@0.2.0`/`dwrote@0.11.5` 三个精确 MPL 例外、`libloading@0.8.9` 的精确 ISC metadata-only 完整路径例外、`wasi@0.11.1`/`wasip2@1.0.4` 原列及新增9条精确 metadata 边，以及七场景 M1 GPUI 组合图指纹。工程准入 all/all-features、macOS ARM/Intel、Windows x64、Linux x64/ARM 七场景已通过；完整自测117/117、path union14/14、许可证自测13/13通过，五个桌面 target tree 均不选中 dwrote/libloading。当前环境没有 `xcrun metal`，原生依赖编译不能越过 shader build；尚未创建/验证窗口、未执行系统语言 GUI 观测、未做 1 MiB 可视化滚动。Windows 10、Intel Mac、Linux 仍未做真实平台实验，不能声明 AC-16 或 V-01/V-05/V-07/V-09 整项通过。证据见 [M1 原生准入候选方案](../openspec/changes/archive/2026-11-13-m1-single-window-readonly/native-admission-proposal.md)及 `logs/validation/m1-single-window-readonly/2026-11-02-apply/`。
 
 **2026-11-03 M1 原生入口进度：** 4.1 准入门已完成；`app` 现在读取系统首选语言并调用 `aline-ui::run_application`，macOS 原生入口和一个本地化空状态窗口构造已写入源码。锁定 GPUI 的静态复审确认初窗失败立即以状态码 1 退出、最后窗口关闭时退出。catalog 专项测试、Linux 目标 app 检查、`-D warnings` Clippy、UI 测试目标编译和完整 fmt 检查通过；完整准入/lint/safety/public API 守卫通过。完整 workspace Clippy 与测试仍被 `gpui-pre-apple` 的 Metal shader 构建阻断（缺少 `xcrun metal`），因此 macOS 专属源码尚未完成实际 Rust 编译，未运行原生窗口或观测系统语言。4.2/4.3 保持未完成；V-01、V-05、V-07、V-09 仍未整项通过，未取得 1 MiB 可视化滚动证据。原始输出见 `logs/validation/m1-single-window-readonly/2026-11-03-continue/`。
 
@@ -36,6 +36,8 @@
 - 原始行尾表示、Unicode17 精确准入与 GPUI 指纹批准已迁入[决策记录 §15～17](./decisions.md#15-2026-10-31-原始行尾表示与存储等价确认)，不再依赖临时报告维持契约。
 - 单元/集成验证由 `crates/*/tests/` 和源码旁测试执行，固定输入及独立预期在 `tests/fixtures/`；门禁与正反例在 `scripts/`、`scripts/fixtures/`。统一复跑入口为 `python3 scripts/check_workspace.py --cargo-home <已核对的隔离缓存>`，脚本负责将运行输出写入 `logs/validation/`，不自动安装工具或下载依赖。
 - 真实 GPUI/IME/焦点与窗口、Intel Mac/Windows10/Linux、远端 CI、已有文件替换/协调/多资源事务等仍未验证；Release 性能已由 2026-11-10 的 360 样本矩阵按分项完成（V-05 首轮，未冻结门槛）。以下 V-01～V-09 继续按各自完整出口执行，不由基础测试或分项记录推定整项通过。
+
+**2026-11-13 M1 交付复核修复（18.1～18.4，非能力通过）：** 独立复核提出的三项缺陷已修复并由无头回归覆盖。其一，`ReaderIndex` 原先让源码分片共享逻辑行上限，最大合法行数的长行文档会被误判 `Budget`；现先按 `LineIndexBudget` 校验逻辑行，再用“行数 + 源码字节 / 4093”作为分片虚拟项上限，每个非末片至少 4093 字节使额外项受实际字节数上界约束，`checked_add` 失败仍返回 `Budget`。其二，文档发布原先把 `ReaderSurface` 建立放在会话替换之后，准备失败会留下“新文档 + 旧阅读面”；现 `ReadonlySession::accept_open_with` 在发布点之前运行宿主准备闭包，初始模式、`ReaderSurface::new` 与 `prepare` 全部成功才同时替换文档与视图，失败保留旧文档/模式/位置并写入反馈，首次打开失败保持无文档。其三，整源解析回退（`BudgetExceeded` / `RawFallback`）原本只在结果树里降级，UI 仍按成功 Visual 打开；现按诊断映射 `reading.parse_budget_fallback` / `reading.parse_raw_fallback` 双语键、强制 Source 只读原文并在通知区持续显示，4 MiB 大小提示保留。`cargo test -p aline-ui --lib` 128 passed/1 ignored（新增分片预算、发布失败保留旧文档、首次打开失败、过期完成不准备、解析回退默认 Source 与诊断映射用例），`cargo test -p aline-app-core` 2 passed，`cargo clippy --workspace --all-targets -- -D warnings` 与 `cargo fmt --all --check` 通过，完整 workspace 测试与 OpenSpec/链接/差异复查见 `logs/validation/m1-single-window-readonly/2026-11-13-18/`。**边界：** 本轮没有新增真实窗口、跨平台或性能证据，V-01/V-04/V-07/V-09 与 AC-15/16 仍未整项通过，M1 阶段出口不因任务勾选而通过；Windows 10、Intel Mac、Linux 与 M0 豁免缺证继续保留。
 
 ## V-01 · 三平台兼容与发布矩阵
 
@@ -369,6 +371,8 @@ M0 编码基础证据（2026-10-31）：行尾边界金样已固定 CR-X-LF 删�
 **2026-11-12 engineering 2.2 收口与 startup 4.3 落地（V-09 仍未整项通过）：** 用户裁决（决定 §42）按「静态边界 + 显式缺口」勾选 `m1-engineering-evidence-gates` 2.2 伞项：真实初窗失败收据在锁定 `gpui-pre 0.3.9` 的 macOS 后端下结构不可达（`Window::new` 唯一可失败点为 `platform.open_window`，`MacPlatform::open_window` 唯一 `Err` 出口为 `WindowKind::AnchoredPopup`，Aline 使用 `WindowKind::Normal`），缺口保留，不写成平台通过。同轮授权并完成 `m1-startup-window-failure-feedback` 4.3：`run_window_failure_probe.py` / `run_signal_probe.py` 及必要 Swift 源移入 `scripts/`，新增合成自测（窗口 17 例、信号 8 例）并接入 `check_workspace.py` 与 `check_validation_output.py` 输出路径拒绝矩阵；统一门禁 37/37 exit 0（含两个新自测），`check_validation_output.py` 14/14。自测只证明文案分类/信号解析与证据解释逻辑，不执行真实沙箱或窗口实验；既有真实收据结论不变。证据 `logs/validation/m1-single-window-readonly/2026-11-12-startup-4_3/`。
 
 **2026-11-12 startup 4.3 独立复审与修复（不改写上条；V-09 仍未整项通过）：** 4.3 的独立复审结论为 `pass-with-findings`，4 条中级 findings 已修复：窗口探针 baseline 与 case 的 `window_probe_run` 语义统一并新增 `window_probe_ok`，字段缺失或类型不符不再默认成 0 窗口；自测绑定实际 locale 文件与剖面独立字面量，并固定用例名单（窗口 32 例、信号 11 例）；真实模式原始输出、excerpt 与 `results.json` 统一经 `evidence_paths` 规范化；迁移文件随本次提交纳入 git。修复后复跑：门禁 37/37、输出路径守卫 14/14、窗口自测 32/32、信号自测 11/11。自测仍不执行真实沙箱或窗口实验，既有真实收据与 V-09 边界不变；复跑证据 `logs/validation/m1-single-window-readonly/2026-11-12-startup-4_3-r2/`。
+
+**2026-11-13 M1 复核修复（不增加 V/AC 证据）：** 打开成功条件扩展为只读阅读面及索引准备成功；失败时保持旧文档/位置，合法逻辑行数上限与长行分片开销分开核算。整篇解析回退现在以只读 Source 和本地化诊断呈现。`cargo check -p aline-ui --locked --offline`、`cargo clippy -p aline-ui --all-targets --locked --offline -- -D warnings`、`cargo fmt --all --check`、`git diff --check` 及 OpenSpec 严格校验通过；本次没有运行测试或真实窗口实验，V-01～V-09 及 M1 阶段出口状态不变。
 
 ## 结果记录
 
