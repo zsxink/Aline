@@ -1,6 +1,6 @@
 # Aline 文档入口
 
-当前已有八成员 Cargo workspace、无头引擎与工程守卫，以及 M1 的原生单窗口只读界面；2026-11-02 用户验收裁决将 M0 出口记为通过（验收豁免，非证据性验证；逐包人工复核、E2/E4/E5/E7 整项、E3 全量、E6 未测项未执行，V-01～V-09 均未整项通过，已执行与未测的分项见[验证计划](./v1-validation-plan.md)）。M1 实现任务已按 2026-11-03 apply 授权完成并于 2026-11-13 归档，阶段出口与未测项仍以[验证计划](./v1-validation-plan.md)和已归档的[M1 OpenSpec tasks](../openspec/changes/archive/2026-11-13-m1-single-window-readonly/tasks.md)为准。实现任务另见已归档的[M0 OpenSpec tasks](../openspec/changes/archive/2026-11-02-m0-engine-foundation/tasks.md)。
+当前已有八成员 Cargo workspace、无头引擎与工程守卫，以及 M1 的原生单窗口只读界面；2026-11-02 用户验收裁决将 M0 出口记为通过（验收豁免，非证据性验证；逐包人工复核、E2/E4/E5/E7 整项、E3 全量、E6 未测项未执行，V-01～V-09 均未整项通过，已执行与未测的分项见[验证计划](./v1-validation-plan.md)）。M1 实现任务已按 2026-11-03 apply 授权完成并于 2026-11-13 归档，阶段出口已于同日按[决定 §43](./decisions.md#43-2026-11-13-m1-阶段出口裁决macos-arm64-范围)在 macOS arm64 范围裁决收口：M2 入口解锁但未开始，M2 伞变更尚未建立，V-08 身份/事务方案仍是 M2 实现前置，W4/W5 不得提前接线。各 V 项整项状态、未测平台与保留缺口仍以[验证计划](./v1-validation-plan.md)和已归档的[M1 OpenSpec tasks](../openspec/changes/archive/2026-11-13-m1-single-window-readonly/tasks.md)为准。实现任务另见已归档的[M0 OpenSpec tasks](../openspec/changes/archive/2026-11-02-m0-engine-foundation/tasks.md)。
 
 PRD定义产品结果，AGENTS铁律及已确认架构/专项约束实现，验证计划负责证据状态，decisions负责决定追踪。OpenSpec承载工程基线和拟议变更，不能覆盖已确认决定；资料无法按职责解释的冲突列入待确认，不按日期或目录自行裁决。
 

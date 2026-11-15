@@ -97,7 +97,7 @@ AGENTS.md 路由安排独立复审（只安排、未执行）。
 `StyledText::layout()` 公开、`PreparedLayout` 已持有 `TextLayout`，H1 缺的是一次真实
 窗口实测而非缺接口。方案 B 改变全部字节身份、C 因禁止 `test-support` 不可行、
 D 需放宽 spec delta，均不采用。**spec delta 未改、未放宽**；
-完整裁决见 `../2026-11-09-cjk-04/cjk-linebreak/decision/h1-ruling.md` 与[决定 §31](../../../docs/decisions.md)。
+完整裁决见 `../2026-11-09-cjk-04/cjk-linebreak/decision/h1-ruling.md` 与[决定 §31](../../../../docs/decisions.md)。
 
 本轮只在 logs 隔离副本交付：纯记录规则（23/23 正反例、`forbid(unsafe_code)`、无 I/O）、
 opt-in 钩子（四环境变量 gate、唯一状态来源、capture 不写盘、flush `create_new`、
@@ -110,7 +110,7 @@ H2、B6、M1、5.1 仍待裁决 / 授权；任务仍 2/12。
 
 ### 7. 六项裁决后的执行结果（2026-11-11-cjk-06，追加，不改写上面各节）
 
-用户六项裁决见[决定 §34](../../../docs/decisions.md)。本轮只在 logs 隔离副本执行：
+用户六项裁决见[决定 §34](../../../../docs/decisions.md)。本轮只在 logs 隔离副本执行：
 受限 opt-in 钩子接入 `on_children_prepainted` 与窗口关闭后后台 flush，独立复审
 `pass-with-findings`、无阻断项（`1_hook/review-summary.md`）。同一 patched Release
 （`app_sha256=c87400a9…`，commit `6ed33f08…`）在真实 macOS arm64 窗口取得 5.1a 六组合
@@ -131,7 +131,7 @@ FontId 映射家族，均不构成 shaped advance / 完整 face 身份；5.1b �
 
 ### 8. 本轮收尾裁决（2026-11-12，追加，不改写上面各节）
 
-用户裁决见[决定 §35](../../../docs/decisions.md)。本 change 以 **evidence-only**
+用户裁决见[决定 §35](../../../../docs/decisions.md)。本 change 以 **evidence-only**
 收尾：M1 接受中文避头尾已知限制，3.2e 生产来源准入不立项，vendor 推到 M2；4.1c 不新增
 平台诊断钩子（会改变已批准的 8 文件字节身份与 `minimal.diff` 哈希）；5.1b 字体失效接受
 为已知限制；5.2d 不另安排定向复审，保持未勾作为「生产准入未推进」的显式边界。
@@ -149,7 +149,7 @@ vendor，须重走来源准入 + 独立评审 + 具体批准，并重新取得�
 
 ### 9. 伞项 1.2 / 2.2 复核与勾选（2026-11-12，追加，不改写上面各节）
 
-用户追加裁决见[决定 §35](../../../docs/decisions.md) 末段。新建只读脚本
+用户追加裁决见[决定 §35](../../../../docs/decisions.md) 末段。新建只读脚本
 `logs/validation/m1-single-window-readonly/2026-11-12-closeout/verify_candidate_identity.py`
 从原始字节重新推导（不引用 `cohort/replay-result.json` 的既有结论），26 项检查全部通过。
 据此勾选 1.2 与 2.2；§6 的「任务仍 2/12」是当时计数，现为 4/12。
@@ -181,7 +181,7 @@ advance 仍未取证；V-04 / V-07 / V-09 与 M1 出口仍未整项通过。
 
 不迁移用户数据。回滚恢复原受审来源/锁/指纹并重新构建、重建派生布局，不改原文件、源码、revision 或历史；回滚不算能力通过。正式补丁保留最小维护清单，运行原文留 logs，阶段摘要回填 V-04/V-07/V-09。
 
-**2026-11-12 追加更正（撤销 §35 其四，字体失效分项取得；不改写上文）：** 上文「5.1b 字体失效接受为已知限制／因 `BUNDLED_FONTS` 为空不可触发／需渲染路径改动」与「正文平滑 A/B 为负结果」的表述已被[决定 §36](../../../docs/decisions.md#36-2026-11-12-m1-生产来源准入本地-vendor--守卫扩展) 同日的后续裁决撤销，历史记录保留、不改写。新增验证专用入口 `crates/aline-ui/src/native_window/font_invalidate.rs`：仅当 `ALINE_M1_FONT_INVALIDATE_FAMILY` 与 `ALINE_M1_FONT_INVALIDATE_MARK` 同时设置时生效（`cmd-alt-i` 也只在此时绑定），走既有 `FontEnvironment::activate`——代次 0→1 → 布局缓存键变化 → 重测；真实窗口 baseline 不写标记，触发组标记 `family=Menlo status=active outcome=activated before=0 after=1`，一级标题由单行变两行（`ink_sum` 10,729,803 → 9,277,343）。**字体失效分项已取得**，与 `tasks.md` 5.1b 的 2026-11-12 撤销记录一致；**5.1b 仍未勾选**：本项要求同一轮完成「新断点两侧点击 + 两视图往返 + 换宽 + 字体失效 + 源码锚点恢复」，其余分项在 run-6、字体失效在 2026-11-12，不同轮，是否据此勾选留待裁决。入口只证明验证链，不发布运行中字体切换。平滑侧旧负结果的归因亦已更正（argv 参数域 vs CGContext `allowsFontSmoothing`），真实窗口 A/B 取得墨迹 +9.75%，属 `m1-cjk-typography-font-evidence` 2.1c/2.2b 的证据，2.1c/2.2b 仍未勾选。证据 `logs/validation/m1-single-window-readonly/2026-11-12-font-invalidation/` 与 `.../2026-11-12-smoothing-ab/`。同段「5.2d 不另安排定向复审」亦不再适用：已安排独立定向复审（`logs/validation/m1-single-window-readonly/2026-11-12-5_2d/`），结论 pass-with-findings，重要 finding 未清零，5.2d 保持未勾。
+**2026-11-12 追加更正（撤销 §35 其四，字体失效分项取得；不改写上文）：** 上文「5.1b 字体失效接受为已知限制／因 `BUNDLED_FONTS` 为空不可触发／需渲染路径改动」与「正文平滑 A/B 为负结果」的表述已被[决定 §36](../../../../docs/decisions.md#36-2026-11-12-m1-生产来源准入本地-vendor--守卫扩展) 同日的后续裁决撤销，历史记录保留、不改写。新增验证专用入口 `crates/aline-ui/src/native_window/font_invalidate.rs`：仅当 `ALINE_M1_FONT_INVALIDATE_FAMILY` 与 `ALINE_M1_FONT_INVALIDATE_MARK` 同时设置时生效（`cmd-alt-i` 也只在此时绑定），走既有 `FontEnvironment::activate`——代次 0→1 → 布局缓存键变化 → 重测；真实窗口 baseline 不写标记，触发组标记 `family=Menlo status=active outcome=activated before=0 after=1`，一级标题由单行变两行（`ink_sum` 10,729,803 → 9,277,343）。**字体失效分项已取得**，与 `tasks.md` 5.1b 的 2026-11-12 撤销记录一致；**5.1b 仍未勾选**：本项要求同一轮完成「新断点两侧点击 + 两视图往返 + 换宽 + 字体失效 + 源码锚点恢复」，其余分项在 run-6、字体失效在 2026-11-12，不同轮，是否据此勾选留待裁决。入口只证明验证链，不发布运行中字体切换。平滑侧旧负结果的归因亦已更正（argv 参数域 vs CGContext `allowsFontSmoothing`），真实窗口 A/B 取得墨迹 +9.75%，属 `m1-cjk-typography-font-evidence` 2.1c/2.2b 的证据，2.1c/2.2b 仍未勾选。证据 `logs/validation/m1-single-window-readonly/2026-11-12-font-invalidation/` 与 `.../2026-11-12-smoothing-ab/`。同段「5.2d 不另安排定向复审」亦不再适用：已安排独立定向复审（`logs/validation/m1-single-window-readonly/2026-11-12-5_2d/`），结论 pass-with-findings，重要 finding 未清零，5.2d 保持未勾。
 
 **2026-11-12 后续裁决（决定 §37，不改写上条）：** F1（高）经用户明确接受为已知边界，F2/F3（中）保留未修，vendor 字节与策略资产零变更；按复审员 A「F1 修复或用户明确接受」的处置口径，5.2d 已勾选、5.2 伞项成立，**不写成 F1 已修复或已清零**。字体失效证据已按修正后的 baseline 重跑（对照组同样发送 `cmd-alt-i`，不写标记且墨迹前后相同；触发组代次 0→1），见 `logs/validation/m1-single-window-readonly/2026-11-12-font-invalidation/report.md` 与 `runs/run-3/`。5.1b 仍未勾选。
 

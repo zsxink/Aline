@@ -4,7 +4,7 @@
 
 更新日期：2026-10-29
 
-状态：**RS-01～RS-05 与 ED-01 已由用户确认采用方案 A 并完成回写，当前无待确认问题。仓库已建立 8 成员 Cargo workspace 和 lint 配置，M0 工程守卫已有脚本及 self-test 证据；`.github/workflows/m0.yml` 已配置，但远端实际运行状态未核实。V-01～V-09 与 M0 总体出口仍未完成；具体进度见[当前 M0 状态](v1-validation-plan.md#当前-m0-状态与复跑入口)。**
+状态：**RS-01～RS-05 与 ED-01 已由用户确认采用方案 A 并完成回写，当前无待确认问题。仓库已建立 8 成员 Cargo workspace 和 lint 配置，M0 工程守卫已有脚本及 self-test 证据；`.github/workflows/m0.yml` 已配置，但远端实际运行状态未核实。V-01～V-09 与 M0 总体出口仍未完成；具体进度见[验证计划的 M1 分项状态与复跑入口](v1-validation-plan.md#m1-分项状态与复跑入口)。**
 
 基线：[AGENTS.md](../AGENTS.md) · [PRD 0.9](./v1-prd.md) · [架构指引 0.8](./v1-architecture.md) · [引擎指引 0.2](./engine-design.md) · [架构规范 0.4](./architecture-guide.md) · [验证计划](./v1-validation-plan.md)
 

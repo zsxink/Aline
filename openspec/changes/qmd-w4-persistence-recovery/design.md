@@ -4,7 +4,7 @@
 
 动机见 proposal。当前 source `prepare_atomic` 准备同目录 staging，`publish_new` 仅用 hard link 发布不存在目标；既有目标替换、权限/目录同步与保存点未接。DocCore 有当前快照、组合期发布等待及恢复读取，但没有文件协调器。调查依据为源码 `crates/aline-source/src/atomic.rs`、`crates/aline-ui/src/document/doc_core.rs` 与 V-08，不能把它们描述成已完成保存。
 
-M1 出口与 M2 可编辑会话是生产接线前置；当前可准备本方案、故障输入和纯规则。依据架构 §7.1/7.3/7.4/13、引擎 §8/17、R-15-01～13、CODE_STANDARDS §2～6。W5 负责原生平台组合结束接线，W4 消费同一发布协议，不复制组合状态机。
+M1 出口已于 2026-11-13 按[决定 §43](../../../docs/decisions.md#43-2026-11-13-m1-阶段出口裁决macos-arm64-范围)在 macOS arm64 范围收口；M2 可编辑会话仍是生产接线前置，当前可准备本方案、故障输入和纯规则。依据架构 §7.1/7.3/7.4/13、引擎 §8/17、R-15-01～13、CODE_STANDARDS §2～6。W5 负责原生平台组合结束接线，W4 消费同一发布协议，不复制组合状态机。
 
 ## Goals / Non-Goals
 
