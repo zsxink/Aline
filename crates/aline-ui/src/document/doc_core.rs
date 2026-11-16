@@ -24,7 +24,7 @@ use crate::document::identity::{
     DerivedRequestId, DocumentId, DraftGeneration, IdentityError, InputIdentity,
     ParseConfigGeneration, WorkingVersion,
 };
-use crate::document::open_block::{DraftSlot, OpenBlock, TypingGroup};
+use crate::document::open_block::{DraftSlot, InputTarget, OpenBlock, TypingGroup};
 use crate::document::publication::{
     PublicationKind, PublicationOutcome, PublicationResult, WaitHandle, WaitState, WaitStatus,
     WaitView,
@@ -93,6 +93,12 @@ pub enum DocError {
     NoOpenBlock,
     /// 已有打开块，不能重复打开。
     BlockAlreadyOpen,
+    /// 当前模式无法打开可视化块。
+    RequiresVisual,
+    /// 解析中没有这个可编辑块。
+    InvalidVisualBlock,
+    /// 普通输入目标超出当前块，不可覆盖块尾分隔字节或其他块。
+    OutsideOpenBlock,
     /// 打开块基线与当前已提交代次不符；草稿与选区保留。
     DraftBaselineConflict,
     /// 组合候选活动时不允许该操作。
@@ -169,6 +175,26 @@ impl DocCore {
         selection: SelectionSpec,
         limits: DocLimits,
     ) -> Result<Self, DocError> {
+        let mut doc = Self::new_editable(text, selection, limits)?;
+        doc.open_block(selection.range(), selection)?;
+        Ok(doc)
+    }
+
+    /// 建立一个无草稿的可编辑文档。宿主注入预算并在取得当前解析后打开块。
+    pub fn new_editable(
+        text: impl Into<String>,
+        selection: SelectionSpec,
+        limits: DocLimits,
+    ) -> Result<Self, DocError> {
+        Self::with_access(text, selection, limits, readonly::DocumentAccess::Editing)
+    }
+
+    fn with_access(
+        text: impl Into<String>,
+        selection: SelectionSpec,
+        limits: DocLimits,
+        access: readonly::DocumentAccess,
+    ) -> Result<Self, DocError> {
         let buffer = StringBuffer::new(
             text.into(),
             selection,
@@ -177,21 +203,11 @@ impl DocCore {
             limits.history,
         )
         .map_err(DocError::Buffer)?;
-        let range = selection.range();
-        let fragment = slice_buffer(&buffer, range.clone(), limits.text)?;
-        let block = OpenBlock {
-            baseline_revision: buffer.revision(),
-            range,
-            baseline_fragment: fragment,
-            selection,
-            draft: DraftSlot::Empty,
-            undone_typing: None,
-        };
         Ok(Self {
             document: DocumentId::new(),
             version: WorkingVersion::new(buffer.revision(), DraftGeneration::initial()),
             buffer,
-            open: Some(block),
+            open: None,
             wait: None,
             next_wait_id: INITIAL_WAIT_ID,
             limits,
@@ -200,7 +216,7 @@ impl DocCore {
             parse_config: ParseConfigGeneration::initial(),
             derived_request: DerivedRequestId::initial(),
             mode: EditorMode::Visual,
-            access: readonly::DocumentAccess::Editing,
+            access,
             alive: true,
         })
     }
@@ -315,19 +331,29 @@ impl DocCore {
         range: Range<usize>,
         selection: SelectionSpec,
     ) -> Result<(), DocError> {
+        self.open_input_target(InputTarget::Legacy, range, selection)
+    }
+
+    fn open_input_target(
+        &mut self,
+        target: InputTarget,
+        range: Range<usize>,
+        selection: SelectionSpec,
+    ) -> Result<(), DocError> {
         self.ensure_writable()?;
         if self.open.is_some() {
             return Err(DocError::BlockAlreadyOpen);
         }
         let base = self.buffer.snapshot();
         base.src_range(range.clone()).map_err(DocError::Buffer)?;
-        base.src_offset(selection.anchor())
-            .map_err(DocError::Buffer)?;
-        base.src_offset(selection.head())
-            .map_err(DocError::Buffer)?;
+        let bound = bind_selection(base, selection)?;
         let fragment = slice_buffer(&self.buffer, range.clone(), self.limits.text)?;
+        self.buffer
+            .set_selection(&bound)
+            .map_err(DocError::Buffer)?;
         self.open = Some(OpenBlock {
             baseline_revision: self.buffer.revision(),
+            target,
             range,
             baseline_fragment: fragment,
             selection,
@@ -348,12 +374,17 @@ impl DocCore {
         }
         let block = self.open.as_ref().ok_or(DocError::NoOpenBlock)?;
         self.validate_selection(block, selection)?;
+        if matches!(block.draft, DraftSlot::Empty) {
+            let bound = bind_selection(self.buffer.snapshot(), selection)?;
+            self.buffer
+                .set_selection(&bound)
+                .map_err(DocError::Buffer)?;
+        }
         let block = self.open.as_mut().ok_or(DocError::NoOpenBlock)?;
         block.selection = selection;
         if matches!(block.draft, DraftSlot::Empty) {
             block.range = selection.range();
         }
-        self.snapshot_cache = None;
         Ok(())
     }
 
@@ -371,6 +402,7 @@ impl DocCore {
         }
         let block = self.open.as_ref().ok_or(DocError::NoOpenBlock)?;
         self.validate_position(block, at)?;
+        self.check_open_edit_range(&(at..at))?;
         let continuous = match block.typing() {
             Some(group) => {
                 let end = group
@@ -392,7 +424,7 @@ impl DocCore {
         if continuous {
             self.append_to_group(at, text, now_millis)
         } else {
-            self.start_group(at, text, now_millis)
+            self.start_group(SelectionSpec::new(at, at), text, now_millis)
         }
     }
 
@@ -436,7 +468,14 @@ impl DocCore {
             && cache.version == self.version
         {
             check_len(cache.snapshot.len_bytes(), text_budget)?;
-            return Ok(cache.snapshot.clone());
+            let selection = bind_selection(cache.snapshot.text(), self.current_selection())?;
+            return Ok(CurrentSnapshot::new(
+                self.document.clone(),
+                self.version,
+                cache.snapshot.text().clone(),
+                selection,
+                self.resources.clone(),
+            ));
         }
         let snapshot = self.build_current_snapshot(text_budget)?;
         if has_draft {
@@ -497,6 +536,7 @@ impl DocCore {
             (before_selection, after_selection),
             OperationSource::ImeCommit,
             now_millis,
+            None,
         )?;
         match outcome {
             ApplyOutcome::Changed(applied) => {
@@ -633,19 +673,20 @@ impl DocCore {
         self.validate_result_identity(identity)
     }
 
-    fn validate_result_identity(&mut self, identity: &InputIdentity) -> Result<(), DocError> {
-        let snapshot = self.current_snapshot(self.limits.text)?;
+    fn validate_result_identity(&self, identity: &InputIdentity) -> Result<(), DocError> {
+        if identity.document_id() != &self.document {
+            return Err(DocError::WrongDocument);
+        }
         let current = InputIdentity::for_request(
             self.document.clone(),
             self.version,
-            snapshot.text(),
+            self.cached_current_text()?,
             self.parse_config,
             self.derived_request,
         )
         .map_err(DocError::Identity)?;
         match identity.validate(&current) {
             Ok(()) => Ok(()),
-            Err(IdentityError::WrongDocument) => Err(DocError::WrongDocument),
             Err(
                 IdentityError::StaleWorkingVersion
                 | IdentityError::StaleSnapshot
@@ -653,6 +694,29 @@ impl DocCore {
                 | IdentityError::StaleRequest,
             ) => Err(DocError::StaleResult),
             Err(error) => Err(DocError::Identity(error)),
+        }
+    }
+
+    fn cached_current_text(&self) -> Result<&TextSnapshot, DocError> {
+        if self.open.is_some() {
+            self.ensure_ready()?;
+        }
+        if self
+            .open
+            .as_ref()
+            .and_then(OpenBlock::current_draft)
+            .is_some()
+        {
+            // 草稿身份只能由工作快照发放；拒收时不能为新草稿生成快照或改缓存。
+            Ok(self
+                .snapshot_cache
+                .as_ref()
+                .filter(|cache| cache.version == self.version)
+                .ok_or(DocError::StaleResult)?
+                .snapshot
+                .text())
+        } else {
+            Ok(self.buffer.snapshot())
         }
     }
 
@@ -871,19 +935,19 @@ impl DocCore {
 
     fn append_to_group(&mut self, at: usize, text: &str, now_millis: u64) -> Result<(), DocError> {
         let next_version = self.version.next_draft().map_err(DocError::Identity)?;
-        let (start, draft_len, old_draft) = {
-            let group = self
-                .open
-                .as_ref()
-                .and_then(OpenBlock::typing)
-                .ok_or(DocError::NoOpenBlock)?;
-            (group.range.start, group.draft.len(), group.draft.clone())
-        };
+        let group = self
+            .open
+            .as_ref()
+            .and_then(OpenBlock::typing)
+            .ok_or(DocError::NoOpenBlock)?;
+        let (start, removed_len, draft_len) =
+            (group.range.start, group.range.len(), group.draft.len());
         let new_draft_len = draft_len.checked_add(text.len()).ok_or_else(overflow)?;
         let total = self
             .buffer
             .len_bytes()
-            .checked_add(new_draft_len)
+            .checked_sub(removed_len)
+            .and_then(|value| value.checked_add(new_draft_len))
             .ok_or_else(overflow)?;
         check_len(total, self.limits.text)?;
         let local = at.checked_sub(start).ok_or_else(overflow)?;
@@ -896,7 +960,7 @@ impl DocCore {
         let end = at.checked_add(text.len()).ok_or_else(overflow)?;
         let selection = SelectionSpec::new(end, end);
         let mut draft = try_string(new_draft_len)?;
-        draft.push_str(&old_draft);
+        draft.push_str(&group.draft);
         draft.insert_str(local, text);
         let block = self.open.as_mut().ok_or(DocError::NoOpenBlock)?;
         let group = block.typing_mut().ok_or(DocError::NoOpenBlock)?;
@@ -910,7 +974,13 @@ impl DocCore {
         Ok(())
     }
 
-    fn start_group(&mut self, at: usize, text: &str, now_millis: u64) -> Result<(), DocError> {
+    fn start_group(
+        &mut self,
+        before_selection: SelectionSpec,
+        text: &str,
+        now_millis: u64,
+    ) -> Result<(), DocError> {
+        let range = before_selection.range();
         let has_group = self.open.as_ref().and_then(OpenBlock::typing).is_some();
         let committed_len = {
             let block = self.open.as_ref().ok_or(DocError::NoOpenBlock)?;
@@ -924,55 +994,53 @@ impl DocCore {
                 None => self.buffer.len_bytes(),
             }
         };
-        let total = committed_len.checked_add(text.len()).ok_or_else(overflow)?;
+        let total = committed_len
+            .checked_sub(range.len())
+            .and_then(|value| value.checked_add(text.len()))
+            .ok_or_else(overflow)?;
         check_len(total, self.limits.text)?;
         let next_version = self.version.next_draft().map_err(DocError::Identity)?;
         if has_group {
             next_version.next_draft().map_err(DocError::Identity)?;
         }
         let draft = copy_bounded(text, self.limits.text)?;
-        let end = at.checked_add(text.len()).ok_or_else(overflow)?;
+        let end = range.start.checked_add(text.len()).ok_or_else(overflow)?;
         let selection = SelectionSpec::new(end, end);
         if has_group {
-            self.commit_typing_group(now_millis)?;
+            self.commit_typing_group_for(now_millis, Some(range.clone()))?;
             self.version = self.version.next_draft().map_err(DocError::Identity)?;
-            let revision = self.buffer.revision();
-            let block = self.open.as_mut().ok_or(DocError::NoOpenBlock)?;
-            block.baseline_revision = revision;
-            block.range = at..at;
-            block.baseline_fragment.clear();
-            block.selection = selection;
-            block.draft = DraftSlot::Typing(TypingGroup {
-                range: at..at,
-                draft,
-                before_selection: SelectionSpec::new(at, at),
-                after_selection: selection,
-                last_input_at: now_millis,
-            });
-            block.undone_typing = None;
         } else {
             // 有效的非空输入一旦建立新草稿，即分叉当前编辑历史。
             // 前面的校验和草稿分配均已成功，之后的状态发布不再失败。
-            let block = self.open.as_mut().ok_or(DocError::NoOpenBlock)?;
             self.buffer.discard_redo_branch();
             self.version = next_version;
-            block.range = at..at;
-            block.baseline_fragment.clear();
-            block.selection = selection;
-            block.draft = DraftSlot::Typing(TypingGroup {
-                range: at..at,
-                draft,
-                before_selection: SelectionSpec::new(at, at),
-                after_selection: selection,
-                last_input_at: now_millis,
-            });
-            block.undone_typing = None;
         }
+        let block = self.open.as_mut().ok_or(DocError::NoOpenBlock)?;
+        block.baseline_revision = self.buffer.revision();
+        block.range = range.clone();
+        block.baseline_fragment.clear();
+        block.selection = selection;
+        block.draft = DraftSlot::Typing(TypingGroup {
+            range,
+            draft,
+            before_selection,
+            after_selection: selection,
+            last_input_at: now_millis,
+        });
+        block.undone_typing = None;
         self.snapshot_cache = None;
         Ok(())
     }
 
     fn commit_typing_group(&mut self, now_millis: u64) -> Result<CommitOutcome, DocError> {
+        self.commit_typing_group_for(now_millis, None)
+    }
+
+    fn commit_typing_group_for(
+        &mut self,
+        now_millis: u64,
+        next_target: Option<Range<usize>>,
+    ) -> Result<CommitOutcome, DocError> {
         let (range, draft, before_selection, after_selection) = {
             let block = self.open.as_ref().ok_or(DocError::NoOpenBlock)?;
             let Some(group) = block.typing() else {
@@ -988,33 +1056,46 @@ impl DocCore {
         if draft.is_empty() {
             return Ok(CommitOutcome::Unchanged);
         }
-        self.version.next_draft().map_err(DocError::Identity)?;
+        let next_version = self.version.next_draft().map_err(DocError::Identity)?;
         let outcome = self.publish_input(
             range,
             draft,
             (before_selection, after_selection),
             OperationSource::Typing,
             now_millis,
+            next_target,
         )?;
-        let ApplyOutcome::Changed(applied) = outcome else {
-            return Err(DocError::Buffer(BufferError::InvalidBacking));
+        let committed = match outcome {
+            ApplyOutcome::Changed(applied) => {
+                let revision = applied.revision();
+                self.buffer.seal_pending();
+                self.version = self
+                    .version
+                    .after_commit(revision)
+                    .map_err(DocError::Identity)?;
+                CommitOutcome::Committed { revision }
+            }
+            ApplyOutcome::Unchanged => {
+                // 替换后继续输入可能回到原字节；结束草稿但不制造历史。
+                let selection = bind_selection(self.buffer.snapshot(), after_selection)?;
+                self.buffer
+                    .set_selection(&selection)
+                    .map_err(DocError::Buffer)?;
+                self.version = next_version;
+                CommitOutcome::Unchanged
+            }
         };
-        let revision = applied.revision();
-        self.buffer.seal_pending();
-        self.version = self
-            .version
-            .after_commit(revision)
-            .map_err(DocError::Identity)?;
-        let block = self.open.as_mut().ok_or(DocError::NoOpenBlock)?;
-        let head = after_selection.head();
-        block.baseline_revision = revision;
-        block.range = head..head;
-        block.baseline_fragment.clear();
-        block.selection = after_selection;
-        block.draft = DraftSlot::Empty;
-        block.undone_typing = None;
+        if let Some(block) = self.open.as_mut() {
+            let head = after_selection.head();
+            block.baseline_revision = self.buffer.revision();
+            block.range = head..head;
+            block.baseline_fragment.clear();
+            block.selection = after_selection;
+            block.draft = DraftSlot::Empty;
+            block.undone_typing = None;
+        }
         self.snapshot_cache = None;
-        Ok(CommitOutcome::Committed { revision })
+        Ok(committed)
     }
 
     fn close_block(&mut self, now_millis: u64) -> Result<(), DocError> {
@@ -1048,6 +1129,7 @@ impl DocCore {
             (base, block.selection)
         };
         let range = selection.range();
+        self.check_open_edit_range(&range)?;
         let range_len = range.end.checked_sub(range.start).ok_or_else(overflow)?;
         let without_range = logical_base.checked_sub(range_len).ok_or_else(overflow)?;
         let total = without_range
@@ -1055,32 +1137,31 @@ impl DocCore {
             .ok_or_else(overflow)?;
         check_len(total, self.limits.text)?;
         let candidate = copy_bounded(candidate, self.limits.text)?;
+        let after = range
+            .start
+            .checked_add(candidate.len())
+            .ok_or_else(overflow)?;
+        let after_selection = SelectionSpec::new(after, after);
+        let current = self.build_current_snapshot(self.limits.text)?;
+        let src_range = current
+            .text()
+            .src_range(range.clone())
+            .map_err(DocError::Buffer)?;
+        let fragment = current
+            .text()
+            .slice(&src_range, self.limits.text)
+            .map_err(DocError::Buffer)?
+            .into_owned();
         if has_group {
             self.version
                 .next_draft()
                 .map_err(DocError::Identity)?
                 .next_draft()
                 .map_err(DocError::Identity)?;
-            self.commit_typing_group(now_millis)?;
+            self.commit_typing_group_for(now_millis, Some(range.clone()))?;
         } else {
             self.version.next_draft().map_err(DocError::Identity)?;
         }
-        let src_range = self
-            .buffer
-            .snapshot()
-            .src_range(range.clone())
-            .map_err(DocError::Buffer)?;
-        let fragment = self
-            .buffer
-            .snapshot()
-            .slice(&src_range, self.limits.text)
-            .map_err(DocError::Buffer)?
-            .into_owned();
-        let after = range
-            .start
-            .checked_add(candidate.len())
-            .ok_or_else(overflow)?;
-        let after_selection = SelectionSpec::new(after, after);
         let next_version = self.version.next_draft().map_err(DocError::Identity)?;
         let block = self.open.as_mut().ok_or(DocError::NoOpenBlock)?;
         block.baseline_revision = self.buffer.revision();
@@ -1110,6 +1191,9 @@ impl DocCore {
                 .ok_or(DocError::NoComposition)?;
             state.range.clone()
         };
+        if let Some(target) = self.open.as_ref().and_then(OpenBlock::visual_input) {
+            target.check_permissions(&range, |protected| Ok(protected.clone()))?;
+        }
         let without_range = self
             .buffer
             .len_bytes()
@@ -1166,6 +1250,17 @@ impl DocCore {
     }
 
     fn sync_block_after_buffer_change(&mut self) {
+        // 命令/历史可跨块修改。下次就地编辑必须使用该版本的新解析。
+        if self
+            .open
+            .as_ref()
+            .and_then(OpenBlock::visual_extent)
+            .is_some()
+        {
+            self.open = None;
+            self.wait = None;
+            return;
+        }
         let selection = self.buffer_selection();
         if let Some(block) = self.open.as_mut() {
             let head = selection.head();
@@ -1290,6 +1385,7 @@ fn selection_of(selection: &aline_buffer::SrcSelection) -> SelectionSpec {
 }
 
 mod checked_commit;
+mod editing;
 mod protocols;
 mod readonly;
 

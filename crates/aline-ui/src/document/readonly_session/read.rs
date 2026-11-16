@@ -181,9 +181,12 @@ impl ReadonlyOpenJob {
             .try_reserve_exact(baseline.source().len())
             .map_err(OpenError::Allocation)?;
         source.push_str(baseline.source());
-        let mut core =
+        let mut core = if self.limits.editable {
+            DocCore::new_editable(source, SelectionSpec::new(0, 0), self.limits.document)
+        } else {
             DocCore::new_readonly(source, SelectionSpec::new(0, 0), self.limits.document)
-                .map_err(OpenError::Document)?;
+        }
+        .map_err(OpenError::Document)?;
         let snapshot = core
             .current_snapshot(self.limits.document.text())
             .map_err(OpenError::Document)?;
@@ -219,6 +222,8 @@ impl ReadonlyOpenJob {
                 baseline,
                 core,
                 parsed,
+                editable: self.limits.editable,
+                limits: self.limits.document,
             },
             timings,
         ))

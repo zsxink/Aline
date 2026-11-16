@@ -3,12 +3,9 @@
 //! 本模块消费当前源码/身份，提供不开块构造、受检导航、模式与关闭边界。
 //! 不调度任务、不写磁盘，也不把文档存活等同于编辑块存活。
 
-use super::{DocCore, DocError, DocLimits, INITIAL_WAIT_ID};
-use crate::document::{
-    DerivedRequestId, DocumentId, DraftGeneration, EditorMode, InputIdentity,
-    ParseConfigGeneration, WorkingVersion,
-};
-use aline_buffer::{SelectionSpec, SrcSelection, StringBuffer};
+use super::{DocCore, DocError, DocLimits};
+use crate::document::InputIdentity;
+use aline_buffer::{SelectionSpec, SrcSelection};
 use std::sync::Arc;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -26,30 +23,7 @@ impl DocCore {
         selection: SelectionSpec,
         limits: DocLimits,
     ) -> Result<Self, DocError> {
-        let buffer = StringBuffer::new(
-            text.into(),
-            selection,
-            limits.text,
-            limits.index,
-            limits.history,
-        )
-        .map_err(DocError::Buffer)?;
-        Ok(Self {
-            document: DocumentId::new(),
-            version: WorkingVersion::new(buffer.revision(), DraftGeneration::initial()),
-            buffer,
-            open: None,
-            wait: None,
-            next_wait_id: INITIAL_WAIT_ID,
-            limits,
-            snapshot_cache: None,
-            resources: Arc::from([]),
-            parse_config: ParseConfigGeneration::initial(),
-            derived_request: DerivedRequestId::initial(),
-            mode: EditorMode::Visual,
-            access: DocumentAccess::Readonly,
-            alive: true,
-        })
+        Self::with_access(text, selection, limits, DocumentAccess::Readonly)
     }
 
     /// 判断文档是否具有只读阶段能力；不由有无编辑块推导。
@@ -142,7 +116,7 @@ impl DocCore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::document::IdentityError;
+    use crate::document::{DerivedRequestId, EditorMode, IdentityError, WorkingVersion};
     use aline_buffer::{HistoryBudget, LineIndexBudget, TextBudget};
 
     fn fixture() -> Result<DocCore, DocError> {

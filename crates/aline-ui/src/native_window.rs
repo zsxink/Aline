@@ -71,7 +71,7 @@ const BUNDLED_FONTS: &[(&str, &[u8])] = &[];
 /// M1 实验预算沿用现有 16 MiB 解析输入上限；不是发布限额。
 const MAX_DOCUMENT_BYTES: usize = 16 * 1024 * 1024;
 
-/// M1 实验预算沿用现有 16 MiB 解析输入上限；不是发布限额。
+/// M1 原生阅读窗口预算；可编辑打开与历史预算仍由 M2 接线单独启用。
 pub(super) fn open_limits() -> ReadonlyOpenLimits {
     ReadonlyOpenLimits::new(
         StorageBudget::new(MAX_DOCUMENT_BYTES),
@@ -883,12 +883,31 @@ impl NativeDocumentWindow {
             }
             debug_assert_eq!(hit.is_edge_candidate(), expected_edge);
             let start = hit.source_range().byte_range().start;
-            if let Some(NavigationIntent::Jump { target }) =
-                navigation_intent(document.parsed(), start)
-                && reader.scroll_to_source(document, target.start).is_ok()
-                && let Some(evidence) = &self.evidence
-            {
-                evidence.borrow_mut().event("jump");
+            match navigation_intent(document.parsed(), start) {
+                Some(NavigationIntent::Jump { target }) => {
+                    if reader.scroll_to_source(document, target.start).is_ok()
+                        && let Some(evidence) = &self.evidence
+                    {
+                        evidence.borrow_mut().event("jump");
+                    }
+                }
+                _ if document.is_editable() => {
+                    let current_selection = document.core().current_selection();
+                    let mapped = (|| {
+                        let snapshot = document.parsed().snapshot();
+                        aline_buffer::SrcSelection::new(
+                            snapshot.src_offset(current_selection.anchor())?,
+                            snapshot.src_offset(current_selection.head())?,
+                        )
+                    })();
+                    if let Ok(selection) = mapped
+                        && let Ok(identity) = document.input_identity()
+                        && document.open_visual_at(&identity, &selection).is_ok()
+                    {
+                        cx.notify();
+                    }
+                }
+                _ => {}
             }
             debug_assert!(match hit.precision() {
                 aline_markdown::MappingPrecision::Exact

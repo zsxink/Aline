@@ -2,6 +2,7 @@
 //!
 //! 所有状态继续由父模块 DocCore 持有；本模块不引入副本、调度或文件协调器。
 use super::{DocCore, DocError};
+use crate::document::open_block::InputTarget;
 use crate::document::{
     CurrentSnapshot, DerivedRequestId, EditorMode, InputIdentity, ModeSwitchOutcome,
     ParseConfigGeneration, ResourceReference,
@@ -112,7 +113,7 @@ impl DocCore {
         now_millis: u64,
     ) -> Result<ModeSwitchOutcome, DocError> {
         self.ensure_document_alive()?;
-        if !self.is_readonly() {
+        if self.open.is_some() {
             self.ensure_ready()?;
         }
         if self.is_composition_active() {
@@ -123,8 +124,14 @@ impl DocCore {
         }
         // 即使源码不变，模式变化也使先前请求失效；失败不得先改变输入历史。
         let next_request = self.derived_request.next().map_err(DocError::Identity)?;
-        if !self.is_readonly() {
+        if let Some(block) = &self.open {
+            let leave_editor = block.target != InputTarget::Legacy;
             self.commit_typing_group(now_millis)?;
+            if leave_editor {
+                self.open = None;
+                self.wait = None;
+                self.snapshot_cache = None;
+            }
         }
         self.derived_request = next_request;
         self.mode = mode;

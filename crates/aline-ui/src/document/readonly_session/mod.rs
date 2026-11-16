@@ -1,4 +1,4 @@
-//! 单窗口只读打开生命周期；唯一持有 Ready 文档与至多一个打开请求。
+//! 单窗口文档打开生命周期；唯一持有 Ready 文档与至多一个打开请求。
 //!
 //! 输入为文件选择结果和后台完成候选，输出为当前只读文档与明确结算结果。
 //! 请求资格在候选发布前复验；失败/取消保留原文档。本模块不调度线程、不写盘。
@@ -19,13 +19,14 @@ mod timing;
 pub use read::{ReadonlyFileAccess, ReadonlyFileInput};
 pub(crate) use timing::{StageTimer, StageTiming};
 
-/// 只读打开输入、文档与解析的显式注入预算。
+/// 打开输入、文档与解析的显式注入预算；默认只读，可为 M2 选择可编辑访问。
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ReadonlyOpenLimits {
     storage: StorageBudget,
     document: DocLimits,
     config: ParseConfig,
     parse: ParseBudget,
+    editable: bool,
 }
 
 impl ReadonlyOpenLimits {
@@ -41,7 +42,14 @@ impl ReadonlyOpenLimits {
             document,
             config,
             parse,
+            editable: false,
         }
+    }
+
+    /// 将此组打开预算用于 M2 可编辑文档；历史预算仍由宿主显式注入。
+    pub const fn with_editing(mut self) -> Self {
+        self.editable = true;
+        self
     }
 }
 
@@ -139,6 +147,8 @@ pub struct ReadonlyDocument {
     baseline: SourceBaseline,
     core: DocCore,
     parsed: Parsed,
+    editable: bool,
+    limits: DocLimits,
 }
 impl ReadonlyDocument {
     /// 返回用户选择的文件路径，供标题等显式 UI 使用。
@@ -149,11 +159,19 @@ impl ReadonlyDocument {
     pub fn baseline(&self) -> &SourceBaseline {
         &self.baseline
     }
-    /// 借用唯一只读文档核心。
+    /// 借用唯一文档核心；其访问策略由打开预算决定。
     pub fn core(&self) -> &DocCore {
         &self.core
     }
-    /// 冻结当前阅读输入身份；不开放配置、编辑或核心关闭能力。
+    /// 返回该打开请求是否采用可编辑访问策略。
+    pub const fn is_editable(&self) -> bool {
+        self.editable
+    }
+    /// 冻结当前文档快照，使用本次打开时注入的文本预算。
+    pub fn current_snapshot(&mut self) -> Result<super::CurrentSnapshot, DocError> {
+        self.core.current_snapshot(self.limits.text())
+    }
+    /// 冻结当前文档输入身份，供布局与派生结果受检消费。
     pub fn input_identity(&mut self) -> Result<InputIdentity, DocError> {
         self.core.current_input_identity()
     }
@@ -163,9 +181,96 @@ impl ReadonlyDocument {
         identity: &InputIdentity,
         selection: &SrcSelection,
     ) -> Result<(), DocError> {
-        self.core.navigate_readonly(identity, selection)
+        if !self.editable {
+            return self.core.navigate_readonly(identity, selection);
+        }
+        let observed_identity = self.core.current_input_identity()?;
+        if &observed_identity != identity {
+            return Err(DocError::StaleResult);
+        }
+        let current = self.core.current_snapshot(self.limits.text())?;
+        if current.text().id() != self.parsed.snapshot().id() {
+            return Err(DocError::StaleResult);
+        }
+        current
+            .text()
+            .validate_selection(selection)
+            .map_err(DocError::Buffer)?;
+
+        if self.core.mode() == EditorMode::Visual
+            && let Some(open) = self.core.visual_block_range(&current)?
+        {
+            let extent = open.byte_range();
+            let selected = selection.range().byte_range();
+            if extent.start > selected.start || selected.end > extent.end {
+                // 仅当解析仍对应当前快照时才会到这里；块内待定草稿会在上方过期拒绝。
+                self.core.leave_block(0)?;
+                let current_identity = self.core.current_input_identity()?;
+                return self.core.select(&current_identity, selection);
+            }
+        }
+        self.core.select(identity, selection)
     }
-    /// 在两种只读视图间切换，不改变源码、历史或文档存活状态。
+
+    /// 将一次普通可视化点击升级为块编辑；目录/脚注导航继续只移动选区。
+    pub fn open_visual_at(
+        &mut self,
+        identity: &InputIdentity,
+        selection: &SrcSelection,
+    ) -> Result<bool, DocError> {
+        if !self.editable || self.core.mode() != EditorMode::Visual {
+            return Ok(false);
+        }
+        let observed_identity = self.core.current_input_identity()?;
+        if &observed_identity != identity {
+            return Err(DocError::StaleResult);
+        }
+        let current = self.core.current_snapshot(self.limits.text())?;
+        if current.text().id() != self.parsed.snapshot().id() {
+            return Err(DocError::StaleResult);
+        }
+        current
+            .text()
+            .validate_selection(selection)
+            .map_err(DocError::Buffer)?;
+        let selected = selection.range().byte_range();
+        let mut matching = self.parsed.blocks().iter().filter(|block| {
+            let extent = block.range().byte_range();
+            extent.start <= selected.start && selected.end <= extent.end
+        });
+        let first = matching.next();
+        let Some(block) = first.filter(|_| matching.next().is_none()) else {
+            if self.core.has_open_block() {
+                self.core.leave_block(0)?;
+            }
+            return Ok(false);
+        };
+        let protected = self.parsed.protected_ranges().iter().any(|range| {
+            let protected = range.range().byte_range();
+            selected.start <= protected.end && protected.start <= selected.end
+        });
+        if protected {
+            if self.core.has_open_block() {
+                self.core.leave_block(0)?;
+            }
+            return Ok(false);
+        }
+
+        if let Some(open) = self.core.visual_block_range(&current)?
+            && open == *block.range()
+        {
+            self.core.select(identity, selection)?;
+            return Ok(true);
+        }
+        if self.core.has_open_block() {
+            self.core.leave_block(0)?;
+        }
+        let current_identity = self.core.current_input_identity()?;
+        self.core
+            .open_visual_block(&current_identity, &self.parsed, block.range(), selection)?;
+        Ok(true)
+    }
+    /// 在两种视图间切换，不改变文档生命周期。
     pub fn switch_mode(&mut self, mode: EditorMode) -> Result<ModeSwitchOutcome, DocError> {
         self.core.switch_mode(mode, 0)
     }

@@ -243,6 +243,27 @@ mod tests {
         session.accept_open(job.read_with(&Files(bytes)));
         Ok(session)
     }
+    fn editable_session(bytes: &'static [u8]) -> Result<ReadonlySession, Box<dyn Error>> {
+        let max = 1024 * 1024;
+        let limits = ReadonlyOpenLimits::new(
+            StorageBudget::new(max),
+            DocLimits::new(
+                TextBudget::new(max),
+                LineIndexBudget::new(4096),
+                HistoryBudget::new(16, max),
+            ),
+            ParseConfig::m0(),
+            ParseBudget::m0(),
+        )
+        .with_editing();
+        let mut session = ReadonlySession::new(limits);
+        let request = session.request_open()?;
+        let job = session
+            .accept_selection(&request, Some(vec![PathBuf::from("fixture.md")]))?
+            .ok_or("job")?;
+        session.accept_open(job.read_with(&Files(bytes)));
+        Ok(session)
+    }
     fn layout(
         document: &ReadonlyDocument,
         mode: EditorMode,
@@ -302,6 +323,43 @@ mod tests {
         assert_eq!(repeated.precision(), MappingPrecision::Exact);
         assert_eq!(document.core().buffer_selection().head(), 21);
         assert_readonly(document, text, version)
+    }
+
+    #[test]
+    fn mapped_visual_hit_opens_the_current_top_level_block_for_editing()
+    -> Result<(), Box<dyn Error>> {
+        let mut session = editable_session(b"before **target** after\n\nsecond")?;
+        let document = session.document_mut().ok_or("document")?;
+        let expected = document
+            .parsed()
+            .blocks()
+            .first()
+            .ok_or("parsed block")?
+            .range()
+            .byte_range();
+        let cache = layout(document, EditorMode::Visual, 600.0)?;
+        let token = cache.token().ok_or("layout token")?;
+        let target = make_target(document, EditorMode::Visual, 0, token)?;
+        let _outcome = target.navigate(document, Some(token), Ok(8), Affinity::After)?;
+        let logical = document.core().current_selection();
+        let selection = aline_buffer::SrcSelection::new(
+            document.parsed().snapshot().src_offset(logical.anchor())?,
+            document.parsed().snapshot().src_offset(logical.head())?,
+        )?;
+        let identity = document.input_identity()?;
+        assert!(document.open_visual_at(&identity, &selection)?);
+        let current = document.current_snapshot()?;
+        let opened = document
+            .core()
+            .visual_block_range(&current)?
+            .ok_or("visual block")?
+            .byte_range();
+        assert_eq!(opened, expected);
+        let head = document.core().current_selection().head();
+        assert!(expected.start <= head && head <= expected.end);
+        assert!(document.core().has_open_block());
+        assert_eq!(document.core().history_node_count(), 0);
+        Ok(())
     }
 
     #[test]
