@@ -74,6 +74,28 @@ pub struct StringBuffer {
     index_budget: LineIndexBudget,
 }
 
+struct PreparedBufferState {
+    snapshot: TextSnapshot,
+    selection: SrcSelection,
+    line_index: LineIndex,
+}
+
+struct PreparedApply {
+    state: PreparedBufferState,
+    step: HistoryStep,
+}
+
+impl PreparedApply {
+    fn applied_batch(&self) -> AppliedBatch {
+        AppliedBatch {
+            inverse: Arc::clone(&self.step.inverse),
+            revision: self.step.after_revision,
+            line_count: self.state.line_index.line_count(),
+            after_selection: self.step.after_selection,
+        }
+    }
+}
+
 impl StringBuffer {
     /// 接管完整文本并建立初始行索引、选区与空历史；所有预算在分配前检查。
     pub fn new(
@@ -157,50 +179,90 @@ impl StringBuffer {
         now_millis: u64,
         text_budget: TextBudget,
     ) -> Result<ApplyOutcome, BufferError> {
-        batch.validate(&self.snapshot)?;
-        let forward = effective_patches(&self.snapshot, batch.patches(), text_budget)?;
-        if forward.is_empty() {
-            return Ok(ApplyOutcome::Unchanged);
-        }
-        let after_text =
-            build_after_text(&self.snapshot, &forward, batch.output_len(), text_budget)?;
-        let inverse = Arc::new(build_inverse_patches(
+        let Some(prepared) = prepare_apply(
             &self.snapshot,
-            &forward,
-            text_budget,
-        )?);
-        let after_index = LineIndex::build(&after_text, self.index_budget)?;
-        let after_revision = self.snapshot.revision().next()?;
-        let before_selection = selection_spec(&self.selection);
-        let before_len = self.snapshot.len_bytes();
-        let after_snapshot =
-            TextSnapshot::from_shared(Arc::new(after_text), after_revision, text_budget)?;
-        let after_selection_bound = bind_selection(&after_snapshot, after_selection)?;
-        let after_len = after_snapshot.len_bytes();
-        let step = HistoryStep {
-            forward: Arc::new(forward),
-            inverse: Arc::clone(&inverse),
-            before_selection,
-            after_selection,
+            batch,
+            (&self.selection, after_selection),
             source,
-            before_revision: self.snapshot.revision(),
-            after_revision,
-            after_id: after_snapshot.id().clone(),
-            before_len,
-            after_len,
+            text_budget,
+            self.index_budget,
+        )?
+        else {
+            return Ok(ApplyOutcome::Unchanged);
         };
-        let plan = self.history.prepare_record(&step, source, now_millis)?;
-        let line_count = after_index.line_count();
-        self.snapshot = after_snapshot;
-        self.selection = after_selection_bound;
-        self.line_index = after_index;
-        self.history.commit_record(plan, step, now_millis);
-        Ok(ApplyOutcome::Changed(AppliedBatch {
-            inverse,
-            revision: after_revision,
-            line_count,
-            after_selection,
-        }))
+        let plan = self
+            .history
+            .prepare_record(&prepared.step, source, now_millis)?;
+        let outcome = prepared.applied_batch();
+        self.install(prepared.state);
+        self.history.commit_record(plan, prepared.step, now_millis);
+        Ok(ApplyOutcome::Changed(outcome))
+    }
+
+    /// 原子发布待定普通输入和一个独立命令，各记录一个已封口历史节点。
+    ///
+    /// 第一批绑定当前快照，选区分别为输入开始前及命令发起时的方向性选区。
+    /// 回调只读取第一批之后的候选快照与选区，返回绑定该快照的命令批次和目标选区。
+    /// 回调仅负责规划，取消或拒绝通过错误返回，且不得产生外部副作用。
+    /// 若输入组净无变化，回调读取原快照和命令发起时的方向性选区，历史仅记录命令。
+    /// 若命令批次无实际补丁或回调返回 `None`，整体无变化。失败保留真实状态。
+    /// 成功结果的逆补丁只对应命令批次，撤销时按实际发布的历史节点数调用 `undo`。
+    pub fn apply_staged_command<E: From<BufferError>>(
+        &mut self,
+        typing: &CheckedBatch,
+        typing_selections: (&SrcSelection, SelectionSpec),
+        now_millis: u64,
+        text_budget: TextBudget,
+        plan_command: impl FnOnce(
+            &TextSnapshot,
+            &SrcSelection,
+        ) -> Result<Option<(CheckedBatch, SelectionSpec)>, E>,
+    ) -> Result<ApplyOutcome, E> {
+        let input = prepare_apply(
+            &self.snapshot,
+            typing,
+            typing_selections,
+            OperationSource::Typing,
+            text_budget,
+            self.index_budget,
+        )?;
+        let unchanged_selection;
+        let (candidate, selection) = match &input {
+            Some(input) => (&input.state.snapshot, &input.state.selection),
+            None => {
+                unchanged_selection = bind_selection(&self.snapshot, typing_selections.1)?;
+                (&self.snapshot, &unchanged_selection)
+            }
+        };
+        let Some((batch, after_selection)) = plan_command(candidate, selection)? else {
+            return Ok(ApplyOutcome::Unchanged);
+        };
+        let Some(command) = prepare_apply(
+            candidate,
+            &batch,
+            (selection, after_selection),
+            OperationSource::Command,
+            text_budget,
+            self.index_budget,
+        )?
+        else {
+            return Ok(ApplyOutcome::Unchanged);
+        };
+        typing.validate(&self.snapshot)?;
+        let outcome = command.applied_batch();
+        self.history.record_staged_command(
+            input.map(|input| input.step),
+            command.step,
+            now_millis,
+        )?;
+        self.install(command.state);
+        Ok(ApplyOutcome::Changed(outcome))
+    }
+
+    fn install(&mut self, prepared: PreparedBufferState) {
+        self.snapshot = prepared.snapshot;
+        self.selection = prepared.selection;
+        self.line_index = prepared.line_index;
     }
 
     /// 撤销最近一个历史节点；恢复该节点首个步骤之前的选区和文本。
@@ -371,6 +433,49 @@ impl StringBuffer {
     }
 }
 
+fn prepare_apply(
+    snapshot: &TextSnapshot,
+    batch: &CheckedBatch,
+    selections: (&SrcSelection, SelectionSpec),
+    source: OperationSource,
+    text_budget: TextBudget,
+    index_budget: LineIndexBudget,
+) -> Result<Option<PreparedApply>, BufferError> {
+    batch.validate(snapshot)?;
+    snapshot.validate_selection(selections.0)?;
+    let forward = effective_patches(snapshot, batch, text_budget)?;
+    if forward.is_empty() {
+        return Ok(None);
+    }
+    let after_text = build_after_text(snapshot, &forward, batch.output_len(), text_budget)?;
+    let inverse = build_inverse_patches(snapshot, &forward, text_budget)?;
+    let line_index = LineIndex::build(&after_text, index_budget)?;
+    let after_revision = snapshot.revision().next()?;
+    let after_snapshot =
+        TextSnapshot::from_shared(Arc::new(after_text), after_revision, text_budget)?;
+    let selection = bind_selection(&after_snapshot, selections.1)?;
+    let step = HistoryStep {
+        forward: Arc::new(forward),
+        inverse: Arc::new(inverse),
+        before_selection: selection_spec(selections.0),
+        after_selection: selections.1,
+        source,
+        before_revision: snapshot.revision(),
+        after_revision,
+        after_id: after_snapshot.id().clone(),
+        before_len: snapshot.len_bytes(),
+        after_len: after_snapshot.len_bytes(),
+    };
+    Ok(Some(PreparedApply {
+        state: PreparedBufferState {
+            snapshot: after_snapshot,
+            selection,
+            line_index,
+        },
+        step,
+    }))
+}
+
 fn selection_spec(selection: &SrcSelection) -> SelectionSpec {
     SelectionSpec::new(
         selection.anchor().byte_offset(),
@@ -390,14 +495,14 @@ fn bind_selection(
 
 fn effective_patches(
     snapshot: &TextSnapshot,
-    patches: &[(Range<usize>, String)],
+    batch: &CheckedBatch,
     budget: TextBudget,
 ) -> Result<Vec<(Range<usize>, String)>, BufferError> {
     let mut effective = Vec::new();
     effective
-        .try_reserve_exact(patches.len())
+        .try_reserve_exact(batch.patches().len())
         .map_err(BufferError::Allocation)?;
-    for (range, replacement) in patches {
+    for (range, replacement) in batch.patches() {
         let unchanged = if range.len() != replacement.len() {
             false
         } else if range.is_empty() {
@@ -407,7 +512,8 @@ fn effective_patches(
             snapshot.slice(&src, budget)?.as_bytes() == replacement.as_bytes()
         };
         if !unchanged {
-            effective.push((range.clone(), replacement.clone()));
+            budget.check(batch.output_len())?;
+            effective.push((range.clone(), copy_patch_text(replacement)?));
         }
     }
     Ok(effective)
@@ -482,7 +588,11 @@ fn build_inverse_patches(
             last_text.push_str(&restored);
             last_range.end = after_end;
         } else {
-            inverse.push((after_start..after_end, restored.into_owned()));
+            let restored = match restored {
+                Cow::Borrowed(text) => copy_patch_text(text)?,
+                Cow::Owned(text) => text,
+            };
+            inverse.push((after_start..after_end, restored));
         }
         removed = removed
             .checked_add(range.len())
@@ -492,6 +602,14 @@ fn build_inverse_patches(
             .ok_or(BufferError::LengthOverflow)?;
     }
     Ok(inverse)
+}
+
+fn copy_patch_text(text: &str) -> Result<String, BufferError> {
+    let mut copy = String::new();
+    copy.try_reserve_exact(text.len())
+        .map_err(BufferError::Allocation)?;
+    copy.push_str(text);
+    Ok(copy)
 }
 
 fn apply_patches_to_text(
