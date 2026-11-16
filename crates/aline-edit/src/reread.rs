@@ -16,6 +16,10 @@ pub(crate) enum RereadContract {
     Source,
     /// 所见替换：可见文本按替换拼接，隐藏语义必须保持。
     Visible,
+    /// 可视化查找以源码范围为准，仍须保留隐藏语义。
+    FindVisual,
+    /// 已打开的可视化块编辑其原始源码，允许普通 Markdown 呈现变化。
+    RawBlock,
     /// 行内格式：可见文本和块结构保持，仅允许成对标记变化。
     Format { marker: &'static str },
 }
@@ -83,6 +87,16 @@ pub(crate) fn verify(
 ) -> Result<(), EditRefusal> {
     match contract {
         RereadContract::Source => Ok(()),
+        RereadContract::RawBlock => reject_raw_fallback(candidate),
+        RereadContract::FindVisual => {
+            reject_raw_fallback(candidate)?;
+            if semantic_hidden(before, budget.text())?
+                != semantic_hidden(&candidate.parsed, budget.text())?
+            {
+                return Err(reread_failure(RereadFailure::HiddenSourceChanged));
+            }
+            Ok(())
+        }
         RereadContract::Visible => {
             let before_hidden = semantic_hidden(before, budget.text())?;
             let after_hidden = semantic_hidden(&candidate.parsed, budget.text())?;
@@ -115,6 +129,18 @@ pub(crate) fn verify(
             Ok(())
         }
     }
+}
+
+fn reject_raw_fallback(candidate: &Candidate) -> Result<(), EditRefusal> {
+    if candidate
+        .parsed
+        .diagnostics()
+        .iter()
+        .any(|diagnostic| diagnostic.kind() == DiagnosticKind::RawFallback)
+    {
+        return Err(reread_failure(RereadFailure::Projection));
+    }
+    Ok(())
 }
 
 fn reread_failure(reason: RereadFailure) -> EditRefusal {

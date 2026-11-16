@@ -10,6 +10,7 @@ use aline_markdown::{ParseConfig, Parsed, ProjectionId};
 use crate::budget::EditBudget;
 use crate::command::{EditCommand, EditContext, EditMode, GroupReason, InlineFormat, SourceEdit};
 use crate::errors::{map_batch_error, map_buffer_error};
+use crate::find::FindIntent;
 use crate::permissions::check_visual_permissions;
 use crate::refusal::{EditRefusal, RereadFailure};
 use crate::reread::{Candidate, RereadContract, build_candidate, verify};
@@ -77,6 +78,7 @@ pub struct ChangePlan {
     pub(crate) contract: RereadContract,
     pub(crate) parse_config: ParseConfig,
     pub(crate) budget: EditBudget,
+    pub(crate) find_intent: Option<FindIntent>,
 }
 
 impl ChangePlan {
@@ -129,6 +131,29 @@ impl ChangePlan {
     pub fn preview(&self) -> &Preview {
         &self.preview
     }
+
+    /// 检查计划属于正确的命令入口和实时查询代次。
+    ///
+    /// 普通命令传入 `None`。查找替换须从查询状态所有者传入当前代次；
+    /// 缺失、过期或将普通命令交给查找入口均拒绝。普通计划不受查询代次影响，
+    /// 计划未绑定查询所有者（代次 `0`）时不要求调用方提供代次。
+    pub fn validate_find_query_generation(&self, current: Option<u64>) -> Result<(), EditRefusal> {
+        let Some(intent) = &self.find_intent else {
+            return Ok(());
+        };
+        let required = (intent.query_generation() != 0).then_some(intent.query_generation());
+        if required != current {
+            return Err(EditRefusal::StaleFindResults);
+        }
+        Ok(())
+    }
+
+    /// 返回查找替换计划绑定的查询代次；普通计划返回 `None`。
+    ///
+    /// 命令入口据此区分普通计划与查找计划，避免互相消费。
+    pub fn find_query_generation(&self) -> Option<u64> {
+        self.find_intent.as_ref().map(FindIntent::query_generation)
+    }
 }
 
 /// 计划期保存的期望片段；校验时会逐条重读核对。
@@ -154,16 +179,22 @@ pub fn plan_change(
         .map_err(map_buffer_error)?;
 
     match command {
-        EditCommand::Replace { edits } => {
-            plan_replace(snapshot, parsed, selection, context, edits, budget)
-        }
+        EditCommand::Replace { edits } => plan_replace(
+            snapshot,
+            parsed,
+            selection,
+            context,
+            edits,
+            budget,
+            ReplaceKind::Direct,
+        ),
         EditCommand::ToggleInlineFormat { range, format } => {
             plan_format(snapshot, parsed, selection, context, range, *format, budget)
         }
     }
 }
 
-fn precheck(context: &EditContext) -> Result<(), EditRefusal> {
+pub(crate) fn precheck(context: &EditContext) -> Result<(), EditRefusal> {
     if context.has_pending_input() {
         return Err(EditRefusal::PendingInput);
     }
@@ -173,7 +204,7 @@ fn precheck(context: &EditContext) -> Result<(), EditRefusal> {
     Ok(())
 }
 
-fn bind_parsed(snapshot: &TextSnapshot, parsed: &Parsed) -> Result<(), EditRefusal> {
+pub(crate) fn bind_parsed(snapshot: &TextSnapshot, parsed: &Parsed) -> Result<(), EditRefusal> {
     if parsed.snapshot().id() != snapshot.id() || parsed.projection().snapshot_id() != snapshot.id()
     {
         return Err(EditRefusal::ProjectionMismatch);
@@ -181,13 +212,22 @@ fn bind_parsed(snapshot: &TextSnapshot, parsed: &Parsed) -> Result<(), EditRefus
     Ok(())
 }
 
-fn plan_replace(
+/// 同一批次规划入口应用的替换语义。
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ReplaceKind {
+    Direct,
+    Find,
+    RawBlock,
+}
+
+pub(crate) fn plan_replace(
     snapshot: &TextSnapshot,
     parsed: &Parsed,
     selection: &SrcSelection,
     context: &EditContext,
     edits: &[SourceEdit],
     budget: EditBudget,
+    kind: ReplaceKind,
 ) -> Result<PlanOutcome, EditRefusal> {
     let mode = context.mode();
     let mut effective = Vec::new();
@@ -222,11 +262,12 @@ fn plan_replace(
         // 不校验命令范围与选区一致。M1 消费者必须由选区派生命令范围，
         // 不得把光标当选区、把命令当范围；`ToggleInlineFormat` 是例外，
         // 额外要求范围等于选区（见 `plan_toggle_format`）。
-        if effective.len() != 1 {
+        if kind != ReplaceKind::Find && effective.len() != 1 {
             return Err(EditRefusal::UnsupportedVisualBatch);
         }
-        let only = effective.first().ok_or(EditRefusal::InvalidPlan)?;
-        check_visual_permissions(parsed, &only.range)?;
+        for edit in &effective {
+            check_visual_permissions(parsed, &edit.range)?;
+        }
     }
     effective.sort_by(|left, right| {
         left.range
@@ -240,14 +281,18 @@ fn plan_replace(
         .map(|edit| (edit.range.clone(), edit.replacement.clone()))
         .collect();
     let batch = CheckedBatch::new(snapshot, patches, budget.patch()).map_err(map_batch_error)?;
-    let reason = match (mode, effective.len()) {
-        (EditMode::Source, 1) => GroupReason::SourceReplace,
-        (EditMode::Source, _) => GroupReason::BulkReplace,
-        (EditMode::Visual, _) => GroupReason::VisibleReplace,
+    let reason = match (mode, effective.len(), kind) {
+        (EditMode::Source, 1, _) => GroupReason::SourceReplace,
+        (EditMode::Source, _, _) => GroupReason::BulkReplace,
+        (EditMode::Visual, _, ReplaceKind::RawBlock) => GroupReason::RawBlockInput,
+        (EditMode::Visual, 1, _) => GroupReason::VisibleReplace,
+        (EditMode::Visual, _, _) => GroupReason::BulkReplace,
     };
-    let contract = match mode {
-        EditMode::Source => RereadContract::Source,
-        EditMode::Visual => RereadContract::Visible,
+    let contract = match (mode, kind) {
+        (EditMode::Source, _) => RereadContract::Source,
+        (EditMode::Visual, ReplaceKind::Direct) => RereadContract::Visible,
+        (EditMode::Visual, ReplaceKind::Find) => RereadContract::FindVisual,
+        (EditMode::Visual, ReplaceKind::RawBlock) => RereadContract::RawBlock,
     };
     let target_selection = after_selection_for_last_patch(batch.patches())?;
     let expectations = effective
@@ -280,6 +325,7 @@ fn plan_replace(
         contract,
         parse_config: parsed.config(),
         budget,
+        find_intent: None,
     })))
 }
 
@@ -367,6 +413,7 @@ fn plan_format(
         contract,
         parse_config: parsed.config(),
         budget,
+        find_intent: None,
     })))
 }
 

@@ -27,6 +27,7 @@ pub struct EditContext {
     mode: EditMode,
     pending_input: bool,
     composition_active: bool,
+    find_query_generation: Option<u64>,
 }
 
 impl EditContext {
@@ -36,6 +37,7 @@ impl EditContext {
             mode,
             pending_input: false,
             composition_active: false,
+            find_query_generation: None,
         }
     }
 
@@ -49,6 +51,23 @@ impl EditContext {
     pub const fn with_composition_active(mut self, value: bool) -> Self {
         self.composition_active = value;
         self
+    }
+
+    /// 绑定查找所有者当前的查询代次，用于消费查找替换计划。
+    ///
+    /// 查询文字、大小写开关或影响当前项替换的查找状态变化时，
+    /// 所有者须推进代次。代次 `0` 表示没有实时查询所有者，等同于不绑定。
+    pub const fn with_find_query_generation(mut self, generation: u64) -> Self {
+        self.find_query_generation = if generation == 0 {
+            None
+        } else {
+            Some(generation)
+        };
+        self
+    }
+
+    pub(crate) const fn find_query_generation(self) -> Option<u64> {
+        self.find_query_generation
     }
 
     /// 返回来源模式。
@@ -103,6 +122,8 @@ pub enum GroupReason {
     VisibleReplace,
     /// 多条源码补丁组成的批量替换。
     BulkReplace,
+    /// 已打开的可视化块内一次源码输入。
+    RawBlockInput,
     /// 行内格式切换。
     InlineFormat(InlineFormat),
 }
@@ -114,6 +135,7 @@ impl GroupReason {
             Self::SourceReplace => "SourceReplace",
             Self::VisibleReplace => "VisibleReplace",
             Self::BulkReplace => "BulkReplace",
+            Self::RawBlockInput => "RawBlockInput",
             Self::InlineFormat(InlineFormat::Strong) => "InlineFormatStrong",
             Self::InlineFormat(InlineFormat::Strike) => "InlineFormatStrike",
         }
