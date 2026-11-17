@@ -171,6 +171,25 @@ M0 workspace 建立后，Rust 提交 MUST 通过 cargo fmt --all --check、cargo
 - **WHEN** 拟提交的 Markdown、JSON、CSV 或压缩包只记录一次运行过程或复制已有交接
 - **THEN** 不提交该产物，将必要决定/验收摘要回填既有入口，将有回归价值的复现整理为测试或脚本
 
+### Requirement: 验证输出必须有有限保留期
+
+本地验证输出 MUST 只承载核对与复查所需证据，MUST NOT 成为永久档案。每类通用门禁原始输出 MUST 最多保留最近一次成功运行；结论回填后，旧 `run-*`、空目录、0 字节 stdout/stderr 与遗留构建缓存 MUST 可回收。构建缓存 MUST NOT 写入 `logs/validation/`，MUST 使用系统临时目录或仓库 `target/` 并在结束时清理。回收工具 MUST 默认 dry-run，仅在显式 `--apply` 时删除；MUST 跳过被 tracked 文档/OpenSpec 引用的路径、近期运行与当前任务目录。新增或修改回收规则 MUST 以正例和最小违规反例证明既会删除目标废料，也会保护上述边界。
+
+#### Scenario: 旧成功运行不断堆积
+
+- **WHEN** 同一通用门禁已有多次成功 `run-*`，结论与限制已回填验证计划或任务记录
+- **THEN** 回收工具只保留最近一次，其余旧运行可在 `--apply` 后删除，且不影响被跟踪文件
+
+#### Scenario: 被引用证据或当前任务目录被误判
+
+- **WHEN** 某运行路径被 `AGENTS.md` / `docs/` / `openspec/` 引用，或位于当前任务保留目录
+- **THEN** 回收工具跳过该路径及其后代，不因时间或排序删除；回收自测必须包含该反例
+
+#### Scenario: 构建缓存写入证据目录
+
+- **WHEN** 验证脚本把 `CARGO_TARGET_DIR` 指向 `logs/validation/` 内，或留下的缓存目录被回收工具列为候选
+- **THEN** 判定不符合保留规则；脚本应改用系统临时目录并在结束时删除，已有遗留缓存应可被回收
+
 ### Requirement: 验证方法采纳必须标明来源和效力边界
 
 QMD-01 的方法采纳 MUST 逐项标明来源，区分 quiet-md 已有机制、Aline 既有规则与 Aline 追加/补强；没有直接证据的 quiet-md 行为 MUST 标为“未确认”或“仅方向参考”，MUST NOT 写成已观察事实或 Aline 已实现能力。研究文档 MUST 只作证据索引，与现行 `docs/` 冲突时以现行规范为准。方法采纳 MUST NOT 改变产品契约、依赖图或阶段范围；改变依赖、夹具、验收方式或跨模块契约时 MUST 先建对应 OpenSpec change。关联 QMD-01、开发流程 §2/§3.1、CODE_STANDARDS §6。

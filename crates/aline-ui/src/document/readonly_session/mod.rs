@@ -11,12 +11,16 @@ use std::sync::Arc;
 use aline_markdown::{CancelToken, ParseBudget, ParseConfig, Parsed};
 use aline_source::{SourceBaseline, StorageBudget};
 
-use super::{DocCore, DocError, DocLimits, EditorMode, InputIdentity, ModeSwitchOutcome};
+use super::{
+    DocCore, DocError, DocLimits, EditorMode, InputIdentity, ModeSwitchOutcome, WaitStatus,
+};
 use aline_buffer::SrcSelection;
 
 mod read;
+mod refresh;
 mod timing;
 pub use read::{ReadonlyFileAccess, ReadonlyFileInput};
+pub use refresh::{ParseRefreshCompletion, ParseRefreshDisposition, ParseRefreshJob};
 pub(crate) use timing::{StageTimer, StageTiming};
 
 /// 打开输入、文档与解析的显式注入预算；默认只读，可为 M2 选择可编辑访问。
@@ -147,6 +151,8 @@ pub struct ReadonlyDocument {
     baseline: SourceBaseline,
     core: DocCore,
     parsed: Parsed,
+    parsed_identity: InputIdentity,
+    pending_parse: Option<refresh::PendingParse>,
     editable: bool,
     limits: DocLimits,
 }
@@ -163,6 +169,14 @@ impl ReadonlyDocument {
     pub fn core(&self) -> &DocCore {
         &self.core
     }
+    /// 仅向原生宿主借用当前可编辑核心，核心仍负责每次命令的受检写入。
+    #[cfg(target_os = "macos")]
+    pub(crate) fn edit_core(&mut self) -> Result<&mut DocCore, DocError> {
+        if !self.editable {
+            return Err(DocError::ReadOnly);
+        }
+        Ok(&mut self.core)
+    }
     /// 返回该打开请求是否采用可编辑访问策略。
     pub const fn is_editable(&self) -> bool {
         self.editable
@@ -175,6 +189,24 @@ impl ReadonlyDocument {
     pub fn input_identity(&mut self) -> Result<InputIdentity, DocError> {
         self.core.current_input_identity()
     }
+
+    /// 判断已采用解析是否仍属于当前源码和解析配置。
+    pub fn is_parse_current(&self) -> bool {
+        self.pending_parse.is_none()
+            && self.core.is_document_alive()
+            && self.parsed_identity.working_version() == self.core.version()
+            && self.parsed_identity.parse_config_generation() == self.core.parse_config_generation()
+    }
+
+    #[cfg(target_os = "macos")]
+    pub(crate) fn parsed_identity(&self) -> &InputIdentity {
+        &self.parsed_identity
+    }
+
+    #[cfg(target_os = "macos")]
+    pub(crate) fn text_budget(&self) -> aline_buffer::TextBudget {
+        self.limits.text()
+    }
     /// 以当前布局/解析身份导航；文档生命周期仍由 ReadonlySession 唯一持有。
     pub fn navigate(
         &mut self,
@@ -184,14 +216,7 @@ impl ReadonlyDocument {
         if !self.editable {
             return self.core.navigate_readonly(identity, selection);
         }
-        let observed_identity = self.core.current_input_identity()?;
-        if &observed_identity != identity {
-            return Err(DocError::StaleResult);
-        }
-        let current = self.core.current_snapshot(self.limits.text())?;
-        if current.text().id() != self.parsed.snapshot().id() {
-            return Err(DocError::StaleResult);
-        }
+        let current = self.current_parsed_snapshot(identity)?;
         current
             .text()
             .validate_selection(selection)
@@ -203,10 +228,9 @@ impl ReadonlyDocument {
             let extent = open.byte_range();
             let selected = selection.range().byte_range();
             if extent.start > selected.start || selected.end > extent.end {
-                // 仅当解析仍对应当前快照时才会到这里；块内待定草稿会在上方过期拒绝。
-                self.core.leave_block(0)?;
-                let current_identity = self.core.current_input_identity()?;
-                return self.core.select(&current_identity, selection);
+                return self
+                    .core
+                    .retarget_visual(identity, &self.parsed, None, selection);
             }
         }
         self.core.select(identity, selection)
@@ -221,14 +245,7 @@ impl ReadonlyDocument {
         if !self.editable || self.core.mode() != EditorMode::Visual {
             return Ok(false);
         }
-        let observed_identity = self.core.current_input_identity()?;
-        if &observed_identity != identity {
-            return Err(DocError::StaleResult);
-        }
-        let current = self.core.current_snapshot(self.limits.text())?;
-        if current.text().id() != self.parsed.snapshot().id() {
-            return Err(DocError::StaleResult);
-        }
+        let current = self.current_parsed_snapshot(identity)?;
         current
             .text()
             .validate_selection(selection)
@@ -240,9 +257,6 @@ impl ReadonlyDocument {
         });
         let first = matching.next();
         let Some(block) = first.filter(|_| matching.next().is_none()) else {
-            if self.core.has_open_block() {
-                self.core.leave_block(0)?;
-            }
             return Ok(false);
         };
         let protected = self.parsed.protected_ranges().iter().any(|range| {
@@ -250,9 +264,6 @@ impl ReadonlyDocument {
             selected.start <= protected.end && protected.start <= selected.end
         });
         if protected {
-            if self.core.has_open_block() {
-                self.core.leave_block(0)?;
-            }
             return Ok(false);
         }
 
@@ -263,20 +274,57 @@ impl ReadonlyDocument {
             return Ok(true);
         }
         if self.core.has_open_block() {
-            self.core.leave_block(0)?;
+            self.core
+                .retarget_visual(identity, &self.parsed, Some(block.range()), selection)?;
+        } else {
+            self.core
+                .open_visual_block(identity, &self.parsed, block.range(), selection)?;
         }
-        let current_identity = self.core.current_input_identity()?;
-        self.core
-            .open_visual_block(&current_identity, &self.parsed, block.range(), selection)?;
         Ok(true)
     }
     /// 在两种视图间切换，不改变文档生命周期。
     pub fn switch_mode(&mut self, mode: EditorMode) -> Result<ModeSwitchOutcome, DocError> {
-        self.core.switch_mode(mode, 0)
+        let previous = self.core.mode();
+        let outcome = self.core.switch_mode(mode, 0)?;
+        if self.core.mode() != previous {
+            self.cancel_pending_parse();
+        }
+        Ok(outcome)
     }
-    /// 返回与初始核心源码快照绑定的完整解析结果。
+    /// 返回上一份已采用的解析。命中或编辑前还须复验当前文档身份。
     pub fn parsed(&self) -> &Parsed {
         &self.parsed
+    }
+
+    fn current_parsed_snapshot(
+        &mut self,
+        identity: &InputIdentity,
+    ) -> Result<super::CurrentSnapshot, DocError> {
+        if !self.is_parse_current() || self.parsed.snapshot().id() != identity.snapshot_id() {
+            return Err(DocError::StaleResult);
+        }
+        self.core.accept_document_result(identity)?;
+        self.current_snapshot()
+    }
+
+    fn can_discard_for_replacement(&mut self) -> bool {
+        if !self.editable {
+            return true;
+        }
+        if self.core.composition().is_some()
+            || self
+                .core
+                .wait()
+                .is_some_and(|wait| wait.status() == WaitStatus::Pending)
+        {
+            return false;
+        }
+        let Ok(snapshot) = self.current_snapshot() else {
+            return false;
+        };
+        snapshot
+            .full_text(self.limits.text())
+            .is_ok_and(|text| text == self.baseline.source())
     }
 }
 
@@ -324,6 +372,17 @@ pub enum OpenDisposition {
     Stale,
     /// 当前请求失败；旧文档/视图/选区保留。
     Failed(OpenError),
+    /// 完成候选有效，但当前可编辑文档有未结算内容，因此拒绝替换。
+    RejectedUnresolvedDocument,
+}
+
+/// 关闭文档的结果；拒绝时当前文档和在途请求均保留。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CloseDisposition {
+    /// 文档已关闭。
+    Closed,
+    /// 当前可编辑文档仍有未结算内容或发布等待。
+    Refused,
 }
 
 /// 无窗口单文档宿主；当前 Ready 与一个 Selecting/Loading 请求分别持有。
@@ -464,6 +523,13 @@ impl ReadonlySession {
         self.pending = None;
         match completion.result {
             Ok(mut document) => {
+                if self
+                    .document
+                    .as_mut()
+                    .is_some_and(|current| !current.can_discard_for_replacement())
+                {
+                    return Ok((OpenDisposition::RejectedUnresolvedDocument, None));
+                }
                 let prepared = prepare(&mut document)?;
                 self.document = Some(document);
                 Ok((OpenDisposition::Applied, Some(prepared)))
@@ -474,14 +540,38 @@ impl ReadonlySession {
     }
 
     /// 关闭当前文档并取消在途候选；回到可再次打开的无文档状态。
-    pub fn close_document(&mut self) {
+    /// 关闭获准后、释放文档前执行一次由宿主提供的本地结算回调。
+    pub(crate) fn close_document_with<T>(
+        &mut self,
+        before_close: impl FnOnce(&ReadonlyDocument) -> T,
+    ) -> Result<Option<T>, CloseDisposition> {
+        let close_value = if let Some(document) = self.document.as_mut() {
+            if !document.can_discard_for_replacement() {
+                return Err(CloseDisposition::Refused);
+            }
+            Some(before_close(document))
+        } else {
+            None
+        };
         self.cancel_pending();
         self.document = None;
+        Ok(close_value)
+    }
+
+    /// 关闭当前文档并取消在途候选；未结算编辑时保留文档。
+    pub fn close_document(&mut self) -> CloseDisposition {
+        match self.close_document_with(|_| ()) {
+            Ok(_) => CloseDisposition::Closed,
+            Err(disposition) => disposition,
+        }
     }
     /// 系统关闭窗口时失效所有候选、释放文档，之后不再接受新意图。
-    pub fn close_window(&mut self) {
-        self.close_document();
+    pub fn close_window(&mut self) -> CloseDisposition {
+        if self.close_document() == CloseDisposition::Refused {
+            return CloseDisposition::Refused;
+        }
         self.alive = false;
+        CloseDisposition::Closed
     }
     fn cancel_pending(&mut self) {
         if let Some(pending) = self.pending.take() {
@@ -497,8 +587,52 @@ impl Drop for ReadonlySession {
 
 #[cfg(test)]
 mod tests {
+    use std::cell::Cell;
+    use std::error::Error;
+    use std::io::{self, Cursor};
+    use std::path::{Path, PathBuf};
+
     use super::*;
     use aline_buffer::{HistoryBudget, LineIndexBudget, TextBudget};
+
+    struct Files(&'static [u8]);
+
+    impl ReadonlyFileAccess for Files {
+        type Reader = Cursor<&'static [u8]>;
+
+        fn open(&self, _: &Path) -> io::Result<ReadonlyFileInput<Self::Reader>> {
+            Ok(ReadonlyFileInput::new(
+                Cursor::new(self.0),
+                self.0.len() as u64,
+                true,
+            ))
+        }
+    }
+
+    fn editable_session(bytes: &'static [u8]) -> Result<ReadonlySession, Box<dyn Error>> {
+        let max = 4096;
+        let limits = ReadonlyOpenLimits::new(
+            StorageBudget::new(max),
+            DocLimits::new(
+                TextBudget::new(max),
+                LineIndexBudget::new(128),
+                HistoryBudget::new(16, max),
+            ),
+            ParseConfig::m0(),
+            ParseBudget::m0(),
+        )
+        .with_editing();
+        let mut session = ReadonlySession::new(limits);
+        let request = session.request_open()?;
+        let job = session
+            .accept_selection(&request, Some(vec![PathBuf::from("fixture.md")]))?
+            .ok_or("missing open job")?;
+        assert!(matches!(
+            session.accept_open(job.read_with(&Files(bytes))),
+            OpenDisposition::Applied
+        ));
+        Ok(session)
+    }
 
     #[test]
     fn request_id_exhaustion_keeps_the_existing_pending_request() -> Result<(), OpenError> {
@@ -521,6 +655,81 @@ mod tests {
         ));
         assert_eq!(session.pending_phase(), Some(ReadonlyOpenPhase::Selecting));
         assert!(session.cancel_open(&current));
+        Ok(())
+    }
+
+    #[test]
+    fn dirty_editable_document_refuses_close_and_replacement_until_restored()
+    -> Result<(), Box<dyn Error>> {
+        let mut session = editable_session(b"base")?;
+        let document = session.document_mut().ok_or("document")?;
+        let identity = document.input_identity()?;
+        let source = document.parsed().snapshot().src_offset(0)?;
+        let selection = SrcSelection::new(source.clone(), source)?;
+        assert!(document.open_visual_at(&identity, &selection)?);
+        document.core.type_text(0, "x", 1)?;
+        let original_id = document.core.document_id().clone();
+
+        let request = session.request_open()?;
+        let replacement = session
+            .accept_selection(&request, Some(vec![PathBuf::from("replacement.md")]))?
+            .ok_or("replacement job")?;
+        assert!(matches!(
+            session.accept_open(replacement.read_with(&Files(b"replacement"))),
+            OpenDisposition::RejectedUnresolvedDocument
+        ));
+        let document = session.document_mut().ok_or("preserved document")?;
+        assert_eq!(document.core.document_id(), &original_id);
+        assert_eq!(document.path(), Path::new("fixture.md"));
+        let snapshot = document.current_snapshot()?;
+        assert_eq!(snapshot.full_text(document.limits.text())?, "xbase");
+        assert_eq!(session.close_document(), CloseDisposition::Refused);
+        assert!(session.document().is_some());
+        let side_effect = Cell::new(false);
+        assert_eq!(
+            session.close_document_with(|_| side_effect.set(true)),
+            Err(CloseDisposition::Refused)
+        );
+        assert!(!side_effect.get());
+
+        session
+            .document_mut()
+            .ok_or("preserved document")?
+            .core
+            .undo()?;
+        let closed = Cell::new(false);
+        assert_eq!(
+            session.close_document_with(|_| closed.set(true)),
+            Ok(Some(()))
+        );
+        assert!(closed.get());
+        assert!(session.document().is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn cancelled_publication_wait_does_not_block_clean_close() -> Result<(), Box<dyn Error>> {
+        let mut session = editable_session(b"base")?;
+        let document = session.document_mut().ok_or("document")?;
+        let identity = document.input_identity()?;
+        let source = document.parsed().snapshot().src_offset(0)?;
+        let selection = SrcSelection::new(source.clone(), source)?;
+        assert!(document.open_visual_at(&identity, &selection)?);
+        document.core.composition_start("候选", 1)?;
+        let wait = document
+            .core
+            .begin_publication_wait(super::super::PublicationKind::Save)?;
+        document.core.request_cancel_wait(wait)?;
+        document.core.composition_cancel(2)?;
+        assert!(
+            document
+                .core
+                .wait()
+                .is_some_and(|wait| wait.status() == WaitStatus::Cancelled)
+        );
+
+        assert_eq!(session.close_document(), CloseDisposition::Closed);
+        assert!(session.document().is_none());
         Ok(())
     }
 }

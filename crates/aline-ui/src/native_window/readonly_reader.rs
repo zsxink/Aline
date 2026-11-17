@@ -10,8 +10,10 @@ use std::collections::VecDeque;
 use std::ops::Range;
 use std::rc::Rc;
 
-use aline_buffer::Affinity;
-use aline_markdown::{AlertKind, CodeLine, MappingBudget, Parsed, Projection, TableAlignment};
+use aline_buffer::{Affinity, SrcOffset};
+use aline_markdown::{
+    AlertKind, CodeLine, MappingBudget, Parsed, Projection, ProjectionId, TableAlignment,
+};
 use gpui::{
     AnyElement, App, Bounds, Div, Font, FontFallbacks, FontStyle, FontWeight, ListAlignment,
     ListOffset, ListSizingBehavior, ListState, MouseButton, Pixels, Point, Role, SharedString,
@@ -33,7 +35,7 @@ use super::readonly_layout::{
 };
 use super::tokens;
 use crate::fonts::FontEnvironment;
-use crate::{DocumentId, EditorMode, ReadonlyDocument};
+use crate::{DocumentId, EditorMode, InputIdentity, ReadonlyDocument};
 
 const MAX_ROWS: usize = 1_000_000;
 const MAX_ITEM_BYTES: usize = 64 * 1024;
@@ -395,7 +397,16 @@ type HitCallback = dyn Fn(
 );
 
 /// 生成导航回调；参数是目标源码字节偏移。
-type NavigateCallback = dyn Fn(usize, &mut Window, &mut App);
+type NavigateCallback = dyn Fn(SourceNavigationTarget, &mut Window, &mut App);
+
+/// 绑定到创建导航控件时的文档、解析投影、布局和源码快照。
+#[derive(Clone)]
+pub(super) struct SourceNavigationTarget {
+    pub(super) identity: InputIdentity,
+    pub(super) projection: ProjectionId,
+    pub(super) layout: LayoutToken,
+    pub(super) source: SrcOffset,
+}
 
 pub(super) struct ReaderSurface {
     generation: u64,
@@ -420,11 +431,27 @@ impl ReaderSurface {
         evidence: Option<super::readonly_evidence::SharedEvidence>,
     ) -> Result<Self, LayoutError> {
         let index = ReaderIndex::new(document, MAX_ROWS)?;
-        let mode = document.core().mode();
+        Ok(Self::from_index(
+            index,
+            document.core().document_id().clone(),
+            document.core().mode(),
+            generation,
+            evidence,
+        ))
+    }
+
+    /// 组装已预检的索引，让宿主可在采用候选解析前完成阅读面准备。
+    pub(super) fn from_index(
+        index: ReaderIndex,
+        document: DocumentId,
+        mode: EditorMode,
+        generation: u64,
+        evidence: Option<super::readonly_evidence::SharedEvidence>,
+    ) -> Self {
         let list = ListState::new(index.row_count(mode), ListAlignment::Top, px(120.0));
         let restores = Rc::new(RefCell::new(RestoreState::new(
-            document.core().document_id().clone(),
-            document.parsed().snapshot().id().clone(),
+            document,
+            index.snapshot_id().clone(),
         )));
         let scroll_restores = restores.clone();
         list.set_scroll_handler(move |_, _, _| {
@@ -433,7 +460,7 @@ impl ReaderSurface {
             }
             scroll_restores.borrow_mut().cancel_current();
         });
-        Ok(Self {
+        Self {
             generation,
             index,
             list,
@@ -447,7 +474,7 @@ impl ReaderSurface {
             font: Font::default(),
             alive: Rc::new(Cell::new(true)),
             hint_width: Rc::new(Cell::new(None)),
-        })
+        }
     }
     /// 准备当前布局键；返回是否重建了列表（调用方需在帧末补未测量行高度提示）。
     pub(super) fn prepare(
@@ -457,6 +484,7 @@ impl ReaderSurface {
         metrics: ContentMetrics,
         font: &FontEnvironment,
     ) -> Result<bool, LayoutError> {
+        self.index.check(document.parsed())?;
         self.metrics.set(metrics);
         self.font = font.font();
         let mode = document.core().mode();
@@ -583,6 +611,28 @@ impl ReaderSurface {
             .map(|pending| pending.request);
         request.is_some_and(|request| self.restores.borrow_mut().cancel(&request))
     }
+    fn navigation_target(
+        &self,
+        document: &mut ReadonlyDocument,
+        offset: usize,
+    ) -> Option<SourceNavigationTarget> {
+        if !document.is_parse_current() {
+            return None;
+        }
+        let identity = document.input_identity().ok()?;
+        let layout = self.layout_token()?;
+        let parsed = document.parsed();
+        if self.index.check(parsed).is_err() || identity.snapshot_id() != parsed.snapshot().id() {
+            return None;
+        }
+        let source = parsed.snapshot().src_offset(offset).ok()?;
+        Some(SourceNavigationTarget {
+            identity,
+            projection: parsed.projection().id().clone(),
+            layout,
+            source,
+        })
+    }
     /// 把包含目标源码偏移的行滚动到顶部；用于目录与脚注跳转。
     pub(super) fn scroll_to_source(
         &self,
@@ -608,6 +658,42 @@ impl ReaderSurface {
         Ok(())
     }
 
+    pub(super) fn input_row(
+        &self,
+        document: &ReadonlyDocument,
+        row: usize,
+    ) -> Option<aline_buffer::SrcRange> {
+        self.index
+            .source_range(document.parsed(), self.mode, row)
+            .ok()
+    }
+
+    pub(super) fn wrap_input_row(&self, row: usize, input: AnyElement) -> AnyElement {
+        let metrics = self.metrics.get();
+        let last_row = self.index.row_count(self.mode).saturating_sub(1);
+        div()
+            .w_full()
+            .flex()
+            .justify_center()
+            .child(
+                div()
+                    .w_full()
+                    .max_w(px(metrics.column_width))
+                    .px(px(metrics.padding_x))
+                    .pt(px(if row == 0 { metrics.padding_top } else { 0.0 }))
+                    .pb(px(if row == last_row {
+                        metrics.padding_bottom
+                    } else {
+                        0.0
+                    }))
+                    .font_family(CODE_FONT)
+                    .text_size(px(BODY_FONT_SIZE))
+                    .whitespace_normal()
+                    .child(input),
+            )
+            .into_any_element()
+    }
+
     pub(super) fn render_row(
         &self,
         document: &mut ReadonlyDocument,
@@ -621,7 +707,7 @@ impl ReaderSurface {
             &mut Window,
             &mut App,
         ) + 'static,
-        on_navigate: impl Fn(usize, &mut Window, &mut App) + 'static,
+        on_navigate: impl Fn(SourceNavigationTarget, &mut Window, &mut App) + 'static,
     ) -> AnyElement {
         self.rendered.set(self.rendered.get().saturating_add(1));
         if self.mode == EditorMode::Source {
@@ -666,13 +752,17 @@ impl ReaderSurface {
         let mark_prepared = prepared.clone();
         let cache = self.heights.clone();
         let token = cache.borrow().token();
-        let caret = document
-            .parsed()
-            .snapshot()
-            .src_offset(document.core().buffer_selection().head())
-            .ok()
-            .and_then(|source| projection.as_ref()?.drawn_at(&source, Affinity::After).ok())
-            .map(|mapped| mapped.value().byte_offset());
+        let caret = if document.is_parse_current() {
+            document
+                .parsed()
+                .snapshot()
+                .src_offset(document.core().current_selection().head())
+                .ok()
+                .and_then(|source| projection.as_ref()?.drawn_at(&source, Affinity::After).ok())
+                .map(|mapped| mapped.value().byte_offset())
+        } else {
+            None
+        };
         let geometry_projection = projection.clone();
         let hit = token
             .and_then(|token| {
@@ -1002,10 +1092,13 @@ impl ReaderSurface {
                         );
                     }
                     for entry in entries.iter() {
-                        let target = entry.source.start;
+                        let offset = entry.source.start;
+                        let target = self.navigation_target(document, offset);
+                        let target_click = target.clone();
+                        let target_key = target;
                         let navigate_click = on_navigate.clone();
                         let navigate_key = on_navigate.clone();
-                        let id = SharedString::from(format!("toc-{}-{target}", self.generation));
+                        let id = SharedString::from(format!("toc-{}-{offset}", self.generation));
                         list = list.child(
                             div()
                                 .id(id)
@@ -1017,12 +1110,18 @@ impl ReaderSurface {
                                 .py(px(2.0))
                                 .hover(|style| style.text_color(rgb(tokens::ACCENT)))
                                 .focus(|style| style.bg(rgba(tokens::ACCENT_SOFT)))
-                                .on_click(move |_, window, cx| navigate_click(target, window, cx))
+                                .on_click(move |_, window, cx| {
+                                    if let Some(target) = target_click.clone() {
+                                        navigate_click(target, window, cx);
+                                    }
+                                })
                                 .on_key_down(move |event: &gpui::KeyDownEvent, window, cx| {
                                     if event.keystroke.key == "enter"
                                         || event.keystroke.key == "space"
                                     {
-                                        navigate_key(target, window, cx);
+                                        if let Some(target) = target_key.clone() {
+                                            navigate_key(target, window, cx);
+                                        }
                                         cx.stop_propagation();
                                     }
                                 })
@@ -1104,8 +1203,11 @@ impl ReaderSurface {
         let outer = div().w_full().flex().justify_center().child(content);
         let outer = self.measured_row(outer, row, token, geometry, text_bounds, document_id);
         let outer = outer.id(element_id);
-        let outer = if let Some(target) = footnote_target {
+        let outer = if let Some(target) =
+            footnote_target.and_then(|target| self.navigation_target(document, target))
+        {
             let navigate = on_navigate.clone();
+            let target = target.clone();
             outer
                 .focusable()
                 .tab_stop(true)
@@ -1113,7 +1215,7 @@ impl ReaderSurface {
                 .focus(|style| style.bg(rgba(tokens::ACCENT_SOFT)))
                 .on_key_down(move |event: &gpui::KeyDownEvent, window, cx| {
                     if event.keystroke.key == "enter" || event.keystroke.key == "space" {
-                        navigate(target, window, cx);
+                        navigate(target.clone(), window, cx);
                         cx.stop_propagation();
                     }
                 })
@@ -1137,9 +1239,14 @@ impl ReaderSurface {
             outer
         };
         if let Some(target) = fallback {
+            let target = self.navigation_target(document, target);
             let navigate = on_navigate.clone();
             outer
-                .on_click(move |_, window, cx| navigate(target, window, cx))
+                .on_click(move |_, window, cx| {
+                    if let Some(target) = target.clone() {
+                        navigate(target, window, cx);
+                    }
+                })
                 .into_any_element()
         } else {
             outer.into_any_element()
@@ -1402,6 +1509,9 @@ impl ReaderSurface {
     }
     pub(super) fn layout_token(&self) -> Option<LayoutToken> {
         self.heights.borrow().token()
+    }
+    pub(super) fn check_index(&self, parsed: &Parsed) -> Result<(), LayoutError> {
+        self.index.check(parsed)
     }
     /// 返回本帧已渲染的虚拟项数量；验证探针用它记录虚拟化规模。
     pub(super) fn rendered_item_count(&self) -> usize {

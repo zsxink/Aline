@@ -1,13 +1,12 @@
-//! create-only 受检文件发布：同目录 staging 完整写入并 sync 后，以硬链接发布到新目标。
+//! 用同目录 staging 准备完整字节，并通过受检入口发布到磁盘。
 //!
-//! 本模块只提供 M0 的最小受检原语：prepare 阶段独占创建 staging、完整写入并
+//! 原有 create-only 路径在 prepare 阶段独占创建 staging、完整写入并
 //! `sync_all`；publish 阶段用 `hard_link` 将 staging 发布到尚不存在的目标。
-//! 目标已存在时按类型拒绝，不 rename、不截断、不原地覆盖，也不把能力未验证
-//! 伪称 OS Unsupported。现有文件 metadata/ACL/xattr、目录同步、断电、跨进程
-//! CAS 与 Windows/Linux 行为不在本模块的已验证范围。
+//! 目标已存在时按类型拒绝。既有目标使用独立 `replace` 入口，绑定真实观察后
+//! 准备、复验并结算已发生的写盘事实。调用方持有业务排程、版本和结算状态。
 //!
 //! staging 由调用方显式命名；成功与失败都不在 Drop 中静默删除，结果携带本操作
-//! 拥有的 staging 路径供宿主取证或后续清理。发布后不在本模块实现目录同步。
+//! 拥有的 staging 路径供宿主取证或后续清理。
 //! 路径前提只做词法比较（不 canonicalize），同一目录的等价别名可能被拒绝。
 //! publish 前的身份检查只比较 staging 路径与已打开句柄的 dev/ino；检查之后外部
 //! 进程仍可原地改写同一 inode，M0 不在发布后回读目标核对，因此 [`Written::bytes`]
@@ -24,6 +23,13 @@ use crate::baseline::SourceBaseline;
 use crate::decode::{DecodeError, decode};
 use crate::encode::EncodedBytes;
 use crate::storage::{BaselineId, DiskVersion, StorageBudget, StorageError, StorageSnapshot};
+
+mod replace;
+
+pub use replace::{
+    ExistingTarget, PreparedReplacement, ReplacementDurability, ReplacementReceipt,
+    prepare_checked_replace,
+};
 
 const WRITE_CHUNK_BYTES: usize = 64 * 1024;
 
@@ -71,6 +77,8 @@ impl IoBudget {
 /// 受检文件操作阶段；用于区分 I/O 与取消发生在哪一步。
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AtomicStage {
+    /// 观察既有目标，冻结实际身份及字节。
+    Observe,
     /// 参数、预算或取消的前置检查。
     Prepare,
     /// 独占创建 staging。
@@ -79,8 +87,12 @@ pub enum AtomicStage {
     Write,
     /// 对 staging 调用 `sync_all`。
     Sync,
-    /// 检查并发布新目标。
+    /// 为替换准备 staging 的访问元数据。
+    Permissions,
+    /// 检查并发布目标。
     Publish,
+    /// 在替换系统调用成功后核对目标身份与字节。
+    VerifyPublished,
 }
 
 /// prepare 的路径输入不满足同目录、独占新文件等前提。
@@ -105,6 +117,8 @@ pub enum ExistingTargetKind {
     Directory,
     /// 其他非普通文件，例如设备、FIFO 或套接字。
     Other,
+    /// 存在其他硬链接，替换目录项会拆散原来的链接关系。
+    HardLink,
 }
 
 /// 受检文件原语的失败分类；不包含已翻译的用户文案。
@@ -134,13 +148,31 @@ pub enum AtomicFailureKind {
         /// 检测到取消的阶段。
         stage: AtomicStage,
     },
-    /// `hard_link` 发现目标已存在，包括检查后竞争出现；不覆盖该目标。
+    /// 目标存在性或观察的磁盘身份/字节变化，拒绝发布。
     Conflict {
-        /// 目标是否存在；当前发布路径只会产生 `true`。
+        /// 检查时目标是否存在。
         target_exists: bool,
     },
     /// 目标已存在且是普通文件；现有文件完整 metadata 替换能力未实现。
     MetadataPreservationUnverified,
+    /// 平台访问元数据适配未验证，拒绝发布既有目标。
+    ReplacementMetadataUnverified,
+    /// 平台无法证明替换同时绑定已检验的父目录与 staging 句柄，拒绝发布。
+    ReplacementIdentityUnverified,
+    /// 目标路径的父目录不是普通目录，或已不同于观察时固定的目录。
+    TargetDirectoryChanged,
+    /// 替换已发生，但无法将当前磁盘观察归属于预期的目标及写入字节。
+    /// 宿主须保留实际副作用并重新观察，不采用保存基线或自动重试覆盖。
+    PublishedTargetUnverified {
+        /// 替换操作使用的目标路径。
+        target: PathBuf,
+        /// 发布后核验未通过的原始分类。
+        cause: Box<AtomicFailureKind>,
+    },
+    /// 观察方无法使用已核对的文件平台能力。
+    ObservationUnverified,
+    /// 无法再递增观察所绑定的磁盘代次。
+    VersionExhausted,
     /// 目标已存在但不是普通文件；create-only 发布不适用。
     ExistingTarget {
         /// 已存在目标的类别。
@@ -150,10 +182,13 @@ pub enum AtomicFailureKind {
     ///
     /// 非 Unix 目标尚未验证句柄身份比较；当前实现恒拒绝发布并返回本错误。
     StagingReplaced,
+    /// staging 路径身份未变，但不再包含本操作准备的字节。
+    StagingContentChanged,
 }
 
-/// 受检文件原语失败；若本操作曾创建 staging 且未观察到路径被替换，则携带调用方
-/// 提供的路径。该路径不保证当前仍存在，也不保证仍指向本操作写入的 inode。
+/// 受检文件原语失败。`PublishedTargetUnverified` 表示已发生写盘副作用。
+/// 若本操作曾创建 staging 且未观察到路径被替换，则携带调用方提供的路径。
+/// 该路径不保证当前仍存在，也不保证仍指向本操作写入的 inode。
 #[derive(Debug)]
 pub struct AtomicFailure {
     kind: AtomicFailureKind,
@@ -670,12 +705,12 @@ mod tests {
 
     type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
-    struct TestDir {
+    pub(super) struct TestDir {
         path: PathBuf,
     }
 
     impl TestDir {
-        fn new() -> TestResult<Self> {
+        pub(super) fn new() -> TestResult<Self> {
             let base = std::env::temp_dir();
             let nanos = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
             for attempt in 0..100u32 {
@@ -692,11 +727,11 @@ mod tests {
             Err(io::Error::other("无法创建单元测试目录").into())
         }
 
-        fn target(&self) -> PathBuf {
+        pub(super) fn target(&self) -> PathBuf {
             self.path.join("target.md")
         }
 
-        fn staging(&self) -> PathBuf {
+        pub(super) fn staging(&self) -> PathBuf {
             self.path.join("staging.tmp")
         }
     }

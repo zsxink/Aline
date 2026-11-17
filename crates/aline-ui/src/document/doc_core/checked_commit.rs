@@ -3,12 +3,16 @@
 //! 状态仍全部属于 DocCore；本模块只在组/IME提交或显式命令时解析和校验，
 //! 不持第二全文、派生缓存或历史。输入携带自身范围和 before/after 选区；
 //! 命令携带宿主身份信封和只读 Parsed，全部检查完成后才允许 Buffer 发布。
-use super::{CommitOutcome, DocCore, DocError, bind_selection, copy_bounded};
+use super::{
+    CommitOutcome, DocCore, DocError, TypingGroup, TypingRedo, WorkingVersion, bind_selection,
+    copy_bounded, slice_buffer,
+};
 use crate::document::open_block::{InputTarget, OpenBlock, VisualInput};
 use crate::document::{EditorMode, InputIdentity};
 use aline_buffer::{
-    Affinity, AnchorTransform, ApplyOutcome, BufferError, CheckedBatch, OperationSource,
-    SelectionSpec, SrcSelection, TextSnapshot, transform_anchor,
+    Affinity, AnchorTransform, ApplyOutcome, BufferEditBase, BufferError, CheckedBatch,
+    OperationSource, PreparedBufferEdit, SelectionSpec, SrcSelection, TextSnapshot,
+    transform_anchor,
 };
 use aline_edit::{
     ChangePlan, EditBudget, EditCommand, EditContext, EditMode, EditRefusal, GroupReason,
@@ -25,7 +29,107 @@ impl From<BufferError> for DocError {
 }
 
 impl DocCore {
-    /// 执行已规划命令。活动组合先拒绝，待定普通输入与重规划命令原子发布。
+    pub(super) fn publish_typing_redo_in_current_mode(
+        &mut self,
+        redo: &TypingRedo,
+        next_version: WorkingVersion,
+    ) -> Result<(), DocError> {
+        let snapshot = self.buffer.snapshot();
+        let selection = bind_selection(snapshot, redo.group.before_selection)?;
+        let budget = self.edit_budget();
+        let parsed = parse_for_edit(snapshot, budget)?;
+        let edit_mode = match redo.mode {
+            EditorMode::Visual => EditMode::Visual,
+            EditorMode::Source => EditMode::Source,
+        };
+        let context = EditContext::new(edit_mode);
+        let raw_block = match &redo.target {
+            InputTarget::Visual(target) => Some(target.extent.clone()),
+            InputTarget::Legacy | InputTarget::Source => None,
+        };
+        let plan = plan_single_patch(
+            &parsed,
+            &selection,
+            &context,
+            raw_block.as_ref(),
+            redo.group.range.clone(),
+            &redo.group.draft,
+            budget,
+        )?;
+        let PlanOutcome::Changed(plan) = plan else {
+            // 净无变化的待定 redo 只恢复逻辑选区，不创建空历史。
+            let after = bind_selection(snapshot, redo.group.after_selection)?;
+            let fragment = if let Some(block) = self.open.as_ref() {
+                self.validate_selection(block, redo.group.after_selection)?;
+                Some(slice_buffer(
+                    &self.buffer,
+                    redo.group.after_selection.range(),
+                    self.limits.text,
+                )?)
+            } else {
+                None
+            };
+            self.buffer
+                .set_selection(&after)
+                .map_err(DocError::Buffer)?;
+            if let (Some(block), Some(fragment)) = (self.open.as_mut(), fragment) {
+                block.range = redo.group.after_selection.range();
+                block.baseline_fragment = fragment;
+                block.selection = redo.group.after_selection;
+                block.baseline_revision = self.buffer.revision();
+            }
+            self.typing_redo = None;
+            self.version = next_version;
+            self.snapshot_cache = None;
+            return Ok(());
+        };
+        let change = validate_change(&plan, snapshot, &parsed, &selection, &context)
+            .map_err(DocError::Edit)?;
+
+        // Buffer 在 apply 前读取自身 selection 形成历史 before-selection。临时设置
+        // 为输入组起点；若任何提交预算拒绝，立即恢复调用前逻辑选区。
+        let previous_selection = self.buffer.selection().clone();
+        self.buffer
+            .set_selection(&selection)
+            .map_err(DocError::Buffer)?;
+        let applied = self.buffer.apply(
+            change.batch(),
+            redo.group.after_selection,
+            OperationSource::Typing,
+            redo.group.last_input_at,
+            self.limits.text,
+        );
+        let applied = match applied {
+            Ok(ApplyOutcome::Changed(applied)) => applied,
+            Ok(ApplyOutcome::Unchanged) => {
+                self.buffer
+                    .set_selection(&previous_selection)
+                    .map_err(DocError::Buffer)?;
+                self.typing_redo = None;
+                self.version = next_version;
+                self.snapshot_cache = None;
+                return Ok(());
+            }
+            Err(error) => {
+                self.buffer
+                    .set_selection(&previous_selection)
+                    .map_err(DocError::Buffer)?;
+                return Err(DocError::Buffer(error));
+            }
+        };
+        let revision = applied.revision();
+        self.buffer.seal_pending();
+        self.version = self
+            .version
+            .after_commit(revision)
+            .map_err(DocError::Identity)?;
+        self.typing_redo = None;
+        self.open = None;
+        self.snapshot_cache = None;
+        Ok(())
+    }
+
+    /// 执行已规划的普通命令。查找计划须经 `apply_find_change` 消费。
     ///
     /// `identity` 必须来自本 DocCore 的当前输入身份；`parsed` 必须绑定该源码
     /// 快照、M0 配置和计划投影。复验文档/工作版本/快照/配置/请求及当前选区后
@@ -38,74 +142,12 @@ impl DocCore {
         plan: &ChangePlan,
         now_millis: u64,
     ) -> Result<CommitOutcome, DocError> {
-        self.ensure_writable()?;
-        if self.open.is_some() {
-            self.ensure_ready()?;
-        }
-        let context = self.command_context();
-        if context.has_composition() {
-            return Err(DocError::CompositionActive);
-        }
-        if context.has_pending_input()
-            && self
-                .open
-                .as_ref()
-                .is_some_and(|block| block.target == InputTarget::Legacy)
-            && identity.document_id() == &self.document
-            && identity.working_version() != self.version
-        {
-            // 既有无头入口的组前计划无法用于当前草稿，保留其明确拒绝原因。
-            return Err(DocError::PendingInput);
-        }
-        self.accept_document_result(identity)?;
-        if parsed.config() != ParseConfig::m0() || parsed.snapshot().id() != identity.snapshot_id()
-        {
-            return Err(DocError::StaleResult);
-        }
-        if plan.group_reason() == GroupReason::RawBlockInput {
-            return Err(DocError::Edit(EditRefusal::UnsupportedReplan));
-        }
-        if plan.find_query_generation().is_some() {
-            // 查找计划只能由查找入口消费；普通命令不得越过查询代次绑定。
-            return Err(DocError::Edit(EditRefusal::StaleFindResults));
-        }
-        let selection = bind_selection(self.cached_current_text()?, self.current_selection())?;
-        self.version.next_draft().map_err(DocError::Identity)?;
-        if context.has_pending_input() {
-            let outcome = self.publish_staged_command(
-                now_millis,
-                None,
-                |candidate, candidate_selection, context, _| {
-                    plan.replan_on_equivalent_candidate(
-                        parsed,
-                        &selection,
-                        candidate,
-                        candidate_selection,
-                        context,
-                    )
-                    .map_err(DocError::Edit)
-                },
-            )?;
-            return self.settle_command_outcome(outcome);
-        }
-        let change = validate_change(plan, self.buffer.snapshot(), parsed, &selection, &context)
-            .map_err(DocError::Edit)?;
-        let outcome = self
-            .buffer
-            .apply(
-                change.batch(),
-                change.target_selection(),
-                OperationSource::Command,
-                now_millis,
-                self.limits.text,
-            )
-            .map_err(DocError::Buffer)?;
-        self.settle_command_outcome(outcome)
+        self.apply_bound_change(identity, parsed, plan, None, None, now_millis)
     }
 
     /// 执行已规划的查找替换命令。
     ///
-    /// `query_generation` 必须是查找所有者当前的实时查询代次；普通命令入口不得
+    /// `query_generation` 来自查找所有者的当前查询，`0` 是合法初始代次。普通命令入口不得
     /// 消费查找计划，查找入口也不得消费普通计划，两侧都按 `StaleFindResults`
     /// 拒绝。待定普通输入存在时，输入组与替换命令按两步候选事务原子发布，替换
     /// 命令在封口候选上按同一查询重新查找并重规划。拒绝保留草稿、组合、选区与
@@ -118,13 +160,66 @@ impl DocCore {
         query_generation: u64,
         now_millis: u64,
     ) -> Result<CommitOutcome, DocError> {
+        self.apply_bound_change(
+            identity,
+            parsed,
+            plan,
+            Some(query_generation),
+            None,
+            now_millis,
+        )
+    }
+
+    /// 按源码模式原子执行需要回退到源码视图的查找替换。
+    ///
+    /// 模式、打开块和派生请求只在 Buffer 实际提交后发布；计划拒绝保留调用前
+    /// 模式、块、选区与历史。待定输入及组合期间仍拒绝。
+    pub(crate) fn apply_find_change_in_source_mode(
+        &mut self,
+        identity: &InputIdentity,
+        parsed: &Parsed,
+        plan: &ChangePlan,
+        query_generation: u64,
+        now_millis: u64,
+    ) -> Result<CommitOutcome, DocError> {
+        self.apply_bound_change(
+            identity,
+            parsed,
+            plan,
+            Some(query_generation),
+            Some(EditorMode::Source),
+            now_millis,
+        )
+    }
+
+    fn apply_bound_change(
+        &mut self,
+        identity: &InputIdentity,
+        parsed: &Parsed,
+        plan: &ChangePlan,
+        query_generation: Option<u64>,
+        target_mode: Option<EditorMode>,
+        now_millis: u64,
+    ) -> Result<CommitOutcome, DocError> {
         self.ensure_writable()?;
         if self.open.is_some() {
             self.ensure_ready()?;
         }
-        let context = self.command_context();
+        let current_context = self.command_context();
+        let context = target_mode.map_or(current_context, |mode| {
+            let edit_mode = match mode {
+                EditorMode::Visual => EditMode::Visual,
+                EditorMode::Source => EditMode::Source,
+            };
+            EditContext::new(edit_mode)
+                .with_pending_input(current_context.has_pending_input())
+                .with_composition_active(current_context.has_composition())
+        });
         if context.has_composition() {
             return Err(DocError::CompositionActive);
+        }
+        if target_mode.is_some_and(|mode| mode != self.mode) && context.has_pending_input() {
+            return Err(DocError::PendingInput);
         }
         if context.has_pending_input()
             && self
@@ -145,16 +240,18 @@ impl DocCore {
         if plan.group_reason() == GroupReason::RawBlockInput {
             return Err(DocError::Edit(EditRefusal::UnsupportedReplan));
         }
-        // 查找计划必须绑定本次消费的实时查询代次；普通计划在此入口一律拒绝。
-        if plan.find_query_generation() != Some(query_generation) {
-            return Err(DocError::Edit(EditRefusal::StaleFindResults));
-        }
+        plan.validate_find_query_generation(query_generation)
+            .map_err(DocError::Edit)?;
+        let next_request = target_mode
+            .filter(|mode| *mode != self.mode)
+            .map(|_| self.derived_request.next().map_err(DocError::Identity))
+            .transpose()?;
         let selection = bind_selection(self.cached_current_text()?, self.current_selection())?;
         self.version.next_draft().map_err(DocError::Identity)?;
         if context.has_pending_input() {
             let outcome = self.publish_staged_command(
                 now_millis,
-                Some(query_generation),
+                query_generation,
                 |candidate, candidate_selection, context, _| {
                     plan.replan_on_equivalent_candidate(
                         parsed,
@@ -166,17 +263,13 @@ impl DocCore {
                     .map_err(DocError::Edit)
                 },
             )?;
-            return self.settle_command_outcome(outcome);
+            let committed = self.settle_command_outcome(outcome)?;
+            self.publish_target_mode(committed, target_mode, next_request);
+            return Ok(committed);
         }
-        let find_context = context.with_find_query_generation(query_generation);
-        let change = validate_change(
-            plan,
-            self.buffer.snapshot(),
-            parsed,
-            &selection,
-            &find_context,
-        )
-        .map_err(DocError::Edit)?;
+        let context = query_context(context, query_generation);
+        let change = validate_change(plan, self.buffer.snapshot(), parsed, &selection, &context)
+            .map_err(DocError::Edit)?;
         let outcome = self
             .buffer
             .apply(
@@ -187,7 +280,30 @@ impl DocCore {
                 self.limits.text,
             )
             .map_err(DocError::Buffer)?;
-        self.settle_command_outcome(outcome)
+        let committed = self.settle_command_outcome(outcome)?;
+        self.publish_target_mode(committed, target_mode, next_request);
+        Ok(committed)
+    }
+
+    fn publish_target_mode(
+        &mut self,
+        outcome: CommitOutcome,
+        target_mode: Option<EditorMode>,
+        next_request: Option<crate::document::DerivedRequestId>,
+    ) {
+        let Some(target_mode) = target_mode
+            .filter(|mode| *mode != self.mode)
+            .filter(|_| matches!(outcome, CommitOutcome::Committed { .. }))
+        else {
+            return;
+        };
+        self.open = None;
+        self.wait = None;
+        self.snapshot_cache = None;
+        if let Some(next_request) = next_request {
+            self.derived_request = next_request;
+        }
+        self.mode = target_mode;
     }
 
     pub(super) fn settle_command_outcome(
@@ -210,7 +326,7 @@ impl DocCore {
         }
     }
 
-    fn command_context(&self) -> EditContext {
+    pub(super) fn command_context(&self) -> EditContext {
         let mode = match self.mode {
             EditorMode::Visual => EditMode::Visual,
             EditorMode::Source => EditMode::Source,
@@ -225,7 +341,7 @@ impl DocCore {
             .with_composition_active(self.is_composition_active())
     }
 
-    fn edit_budget(&self) -> EditBudget {
+    pub(super) fn edit_budget(&self) -> EditBudget {
         let parse_budget = ParseBudget::m0().with_max_source_bytes(
             ParseBudget::m0()
                 .max_source_bytes()
@@ -240,13 +356,22 @@ impl DocCore {
         replacement: &str,
         now_millis: u64,
     ) -> Result<ApplyOutcome, DocError> {
+        self.publish_staged_range_replacement(None, replacement, now_millis)
+    }
+
+    pub(super) fn publish_staged_range_replacement(
+        &mut self,
+        range: Option<Range<usize>>,
+        replacement: &str,
+        now_millis: u64,
+    ) -> Result<ApplyOutcome, DocError> {
         self.publish_staged_command(now_millis, None, |parsed, selection, context, budget| {
             plan_single_patch(
                 parsed,
                 selection,
                 context,
                 None,
-                selection.range().byte_range(),
+                range.unwrap_or_else(|| selection.range().byte_range()),
                 replacement,
                 budget,
             )
@@ -267,53 +392,21 @@ impl DocCore {
     ) -> Result<ApplyOutcome, DocError> {
         let block = self.open.as_ref().ok_or(DocError::NoOpenBlock)?;
         let group = block.typing().ok_or(DocError::PendingInput)?;
-        let before = self.buffer.snapshot();
-        let input_selection = bind_selection(before, group.before_selection)?;
-        let command_selection = block.selection;
-        let mut context = EditContext::new(self.command_context().mode());
-        if let Some(generation) = find_generation {
-            context = context.with_find_query_generation(generation);
-        }
-        let budget = self.edit_budget();
-        let parsed = parse_for_edit(before, budget)?;
-        let input_plan = plan_single_patch(
-            &parsed,
-            &input_selection,
-            &context,
-            block.visual_extent(),
-            group.range.clone(),
-            &group.draft,
-            budget,
-        )?;
-        let input_batch = match input_plan {
-            PlanOutcome::Changed(plan) => {
-                validate_change(&plan, before, &parsed, &input_selection, &context)
-                    .map_err(DocError::Edit)?
-                    .batch()
-                    .clone()
-            }
-            PlanOutcome::Unchanged(_) => {
-                // 保留绑定当前基线的第一批；净无变化只记录实际命令。
-                let draft = copy_bounded(&group.draft, budget.text())?;
-                CheckedBatch::new(before, vec![(group.range.clone(), draft)], budget.patch())?
-            }
-        };
-        self.buffer.apply_staged_command(
-            &input_batch,
-            (&input_selection, command_selection),
+        let prepared = StagedInput {
+            group,
+            visual_extent: block.visual_extent(),
+            selection: block.selection,
+            context: query_context(
+                EditContext::new(self.command_context().mode()),
+                find_generation,
+            ),
             now_millis,
-            budget.text(),
-            |candidate, selection| {
-                let parsed = parse_for_edit(candidate, budget)?;
-                let plan = plan_command(&parsed, selection, &context, budget)?;
-                let PlanOutcome::Changed(plan) = plan else {
-                    return Ok(None);
-                };
-                let change = validate_change(&plan, candidate, &parsed, selection, &context)
-                    .map_err(DocError::Edit)?;
-                Ok(Some((change.batch().clone(), change.target_selection())))
-            },
-        )
+            budget: self.edit_budget(),
+        }
+        .prepare(self.buffer.edit_base(), plan_command)?;
+        self.buffer
+            .publish_prepared(prepared)
+            .map_err(DocError::Buffer)
     }
 
     pub(super) fn publish_input(
@@ -325,77 +418,214 @@ impl DocCore {
         now_millis: u64,
         next_target: Option<Range<usize>>,
     ) -> Result<ApplyOutcome, DocError> {
-        let snapshot = self.buffer.snapshot();
-        let selection = bind_selection(snapshot, selections.0)?;
-        let budget = self.edit_budget();
+        let prepared = InputPatch {
+            range,
+            replacement,
+            selections,
+            source,
+            now_millis,
+            next_target,
+        }
+        .prepare(
+            self.buffer.edit_base(),
+            self.command_context().mode(),
+            self.open.as_ref().and_then(OpenBlock::visual_extent),
+            self.edit_budget(),
+        )?;
+        let Some(buffer) = prepared.buffer else {
+            return Ok(ApplyOutcome::Unchanged);
+        };
+        let outcome = self.buffer.publish_prepared(buffer)?;
+        self.update_raw_input_target(prepared.target);
+        Ok(outcome)
+    }
+
+    pub(super) fn update_raw_input_target(&mut self, target: InputTargetUpdate) {
+        match target {
+            InputTargetUpdate::Preserve => {}
+            InputTargetUpdate::Rebind(target) => {
+                if let Some(block) = self.open.as_mut() {
+                    block.target = InputTarget::Visual(target);
+                }
+            }
+            InputTargetUpdate::Close => self.open = None,
+        }
+    }
+}
+
+/// 单区间输入的已冻结意图。准备可在后台进行，发布仍由文档所有者负责。
+pub(super) struct InputPatch {
+    pub(super) range: Range<usize>,
+    pub(super) replacement: String,
+    pub(super) selections: (SelectionSpec, SelectionSpec),
+    pub(super) source: OperationSource,
+    pub(super) now_millis: u64,
+    pub(super) next_target: Option<Range<usize>>,
+}
+
+pub(super) struct PreparedInputPatch {
+    pub(super) buffer: Option<PreparedBufferEdit>,
+    pub(super) target: InputTargetUpdate,
+}
+
+pub(super) enum InputTargetUpdate {
+    Preserve,
+    Rebind(VisualInput),
+    Close,
+}
+
+impl InputPatch {
+    pub(super) fn prepare(
+        self,
+        base: BufferEditBase,
+        mode: EditMode,
+        extent: Option<&Range<usize>>,
+        budget: EditBudget,
+    ) -> Result<PreparedInputPatch, DocError> {
+        let snapshot = base.snapshot();
+        let selection = bind_selection(snapshot, self.selections.0)?;
         let parsed = parse_for_edit(snapshot, budget)?;
-        // 这是唯一输入槽自身的发布，不是待定输入期间执行其它命令。
-        // 草稿始终保留至发布成功；edit 读取的是该输入开始前的稳定 Buffer 基线。
-        let context = EditContext::new(self.command_context().mode());
-        let extent = self.open.as_ref().and_then(OpenBlock::visual_extent);
-        let raw_block = matches!(source, OperationSource::Typing | OperationSource::ImeCommit)
-            .then_some(extent)
-            .flatten();
+        // 真实基线是输入开始前的已提交快照；草稿仍由 DocCore 保留。
+        let context = EditContext::new(mode);
+        let raw_block = matches!(
+            self.source,
+            OperationSource::Typing | OperationSource::ImeCommit
+        )
+        .then_some(extent)
+        .flatten();
         let outcome = plan_single_patch(
             &parsed,
             &selection,
             &context,
             raw_block,
-            range,
-            &replacement,
+            self.range,
+            &self.replacement,
             budget,
         )?;
         let PlanOutcome::Changed(plan) = outcome else {
-            return Ok(ApplyOutcome::Unchanged);
+            return Ok(PreparedInputPatch {
+                buffer: None,
+                target: InputTargetUpdate::Preserve,
+            });
         };
         let change = validate_change(&plan, snapshot, &parsed, &selection, &context)
             .map_err(DocError::Edit)?;
-        let updated_target = if let Some(extent) = raw_block {
-            let transformed = transform_extent(snapshot, change.batch(), extent)?;
-            let after_head = selections.1.head();
-            let target = next_target.clone().unwrap_or(after_head..after_head);
-            let rebound = rebound_extent(change.candidate_blocks(), &transformed, &target);
-            if next_target.is_some() && rebound.is_none() {
-                // 滚动到下一输入组时，先确认解析中仍有可接收该输入的块。
-                return Err(DocError::InvalidVisualBlock);
-            }
-            if let Some(rebound) = rebound {
-                let visual = VisualInput::from_parse(
-                    rebound,
-                    change.candidate_protected_ranges(),
-                    change.candidate_styled_ranges(),
-                )?;
-                if let Some(next_target) = next_target.as_ref() {
-                    visual.check_permissions(next_target, |range| Ok(range.clone()))?;
+        let target = match raw_block {
+            Some(extent) => {
+                let transformed = transform_extent(snapshot, change.batch(), extent)?;
+                let after_head = self.selections.1.head();
+                let target = self
+                    .next_target
+                    .as_ref()
+                    .cloned()
+                    .unwrap_or(after_head..after_head);
+                let rebound = rebound_extent(change.candidate_blocks(), &transformed, &target);
+                if self.next_target.is_some() && rebound.is_none() {
+                    return Err(DocError::InvalidVisualBlock);
                 }
-                Some(visual)
-            } else {
-                None
+                if let Some(rebound) = rebound {
+                    let visual = VisualInput::from_parse(
+                        rebound,
+                        change.candidate_protected_ranges(),
+                        change.candidate_styled_ranges(),
+                    )?;
+                    if let Some(next_target) = &self.next_target {
+                        visual.check_permissions(next_target, |range| Ok(range.clone()))?;
+                    }
+                    InputTargetUpdate::Rebind(visual)
+                } else {
+                    InputTargetUpdate::Close
+                }
             }
-        } else {
-            None
+            None => InputTargetUpdate::Preserve,
         };
-        let outcome = self
-            .buffer
-            .apply(
-                change.batch(),
-                selections.1,
-                source,
-                now_millis,
-                self.limits.text,
-            )
-            .map_err(DocError::Buffer)?;
-        if raw_block.is_some() && matches!(outcome, ApplyOutcome::Changed(_)) {
-            if let Some(target) = updated_target {
-                if let Some(block) = self.open.as_mut() {
-                    block.target = InputTarget::Visual(target);
-                }
-            } else {
-                self.open = None;
-            }
-        }
-        Ok(outcome)
+        let buffer = base.prepare_apply(
+            change.batch(),
+            self.selections.1,
+            self.source,
+            self.now_millis,
+            budget.text(),
+        )?;
+        Ok(PreparedInputPatch {
+            buffer: Some(buffer),
+            target,
+        })
     }
+}
+
+pub(super) struct StagedInput<'a> {
+    pub(super) group: &'a TypingGroup,
+    pub(super) visual_extent: Option<&'a Range<usize>>,
+    pub(super) selection: SelectionSpec,
+    pub(super) context: EditContext,
+    pub(super) now_millis: u64,
+    pub(super) budget: EditBudget,
+}
+
+impl StagedInput<'_> {
+    pub(super) fn prepare(
+        self,
+        base: BufferEditBase,
+        plan_command: impl FnOnce(
+            &Parsed,
+            &SrcSelection,
+            &EditContext,
+            EditBudget,
+        ) -> Result<PlanOutcome, DocError>,
+    ) -> Result<PreparedBufferEdit, DocError> {
+        let before = base.snapshot();
+        let input_selection = bind_selection(before, self.group.before_selection)?;
+        let input_context = EditContext::new(self.context.mode());
+        let parsed = parse_for_edit(before, self.budget)?;
+        let input_plan = plan_single_patch(
+            &parsed,
+            &input_selection,
+            &input_context,
+            self.visual_extent,
+            self.group.range.clone(),
+            &self.group.draft,
+            self.budget,
+        )?;
+        let input_batch = match input_plan {
+            PlanOutcome::Changed(plan) => {
+                validate_change(&plan, before, &parsed, &input_selection, &input_context)
+                    .map_err(DocError::Edit)?
+                    .batch()
+                    .clone()
+            }
+            PlanOutcome::Unchanged(_) => {
+                // 保留绑定实际基线的第一批；净无变化只记录实际命令。
+                let draft = copy_bounded(&self.group.draft, self.budget.text())?;
+                CheckedBatch::new(
+                    before,
+                    vec![(self.group.range.clone(), draft)],
+                    self.budget.patch(),
+                )?
+            }
+        };
+        base.prepare_staged_command(
+            &input_batch,
+            (&input_selection, self.selection),
+            self.now_millis,
+            self.budget.text(),
+            |candidate, selection| {
+                let parsed = parse_for_edit(candidate, self.budget)?;
+                let plan = plan_command(&parsed, selection, &self.context, self.budget)?;
+                let PlanOutcome::Changed(plan) = plan else {
+                    return Ok(None);
+                };
+                let change = validate_change(&plan, candidate, &parsed, selection, &self.context)
+                    .map_err(DocError::Edit)?;
+                Ok(Some((change.batch().clone(), change.target_selection())))
+            },
+        )
+    }
+}
+
+fn query_context(context: EditContext, generation: Option<u64>) -> EditContext {
+    generation.map_or(context, |generation| {
+        context.with_find_query_generation(generation)
+    })
 }
 
 fn parse_for_edit(snapshot: &TextSnapshot, budget: EditBudget) -> Result<Parsed, DocError> {
@@ -407,7 +637,7 @@ fn parse_for_edit(snapshot: &TextSnapshot, budget: EditBudget) -> Result<Parsed,
     })
 }
 
-fn plan_single_patch(
+pub(super) fn plan_single_patch(
     parsed: &Parsed,
     selection: &SrcSelection,
     context: &EditContext,

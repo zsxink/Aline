@@ -1,8 +1,11 @@
-//! 原生单窗的打开协调与最小只读表面。
+//! 原生单窗的打开、编辑动作及文档派生视图。
 //!
-//! 窗口持有一个只读会话、一个实际读取及至多一个最新候选；文件选择、任务与
-//! 焦点在本层装配。读取和解析在后台完成，render 只读当前状态，不读盘或解析。
+//! 窗口持有一个文档会话。读取和解析刷新各保留一个在途任务及至多一个最新候选；
+//! 文件选择、任务与焦点在本层装配，render 只读已采用的解析。
 
+mod edit_actions;
+mod editable_input;
+mod find_panel;
 mod font_invalidate;
 mod geometry;
 mod probe;
@@ -18,30 +21,36 @@ mod tokens;
 #[cfg(test)]
 mod tests;
 
+use edit_actions::{EditAction, edit_error_key};
+use find_panel::FindPanel;
 use geometry::content_metrics;
 use readonly_content::{NavigationIntent, navigation_intent};
 use readonly_hit::{HitError, HitTarget, PreparedLayout};
 use readonly_layout::LayoutError;
-use readonly_reader::{ContentCopy, ReaderSurface};
+use readonly_reader::{ContentCopy, ReaderSurface, SourceNavigationTarget};
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::sync::Arc;
+use std::time::Instant;
 
 use aline_app_core::Translator;
 use aline_buffer::{HistoryBudget, LineIndexBudget, TextBudget};
 use aline_markdown::{DiagnosticKind, ParseBudget, ParseConfig, Parsed};
 use aline_source::StorageBudget;
 use gpui::{
-    App, Bounds, Context, FocusHandle, Image, KeyBinding, Menu, MenuItem, PathPromptOptions, Role,
-    SharedString, Task, Window, WindowBounds, WindowOptions, div, prelude::*, px, rgb, rgba, size,
+    App, Bounds, Context, Entity, FocusHandle, Image, KeyBinding, Menu, MenuItem,
+    PathPromptOptions, Role, SharedString, Subscription, Task, Window, WindowBounds, WindowOptions,
+    div, prelude::*, px, rgb, rgba, size,
 };
 
 use crate::document::{DocumentStatistics, StageTimer, StageTiming};
 use crate::fonts::{FontEnvironment, FontStatus};
 use crate::{
-    DocLimits, DocumentId, EditorMode, OpenDisposition, OpenError, OpenRequestId, ReadonlyDocument,
-    ReadonlyOpenCompletion, ReadonlyOpenJob, ReadonlyOpenLimits, ReadonlySession,
+    DocLimits, DocumentId, EditorMode, ModeSwitchOutcome, OpenDisposition, OpenError,
+    OpenRequestId, ParseRefreshJob, ReadonlyDocument, ReadonlyOpenCompletion, ReadonlyOpenJob,
+    ReadonlyOpenLimits, ReadonlySession,
 };
 
 gpui::actions!(
@@ -59,6 +68,13 @@ gpui::actions!(
         ReadEnd,
         CancelNavigation,
         InvalidateFont
+    ]
+);
+
+gpui::actions!(
+    m2_document,
+    [
+        Cut, Copy, Paste, PastePlain, SelectAll, Undo, Redo, OpenFind
     ]
 );
 
@@ -90,6 +106,8 @@ pub(super) struct NativeOpenCoordinator {
     session: ReadonlySession,
     reading: bool,
     queued: Option<ReadonlyOpenJob>,
+    refreshing: bool,
+    queued_refresh: Option<ParseRefreshJob>,
     feedback: Option<&'static str>,
     return_focus: bool,
     closed: bool,
@@ -101,6 +119,8 @@ impl NativeOpenCoordinator {
             session: ReadonlySession::new(limits),
             reading: false,
             queued: None,
+            refreshing: false,
+            queued_refresh: None,
             feedback: None,
             return_focus: false,
             closed: false,
@@ -178,11 +198,16 @@ impl NativeOpenCoordinator {
         });
         let prepared = match result {
             Ok((_, Some((prepared, reason)))) => {
+                self.queued_refresh = None;
                 self.feedback = reason;
                 Some(prepared)
             }
             Ok((OpenDisposition::Failed(error), None)) => {
                 self.feedback = Some(open_error_key(&error));
+                None
+            }
+            Ok((OpenDisposition::RejectedUnresolvedDocument, None)) => {
+                self.feedback = Some("document.close_pending_changes");
                 None
             }
             Err(key) => {
@@ -206,17 +231,37 @@ impl NativeOpenCoordinator {
         Some(job)
     }
 
-    fn close_document(&mut self) {
-        self.session.close_document();
-        self.queued = None;
-        self.feedback = None;
-        self.return_focus = false;
+    fn close_document_with<T>(
+        &mut self,
+        before_close: impl FnOnce(&ReadonlyDocument) -> T,
+    ) -> Result<Option<T>, ()> {
+        match self.session.close_document_with(before_close) {
+            Ok(value) => {
+                self.queued = None;
+                self.queued_refresh = None;
+                self.feedback = None;
+                self.return_focus = false;
+                Ok(value)
+            }
+            Err(crate::CloseDisposition::Refused) => {
+                self.feedback = Some("document.close_pending_changes");
+                Err(())
+            }
+            Err(crate::CloseDisposition::Closed) => Err(()),
+        }
     }
 
-    pub(super) fn close_window(&mut self) {
-        self.close_document();
+    fn close_document(&mut self) -> bool {
+        self.close_document_with(|_| ()).is_ok()
+    }
+
+    pub(super) fn close_window(&mut self) -> bool {
+        if !self.close_document() {
+            return false;
+        }
         self.session.close_window();
         self.closed = true;
+        true
     }
 }
 
@@ -284,12 +329,15 @@ fn statistics_source(document: &ReadonlyDocument) -> Option<String> {
 }
 
 pub(super) struct NativeWindowCopy {
-    translator: Translator,
+    translator: Rc<Translator>,
     title: SharedString,
     empty: SharedString,
     open: SharedString,
     close: SharedString,
     file_menu: SharedString,
+    edit_menu: SharedString,
+    find_action: SharedString,
+    edit_actions: [SharedString; 7],
     selecting: SharedString,
     loading: SharedString,
     readonly: SharedString,
@@ -311,6 +359,12 @@ impl NativeWindowCopy {
         };
         let mut errors = BTreeMap::new();
         for key in [
+            "document.close_pending_changes",
+            "document.edit_refused",
+            "document.composition_pending",
+            "document.refresh_failed",
+            "find.failed",
+            "find.refused",
             "open_error.selection",
             "open_error.extension",
             "open_error.not_regular",
@@ -334,6 +388,17 @@ impl NativeWindowCopy {
             open: text("action.open")?,
             close: text("action.close_document")?,
             file_menu: text("menu.file")?,
+            edit_menu: text("menu.edit")?,
+            find_action: text("action.find")?,
+            edit_actions: [
+                text("action.undo")?,
+                text("action.redo")?,
+                text("action.cut")?,
+                text("action.copy")?,
+                text("action.paste")?,
+                text("action.paste_plain")?,
+                text("action.select_all")?,
+            ],
             selecting: text("window.selecting")?,
             loading: text("window.loading")?,
             readonly: text("window.readonly")?,
@@ -354,7 +419,7 @@ impl NativeWindowCopy {
                 ],
             ),
             errors,
-            translator,
+            translator: Rc::new(translator),
         })
     }
 
@@ -377,12 +442,24 @@ impl NativeWindowCopy {
         ))
     }
 
-    fn install_menu(&self, cx: &App, can_close: bool) {
+    fn install_menu(&self, cx: &App, can_close: bool, can_edit: bool) {
+        let [undo, redo, cut, copy, paste, paste_plain, select_all] = &self.edit_actions;
         cx.set_menus([
             Menu::new(self.title.clone()),
             Menu::new(self.file_menu.clone()).items([
                 MenuItem::action(self.open.clone(), OpenDocument),
                 MenuItem::action(self.close.clone(), CloseDocument).disabled(!can_close),
+            ]),
+            Menu::new(self.edit_menu.clone()).items([
+                MenuItem::action(undo.clone(), Undo).disabled(!can_edit),
+                MenuItem::action(redo.clone(), Redo).disabled(!can_edit),
+                MenuItem::action(cut.clone(), Cut).disabled(!can_edit),
+                MenuItem::action(copy.clone(), Copy).disabled(!can_edit),
+                MenuItem::action(paste.clone(), Paste).disabled(!can_edit),
+                MenuItem::action(paste_plain.clone(), PastePlain).disabled(!can_edit),
+                MenuItem::action(select_all.clone(), SelectAll).disabled(!can_edit),
+                MenuItem::separator(),
+                MenuItem::action(self.find_action.clone(), OpenFind),
             ]),
         ]);
     }
@@ -403,6 +480,14 @@ pub(crate) fn open_initial_window(
         KeyBinding::new("home", ReadStart, Some("M1Window")),
         KeyBinding::new("end", ReadEnd, Some("M1Window")),
         KeyBinding::new("escape", CancelNavigation, Some("M1Window")),
+        KeyBinding::new("cmd-x", Cut, Some("M2Editor")),
+        KeyBinding::new("cmd-c", Copy, Some("M2Editor")),
+        KeyBinding::new("cmd-v", Paste, Some("M2Editor")),
+        KeyBinding::new("cmd-shift-v", PastePlain, Some("M2Editor")),
+        KeyBinding::new("cmd-a", SelectAll, Some("M2Editor")),
+        KeyBinding::new("cmd-z", Undo, Some("M2Editor")),
+        KeyBinding::new("cmd-shift-z", Redo, Some("M2Editor")),
+        KeyBinding::new("cmd-f", OpenFind, Some("M1Window")),
     ]);
     #[cfg(debug_assertions)]
     cx.bind_keys([KeyBinding::new("cmd-alt-l", ReportLayout, Some("M1Window"))]);
@@ -414,7 +499,7 @@ pub(crate) fn open_initial_window(
             Some("M1Window"),
         )]);
     }
-    copy.install_menu(cx, false);
+    copy.install_menu(cx, false, false);
     let bounds = Bounds::centered(None, size(px(960.0), px(640.0)), cx);
     cx.open_window(
         WindowOptions {
@@ -426,8 +511,14 @@ pub(crate) fn open_initial_window(
             let entity = cx.new(|cx| NativeDocumentWindow::new(copy, locale_fallback, window, cx));
             let weak = entity.downgrade();
             window.on_window_should_close(cx, move |_, cx| {
-                let _ = weak.update(cx, |this, _| this.state.close_window());
-                true
+                weak.update(cx, |this, cx| {
+                    let close = this.state.close_window();
+                    if !close {
+                        cx.notify();
+                    }
+                    close
+                })
+                .unwrap_or(true)
             });
             entity
         },
@@ -445,8 +536,16 @@ struct NativeDocumentWindow {
     dialog_task: Option<Task<()>>,
     dialog_return_focus: Option<FocusHandle>,
     read_task: Option<Task<()>>,
+    parse_task: Option<Task<()>>,
+    find_panel: Option<(Entity<FindPanel>, Subscription)>,
+    find_return_focus: Option<FocusHandle>,
+    find_replace_task: Option<Task<()>>,
+    started: Instant,
     loaded_name: Option<SharedString>,
     reader: Option<ReaderSurface>,
+    source_input_site: Option<editable_input::SourceInputSite>,
+    input_frame: Option<editable_input::InputFrame>,
+    composing_input_frame: Option<editable_input::InputFrame>,
     next_reader_generation: u64,
     statistics: Option<(DocumentId, SharedString, SharedString)>,
     statistics_task: Option<(DocumentId, Task<()>)>,
@@ -487,8 +586,16 @@ impl NativeDocumentWindow {
             dialog_task: None,
             dialog_return_focus: None,
             read_task: None,
+            parse_task: None,
+            find_panel: None,
+            find_return_focus: None,
+            find_replace_task: None,
+            started: Instant::now(),
             loaded_name: None,
             reader: None,
+            source_input_site: None,
+            input_frame: None,
+            composing_input_frame: None,
             next_reader_generation: 0,
             statistics: None,
             statistics_task: None,
@@ -613,6 +720,7 @@ impl NativeDocumentWindow {
                     if let Some(name) = &this.loaded_name {
                         window.set_window_title(name.as_ref());
                     }
+                    this.refresh_find(cx);
                 }
                 let adopt_timing =
                     adopt_started.map_or_else(StageTiming::default, StageTimer::finish);
@@ -636,10 +744,14 @@ impl NativeDocumentWindow {
     }
 
     fn close_document(&mut self, _: &CloseDocument, window: &mut Window, cx: &mut Context<Self>) {
-        self.close_with_evidence(cx);
+        if !self.close_with_evidence(cx) {
+            cx.notify();
+            return;
+        }
         self.loaded_name = None;
         self.reader = None;
         self.invalidate_statistics();
+        self.refresh_find(cx);
         window.set_window_title(self.copy.title.as_ref());
         self.focus.focus(window, cx);
         self.update_menu(cx);
@@ -647,18 +759,21 @@ impl NativeDocumentWindow {
     }
 
     /// 关闭前捕获当前核心，关闭后在后台读磁盘并只创建证据文件。
-    fn close_with_evidence(&mut self, cx: &mut App) {
-        let packet = match (&self.evidence, self.state.session().document()) {
-            (Some(evidence), Some(document)) => match evidence.borrow_mut().closing(document) {
-                Ok(packet) => Some(packet),
-                Err(error) => {
-                    eprintln!("m1-readonly-evidence close failed: {error}");
-                    None
-                }
-            },
-            _ => None,
+    fn close_with_evidence(&mut self, cx: &mut App) -> bool {
+        let evidence = self.evidence.clone();
+        let packet = match self.state.close_document_with(|document| {
+            evidence
+                .as_ref()
+                .map(|evidence| evidence.borrow_mut().closing(document))
+        }) {
+            Ok(Some(Some(Ok(packet)))) => Some(packet),
+            Ok(Some(Some(Err(error)))) => {
+                eprintln!("m1-readonly-evidence close failed: {error}");
+                None
+            }
+            Ok(Some(None)) | Ok(None) => None,
+            Err(()) => return false,
         };
-        self.state.close_document();
         if let Some(packet) = packet {
             let closed = self.state.session().document().is_none();
             cx.background_executor()
@@ -669,6 +784,7 @@ impl NativeDocumentWindow {
                 })
                 .detach();
         }
+        true
     }
 
     /// 立即作废统计值与在途任务；关闭、替换或开始新读取时调用。
@@ -737,17 +853,29 @@ impl NativeDocumentWindow {
     fn switch_view(&mut self, mode: EditorMode, cx: &mut Context<Self>) {
         if let Some(document) = self.state.session.document_mut() {
             let before = document.core().mode();
-            if document.switch_mode(mode).is_err() {
-                self.state.feedback = Some("open_error.internal");
-            } else {
-                if let Some(evidence) = &self.evidence {
-                    evidence.borrow_mut().switching(before, mode);
+            match document.switch_mode(mode) {
+                Err(error) => self.state.feedback = Some(edit_error_key(error)),
+                Ok(ModeSwitchOutcome::Deferred) => {
+                    self.state.feedback = Some("document.composition_pending");
                 }
-                if self.state.feedback == Some("reading.large_source") {
-                    self.state.feedback = None;
+                Ok(ModeSwitchOutcome::Ready) => {
+                    if let Some(evidence) = &self.evidence {
+                        evidence.borrow_mut().switching(before, mode);
+                    }
+                    if self.state.feedback == Some("reading.large_source") {
+                        self.state.feedback = None;
+                    }
                 }
             }
+            self.refresh_find(cx);
             cx.notify();
+        }
+    }
+
+    fn dispatch_edit(&mut self, action: EditAction, window: &Window, cx: &mut Context<Self>) {
+        if !self.find_contains_focus(window, cx) {
+            self.edit_document(action, window, cx);
+            self.refresh_find(cx);
         }
     }
 
@@ -805,6 +933,16 @@ impl NativeDocumentWindow {
         let Some(document) = self.state.session.document_mut() else {
             return div().into_any_element();
         };
+        if document.is_editable()
+            && let Some(range) = reader.input_row(document, row)
+            && let Some(site) =
+                editable_input::InputSite::for_row(document, range, self.source_input_site.as_ref())
+            && let Some((input, frame)) =
+                editable_input::render(document, site, self.focus.clone(), cx)
+        {
+            self.input_frame = Some(frame);
+            return reader.wrap_input_row(row, input);
+        }
         let failure = self
             .copy
             .errors
@@ -823,33 +961,45 @@ impl NativeDocumentWindow {
                     this.accept_reading_hit(target, candidate, prepared, cx)
                 });
             },
-            move |offset, _, cx| {
-                let _ = navigate.update(cx, |this, cx| this.navigate_to_source(offset, cx));
+            move |target, _, cx| {
+                let _ = navigate.update(cx, |this, cx| this.navigate_to_source(target, cx));
             },
         )
     }
 
     /// 目录与脚注跳转：先写入只读导航锚点，再把目标行滚到顶部。
-    fn navigate_to_source(&mut self, offset: usize, cx: &mut Context<Self>) {
+    fn navigate_to_source(&mut self, target: SourceNavigationTarget, cx: &mut Context<Self>) {
         let Some(reader) = &self.reader else {
             return;
         };
         let Some(document) = self.state.session.document_mut() else {
             return;
         };
-        let Ok(source) = document.parsed().snapshot().src_offset(offset) else {
+        if !document.is_parse_current()
+            || reader.check_index(document.parsed()).is_err()
+            || reader.layout_token() != Some(target.layout)
+            || document.parsed().projection().id() != &target.projection
+            || target.source.snapshot_id() != document.parsed().snapshot().id()
+        {
             return;
-        };
+        }
         let Ok(identity) = document.input_identity() else {
             return;
         };
-        let Ok(selection) = aline_buffer::SrcSelection::new(source.clone(), source) else {
-            return;
-        };
-        if document.navigate(&identity, &selection).is_err() {
+        if target.identity.validate(&identity).is_err() {
             return;
         }
-        if reader.scroll_to_source(document, offset).is_ok()
+        let Ok(selection) =
+            aline_buffer::SrcSelection::new(target.source.clone(), target.source.clone())
+        else {
+            return;
+        };
+        if document.navigate(&target.identity, &selection).is_err() {
+            return;
+        }
+        if reader
+            .scroll_to_source(document, target.source.byte_offset())
+            .is_ok()
             && let Some(evidence) = &self.evidence
         {
             evidence.borrow_mut().event("jump");
@@ -972,13 +1122,15 @@ impl NativeDocumentWindow {
                     .text_color(rgb(tokens::TEXT))
                     .hover(|style| style.bg(rgba(tokens::HOVER)))
             })
-            .on_click(cx.listener(move |this, _, _, cx| this.switch_view(mode, cx)))
-            .on_key_down(cx.listener(move |this, event: &gpui::KeyDownEvent, _, cx| {
-                if event.keystroke.key == "enter" || event.keystroke.key == "space" {
-                    this.switch_view(mode, cx);
-                    cx.stop_propagation();
-                }
-            }))
+            .on_click(cx.listener(move |this, _, window, cx| this.request_view(mode, window, cx)))
+            .on_key_down(
+                cx.listener(move |this, event: &gpui::KeyDownEvent, window, cx| {
+                    if event.keystroke.key == "enter" || event.keystroke.key == "space" {
+                        this.request_view(mode, window, cx);
+                        cx.stop_propagation();
+                    }
+                }),
+            )
             .child(label)
             .into_any_element()
     }
@@ -987,6 +1139,10 @@ impl NativeDocumentWindow {
         self.copy.install_menu(
             cx,
             self.state.session().document().is_some() || self.state.session().is_loading(),
+            self.state
+                .session()
+                .document()
+                .is_some_and(ReadonlyDocument::is_editable),
         );
     }
 }
@@ -1019,12 +1175,18 @@ impl Render for NativeDocumentWindow {
             reader.schedule_height_hint(window, cx);
         }
         let document_open = self.state.session().document().is_some();
+        let editable = self
+            .state
+            .session()
+            .document()
+            .is_some_and(ReadonlyDocument::is_editable);
         let mode = self
             .state
             .session()
             .document()
             .map(|document| document.core().mode());
         let entity = cx.entity().downgrade();
+        self.input_frame = None;
         let reader_element = self.reader.as_ref().map(|reader| {
             reader.render(move |row, _, cx| {
                 entity
@@ -1177,7 +1339,7 @@ impl Render for NativeDocumentWindow {
                         cx,
                     ))
             }))
-            .when(document_open, |row| {
+            .when(document_open && !editable, |row| {
                 row.child(
                     div()
                         .pl_2()
@@ -1217,29 +1379,60 @@ impl Render for NativeDocumentWindow {
                 .flex()
                 .flex_col()
                 .children(notice)
+                .children(self.find_panel.as_ref().map(|(panel, _)| panel.clone()))
                 .child(content_body),
         );
         let root = div()
             .size_full()
             .bg(rgb(tokens::SURFACE))
             .text_color(rgb(tokens::TEXT))
-            .key_context("M1Window")
+            .key_context(if editable {
+                "M1Window M2Editor"
+            } else {
+                "M1Window"
+            })
             .track_focus(&self.focus)
+            .on_key_down(cx.listener(Self::document_key))
             .on_action(cx.listener(Self::open_document))
             .on_action(cx.listener(Self::close_document))
-            .on_action(cx.listener(|this, _: &CancelNavigation, _, cx| {
+            .on_action(cx.listener(Self::open_find))
+            .on_action(cx.listener(|this, _: &Cut, window, cx| {
+                this.dispatch_edit(EditAction::Cut, window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &Copy, window, cx| {
+                this.dispatch_edit(EditAction::Copy, window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &Paste, window, cx| {
+                this.dispatch_edit(EditAction::Paste, window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &PastePlain, window, cx| {
+                this.dispatch_edit(EditAction::Paste, window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &SelectAll, window, cx| {
+                this.dispatch_edit(EditAction::SelectAll, window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &Undo, window, cx| {
+                this.dispatch_edit(EditAction::Undo, window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &Redo, window, cx| {
+                this.dispatch_edit(EditAction::Redo, window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &CancelNavigation, window, cx| {
+                if this.close_focused_find(window, cx) || this.escape_document_input(window, cx) {
+                    return;
+                }
                 if let Some(reader) = &this.reader
                     && reader.cancel_restore()
                 {
                     cx.notify();
                 }
             }))
-            .on_action(
-                cx.listener(|this, _: &VisualView, _, cx| this.switch_view(EditorMode::Visual, cx)),
-            )
-            .on_action(
-                cx.listener(|this, _: &SourceView, _, cx| this.switch_view(EditorMode::Source, cx)),
-            )
+            .on_action(cx.listener(|this, _: &VisualView, window, cx| {
+                this.request_view(EditorMode::Visual, window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &SourceView, window, cx| {
+                this.request_view(EditorMode::Source, window, cx)
+            }))
             .on_action(cx.listener(|this, _: &ReadPageUp, window, cx| {
                 if let Some(reader) = &this.reader {
                     reader.page(-1.0, window.viewport_size().height);
@@ -1276,12 +1469,18 @@ impl Render for NativeDocumentWindow {
                     cx.notify();
                 }
             }))
-            .on_action(cx.listener(|_, _: &FocusNext, window, cx| window.focus_next(cx)))
-            .on_action(cx.listener(|_, _: &FocusPrevious, window, cx| window.focus_prev(cx)))
+            .on_action(cx.listener(|this, _: &FocusNext, window, cx| {
+                this.move_window_focus(true, window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &FocusPrevious, window, cx| {
+                this.move_window_focus(false, window, cx)
+            }))
             .on_action(cx.listener(Self::invalidate_font))
             .flex()
             .flex_col()
             .child(toolbar)
+            // GPUI 0.3.9 采用最后注册的 handler，正文绘制时覆盖此组合借位。
+            .children(self.offscreen_input(cx))
             .child(content)
             .child(status);
         #[cfg(debug_assertions)]

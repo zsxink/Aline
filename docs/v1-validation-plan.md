@@ -305,10 +305,14 @@ M0 编码基础证据（2026-10-31）：行尾边界金样已固定 CR-X-LF 删�
 
 **2026-11-12 后续裁决（决定 §38，不改写上条）：** 5.1b 已按用户指令「5.1b 也勾选」勾选，5.1 伞项随之勾选。勾选口径为**跨轮证据组合**：run-6（`4_5_1bd/`）覆盖新断点两侧真实像素点击、两视图往返、换宽与源码锚点恢复；2026-11-12 字体失效补跑（run-3）覆盖字体失效分项。不写成同一轮取证；字体失效仍只证明触发链，不证明失效后的点击/锚点/滚动。V-07、AC-09、V-09 与 M1 出口仍未整项通过。
 
+**2026-11-17 M2 无头编辑分项（V-07 仍未整项通过）：** 本轮 workspace tests 通过，其中 `aline-ui` 188 项用例中 187 passed、1 ignored，覆盖 37 项输入分组、5 项 native-input 发布协议与 11 项 handler 单测；另有 DocCore 查找替换原子拒绝、普通输入跨块重定向、同版本旧行 callback 拒绝、删除/方向键、Source 换行后继续输入、组合离开当前 reader 行时自然结束等无头回归。CodeGraph sync/status、公开 API、engineering/lints/safety 守卫通过。**未执行/未通过：** 真实原生输入窗口操作及中文系统 IME 矩阵、候选窗定位/滚动/DPI、编辑态焦点借还、候选发布等待保存、生产打开写入；独立分析确认普通输入/IME 候选发布仍可能同步全文解析/构造候选，未满足 M2 热路径要求；Windows/Linux/Intel Mac 未测。查找面板尚无本轮真实中文逐项跳转/替换证据。不得据此判定 V-07、AC-02～08 或 M2 整项通过。代码与限制记录见 `openspec/changes/m2-editable-core/tasks.md`、`openspec/changes/qmd-w5-native-ime-input/tasks.md` 和本地 `logs/validation/m2-editable-core/2026-11-17-wrap-up.md`。
+
 
 ## V-08 · 文件操作、临时图片与恢复事务
 
 **M0 身份/快照设计准备（2026-10-31，组 8）：** 已有文档/工作版本/快照来源/配置/请求采纳身份、冻结当前输入与已登记资源、组合期显式等待/自动保存延后及独立恢复读取的无头基础。`SnapshotId` 不是版本或内容哈希；宿主须在引用生效前完整登记资源，M0 保守保留而不精确追踪/回收。source create-only 集成用例只证明宿主可保留实际 `Written` 及既有目标拒绝分类，即使派生输入过期/块关闭也不能丢弃已发生写盘事实；它未消费到 DocCore 保存点或真实文件协调器。**未执行**：现有文件安全替换及 metadata 保全、版本竞争/权限/断电、多资源事务、真实手动/自动保存、10 秒恢复与恢复图片可读、另存为迁移/清理、真实平台组合等待、Windows/Linux/Intel Mac。M2 前身份/事务方案及最小安全闭环仍为独立出口，V-08 未通过。证据见[8.5 回填记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-8/step-8.5/report.md)。
+
+**2026-11-17 M2/W4 中途状态（V-08 仍未通过）：** V-08 身份/事务 design 已通过独立审查；`DocCore` 发布等待状态与 `PersistenceCoordinator` 有无头测试，ALINEREC v1 仅有解码器金样/单测，W4 ED-01 等待/取消与晚到回执有 10 项隔离验证。现有 `prepare_checked_replace` 的 staging 权限、元数据迁移和发布对象身份步骤仍拒绝，不能用于生产 Save/Save As；W4 无生产会话消费者、真实写入成功回执、自动保存/冲突重载/10 秒磁盘恢复/资源迁移。独立架构审查记录该路径需平台专用 `aline-source` 能力及 macOS 文件/目录同步与权限取证；当前无依据绕过拒绝点。生产保存仍关闭，Windows/Linux/Intel Mac 及断电保证未测。详见 `openspec/changes/qmd-w4-persistence-recovery/tasks.md`、`design.md` 与本地 `logs/validation/m2-editable-core/2026-11-17-wrap-up.md`。
 
 产物：文件树拖拽源/目标、目录移动、跨卷/外部拖放、冲突/取消/权限失败、回收站不可用、打开文件移动时的保存与关联行为。文档路径、图片预览和资源引用的同步需有实际样例；不能静默覆盖重名目标或破坏源文件。
 

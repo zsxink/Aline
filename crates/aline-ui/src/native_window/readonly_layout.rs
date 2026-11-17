@@ -7,7 +7,9 @@ use std::rc::Rc;
 
 use super::readonly_content::{Block, ContentError, ContentIndex, ContentRow};
 use crate::{DocumentId, EditorMode, ReadonlyDocument, WorkingVersion};
-use aline_buffer::{Affinity, LineIndex, LineIndexBudget, SnapshotId, SrcOffset, SrcRange};
+use aline_buffer::{
+    Affinity, LineIndex, LineIndexBudget, SnapshotId, SrcOffset, SrcRange, TextBudget,
+};
 use aline_markdown::{MappingBudget, Parsed, Projection, ProjectionId};
 
 const SOURCE_FRAGMENT_BYTES: usize = 4096;
@@ -80,15 +82,28 @@ impl ItemLayoutBudget {
 }
 pub(super) struct ReaderIndex {
     snapshot: SnapshotId,
+    projection: ProjectionId,
     source: Vec<SrcRange>,
     visual: ContentIndex,
 }
 impl ReaderIndex {
     pub(super) fn new(document: &ReadonlyDocument, max_rows: usize) -> Result<Self, LayoutError> {
-        let parsed = document.parsed();
+        Self::from_parsed(document.parsed(), max_rows, document.text_budget())
+    }
+
+    pub(super) fn from_parsed(
+        parsed: &Parsed,
+        max_rows: usize,
+        budget: TextBudget,
+    ) -> Result<Self, LayoutError> {
         let snapshot = parsed.snapshot();
-        let text = document.baseline().source();
-        let lines = LineIndex::build(text, LineIndexBudget::new(max_rows))
+        let full_range = snapshot
+            .src_range(0..snapshot.len_bytes())
+            .map_err(|_| LayoutError::InvalidRange)?;
+        let text = snapshot
+            .slice(&full_range, budget)
+            .map_err(|_| LayoutError::Budget)?;
+        let lines = LineIndex::build(&text, LineIndexBudget::new(max_rows))
             .map_err(|_| LayoutError::Budget)?;
         // 每个逻辑行占至少一项，额外项只来自先前已切下的完整分片。
         // 打开阶段已限制全文字节数，因此分片开销随该上限有界。
@@ -128,9 +143,13 @@ impl ReaderIndex {
         let visual = ContentIndex::new(parsed, max_rows).map_err(content_error)?;
         Ok(Self {
             snapshot: snapshot.id().clone(),
+            projection: parsed.projection().id().clone(),
             source,
             visual,
         })
+    }
+    pub(super) fn snapshot_id(&self) -> &SnapshotId {
+        &self.snapshot
     }
     pub(super) fn row_count(&self, mode: EditorMode) -> usize {
         match mode {
@@ -337,8 +356,9 @@ impl ReaderIndex {
         }
         Ok(row)
     }
-    fn check(&self, parsed: &Parsed) -> Result<(), LayoutError> {
-        if &self.snapshot == parsed.snapshot().id() {
+    pub(super) fn check(&self, parsed: &Parsed) -> Result<(), LayoutError> {
+        if &self.snapshot == parsed.snapshot().id() && &self.projection == parsed.projection().id()
+        {
             Ok(())
         } else {
             Err(LayoutError::StaleInput)
@@ -569,8 +589,8 @@ impl LayoutKey {
         environment: LayoutEnvironment,
     ) -> Self {
         Self {
-            document: document.core().document_id().clone(),
-            version: document.core().version(),
+            document: document.parsed_identity().document_id().clone(),
+            version: document.parsed_identity().working_version(),
             snapshot: document.parsed().snapshot().id().clone(),
             projection: document.parsed().projection().id().clone(),
             config: document.parsed().config(),
@@ -654,8 +674,8 @@ impl LayoutCache {
 mod tests {
     use super::*;
     use crate::{
-        DocLimits, ReadonlyDocument, ReadonlyFileAccess, ReadonlyFileInput, ReadonlyOpenLimits,
-        ReadonlySession,
+        DocLimits, ParseRefreshDisposition, ReadonlyDocument, ReadonlyFileAccess,
+        ReadonlyFileInput, ReadonlyOpenLimits, ReadonlySession,
     };
     use std::error::Error;
     use std::io::{self, Cursor};
@@ -677,8 +697,11 @@ mod tests {
         }
     }
     fn session(bytes: &[u8]) -> Result<ReadonlySession, Box<dyn Error>> {
+        open_fixture(bytes, false)
+    }
+    fn open_fixture(bytes: &[u8], editable: bool) -> Result<ReadonlySession, Box<dyn Error>> {
         let max = 1024 * 1024;
-        let mut session = ReadonlySession::new(ReadonlyOpenLimits::new(
+        let limits = ReadonlyOpenLimits::new(
             StorageBudget::new(max),
             DocLimits::new(
                 TextBudget::new(max),
@@ -687,13 +710,88 @@ mod tests {
             ),
             ParseConfig::m0(),
             ParseBudget::m0(),
-        ));
+        );
+        let mut session = ReadonlySession::new(if editable {
+            limits.with_editing()
+        } else {
+            limits
+        });
         let request = session.request_open()?;
         let job = session
             .accept_selection(&request, Some(vec![PathBuf::from("fixture.md")]))?
             .ok_or("job")?;
         session.accept_open(job.read_with(&Files(bytes)));
         Ok(session)
+    }
+
+    #[test]
+    fn source_index_uses_candidate_snapshot_after_unicode_line_edits() -> Result<(), Box<dyn Error>>
+    {
+        use aline_buffer::TextSnapshot;
+        use std::sync::Arc;
+
+        let budget = TextBudget::new(4096);
+        let original = TextSnapshot::new("a\nb\nc".to_owned(), budget)?;
+        // 删除首行，写入两行含多字节字符的内容。
+        let overlay = TextSnapshot::with_overlay(
+            &original,
+            original.src_range(0..2)?,
+            Arc::new("汉\r\n🙂\n".to_owned()),
+            budget,
+        )?;
+        let parsed = aline_markdown::parse(&overlay, ParseConfig::m0(), ParseBudget::m0())?;
+        let index = ReaderIndex::from_parsed(&parsed, 64, budget)?;
+        assert_eq!(index.row_count(EditorMode::Source), 4);
+        for (row, (bytes, expected)) in [(0..3, "汉"), (5..9, "🙂"), (10..11, "b"), (12..13, "c")]
+            .into_iter()
+            .enumerate()
+        {
+            let range = index.source_range(&parsed, EditorMode::Source, row)?;
+            assert_eq!(range.byte_range(), bytes);
+            assert_eq!(overlay.slice(&range, budget)?, expected);
+        }
+        assert!(overlay.src_offset(1).is_err());
+        let original_parsed =
+            aline_markdown::parse(&original, ParseConfig::m0(), ParseBudget::m0())?;
+        assert_eq!(index.check(&original_parsed), Err(LayoutError::StaleInput));
+        assert_eq!(
+            ReaderIndex::from_parsed(&original_parsed, 64, budget)?.row_count(EditorMode::Source),
+            3
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn refresh_index_failure_preserves_the_previous_parse_and_index() -> Result<(), Box<dyn Error>>
+    {
+        let mut session = open_fixture(b"a\nb\nc", true)?;
+        let document = session.document().ok_or("missing document")?;
+        let initial_index = ReaderIndex::new(document, 64)?;
+        let projection = document.parsed().projection().id().clone();
+        let completion = session.begin_parse_refresh()?.run();
+        let result = session.accept_parse_refresh_with(completion, |document, candidate| {
+            ReaderIndex::from_parsed(candidate, 1, document.text_budget())
+        });
+        assert!(matches!(result, Err(LayoutError::Budget)));
+
+        let document = session.document().ok_or("missing document")?;
+        assert_eq!(document.parsed().projection().id(), &projection);
+        initial_index.check(document.parsed())?;
+        let completion = session.begin_parse_refresh()?.run();
+        let (disposition, prepared_index) = session
+            .accept_parse_refresh_with(completion, |document, candidate| {
+                ReaderIndex::from_parsed(candidate, 64, document.text_budget())
+            })?;
+        let document = session.document().ok_or("missing document")?;
+        assert!(matches!(disposition, ParseRefreshDisposition::Applied));
+        prepared_index
+            .ok_or("missing index")?
+            .check(document.parsed())?;
+        assert_eq!(
+            initial_index.check(document.parsed()),
+            Err(LayoutError::StaleInput)
+        );
+        Ok(())
     }
     fn environment(width: f32) -> Result<LayoutEnvironment, Box<dyn Error>> {
         Ok(LayoutEnvironment::new(width, 2.0, 1, true, 16.0, 24.0)?)

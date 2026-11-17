@@ -149,7 +149,7 @@ fn find_replace_all_visual_is_one_undo_for_multiple_cross_block_hits() -> TestRe
     let parsed = parse(snapshot, ParseConfig::m0(), ParseBudget::m0())?;
     let version = FindVersion::new(1, 0, 0);
     let results = find_matches(snapshot, version, "a\n\nb", FindCase::Sensitive, FIND)?;
-    let context = EditContext::new(EditMode::Visual);
+    let context = EditContext::new(EditMode::Visual).with_find_query_generation(0);
     let plan = plan_find_replace(
         &results,
         &version,
@@ -225,7 +225,7 @@ fn find_replace_visual_refuses_deleting_an_invisible_paragraph_gap() -> TestResu
     assert_eq!(buffer.undo_depth(), 0);
     assert_eq!(buffer.redo_depth(), 0);
 
-    let context = EditContext::new(EditMode::Source);
+    let context = EditContext::new(EditMode::Source).with_find_query_generation(0);
     let plan = plan_find_replace(
         &results,
         &version,
@@ -266,26 +266,30 @@ fn find_replace_visual_requires_a_complete_aligned_entity_or_exact_text() -> Tes
     let version = FindVersion::new(1, 0, 3);
     let visual = EditContext::new(EditMode::Visual).with_find_query_generation(3);
 
-    let partial = find_matches(snapshot, version, "amp", FindCase::Sensitive, FIND)?;
-    let replace = FindReplacement::Current {
-        match_index: 0,
-        text: "lt",
-    };
-    assert!(matches!(
-        plan_find_replace(
-            &partial,
-            &version,
-            &parsed,
-            buffer.selection(),
-            &visual,
-            replace,
-            edit_budget()
-        ),
-        Err(EditRefusal::RereadFailed {
-            reason: RereadFailure::Projection,
-            ..
-        })
-    ));
+    for query in ["amp", "a &am", "amp; z"] {
+        let partial = find_matches(snapshot, version, query, FindCase::Sensitive, FIND)?;
+        assert!(
+            matches!(
+                plan_find_replace(
+                    &partial,
+                    &version,
+                    &parsed,
+                    buffer.selection(),
+                    &visual,
+                    FindReplacement::Current {
+                        match_index: 0,
+                        text: "lt",
+                    },
+                    edit_budget()
+                ),
+                Err(EditRefusal::RereadFailed {
+                    reason: RereadFailure::Projection,
+                    ..
+                })
+            ),
+            "{query}"
+        );
+    }
     assert_eq!(buffer.text(TEXT)?.as_ref(), original);
     assert_eq!(buffer.selection().anchor().byte_offset(), 1);
     assert_eq!(buffer.selection().head().byte_offset(), 0);
@@ -293,7 +297,11 @@ fn find_replace_visual_requires_a_complete_aligned_entity_or_exact_text() -> Tes
     assert_eq!(buffer.undo_depth(), 0);
     assert_eq!(buffer.redo_depth(), 0);
 
-    for (query, replacement, expected) in [("&amp;", "&lt;", "a < z"), ("z", "x", "a & x")] {
+    for (query, replacement, expected) in [
+        ("&amp;", "&lt;", "a < z"),
+        ("z", "x", "a & x"),
+        ("a &amp;", "b &lt;", "b < z"),
+    ] {
         let hits = find_matches(snapshot, version, query, FindCase::Sensitive, FIND)?;
         let outcome = plan_find_replace(
             &hits,
@@ -321,37 +329,73 @@ fn find_replace_requires_the_current_query_generation_when_consumed() -> TestRes
     let snapshot = TextSnapshot::new("word word".into(), TEXT)?;
     let parsed = parse(&snapshot, ParseConfig::m0(), ParseBudget::m0())?;
     let selection = SrcSelection::new(snapshot.src_offset(0)?, snapshot.src_offset(0)?)?;
-    let version = FindVersion::new(1, 0, 13);
-    let results = find_matches(&snapshot, version, "word", FindCase::Sensitive, FIND)?;
-    let scope = EditContext::new(EditMode::Source);
-    let outcome = plan_find_replace(
-        &results,
-        &version,
-        &parsed,
-        &selection,
-        &scope,
-        FindReplacement::All("new"),
-        edit_budget(),
-    )?;
-    let PlanOutcome::Changed(plan) = outcome else {
-        return Err("expected a change for both matches".into());
-    };
-    for context in [scope, scope.with_find_query_generation(14)] {
-        assert!(matches!(
-            validate_change(&plan, &snapshot, &parsed, &selection, &context),
-            Err(EditRefusal::StaleFindResults)
-        ));
-    }
-    assert!(
+    let source = EditContext::new(EditMode::Source);
+    for generation in [0, 13] {
+        let version = FindVersion::new(1, 0, generation);
+        let results = find_matches(&snapshot, version, "word", FindCase::Sensitive, FIND)?;
+        let outcome = plan_find_replace(
+            &results,
+            &version,
+            &parsed,
+            &selection,
+            &source,
+            FindReplacement::All("new"),
+            edit_budget(),
+        )?;
+        let PlanOutcome::Changed(plan) = outcome else {
+            return Err("expected a change for both matches".into());
+        };
+        for context in [source, source.with_find_query_generation(generation + 1)] {
+            assert!(matches!(
+                validate_change(&plan, &snapshot, &parsed, &selection, &context),
+                Err(EditRefusal::StaleFindResults)
+            ));
+        }
         validate_change(
             &plan,
             &snapshot,
             &parsed,
             &selection,
-            &scope.with_find_query_generation(13),
-        )
-        .is_ok()
-    );
+            &source.with_find_query_generation(generation),
+        )?;
+    }
+    Ok(())
+}
+
+#[test]
+fn find_replace_visual_refuses_matches_with_hidden_bytes_or_open_separator_edges() -> TestResult {
+    let snapshot = TextSnapshot::new("left\n\nright **bold** next\n\nlast".into(), TEXT)?;
+    let parsed = parse(&snapshot, ParseConfig::m0(), ParseBudget::m0())?;
+    let selection = SrcSelection::new(snapshot.src_offset(0)?, snapshot.src_offset(0)?)?;
+    let version = FindVersion::new(1, 0, 0);
+    let context = EditContext::new(EditMode::Visual).with_find_query_generation(0);
+    for query in [
+        "left\n",
+        "\nright",
+        "right **bold",
+        "bold** next",
+        "next\n\n",
+    ] {
+        let hits = find_matches(&snapshot, version, query, FindCase::Sensitive, FIND)?;
+        assert!(
+            matches!(
+                plan_find_replace(
+                    &hits,
+                    &version,
+                    &parsed,
+                    &selection,
+                    &context,
+                    FindReplacement::All("replacement"),
+                    edit_budget()
+                ),
+                Err(EditRefusal::RereadFailed {
+                    reason: RereadFailure::Projection,
+                    ..
+                })
+            ),
+            "{query:?}"
+        );
+    }
     Ok(())
 }
 
@@ -569,6 +613,25 @@ fn find_replace_refuses_protected_or_hidden_visual_changes_before_any_patch() ->
             FindReplacement::Current {
                 match_index: 0,
                 text: "[label](https://new)"
+            },
+            edit_budget()
+        ),
+        Err(EditRefusal::RereadFailed {
+            reason: RereadFailure::Projection,
+            ..
+        })
+    ));
+    let label = find_matches(&source, version, "label", FindCase::Sensitive, FIND)?;
+    assert!(matches!(
+        plan_find_replace(
+            &label,
+            &version,
+            &parsed,
+            &selection,
+            &visual,
+            FindReplacement::Current {
+                match_index: 0,
+                text: "*label*"
             },
             edit_budget()
         ),

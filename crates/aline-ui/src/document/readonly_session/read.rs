@@ -222,6 +222,8 @@ impl ReadonlyOpenJob {
                 baseline,
                 core,
                 parsed,
+                parsed_identity: identity,
+                pending_parse: None,
                 editable: self.limits.editable,
                 limits: self.limits.document,
             },

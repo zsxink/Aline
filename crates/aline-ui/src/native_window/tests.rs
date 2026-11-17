@@ -306,3 +306,211 @@ fn parse_fallback_messages_cover_both_diagnostic_kinds() {
         "reading.parse_raw_fallback"
     );
 }
+
+fn find_fixture(text: &[u8], editable: bool) -> Result<crate::ReadonlySession, Box<dyn Error>> {
+    use crate::{DocLimits, ReadonlyOpenLimits, ReadonlySession};
+    use aline_buffer::{HistoryBudget, LineIndexBudget, TextBudget};
+    use aline_markdown::{ParseBudget, ParseConfig};
+    use aline_source::StorageBudget;
+
+    let bytes = 64 * 1024;
+    let limits = ReadonlyOpenLimits::new(
+        StorageBudget::new(bytes),
+        DocLimits::new(
+            TextBudget::new(bytes),
+            LineIndexBudget::new(1024),
+            HistoryBudget::new(32, bytes),
+        ),
+        ParseConfig::m0(),
+        ParseBudget::m0(),
+    );
+    let mut session = ReadonlySession::new(if editable {
+        limits.with_editing()
+    } else {
+        limits
+    });
+    let request = session.request_open()?;
+    let read = session
+        .accept_selection(&request, Some(vec![PathBuf::from("find.md")]))?
+        .ok_or("open job")?;
+    assert!(matches!(
+        session.accept_open(read.read_with(&Files(text))),
+        crate::OpenDisposition::Applied
+    ));
+    Ok(session)
+}
+
+#[test]
+fn find_query_generation_and_working_version_reject_late_results() -> Result<(), Box<dyn Error>> {
+    use super::find_panel::{FindDirection, SearchState};
+    use aline_edit::{EditRefusal, FindCase};
+    use gpui::SharedString;
+
+    let mut session = find_fixture(b"Demo demo", true)?;
+    let doc = session.document_mut().ok_or("document")?;
+    let snapshot = doc.current_snapshot()?;
+    let mut search = SearchState::default();
+    let query = SharedString::from("demo");
+    let old = search
+        .submit(Some(snapshot.clone()), query.clone(), FindCase::Insensitive)
+        .ok_or("old")?;
+    search.query_changed(false);
+    let (key, results) = search
+        .submit(Some(snapshot.clone()), query.clone(), FindCase::Sensitive)
+        .ok_or("new")?
+        .run();
+    assert!(search.complete(&key, results));
+    let (old_key, old_results) = old.run();
+    assert!(!search.complete(&old_key, old_results));
+    let hit = search.target(
+        &snapshot,
+        query.clone(),
+        FindCase::Sensitive,
+        FindDirection::Next,
+    )?;
+    assert_eq!(hit.range().byte_range(), 5..9);
+    assert!(search.accept_target(&hit));
+
+    let identity = doc.input_identity()?;
+    doc.edit_core()?.replace_selection(&identity, "!", 1)?;
+    let changed = doc.current_snapshot()?;
+    assert_ne!(changed.version(), snapshot.version());
+    assert!(matches!(
+        search.target(
+            &changed,
+            query.clone(),
+            FindCase::Sensitive,
+            FindDirection::Next
+        ),
+        Err(EditRefusal::StaleFindResults)
+    ));
+    let latest = search
+        .submit(Some(changed), query, FindCase::Sensitive)
+        .ok_or("latest")?;
+    assert!(!search.accept_target(&hit));
+    let (key, results) = latest.run();
+    assert!(search.complete(&key, results));
+    Ok(())
+}
+
+#[test]
+fn find_same_matches_across_modes_and_replacement_field_change() -> Result<(), Box<dyn Error>> {
+    use super::find_panel::{FindDirection, SearchState};
+    use aline_edit::FindCase;
+    use gpui::SharedString;
+
+    let mut session = find_fixture(b"cat cat", false)?;
+    let doc = session.document_mut().ok_or("document")?;
+    let snapshot = doc.current_snapshot()?;
+    let query = SharedString::from("cat");
+    let case = FindCase::Sensitive;
+    let mut search = SearchState::default();
+    let (key, results) = search
+        .submit(Some(snapshot.clone()), query.clone(), case)
+        .ok_or("search")?
+        .run();
+    assert!(search.complete(&key, results));
+    let last = search.target(&snapshot, query.clone(), case, FindDirection::Previous)?;
+    assert_eq!(last.range().byte_range(), 4..7);
+    assert!(search.accept_target(&last));
+    doc.switch_mode(EditorMode::Source)?;
+    let source = doc.current_snapshot()?;
+    assert!(
+        search
+            .submit(Some(source.clone()), query.clone(), case)
+            .is_none()
+    );
+
+    search.query_changed(true);
+    assert!(!search.accept_target(&last));
+    let (key, results) = search
+        .submit(Some(source.clone()), query.clone(), case)
+        .ok_or("replacement refresh")?
+        .run();
+    assert!(search.complete(&key, results));
+    let next = search.target(&source, query, case, FindDirection::Next)?;
+    assert_eq!(next.range().byte_range(), 0..3);
+    Ok(())
+}
+
+#[test]
+fn find_hidden_protected_and_visible_targets_choose_correct_reveal_mode()
+-> Result<(), Box<dyn Error>> {
+    use super::find_panel::reveal_in_source;
+
+    let text = "中 [label](target)\n\n<!-- marker -->\n\nx &amp; y";
+    let session = find_fixture(text.as_bytes(), false)?;
+    let parsed = session.document().ok_or("document")?.parsed();
+    for (query, source_expected) in [
+        ("中", false),
+        ("label", false),
+        ("target", true),
+        ("marker", true),
+        ("amp", true),
+        ("&amp;", false),
+    ] {
+        let start = text.find(query).ok_or("fixture range")?;
+        let range = parsed.snapshot().src_range(start..start + query.len())?;
+        assert_eq!(reveal_in_source(parsed, &range), source_expected, "{query}");
+    }
+    Ok(())
+}
+
+#[test]
+fn find_replace_all_rejects_stale_query_and_keeps_one_undo_step() -> Result<(), Box<dyn Error>> {
+    use super::find_panel::replace_all_for_test;
+    use crate::{CommitOutcome, DocError};
+    use aline_edit::EditRefusal;
+
+    let mut session = find_fixture(b"cat\n\ncat", true)?;
+    let doc = session.document_mut().ok_or("document")?;
+    let initial = doc.input_identity()?;
+    let before = doc.core().current_selection();
+    assert!(matches!(
+        replace_all_for_test(doc, "cat".into(), "dog".into(), 1),
+        Err(DocError::Edit(EditRefusal::StaleFindResults))
+    ));
+    assert_eq!(doc.input_identity()?, initial);
+    assert_eq!(doc.core().current_selection(), before);
+    assert_eq!(doc.core().undo_depth(), 0);
+    assert_eq!(doc.core().buffer_text()?, "cat\n\ncat");
+    assert!(matches!(
+        replace_all_for_test(doc, "cat".into(), "dog".into(), 0)?,
+        CommitOutcome::Committed { .. }
+    ));
+    assert_eq!(doc.core().buffer_text()?, "dog\n\ndog");
+    assert_eq!(doc.core().undo_depth(), 1);
+    doc.edit_core()?.undo()?;
+    assert_eq!(doc.core().buffer_text()?, "cat\n\ncat");
+    Ok(())
+}
+
+#[test]
+fn find_panel_catalogs_cover_controls_status_and_count() -> Result<(), Box<dyn Error>> {
+    for locale in [aline_app_core::Locale::ZhCn, aline_app_core::Locale::En] {
+        let translator = aline_app_core::Translator::embedded(locale)?;
+        for key in [
+            "action.find",
+            "find.query",
+            "find.replacement",
+            "find.previous",
+            "find.next",
+            "find.case_sensitive",
+            "find.replace_current",
+            "find.replace_all",
+            "find.close",
+            "find.empty",
+            "find.no_matches",
+            "find.no_document",
+            "find.readonly",
+            "find.pending",
+            "find.failed",
+            "find.refused",
+        ] {
+            assert!(!translator.t(key)?.is_empty());
+        }
+        let count = translator.t_with("find.count", &[("current", "2"), ("total", "3")])?;
+        assert!(count.contains('2') && count.contains('3'));
+    }
+    Ok(())
+}

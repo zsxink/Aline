@@ -6,7 +6,7 @@
 mod common;
 
 use aline_buffer::{HistoryBudget, LineIndexBudget, SelectionSpec, TextBudget};
-use aline_ui::{CommitOutcome, DocCore, DocError, DocLimits};
+use aline_ui::{CommitOutcome, DocCore, DocError, DocLimits, EditorMode};
 use common::{
     assert_buffer, assert_closed, assert_committed, assert_history, assert_new_snapshot,
     assert_open, assert_rejected_without_change, assert_same_snapshot, assert_snapshot,
@@ -693,6 +693,162 @@ fn pending_redo_restores_collapsed_selection() -> Result<(), Box<dyn std::error:
     assert_history(&doc, 0, 0, 0);
     assert_open(&doc, 0, Some("abc"), 3, 3);
     common::assert_idle(&doc);
+    Ok(())
+}
+
+fn source_editable(limits: DocLimits) -> Result<DocCore, DocError> {
+    let mut doc = DocCore::new_editable("ab", collapsed(1), limits)?;
+    doc.switch_mode(EditorMode::Source, 0)?;
+    Ok(doc)
+}
+
+#[test]
+fn pending_redo_follows_older_buffer_redo() -> Result<(), Box<dyn std::error::Error>> {
+    let mut doc = source_editable(limits())?;
+    let identity = doc.current_input_identity()?;
+    doc.replace_selection(&identity, "x", 1)?;
+    let identity = doc.current_input_identity()?;
+    doc.type_selection(&identity, "中", 2)?;
+    let after = SelectionSpec::new(5, 2);
+    doc.set_selection(after)?;
+
+    doc.undo()?;
+    assert_snapshot(&mut doc, "axb")?;
+    assert_eq!(doc.current_selection(), collapsed(2));
+    doc.undo()?;
+    assert_snapshot(&mut doc, "ab")?;
+    assert_eq!(doc.current_selection(), collapsed(1));
+    assert_history(&doc, 0, 1, 1);
+
+    doc.redo()?;
+    assert_snapshot(&mut doc, "axb")?;
+    assert_eq!(doc.current_selection(), collapsed(2));
+    doc.redo()?;
+    assert_buffer(&doc, "axb")?;
+    assert_snapshot(&mut doc, "ax中b")?;
+    assert_eq!(doc.current_selection(), after);
+    assert_history(&doc, 1, 0, 1);
+    Ok(())
+}
+
+#[test]
+fn pending_redo_crosses_modes_with_original_source_permissions()
+-> Result<(), Box<dyn std::error::Error>> {
+    let mut doc = source_editable(limits())?;
+    let identity = doc.current_input_identity()?;
+    doc.type_selection(&identity, "*中*", 1)?;
+    let after = SelectionSpec::new(6, 1);
+    doc.set_selection(after)?;
+    doc.undo()?;
+    doc.switch_mode(EditorMode::Visual, 2)?;
+    assert_closed(&doc);
+
+    let frozen = doc.current_snapshot(common::TEXT)?;
+    let end = frozen.text().src_offset(2)?;
+    let selection = aline_buffer::SrcSelection::new(end.clone(), end)?;
+    let identity = doc.current_input_identity()?;
+    doc.select(&identity, &selection)?;
+
+    doc.redo()?;
+    assert_eq!(doc.mode(), EditorMode::Visual);
+    assert_closed(&doc);
+    assert_buffer(&doc, "a*中*b")?;
+    assert_eq!(doc.current_selection(), after);
+    assert_history(&doc, 1, 0, 1);
+    doc.undo()?;
+    assert_buffer(&doc, "ab")?;
+    assert_eq!(doc.current_selection(), collapsed(1));
+    assert_history(&doc, 0, 1, 1);
+    Ok(())
+}
+
+#[test]
+fn pending_redo_survives_failed_cross_mode_publication() -> Result<(), Box<dyn std::error::Error>> {
+    let mut doc = source_editable(DocLimits::new(
+        common::TEXT,
+        LineIndexBudget::new(64),
+        HistoryBudget::new(0, 0),
+    ))?;
+    let identity = doc.current_input_identity()?;
+    doc.type_selection(&identity, "x", 1)?;
+    doc.undo()?;
+    doc.switch_mode(EditorMode::Visual, 2)?;
+    let frozen = doc.current_snapshot(common::TEXT)?;
+    let end = frozen.text().src_offset(2)?;
+    let selection = aline_buffer::SrcSelection::new(end.clone(), end)?;
+    let identity = doc.current_input_identity()?;
+    doc.select(&identity, &selection)?;
+
+    common::assert_rejected_without_change(
+        &mut doc,
+        |doc| doc.redo(),
+        |error| {
+            matches!(
+                error,
+                DocError::Buffer(aline_buffer::BufferError::HistoryBudgetExceeded { .. })
+            )
+        },
+    )?;
+    assert_eq!(doc.current_selection(), collapsed(2));
+    doc.switch_mode(EditorMode::Source, 3)?;
+    doc.redo()?;
+    assert_buffer(&doc, "ab")?;
+    assert_snapshot(&mut doc, "axb")?;
+    assert_eq!(doc.current_selection(), collapsed(2));
+    assert_history(&doc, 0, 0, 0);
+    Ok(())
+}
+
+#[test]
+fn pending_redo_is_discarded_by_a_new_actual_edit() -> Result<(), Box<dyn std::error::Error>> {
+    for command in [false, true] {
+        let mut doc = source_editable(limits())?;
+        let identity = doc.current_input_identity()?;
+        doc.replace_selection(&identity, "x", 1)?;
+        let identity = doc.current_input_identity()?;
+        doc.type_selection(&identity, "y", 2)?;
+        doc.undo()?;
+        doc.undo()?;
+        assert_history(&doc, 0, 1, 1);
+
+        let identity = doc.current_input_identity()?;
+        if command {
+            doc.replace_selection(&identity, "z", 3)?;
+        } else {
+            doc.type_selection(&identity, "z", 3)?;
+            doc.commit_open_block(4)?;
+        }
+        assert_history(&doc, 1, 0, 1);
+        common::assert_rejected_without_change(
+            &mut doc,
+            |doc| doc.redo(),
+            |error| {
+                matches!(
+                    error,
+                    DocError::Buffer(aline_buffer::BufferError::NothingToRedo)
+                )
+            },
+        )?;
+        assert_buffer(&doc, "azb")?;
+        doc.undo()?;
+        doc.redo()?;
+        assert_buffer(&doc, "azb")?;
+    }
+    Ok(())
+}
+
+#[test]
+fn pending_redo_survives_cancelled_composition() -> Result<(), Box<dyn std::error::Error>> {
+    let mut doc = source_editable(limits())?;
+    let identity = doc.current_input_identity()?;
+    doc.type_selection(&identity, "x", 1)?;
+    doc.undo()?;
+    doc.composition_start("中", 2)?;
+    doc.composition_cancel(3)?;
+    doc.redo()?;
+    assert_buffer(&doc, "ab")?;
+    assert_snapshot(&mut doc, "axb")?;
+    assert_history(&doc, 0, 0, 0);
     Ok(())
 }
 

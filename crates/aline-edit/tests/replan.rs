@@ -156,6 +156,16 @@ fn replan_format_runs_the_original_format_intent_on_the_candidate() -> TestResul
     let candidate = TextSnapshot::new("one two".into(), TEXT)?;
     let candidate_parsed = parse(&candidate, ParseConfig::m0(), ParseBudget::m0())?;
     let candidate_selection = selection(&candidate, 7, 4)?;
+    assert!(matches!(
+        plan.replan_on_equivalent_candidate(
+            &parsed,
+            &selection_before,
+            &candidate_parsed,
+            &candidate_selection,
+            &VISUAL.with_find_query_generation(0),
+        ),
+        Err(EditRefusal::StaleFindResults)
+    ));
     let new_plan = plan.replan_on_equivalent_candidate(
         &parsed,
         &selection_before,
@@ -192,6 +202,7 @@ fn replan_find_uses_the_original_search_and_checks_visual_protection_again() -> 
     let parsed = parse(&source, ParseConfig::m0(), ParseBudget::m0())?;
     let before_selection = selection(&source, 0, 0)?;
     let version = FindVersion::new(1, (0, 1), 0);
+    let visual_find = VISUAL.with_find_query_generation(0);
     let hits = find_matches(&source, version, "wOrD", FindCase::Insensitive, FIND)?;
     let planned = plan_find_replace(
         &hits,
@@ -208,12 +219,24 @@ fn replan_find_uses_the_original_search_and_checks_visual_protection_again() -> 
     let candidate = TextSnapshot::new("WORD\n\nword".into(), TEXT)?;
     let candidate_parsed = parse(&candidate, ParseConfig::m0(), ParseBudget::m0())?;
     let candidate_selection = selection(&candidate, 0, 0)?;
+    for context in [VISUAL, VISUAL.with_find_query_generation(1)] {
+        assert!(matches!(
+            plan.replan_on_equivalent_candidate(
+                &parsed,
+                &before_selection,
+                &candidate_parsed,
+                &candidate_selection,
+                &context,
+            ),
+            Err(EditRefusal::StaleFindResults)
+        ));
+    }
     let new_plan = plan.replan_on_equivalent_candidate(
         &parsed,
         &before_selection,
         &candidate_parsed,
         &candidate_selection,
-        &VISUAL,
+        &visual_find,
     )?;
     let PlanOutcome::Changed(new_plan) = new_plan else {
         return Err("expected replanned find".into());
@@ -223,6 +246,23 @@ fn replan_find_uses_the_original_search_and_checks_visual_protection_again() -> 
         &[(0..4, "z".into()), (6..10, "z".into())]
     );
     assert_eq!(new_plan.batch().before_id(), candidate.id());
+    assert!(matches!(
+        validate_change(
+            &new_plan,
+            &candidate,
+            &candidate_parsed,
+            &candidate_selection,
+            &VISUAL.with_find_query_generation(1),
+        ),
+        Err(EditRefusal::StaleFindResults)
+    ));
+    validate_change(
+        &new_plan,
+        &candidate,
+        &candidate_parsed,
+        &candidate_selection,
+        &visual_find,
+    )?;
     let current = plan_find_replace(
         &hits,
         &version,
@@ -243,7 +283,7 @@ fn replan_find_uses_the_original_search_and_checks_visual_protection_again() -> 
         &before_selection,
         &candidate_parsed,
         &candidate_selection,
-        &VISUAL,
+        &visual_find,
     )?;
     let PlanOutcome::Changed(current) = current else {
         return Err("expected a replanned single-match find command".into());
@@ -260,7 +300,7 @@ fn replan_find_uses_the_original_search_and_checks_visual_protection_again() -> 
             &before_selection,
             &fallback,
             &candidate_selection,
-            &VISUAL,
+            &visual_find,
         ),
         Err(EditRefusal::ProtectedRange {
             kind: ProtectionKind::RawFallback,

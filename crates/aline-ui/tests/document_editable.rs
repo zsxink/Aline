@@ -627,6 +627,12 @@ fn editable_planned_replace_consumes_current_draft_in_two_steps_and_rejects_sele
     else {
         return Err("夹具应生成替换计划".into());
     };
+    let before = capture(&mut doc)?;
+    assert!(matches!(
+        doc.apply_find_change(&identity, &parsed, &plan, 0, 2),
+        Err(DocError::Edit(aline_edit::EditRefusal::StaleFindResults))
+    ));
+    assert_eq!(capture(&mut doc)?, before);
     select_bytes(&mut doc, 1, 2)?;
     let before = capture(&mut doc)?;
     assert!(matches!(
@@ -663,7 +669,7 @@ fn editable_planned_find_all_uses_current_draft_and_preserves_one_bulk_command_s
     let identity = doc.current_input_identity()?;
     let snapshot = doc.current_snapshot(TEXT)?;
     let parsed = parse(snapshot.text(), ParseConfig::m0(), ParseBudget::m0())?;
-    let version = FindVersion::new(doc.document_id().clone(), doc.version(), 1);
+    let version = FindVersion::new(doc.document_id().clone(), doc.version(), 0);
     let found = find_matches(
         snapshot.text(),
         version.clone(),
@@ -676,7 +682,7 @@ fn editable_planned_find_all_uses_current_draft_and_preserves_one_bulk_command_s
         &version,
         &parsed,
         snapshot.selection(),
-        &EditContext::new(EditMode::Source).with_find_query_generation(1),
+        &EditContext::new(EditMode::Source).with_find_query_generation(0),
         FindReplacement::All("y"),
         EditBudget::new(PatchBudget::new(4, 16, 16), TEXT, ParseBudget::m0()),
     )?
@@ -691,11 +697,11 @@ fn editable_planned_find_all_uses_current_draft_and_preserves_one_bulk_command_s
         Err(DocError::Edit(aline_edit::EditRefusal::StaleFindResults))
     ));
     assert!(matches!(
-        doc.apply_find_change(&fresh_identity, &parsed, &plan, 2, 2),
+        doc.apply_find_change(&fresh_identity, &parsed, &plan, 1, 2),
         Err(DocError::Edit(aline_edit::EditRefusal::StaleFindResults))
     ));
     assert_eq!(capture(&mut doc)?, before);
-    doc.apply_find_change(&fresh_identity, &parsed, &plan, 1, 2)?;
+    doc.apply_find_change(&fresh_identity, &parsed, &plan, 0, 2)?;
     assert_eq!(doc.buffer_text()?, "y y y");
     assert_eq!(doc.undo_depth(), 2);
     doc.undo()?;
@@ -718,7 +724,7 @@ fn editable_find_command_requires_explicit_current_query_generation_without_draf
     doc.switch_mode(EditorMode::Source, 0)?;
     let snapshot = doc.current_snapshot(TEXT)?;
     let parsed = parse(snapshot.text(), ParseConfig::m0(), ParseBudget::m0())?;
-    let version = FindVersion::new(doc.document_id().clone(), doc.version(), 5);
+    let version = FindVersion::new(doc.document_id().clone(), doc.version(), 0);
     let found = find_matches(
         snapshot.text(),
         version.clone(),
@@ -731,7 +737,7 @@ fn editable_find_command_requires_explicit_current_query_generation_without_draf
         &version,
         &parsed,
         snapshot.selection(),
-        &EditContext::new(EditMode::Source).with_find_query_generation(5),
+        &EditContext::new(EditMode::Source).with_find_query_generation(0),
         FindReplacement::All("b"),
         EditBudget::new(PatchBudget::new(4, 16, 16), TEXT, ParseBudget::m0()),
     )?
@@ -742,7 +748,7 @@ fn editable_find_command_requires_explicit_current_query_generation_without_draf
     let before = capture(&mut doc)?;
     for result in [
         doc.apply_change(&identity, &parsed, &plan, 1),
-        doc.apply_find_change(&identity, &parsed, &plan, 6, 1),
+        doc.apply_find_change(&identity, &parsed, &plan, 1, 1),
     ] {
         assert!(matches!(
             result,
@@ -750,7 +756,7 @@ fn editable_find_command_requires_explicit_current_query_generation_without_draf
         ));
         assert_eq!(capture(&mut doc)?, before);
     }
-    doc.apply_find_change(&identity, &parsed, &plan, 5, 2)?;
+    doc.apply_find_change(&identity, &parsed, &plan, 0, 2)?;
     assert_eq!(doc.buffer_text()?, "b b");
     assert_eq!(doc.undo_depth(), 1);
     Ok(())

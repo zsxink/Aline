@@ -67,8 +67,6 @@ pub(crate) struct OpenBlock {
     pub(crate) baseline_fragment: String,
     pub(crate) selection: SelectionSpec,
     pub(crate) draft: DraftSlot,
-    /// 最近一次被撤销的普通输入组；只允许按顺序重做。
-    pub(crate) undone_typing: Option<TypingGroup>,
 }
 
 impl OpenBlock {

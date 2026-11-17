@@ -27,8 +27,7 @@ pub struct FindVersion<Document, Working> {
 
 impl<Document, Working> FindVersion<Document, Working> {
     /// 构造结果所属的身份。查询文字或大小写选项改变时，宿主须推进查询代次。
-    ///
-    /// 代次 `0` 表示结果不绑定实时查询所有者，消费方无须提供代次。
+    /// 初始代次可为 `0`，消费时同样需要复验。
     pub const fn new(document: Document, working: Working, query_generation: u64) -> Self {
         Self {
             document,
@@ -235,14 +234,6 @@ impl FindIntent {
         self.query_generation
     }
 
-    pub(crate) fn validate_generation(&self, context: &EditContext) -> Result<(), EditRefusal> {
-        let required = (self.query_generation != 0).then_some(self.query_generation);
-        if context.find_query_generation() != required {
-            return Err(EditRefusal::StaleFindResults);
-        }
-        Ok(())
-    }
-
     pub(crate) fn replan(
         &self,
         parsed: &Parsed,
@@ -250,8 +241,7 @@ impl FindIntent {
         context: &EditContext,
         budget: EditBudget,
     ) -> Result<PlanOutcome, EditRefusal> {
-        self.validate_generation(context)?;
-        // 封口候选是本次已复验事务内的等价源码，沿用真正的原查询代次。
+        // 调用方已经复验原计划身份。候选仅用于本次事务内重搜，沿用原查询代次。
         let candidate = FindVersion::new((), (), self.query_generation);
         let results = find_matches(
             parsed.snapshot(),
@@ -318,7 +308,7 @@ pub fn plan_find_replace<Document: PartialEq, Working: PartialEq>(
         FindReplacement::All(_) => return Err(EditRefusal::FindMatchUnavailable),
     };
     if context.mode() == EditMode::Visual {
-        check_visible_targets(parsed, matches, replacement_text)?;
+        check_visible_targets(parsed, matches, replacement_text, budget.text())?;
     }
     // 先限制重复替换文本的总分配，再交由 CheckedBatch 复验准确的补丁预算。
     let changed_count = matches
@@ -385,11 +375,12 @@ fn check_visible_targets(
     parsed: &Parsed,
     matches: &[FindMatch],
     replacement: &str,
+    budget: TextBudget,
 ) -> Result<(), EditRefusal> {
     if matches.iter().all(|hit| hit.text() == replacement) {
         return Ok(());
     }
-    // 投影片段按绘制顺序保存。按源码起点排序后，与有序命中各扫描一次。
+    // 投影片段按绘制顺序保存。按源码起点排序，检查每个有序命中的连续覆盖。
     let mut visible = Vec::new();
     for segment in parsed.projection().segments() {
         if matches!(
@@ -402,28 +393,16 @@ fn check_visible_targets(
         }
     }
     visible.sort_unstable_by_key(|(range, _)| range.start);
-    let mut visible = visible.into_iter().peekable();
-    let mut exact_end = 0;
+    let mut first = 0;
     for hit in matches.iter().filter(|hit| hit.text() != replacement) {
         let bytes = hit.range().byte_range();
-        let mut whole_aligned = false;
         while visible
-            .peek()
-            .is_some_and(|(range, _)| range.start < bytes.end)
+            .get(first)
+            .is_some_and(|(range, _)| range.end <= bytes.start)
         {
-            let (range, precision) = visible.next().ok_or(EditRefusal::InvalidPlan)?;
-            match precision {
-                MappingPrecision::Exact => exact_end = exact_end.max(range.end),
-                MappingPrecision::Aligned => {
-                    // 对齐片段无法逐字节逆推。例如 amp 不等于整个 &amp; 的绘制来源。
-                    whole_aligned |= bytes.start <= range.start && range.end <= bytes.end;
-                }
-                MappingPrecision::Hidden | MappingPrecision::Synthetic => {
-                    return Err(EditRefusal::InvalidPlan);
-                }
-            }
+            first += 1;
         }
-        if exact_end <= bytes.start && !whole_aligned {
+        if !is_visible_target(parsed, bytes, &visible[first..], budget)? {
             // 保留批次的具体只读区拒绝，供宿主定位第一个受保护的源码目标。
             for hit in matches.iter().filter(|hit| hit.text() != replacement) {
                 check_visual_permissions(parsed, &hit.range().byte_range())?;
@@ -435,6 +414,69 @@ fn check_visible_targets(
         }
     }
     Ok(())
+}
+
+fn is_visible_target(
+    parsed: &Parsed,
+    target: Range<usize>,
+    visible: &[(Range<usize>, MappingPrecision)],
+    budget: TextBudget,
+) -> Result<bool, EditRefusal> {
+    let mut covered_end = target.start;
+    for (range, precision) in visible
+        .iter()
+        .take_while(|(range, _)| range.start < target.end)
+    {
+        if range.end <= covered_end {
+            continue;
+        }
+        // 对齐片段不可逐字节逆推，只允许完整单位，如整个 &amp;。
+        if *precision == MappingPrecision::Aligned
+            && (range.start < target.start || range.end > target.end)
+        {
+            continue;
+        }
+        if range.start > covered_end
+            && (covered_end == target.start
+                || !is_visible_block_separator(parsed, covered_end..range.start, budget)?)
+        {
+            return Ok(false);
+        }
+        covered_end = range.end;
+        if covered_end >= target.end {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn is_visible_block_separator(
+    parsed: &Parsed,
+    range: Range<usize>,
+    budget: TextBudget,
+) -> Result<bool, EditRefusal> {
+    // 跨块命中允许完整的块间分隔，前后仍须分别有可见字节。
+    let Ok(index) = parsed
+        .gaps()
+        .binary_search_by_key(&range.start, |gap| gap.range().byte_range().start)
+    else {
+        return Ok(false);
+    };
+    let gap = parsed
+        .gaps()
+        .get(index)
+        .ok_or(EditRefusal::InvalidPlan)?
+        .range();
+    if gap.byte_range() != range {
+        return Ok(false);
+    }
+    let text = parsed
+        .snapshot()
+        .slice(gap, budget)
+        .map_err(map_buffer_error)?;
+    Ok(text
+        .bytes()
+        .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n')))
 }
 
 fn check_source_bytes(needed: usize, budget: TextBudget) -> Result<(), EditRefusal> {

@@ -8,7 +8,7 @@ use std::fmt;
 use std::rc::Rc;
 
 use aline_buffer::{Affinity, SrcRange, SrcSelection};
-use aline_markdown::{MappingPrecision, Projection};
+use aline_markdown::{MappingPrecision, Projection, ProjectionId};
 use gpui::{Pixels, Point, TextLayout};
 
 use super::readonly_layout::LayoutToken;
@@ -87,6 +87,7 @@ impl PreparedLayout {
 pub(super) struct HitTarget {
     identity: InputIdentity,
     layout: LayoutToken,
+    parsed_projection: ProjectionId,
     projection: Projection,
 }
 impl HitTarget {
@@ -95,7 +96,9 @@ impl HitTarget {
         layout: LayoutToken,
         projection: Projection,
     ) -> Result<Self, HitError> {
-        if projection.snapshot_id() != document.parsed().snapshot().id() {
+        if !document.is_parse_current()
+            || projection.snapshot_id() != document.parsed().snapshot().id()
+        {
             return Err(HitError::StaleInput);
         }
         let identity = document
@@ -107,6 +110,7 @@ impl HitTarget {
         Ok(Self {
             identity,
             layout,
+            parsed_projection: document.parsed().projection().id().clone(),
             projection,
         })
     }
@@ -147,6 +151,11 @@ impl HitTarget {
         affinity: Affinity,
     ) -> Result<HitOutcome, HitError> {
         self.ensure_layout(current_layout)?;
+        if !document.is_parse_current()
+            || &self.parsed_projection != document.parsed().projection().id()
+        {
+            return Err(HitError::StaleInput);
+        }
         let current = document
             .input_identity()
             .map_err(|_| HitError::StaleInput)?;
@@ -516,6 +525,41 @@ mod tests {
             Err(HitError::StaleInput)
         ));
         assert_readonly(b, text, b.core().version())?;
+        Ok(())
+    }
+
+    #[test]
+    fn same_snapshot_reparse_rejects_hits_bound_to_the_previous_projection()
+    -> Result<(), Box<dyn Error>> {
+        let mut session = editable_session(b"same text")?;
+        let document = session.document_mut().ok_or("document")?;
+        let cache = layout(document, EditorMode::Visual, 600.0)?;
+        let token = cache.token().ok_or("token")?;
+        let old_target = make_target(document, EditorMode::Visual, 0, token)?;
+        let old_projection = old_target.projection.clone();
+        let old_parsed_projection = old_target.parsed_projection.clone();
+
+        let job = session.begin_parse_refresh()?;
+        let identity = job.identity().clone();
+        let completion = job.run();
+        assert!(matches!(
+            session.accept_parse_refresh(completion),
+            crate::ParseRefreshDisposition::Applied
+        ));
+
+        let document = session.document_mut().ok_or("document")?;
+        let before = document.core().buffer_selection();
+        let delayed = HitTarget {
+            identity,
+            layout: token,
+            parsed_projection: old_parsed_projection,
+            projection: old_projection,
+        };
+        assert!(matches!(
+            delayed.navigate(document, Some(token), Ok(2), Affinity::After),
+            Err(HitError::StaleInput)
+        ));
+        assert_eq!(document.core().buffer_selection(), before);
         Ok(())
     }
 

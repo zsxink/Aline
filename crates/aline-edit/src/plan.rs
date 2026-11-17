@@ -135,24 +135,12 @@ impl ChangePlan {
     /// 检查计划属于正确的命令入口和实时查询代次。
     ///
     /// 普通命令传入 `None`。查找替换须从查询状态所有者传入当前代次；
-    /// 缺失、过期或将普通命令交给查找入口均拒绝。普通计划不受查询代次影响，
-    /// 计划未绑定查询所有者（代次 `0`）时不要求调用方提供代次。
+    /// 缺失、过期或入口与计划类型不符均拒绝。
     pub fn validate_find_query_generation(&self, current: Option<u64>) -> Result<(), EditRefusal> {
-        let Some(intent) = &self.find_intent else {
-            return Ok(());
-        };
-        let required = (intent.query_generation() != 0).then_some(intent.query_generation());
-        if required != current {
+        if self.find_intent.as_ref().map(FindIntent::query_generation) != current {
             return Err(EditRefusal::StaleFindResults);
         }
         Ok(())
-    }
-
-    /// 返回查找替换计划绑定的查询代次；普通计划返回 `None`。
-    ///
-    /// 命令入口据此区分普通计划与查找计划，避免互相消费。
-    pub fn find_query_generation(&self) -> Option<u64> {
-        self.find_intent.as_ref().map(FindIntent::query_generation)
     }
 }
 

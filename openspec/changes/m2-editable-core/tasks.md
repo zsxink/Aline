@@ -12,33 +12,43 @@
 
 关联 `ui/editable-document` 双模式、单块编辑、历史及保护要求；适用架构 §5.2～5.4、引擎 §7～10、R-3～8/10/17、RS-02、S-5/7/12。
 
-- [ ] 2.1 为可视化点击到源码锚点、受保护区、实体/隐藏标记、Unicode/UTF-16 边界、旧投影与基线竞争补独立金样和零副作用拒绝测试。验收：`cargo test -p aline-ui --test editable_document_mapping`（或实际就近测试目标）覆盖合法映射、非法端点、保护语义和旧版本拒绝；预期不从实现输出生成。
-- [ ] 2.2 完成可视化单块打开/草稿/提交与离块协议的无头闭环，复用 `DocCore` 和 `aline-buffer` 单区间历史，不生成第二份全文或历史。验收：`cargo test -p aline-ui --test editable_document` 覆盖单块限制、单区间提交、尾换行边界、900ms 多组、Escape 保留输入、待定组与 Redo、失败零副作用；引擎/架构文档只回填经确认的实际边界。
-- [ ] 2.3 补齐两模式共享选区、基础源码操作和切换位置的文档核心行为，复用既有编辑/只读能力，不改变 M1 原子打开/关闭语义；独立命令遇到待定普通输入时依赖 2.4 的两步候选发布。验收：无头用例覆盖剪切/复制/粘贴/纯文本粘贴/全选、撤销/重做选区、模式切换零字节/零历史、关闭/替换及旧解析回执；待定输入后命令成功时形成两个可独立撤销步，拒绝、取消或无变化不改变调用前状态。
-- [ ] 2.4 为 `aline-buffer` 增加待定输入组 + 一个独立命令的专用两步候选提交入口，并接入 DocCore。候选回调只读、真实 Buffer 单次发布；复用历史裁剪与共享补丁句柄，不引入通用事务对象。验收：`cargo test -p aline-buffer --test staged_command`（或就近目标）覆盖方向性 before/after 选区、成功后两步 Undo/Redo、redo 分支、历史裁剪、历史仅容纳一步/保存点阻断裁剪、第二批拒绝/无变化/取消、版本与 UTF-8/文本/索引/历史预算失败的零副作用；`cargo test -p aline-ui --test document_editable` 覆盖文档核心草稿/版本/选区/块状态保全及 Cut 仅 Changed 才写冻结文本到剪贴板、其它结果保留剪贴板；Buffer 公共 API 有真实消费者并通过独立 API/一致性审查。
+- [x] 2.1 为可视化点击到源码锚点、受保护区、实体/隐藏标记、Unicode/UTF-16 边界、旧投影与基线竞争补独立金样和零副作用拒绝测试。验收：`cargo test -p aline-ui --test editable_document_mapping`（或实际就近测试目标）覆盖合法映射、非法端点、保护语义和旧版本拒绝；预期不从实现输出生成。
+- [x] 2.2 完成可视化单块打开/草稿/提交与离块协议的无头闭环，复用 `DocCore` 和 `aline-buffer` 单区间历史，不生成第二份全文或历史。验收：`cargo test -p aline-ui --test editable_document` 覆盖单块限制、单区间提交、尾换行边界、900ms 多组、Escape 保留输入、待定组与 Redo、失败零副作用；引擎/架构文档只回填经确认的实际边界。
+- [x] 2.3 补齐两模式共享选区、基础源码操作和切换位置的文档核心行为，复用既有编辑/只读能力，不改变 M1 原子打开/关闭语义；独立命令遇到待定普通输入时依赖 2.4 的两步候选发布。验收：无头用例覆盖剪切/复制/粘贴/纯文本粘贴/全选、撤销/重做选区、模式切换零字节/零历史、关闭/替换及旧解析回执；待定输入后命令成功时形成两个可独立撤销步，拒绝、取消或无变化不改变调用前状态。
+  - 独立审查补出待定输入撤销与 Buffer 历史交错时 redo 丢步的问题。待定输入 redo 已从 OpenBlock 提升为 DocCore 级事务尾步，按历史 tip 先重放 Buffer 节点，再重放输入；跨模式 redo 经原输入模式/保护边界重验后发布独立 Typing 步。37 项输入分组测试及独立探针覆盖同模式、跨模式、方向性选区、历史预算拒绝、取消组合与新分支。
+- [x] 2.4 为 `aline-buffer` 增加待定输入组 + 一个独立命令的专用两步候选提交入口，并接入 DocCore。候选回调只读、真实 Buffer 单次发布；复用历史裁剪与共享补丁句柄，不引入通用事务对象。验收：`cargo test -p aline-buffer --test staged_command`（或就近目标）覆盖方向性 before/after 选区、成功后两步 Undo/Redo、redo 分支、历史裁剪、历史仅容纳一步/保存点阻断裁剪、第二批拒绝/无变化/取消、版本与 UTF-8/文本/索引/历史预算失败的零副作用；`cargo test -p aline-ui --test document_editable` 覆盖文档核心草稿/版本/选区/块状态保全及 Cut 仅 Changed 才写冻结文本到剪贴板、其它结果保留剪贴板；Buffer 公共 API 有真实消费者并通过独立 API/一致性审查。
+  - Buffer 两步入口、DocCore 候选重规划、系统剪贴板菜单/快捷键消费者已接线。Cut 只有 `Committed` 返回的冻结选区文本才写入剪贴板；活动组合、无变化、只读/无文档与拒绝路径保留现有剪贴板。窗口协调测试覆盖 Cut 两步撤销、反向选区和组合期零读取。`aline-ui` 329 项通过、2 项既有夹具 ignored；`check_public_api.py` 12 项符合预期。无头接线不代表真实系统剪贴板/选区已取证。
 
 ## 3. 原生单文档编辑接线
 
 关联 `ui/editable-document` 前三项；适用 UI spec、CODE_STANDARDS §2～4、架构 R-3～8/10/16、UI/Rust 文案与无障碍约束。
 
 - [ ] 3.1 将原生文档会话接到统一可编辑 DocCore，接入可视化打开块、源码编辑和受检提交；renderer 只读派生快照，输入/命令意图走同一文档核心。验收：`cargo test -p aline-ui --test editable_window` 覆盖打开/替换失败保留原文档、输入/模式切换/关闭、迟到结果拒绝；中文界面关键操作与焦点路径可真实检查，catalog 双语键/占位符一致。
+  - 已实现解析刷新工作项、单在途/最新候选排程、会话身份复验、采用前同快照 ReaderIndex 准备、失败保留旧视图及旧命中/导航身份门控；窗口剪切/复制/粘贴/全选/撤销/重做也已连接 DocCore。新增 GPUI `EntityInputHandler`、局部 UTF-16/源码映射、Source 行站点复验、删除/方向键、组合自然结束与 Escape 测试；另补普通输入跨块重定向的无头原子测试。原生生产打开默认仍只读，同步输入提交仍可能全文解析，W4 保存出口与中文真实焦点/IME 证据未完成，本项保持未勾选。
 - [ ] 3.2 接入两模式选择、复制粘贴、撤销/重做和块开合反馈；组合期间的操作只按 W5 已确认协议等待/拒绝，不通过 Blur/Escape 猜测 IME 结果。首次允许编辑/指针驻留时，实际操作代码块横向滚动；若确认缺陷则修复。验收：原生中文操作矩阵逐项对照源码 bytes、选区、草稿、版本与历史，并有代码块真实水平滚动证据；提供正常、拒绝、取消三类证据，不以无头模拟替代真实输入法证据。
+  - 菜单、快捷键及系统剪贴板动作已接到受控会话，组合活动时拒绝且不读取剪贴板；真实原生 selection/clipboard/IME 矩阵及代码块水平滚动尚未取证，故本项保持未完成。
 - [ ] 3.3 检查高频路径和模块边界：render/命中/按键不执行全文解析、全文哈希或 I/O；新模块按职责/生命周期说明所有者和副作用，公开 API 有真实消费方。验收：相关 R/S 守卫、CodeGraph sync/status、公开 API/引用清理和独立 review 无未解决的高严重度 finding。
+  - 2026-11-17 独立分析确认输入候选发布仍在事件路径做同步全文解析/候选复读，且 Buffer 发布准备会物化候选文本并重建行索引；后台展示 refresh 不能替代写前拒绝校验。已按用户确认在 design §7 锁定后台只读准备、DocCore 草稿所有权、主线程身份复验、原子历史发布、准备期间新输入使旧结果失效，以及 W5 平台观测门槛；实现、热路径计量、API 清理及复审仍未完成，不能勾选。
 
 ## 4. 原生 IME 与保存/恢复专项集成
 
 本组严格依赖 1.2；详细协议、实现和平台样本分别归属 W5/W4，不在伞任务复制其细目。
 
 - [ ] 4.1 按 `qmd-w5-native-ime-input` 完成原生输入/IME/候选/焦点/发布等待，并确认其与本 change 的单块和共享历史入口一致。验收：W5 对应 tasks 和真实中文输入法证据完成，覆盖确认/取消、替换、跨块/切模式、Undo/Redo 与保存等待；未测平台明确列出。
+  - GPUI handler 与 DocCore 的无头适配及组合/取消/旧目标拒绝回归已新增；虚拟列表候选矩形与自然回调仍无真实窗口验证，活动 handler 滚出视口、候选矩形回查和同步全文解析均尚未满足 W5 设计/验收，生产写入口仍关闭。
 - [ ] 4.2 按 `qmd-w4-persistence-recovery` 完成单文档保存/自动保存、外改冲突及可撤销重载、10 秒恢复和 M2 最小临时图片保全。验收：W4 对应 tasks 和 V-08 真实文件/故障证据完成，覆盖写前版本检查、失败保全、恢复先入内存、继续输入及图像可读；未测平台明确列出。
+  - ED-01 等待状态与协调器已有无头时序用例；受检文件替换仍在 staging 访问/元数据/发布对象身份步骤失败关闭，尚无生产 Save、自动保存、冲突重载、磁盘恢复或临时图片资源链路。
 - [ ] 4.3 集成 IME 组合、当前快照、保存等待/取消、外改、重载 Undo/Redo 与恢复资源交错。验收：`cargo test -p aline-ui --test m2_document_lifecycle` 独立覆盖确认/取消/继续输入/目标变化/关闭/迟到回执；真实 macOS 中文链路核查内存、历史、磁盘 bytes 和资源身份，V-08 不以 `mtime/size` 单独判版本。
 
 ## 5. 查找替换与 M2 阶段收口
 
 关联 `ui/editable-document` 查找替换、PRD FIND-01～03/AC-08、V-07/V-08；M2 完整操作链及阶段出口见架构 §6/13。
 
-- [ ] 5.1 先实现源码查找与版本绑定替换计划、大小写开关和一键全部替换，保护所有已知只读语法边界。验收：`cargo test -p aline-edit --test find_replace` 与 UI 用例覆盖 Markdown 标记/HTML 注释/链接地址、跨展示块、无命中/空查询、保护区、旧计划拒绝、全部替换单步撤销和拒绝零副作用。
+- [x] 5.1 先实现源码查找与版本绑定替换计划、大小写开关和一键全部替换，保护所有已知只读语法边界。验收：`cargo test -p aline-edit --test find_replace` 与 UI 用例覆盖 Markdown 标记/HTML 注释/链接地址、跨展示块、无命中/空查询、保护区、旧计划拒绝、全部替换单步撤销和拒绝零副作用。
 - [ ] 5.2 接原生查找面板和两模式共享结果/跳转，提供双语状态及键盘反馈。验收：中文原生操作包含逐项跳转、当前项与计数、替换当前/全部、文档改变后旧结果作废；英文 catalog 只以自动键/插值校验取证。
+  - 原生 Find 面板、双语状态、Cmd+F、上下项导航和替换 DocCore 接口已接线；无头窗口/引擎用例通过。查找结果失效与隐藏实体子串的 Source fallback 已补无头回归，Source 替换拒绝路径改为原子发布。生产文档仍只读，实际原生逐项跳转、替换及中文焦点路径未取证，故保持未勾选。
 - [ ] 5.3 执行 M2 整合和独立评审：逐项核对 PRD AC-02～08/10、V-07/V-08 场景、拒绝/取消/关闭/过期结果与 M1 回归，修复 finding 并清理替代路径/无消费者导出/fake。验收：独立审查结论和操作链对照表留在本地 `logs/validation/`，不新增跟踪报告目录；阶段结论区分实现、已测、失败与未测。
-- [ ] 5.4 运行适用工程门禁：`cargo fmt --all --check`、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo test --workspace`、`scripts/check_engineering.py`、`scripts/check_lints.py`、`scripts/check_safety.py`、`scripts/check_public_api.py`。验收：命令结果、环境及限制写入本地证据目录，八成员 lint 继承和准入守卫状态可核对；all-targets 不声称三平台通过。
+  - 2026-11-17 独立评审发现并复核通过修复 Find Source fallback 非原子、Aligned 隐藏子串误判可见，以及待定输入 Undo/Redo 与共享 Buffer 历史交错丢步三项 P2。净同跨模式 redo 的活动块选区同步与实体 `amp`/`&amp;` 定位也已补回归。整合操作链对照表、生产可编辑/保存/IME 接线及 V-07/V-08 全场景核对仍未完成，故保持未勾选。
+- [x] 5.4 运行适用工程门禁：`cargo fmt --all --check`、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo test --workspace`、`scripts/check_engineering.py`、`scripts/check_lints.py`、`scripts/check_safety.py`、`scripts/check_public_api.py`。验收：命令结果、环境及限制写入本地证据目录，八成员 lint 继承和准入守卫状态可核对；all-targets 不声称三平台通过。
+  - 2026-11-17 收尾复跑：fmt、workspace Clippy、workspace tests、engineering/lints/safety/public-api、OpenSpec strict、CodeGraph sync/status 与 diff check 均通过。engineering 首次离线采集因 Cargo 缓存缺 `arbitrary 1.5.0` 失败；`cargo fetch --locked` 后同一守卫通过。记录见 `logs/validation/m2-editable-core/2026-11-17-wrap-up.md`。
 - [ ] 5.5 按实测结果回填 `docs/v1-validation-plan.md`、`docs/v1-architecture.md` 与相关专项规范/决定；执行 OpenSpec 严格校验、全量变更引用检查与 `git diff --check`。验收：架构 M2 出口、验证计划 V-07/V-08 和 W4/W5 状态一致，未测平台与失败保留，全部适用 M2 出口条件实际满足后再申请阶段裁决。

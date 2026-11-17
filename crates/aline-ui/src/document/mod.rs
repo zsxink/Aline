@@ -4,9 +4,15 @@ mod composition;
 mod doc_core;
 mod identity;
 mod mode;
+#[cfg(any(test, target_os = "macos"))]
+pub(crate) mod native_input_coordinates;
 mod open_block;
+#[cfg(test)]
+mod persistence;
 mod publication;
 mod readonly_session;
+#[cfg(test)]
+mod recovery_record;
 mod resource;
 mod snapshot;
 mod statistics;
@@ -27,7 +33,8 @@ pub(crate) use statistics::DocumentStatistics;
 
 pub use mode::{EditorMode, ModeSwitchOutcome};
 pub use readonly_session::{
-    OpenDisposition, OpenError, OpenRequestId, ReadonlyDocument, ReadonlyFileAccess,
+    CloseDisposition, OpenDisposition, OpenError, OpenRequestId, ParseRefreshCompletion,
+    ParseRefreshDisposition, ParseRefreshJob, ReadonlyDocument, ReadonlyFileAccess,
     ReadonlyFileInput, ReadonlyOpenCompletion, ReadonlyOpenJob, ReadonlyOpenLimits,
     ReadonlyOpenPhase, ReadonlySession,
 };

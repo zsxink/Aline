@@ -262,6 +262,7 @@ class OutputDirectoryTests(unittest.TestCase):
                        'collect_m1_readonly.py', 'check_ui_tokens.py', 'check_ui_catalog.py',
                        'check_m1_cjk_typography.py', 'probe_m1_visual_evidence.py',
                        'sample_m1_performance.py', 'capture_m1_readonly_actions.py',
+                       'prune_validation_logs.py',
                        'run_w1_offscreen.py', 'm1_trace_metrics.py',
                        'm1_trace_record.py', 'm1_rederive_performance.py',
                        'run_window_failure_probe.py', 'run_signal_probe.py'):

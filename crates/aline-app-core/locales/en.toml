@@ -14,6 +14,32 @@ close_document = "Close Document"
 visual_view = "Rendered View"
 source_view = "Source View"
 cancel_navigation = "Cancel Navigation"
+cut = "Cut"
+copy = "Copy"
+paste = "Paste"
+paste_plain = "Paste as Plain Text"
+select_all = "Select All"
+undo = "Undo"
+redo = "Redo"
+find = "Find…"
+
+[find]
+query = "Find"
+replacement = "Replace with"
+previous = "Previous"
+next = "Next"
+case_sensitive = "Match Case"
+replace_current = "Replace Current"
+replace_all = "Replace All"
+close = "Close"
+empty = "Enter text to find."
+no_matches = "No matches."
+no_document = "Open a document to find text."
+readonly = "This document is read only."
+pending = "Finding…"
+failed = "Could not search."
+refused = "Could not complete the find or replace operation."
+count = "Match {current} of {total}"
 
 [reading]
 large_source = "This document exceeds 4 MiB. It opened in Source View by default; you can switch to Rendered View."
@@ -39,11 +65,18 @@ family_missing = "The font was installed but the selected family is unavailable;
 
 [menu]
 file = "File"
+edit = "Edit"
 
 [status]
 characters = "{count} characters"
 lines = "{count} lines"
 pending = "Calculating…"
+
+[document]
+close_pending_changes = "This document has unsettled edits and cannot be closed or replaced yet."
+edit_refused = "This editing operation could not be applied. The document and clipboard are unchanged."
+composition_pending = "The input method composition is still active. Finish or cancel it first."
+refresh_failed = "The document view could not be refreshed; the previous complete view is retained."
 
 [open_error]
 selection = "Choose exactly one Markdown document."

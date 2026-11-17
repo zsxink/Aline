@@ -1,10 +1,11 @@
 //! M2 宿主消费的可编辑文档入口。DocCore 统一拥有选区、块、草稿与历史。
 //! 接收已绑定当前快照的源码端点，返回纯内存结果；剪贴板和布局由调用方管理。
 
-use std::ops::Range;
+use std::{borrow::Cow, ops::Range};
 
 use aline_buffer::{
     BufferError, CheckedBatch, OperationSource, SelectionSpec, SrcRange, SrcSelection, TextBudget,
+    TextSnapshot,
 };
 use aline_edit::EditRefusal;
 use aline_markdown::{ParseConfig, Parsed, ProtectedRange, ProtectionKind, StyledRange};
@@ -13,7 +14,9 @@ use super::checked_commit::transform_extent;
 use super::{
     CommitOutcome, DocCore, DocError, bind_selection, copy_bounded, overflow, selection_of,
 };
-use crate::document::open_block::{InputTarget, VisualInput, VisualProtection};
+use crate::document::open_block::{
+    DraftSlot, InputTarget, OpenBlock, VisualInput, VisualProtection,
+};
 use crate::document::{CurrentSnapshot, EditorMode, InputIdentity};
 
 impl DocCore {
@@ -33,32 +36,72 @@ impl DocCore {
         if self.open.is_some() {
             return Err(DocError::BlockAlreadyOpen);
         }
-        self.accept_document_result(identity)?;
+        let snapshot = self.checked_visual_snapshot(identity, parsed)?;
+        snapshot.validate_selection(selection)?;
+        let selection = selection_of(selection);
+        let target = checked_visual_target(snapshot, parsed, block, selection)?;
+        // 草稿范围从选区起步，边界单独记录以防写入分隔换行。
+        self.open_input_target(InputTarget::Visual(target), selection.range(), selection)
+    }
+
+    /// 离开旧块前按当前草稿快照准备完整目标。没有目标块时只移动选区。
+    pub(in crate::document) fn retarget_visual(
+        &mut self,
+        identity: &InputIdentity,
+        parsed: &Parsed,
+        target_block: Option<&SrcRange>,
+        selection: &SrcSelection,
+    ) -> Result<(), DocError> {
+        self.ensure_ready()?;
+        if self.mode != EditorMode::Visual {
+            return Err(DocError::RequiresVisual);
+        }
+        if self.is_composition_active() {
+            return Err(DocError::CompositionActive);
+        }
+        let snapshot = self.checked_visual_snapshot(identity, parsed)?;
+        snapshot.validate_selection(selection)?;
+        let selection = selection_of(selection);
+        let target = target_block
+            .map(|block| {
+                let target = checked_visual_target(snapshot, parsed, block, selection)?;
+                let range = snapshot.src_range(selection.range())?;
+                let fragment = match snapshot.slice(&range, self.limits.text)? {
+                    Cow::Borrowed(text) => copy_bounded(text, self.limits.text)?,
+                    Cow::Owned(text) => text,
+                };
+                Ok::<_, DocError>((target, fragment))
+            })
+            .transpose()?;
+
+        // 历史仍记录旧组结束时的选区。关闭仅提交冻结快照上的同一单区间补丁，
+        // 新 Buffer 与预检时的当前草稿字节相同，因此这两个端点在新身份下仍合法。
+        self.close_block(0)?;
+        let rebound = bind_selection(self.buffer.snapshot(), selection);
+        debug_assert!(rebound.is_ok(), "封口后的 Buffer 必须与预检快照字节一致");
+        self.buffer.set_selection(&rebound?)?;
+        self.open = target.map(|(target, baseline_fragment)| OpenBlock {
+            baseline_revision: self.buffer.revision(),
+            target: InputTarget::Visual(target),
+            range: selection.range(),
+            baseline_fragment,
+            selection,
+            draft: DraftSlot::Empty,
+        });
+        Ok(())
+    }
+
+    fn checked_visual_snapshot(
+        &self,
+        identity: &InputIdentity,
+        parsed: &Parsed,
+    ) -> Result<&TextSnapshot, DocError> {
+        self.validate_result_identity(identity)?;
         if parsed.snapshot().id() != identity.snapshot_id() || parsed.config() != ParseConfig::m0()
         {
             return Err(DocError::StaleResult);
         }
-        let snapshot = self.buffer.snapshot();
-        let extent = snapshot.validate_range(block).map_err(DocError::Buffer)?;
-        if !parsed
-            .blocks()
-            .iter()
-            .any(|candidate| candidate.range() == block)
-        {
-            return Err(DocError::InvalidVisualBlock);
-        }
-        snapshot
-            .validate_selection(selection)
-            .map_err(DocError::Buffer)?;
-        let selection = selection_of(selection);
-        if !contains(&extent, &selection.range()) {
-            return Err(DocError::OutsideOpenBlock);
-        }
-        let target =
-            VisualInput::from_parse(extent, parsed.protected_ranges(), parsed.styled_ranges())?;
-        target.check_permissions(&selection.range(), |range| Ok(range.clone()))?;
-        // 草稿范围从选区起步，边界单独记录以防写入分隔换行。
-        self.open_input_target(InputTarget::Visual(target), selection.range(), selection)
+        self.cached_current_text()
     }
 
     /// 更新文档源码选区。可跨块，且对两种模式和同一 Buffer 生效。
@@ -102,7 +145,7 @@ impl DocCore {
     }
 
     /// 删除并返回选区原文。仅成功后宿主才应改写剪贴板。
-    /// 空选区返回空字符串，宿主应保留剪贴板。
+    /// 空选区或未提交文本返回空字符串，宿主应保留剪贴板。
     pub fn cut_selection(
         &mut self,
         identity: &InputIdentity,
@@ -115,8 +158,10 @@ impl DocCore {
         if text.is_empty() {
             return Ok(text);
         }
-        self.replace_selection(identity, "", now_millis)?;
-        Ok(text)
+        match self.replace_selection(identity, "", now_millis)? {
+            CommitOutcome::Committed { .. } => Ok(text),
+            CommitOutcome::Unchanged => Ok(String::new()),
+        }
     }
 
     /// 使用纯文本独立替换当前选区；删除、粘贴和纯文本粘贴共用此入口。
@@ -327,6 +372,30 @@ impl VisualInput {
         }
         Ok(())
     }
+}
+
+fn checked_visual_target(
+    snapshot: &TextSnapshot,
+    parsed: &Parsed,
+    block: &SrcRange,
+    selection: SelectionSpec,
+) -> Result<VisualInput, DocError> {
+    let extent = snapshot.validate_range(block)?;
+    if !parsed
+        .blocks()
+        .iter()
+        .any(|candidate| candidate.range() == block)
+    {
+        return Err(DocError::InvalidVisualBlock);
+    }
+    let selected = selection.range();
+    if !contains(&extent, &selected) {
+        return Err(DocError::OutsideOpenBlock);
+    }
+    let target =
+        VisualInput::from_parse(extent, parsed.protected_ranges(), parsed.styled_ranges())?;
+    target.check_permissions(&selected, |range| Ok(range.clone()))?;
+    Ok(target)
 }
 
 fn contains(block: &Range<usize>, range: &Range<usize>) -> bool {

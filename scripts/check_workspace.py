@@ -100,6 +100,7 @@ def run(args):
             env['ALINE_M0_TOOLCHAIN_BIN'] = toolchain_bin
     checks = [
         ('output-paths', [sys.executable, str(ROOT / 'scripts/check_validation_output.py'), '--output-dir', str(output / 'output-paths')]),
+        ('prune-validation-logs-self-test', [sys.executable, str(ROOT / 'scripts/prune_validation_logs.py'), '--self-test', '--output-dir', str(output / 'prune-validation-logs-self-test')]),
         ('workspace-self-test', [sys.executable, str(ROOT / 'scripts/check_workspace.py'), '--self-test', '--output-dir', str(output / 'workspace-self-test')]),
         ('m1-summary-self-test', [sys.executable, str(ROOT / 'scripts/run_m1_readonly.py'), '--self-test', '--output-dir', str(output / 'm1-summary-self-test')]),
         ('m1-collector-self-test', [sys.executable, str(ROOT / 'scripts/collect_m1_readonly.py'), '--self-test', '--output-dir', str(output / 'm1-collector-self-test')]),
@@ -132,6 +133,7 @@ def run(args):
         ('safety', [sys.executable, str(ROOT / 'scripts/check_safety.py'), '--output-dir', str(output / 'safety')]),
         ('safety-self-test', [sys.executable, str(ROOT / 'scripts/check_safety.py'), '--self-test', '--output-dir', str(output / 'safety-fixtures')]),
         ('public-api', [sys.executable, str(ROOT / 'scripts/check_public_api.py'), '--self-test', '--output-dir', str(output / 'public-api')]),
+        ('prune-validation-logs-dry-run', [sys.executable, str(ROOT / 'scripts/prune_validation_logs.py')]),
     ]
     records.extend(run_checks(checks, output, env))
     passed = all(row['exit_code'] == 0 for row in records)
@@ -147,7 +149,9 @@ def run(args):
                '它只证明截图读数与判定逻辑，不证明真实窗口滚动；'
                'M1 startup 4.3 的窗口失败复查 run_window_failure_probe.py 与启动信号探针 '
                'run_signal_probe.py 的自测同样纳入清单，它们只证明文案分类/信号解析与证据'
-               '解释逻辑，不执行真实沙箱或窗口实验',
+               '解释逻辑，不执行真实沙箱或窗口实验；'
+               '验证输出回收入口 prune_validation_logs.py 的隔离自测与仓库 dry-run '
+               '同样纳入清单，dry-run 只列候选不删除',
                'catalog': 'cargo test --workspace 实际发现 app-core 正反例与 UI 消费测试',
                'results': records}
     write_json(output / 'summary.json', summary)

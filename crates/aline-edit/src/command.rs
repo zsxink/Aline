@@ -56,13 +56,9 @@ impl EditContext {
     /// 绑定查找所有者当前的查询代次，用于消费查找替换计划。
     ///
     /// 查询文字、大小写开关或影响当前项替换的查找状态变化时，
-    /// 所有者须推进代次。代次 `0` 表示没有实时查询所有者，等同于不绑定。
+    /// 所有者须推进代次，初始代次可为 `0`。
     pub const fn with_find_query_generation(mut self, generation: u64) -> Self {
-        self.find_query_generation = if generation == 0 {
-            None
-        } else {
-            Some(generation)
-        };
+        self.find_query_generation = Some(generation);
         self
     }
 

@@ -99,8 +99,9 @@ fn visual_ime_protection_rejection_preserves_complete_state() -> Result<(), DocE
 
 use aline_buffer::{Affinity, PatchBudget};
 use aline_edit::{
-    ChangePlan, EditBudget, EditCommand, EditContext, EditMode, EditRefusal, PlanOutcome,
-    SourceEdit, plan_change,
+    ChangePlan, EditBudget, EditCommand, EditContext, EditMode, EditRefusal, FindBudget, FindCase,
+    FindReplacement, FindVersion, PlanOutcome, SourceEdit, find_matches, plan_change,
+    plan_find_replace,
 };
 use aline_markdown::{ParseBudget, ParseConfig, Parsed, ProtectionKind, parse};
 use std::error::Error;
@@ -344,6 +345,92 @@ fn command_precheck_refuses_real_pending_or_composition_with_redo_untouched() ->
 }
 
 #[test]
+fn rejected_source_find_change_keeps_visual_state_and_request() -> TestResult {
+    let raw = "<b>&amp;</b>";
+    let mut doc = DocCore::new_editable(raw, SelectionSpec::new(5, 5), limits())?;
+    let identity = doc.current_input_identity()?;
+    let snapshot = doc.current_snapshot(limits().text())?;
+    let parsed = parse(snapshot.text(), ParseConfig::m0(), ParseBudget::m0())?;
+    let version = FindVersion::new(doc.document_id().clone(), doc.version(), 0);
+    let found = find_matches(
+        snapshot.text(),
+        version.clone(),
+        "amp",
+        FindCase::Sensitive,
+        FindBudget::new(limits().text(), 4),
+    )?;
+    let PlanOutcome::Changed(plan) = plan_find_replace(
+        &found,
+        &version,
+        &parsed,
+        snapshot.selection(),
+        &EditContext::new(EditMode::Source).with_find_query_generation(0),
+        FindReplacement::All("AMP"),
+        EditBudget::new(
+            PatchBudget::new(4, 64, 64),
+            limits().text(),
+            ParseBudget::m0(),
+        ),
+    )?
+    else {
+        return Err(std::io::Error::other("源码查找应产生计划").into());
+    };
+
+    let before = state(&doc);
+    assert!(matches!(
+        doc.apply_find_change_in_source_mode(&identity, &parsed, &plan, 1, 1),
+        Err(DocError::Edit(EditRefusal::StaleFindResults))
+    ));
+    assert_eq!(state(&doc), before);
+
+    doc.derived_request = DerivedRequestId::exhausted_for_test();
+    let identity = doc.current_input_identity()?;
+    let before = state(&doc);
+    assert!(matches!(
+        doc.apply_find_change_in_source_mode(&identity, &parsed, &plan, 0, 1),
+        Err(DocError::Identity(IdentityError::GenerationExhausted))
+    ));
+    assert_eq!(state(&doc), before);
+
+    let mut success = DocCore::new_editable(raw, SelectionSpec::new(5, 5), limits())?;
+    let identity = success.current_input_identity()?;
+    let snapshot = success.current_snapshot(limits().text())?;
+    let parsed = parse(snapshot.text(), ParseConfig::m0(), ParseBudget::m0())?;
+    let version = FindVersion::new(success.document_id().clone(), success.version(), 0);
+    let found = find_matches(
+        snapshot.text(),
+        version.clone(),
+        "amp",
+        FindCase::Sensitive,
+        FindBudget::new(limits().text(), 4),
+    )?;
+    let PlanOutcome::Changed(plan) = plan_find_replace(
+        &found,
+        &version,
+        &parsed,
+        snapshot.selection(),
+        &EditContext::new(EditMode::Source).with_find_query_generation(0),
+        FindReplacement::All("AMP"),
+        EditBudget::new(
+            PatchBudget::new(4, 64, 64),
+            limits().text(),
+            ParseBudget::m0(),
+        ),
+    )?
+    else {
+        return Err(std::io::Error::other("源码查找应产生计划").into());
+    };
+    assert!(matches!(
+        success.apply_find_change_in_source_mode(&identity, &parsed, &plan, 0, 1)?,
+        CommitOutcome::Committed { .. }
+    ));
+    assert_eq!(success.mode(), EditorMode::Source);
+    assert_eq!(success.buffer_text()?, "<b>&AMP;</b>");
+    assert!(!success.has_open_block());
+    Ok(())
+}
+
+#[test]
 fn command_success_is_one_atomic_step_and_invalidates_old_redo() -> TestResult {
     let mut doc = with_redo()?;
     let (identity, parsed, plan) = planned(&mut doc, vec![SourceEdit::new(2..2, "", "Q")])?;
@@ -445,18 +532,64 @@ fn no_change_or_cancelled_composition_preserves_redo_and_history_steps() -> Test
     for cancel in [false, true] {
         let mut doc = with_redo()?;
         doc.set_selection(SelectionSpec::new(1, 2))?;
-        let history_before = state(&doc).buffer;
+        let text_before = doc.buffer_text()?;
+        let snapshot_id_before = doc.buffer.snapshot().id().clone();
+        let revision_before = doc.buffer.revision();
+        let line_index_before = format!("{:?}", doc.buffer.line_index());
+        let history_before = (
+            doc.undo_depth(),
+            doc.redo_depth(),
+            doc.history_node_count(),
+            (0..doc.history_node_count())
+                .filter_map(|index| doc.buffer.history_step(index))
+                .map(|step| format!("{:?}", step.get()))
+                .collect::<Vec<_>>(),
+        );
+        let selection_before = doc.buffer.selection().clone();
         doc.composition_start("X", 4)?;
         if cancel {
             doc.composition_cancel(5)?;
         } else {
             assert_eq!(doc.composition_commit(5)?, CommitOutcome::Unchanged);
         }
-        assert_eq!(state(&doc).buffer, history_before);
+        assert_eq!(doc.buffer_text()?, text_before);
+        assert_eq!(doc.buffer.snapshot().id(), &snapshot_id_before);
+        assert_eq!(doc.buffer.revision(), revision_before);
+        assert_eq!(format!("{:?}", doc.buffer.line_index()), line_index_before);
         assert_eq!(
-            (doc.undo_depth(), doc.redo_depth(), doc.history_node_count()),
-            (1, 1, 2)
+            (
+                doc.undo_depth(),
+                doc.redo_depth(),
+                doc.history_node_count(),
+                (0..doc.history_node_count())
+                    .filter_map(|index| doc.buffer.history_step(index))
+                    .map(|step| format!("{:?}", step.get()))
+                    .collect::<Vec<_>>(),
+            ),
+            history_before
         );
+        let buffer_selection = doc.buffer.selection();
+        let current_selection = doc.current_selection();
+        assert_eq!(
+            (
+                buffer_selection.anchor().byte_offset(),
+                buffer_selection.head().byte_offset(),
+            ),
+            (current_selection.anchor(), current_selection.head()),
+            "Buffer 与 DocCore 必须持有同一方向性选区"
+        );
+        if cancel {
+            assert_eq!(buffer_selection, &selection_before);
+        } else {
+            assert_eq!(
+                (
+                    buffer_selection.anchor().byte_offset(),
+                    buffer_selection.head().byte_offset(),
+                ),
+                (2, 2),
+                "相同候选自然确认后，Buffer 选区应与输入核心的确认光标一致"
+            );
+        }
         assert!(doc.composition().is_none());
     }
     Ok(())

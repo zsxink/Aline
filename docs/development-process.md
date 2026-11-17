@@ -105,7 +105,9 @@ OpenSpec 使用仓库根目录 `openspec/` 下的 `spec-driven` schema，所有�
 
 ### 5.1 本地运行产物
 
-- stdout/stderr、command JSON、环境快照、metadata/tree dump、扫描清单、覆盖率/性能原始数据、截图、执行时生成的夹具副本、临时探针及 Agent brief/分析/逐轮 report/review，统一写 `logs/validation/<任务>/<运行编号>/`。验证脚本默认创建唯一运行目录，显式输出目录也必须位于 `logs/validation/`；CI 同样遵守。测试自身的隔离文件工作区可用系统临时目录，构建缓存留 `target/`；当前交接另按 §5.2 放 `tmp/`。
+- stdout/stderr、command JSON、环境快照、metadata/tree dump、扫描清单、覆盖率/性能原始数据、截图、执行时生成的夹具副本、临时探针及 Agent brief/分析/逐轮 report/review，统一写 `logs/validation/<任务>/<运行编号>/`。验证脚本默认创建唯一运行目录，显式输出目录也必须位于 `logs/validation/`；CI 同样遵守。测试自身的隔离文件工作区可用系统临时目录，构建缓存留 `target/` 或系统临时目录且不得写进 `logs/validation/`；当前交接另按 §5.2 放 `tmp/`。
+- 通用门禁统一由 `scripts/check_workspace.py --output-dir logs/validation/<任务>/<轮次>` 进入，子检查写入同一轮次目录；不裸跑 `check_lints.py` / `check_engineering.py` 等子脚本生成散落的默认 `run-*`。
+- 每类通用门禁原始输出最多保留最近一次成功运行；结论回填后，旧 `run-*`、空目录、0 字节 stdout/stderr 与遗留构建缓存由 `scripts/prune_validation_logs.py` 回收。脚本默认 dry-run，`--apply` 才删除；被 tracked 文档/OpenSpec 引用、近 7 天运行及当前任务目录默认保留。
 - 调试与审查期间保留所需输出，结束后可清理，不永久保留每次成功运行。仍在调查的失败或争议、阶段验收依赖的原始证据，完成核对与摘要迁移前保留。CI 产物采用有限保留期，不回灌 Git。
 - 本地记录经 `scripts/evidence_paths.py` 归一化；文档使用仓库相对路径或占位符，不记录本机绝对路径、正文或敏感信息。
 - 本地日志不能成为他人复跑的必要输入。有回归价值的探针先整理成正式测试/脚本，提交最小输入与独立预期；不可自动复现的实验保留必要摘要。缺失旧证据就注明不足，不补造历史。

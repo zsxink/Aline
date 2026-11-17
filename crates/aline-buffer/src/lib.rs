@@ -16,5 +16,7 @@ pub use history::{
     TYPING_MERGE_WINDOW_MILLIS, TrimOutcome,
 };
 pub use line_index::{LineIndex, LineIndexBudget};
-pub use string_buffer::{AppliedBatch, ApplyOutcome, ReloadOutcome, StringBuffer};
+pub use string_buffer::{
+    AppliedBatch, ApplyOutcome, BufferEditBase, PreparedBufferEdit, ReloadOutcome, StringBuffer,
+};
 pub use text::{BufferError, TextBudget, TextSnapshot};

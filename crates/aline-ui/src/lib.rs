@@ -3,13 +3,14 @@
 mod document;
 
 pub use document::{
-    CommitOutcome, CompositionView, CurrentSnapshot, DerivedRequestId, DocCore, DocError,
-    DocLimits, DocumentId, DraftGeneration, EditorMode, IdentityError, InputIdentity,
+    CloseDisposition, CommitOutcome, CompositionView, CurrentSnapshot, DerivedRequestId, DocCore,
+    DocError, DocLimits, DocumentId, DraftGeneration, EditorMode, IdentityError, InputIdentity,
     ModeSwitchOutcome, OpenDisposition, OpenError, OpenRequestId, ParseConfigGeneration,
-    PublicationKind, PublicationOutcome, PublicationResult, ReadonlyDocument, ReadonlyFileAccess,
-    ReadonlyFileInput, ReadonlyOpenCompletion, ReadonlyOpenJob, ReadonlyOpenLimits,
-    ReadonlyOpenPhase, ReadonlySession, ResourceReference, WaitHandle, WaitStatus, WaitView,
-    WeakResourceReference, WorkingVersion,
+    ParseRefreshCompletion, ParseRefreshDisposition, ParseRefreshJob, PublicationKind,
+    PublicationOutcome, PublicationResult, ReadonlyDocument, ReadonlyFileAccess, ReadonlyFileInput,
+    ReadonlyOpenCompletion, ReadonlyOpenJob, ReadonlyOpenLimits, ReadonlyOpenPhase,
+    ReadonlySession, ResourceReference, WaitHandle, WaitStatus, WaitView, WeakResourceReference,
+    WorkingVersion,
 };
 
 use aline_app_core::{CatalogError, Locale, Translator};

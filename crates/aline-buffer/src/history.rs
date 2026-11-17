@@ -206,7 +206,7 @@ struct SavePoint {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct RecordPlan {
+struct RecordPlan {
     truncate_to: usize,
     merge_node: Option<usize>,
     remove_nodes: usize,
@@ -259,14 +259,13 @@ impl History {
         Ok(total)
     }
 
-    pub(crate) fn prepare_record(
+    fn prepare_record(
         &self,
         step: &HistoryStep,
-        source: OperationSource,
         now_millis: u64,
     ) -> Result<RecordPlan, BufferError> {
         let truncate_to = self.cursor;
-        let merge_node = if source == OperationSource::Typing && truncate_to > 0 {
+        let merge_node = if step.source() == OperationSource::Typing && truncate_to > 0 {
             let index = truncate_to - 1;
             let node = self.nodes.get(index);
             match node {
@@ -372,8 +371,8 @@ impl History {
     /// 预算与容量受检后，发布候选命令及其有变化的输入节点。
     pub(crate) fn record_staged_command(
         &mut self,
-        typing: Option<HistoryStep>,
-        command: HistoryStep,
+        typing: Option<Arc<HistoryStep>>,
+        command: Arc<HistoryStep>,
         now_millis: u64,
     ) -> Result<(), BufferError> {
         debug_assert!(
@@ -386,7 +385,7 @@ impl History {
             .cursor
             .checked_add(1 + usize::from(typing.is_some()))
             .ok_or(BufferError::LengthOverflow)?;
-        let typing_bytes = typing.as_ref().map(step_bytes).transpose()?.unwrap_or(0);
+        let typing_bytes = typing.as_deref().map(step_bytes).transpose()?.unwrap_or(0);
         let added_bytes = typing_bytes
             .checked_add(step_bytes(&command)?)
             .ok_or(BufferError::LengthOverflow)?;
@@ -412,30 +411,41 @@ impl History {
         Ok(())
     }
 
-    pub(crate) fn commit_record(&mut self, plan: RecordPlan, step: HistoryStep, now_millis: u64) {
+    /// 在修改历史前预留新增节点或步骤的容量。
+    pub(crate) fn record(
+        &mut self,
+        step: Arc<HistoryStep>,
+        now_millis: u64,
+    ) -> Result<(), BufferError> {
+        let plan = self.prepare_record(&step, now_millis)?;
+        if let Some(index) = plan.merge_node {
+            let node = self
+                .nodes
+                .get_mut(index)
+                .ok_or(BufferError::HistoryContextMismatch)?;
+            node.steps.try_reserve(1).map_err(BufferError::Allocation)?;
+            // 被合并节点在受保护前缀之后，截断和裁剪均会保留此节点。
+            node.steps.push(step);
+            node.pending = true;
+            node.last_input_at = now_millis;
+            self.truncate_and_trim_for_record(plan);
+            return Ok(());
+        }
+        let retained = plan
+            .truncate_to
+            .checked_sub(plan.remove_nodes)
+            .ok_or(BufferError::HistoryContextMismatch)?;
+        let needed = retained.checked_add(1).ok_or(BufferError::LengthOverflow)?;
+        let mut node = sealed_node(step, now_millis)?;
+        node.pending = node.source == OperationSource::Typing;
+        self.nodes
+            .try_reserve(needed.saturating_sub(self.nodes.len()))
+            .map_err(BufferError::Allocation)?;
         self.truncate_and_trim_for_record(plan);
-        let step = Arc::new(step);
-        if let Some(merge_node) = plan.merge_node {
-            let index = merge_node.saturating_sub(plan.remove_nodes);
-            if let Some(node) = self.nodes.get_mut(index) {
-                node.steps.push(step);
-                node.pending = true;
-                node.last_input_at = now_millis;
-                return;
-            }
-        }
-        let source = step.source();
-        if let Some(previous) = self.nodes.get_mut(self.cursor.saturating_sub(1)) {
-            previous.pending = false;
-        }
-        let last_input_at = now_millis;
-        self.nodes.push(HistoryNode {
-            source,
-            steps: vec![step],
-            pending: source == OperationSource::Typing,
-            last_input_at,
-        });
-        self.cursor = self.cursor.saturating_add(1);
+        self.seal_pending();
+        self.nodes.push(node);
+        self.cursor = self.nodes.len();
+        Ok(())
     }
 
     pub(crate) fn undo_move(&self) -> Option<HistoryMove> {
@@ -559,13 +569,13 @@ impl History {
     }
 }
 
-fn sealed_node(step: HistoryStep, now_millis: u64) -> Result<HistoryNode, BufferError> {
+fn sealed_node(step: Arc<HistoryStep>, now_millis: u64) -> Result<HistoryNode, BufferError> {
     let mut steps = Vec::new();
     steps
         .try_reserve_exact(1)
         .map_err(BufferError::Allocation)?;
     let source = step.source();
-    steps.push(Arc::new(step));
+    steps.push(step);
     Ok(HistoryNode {
         source,
         steps,

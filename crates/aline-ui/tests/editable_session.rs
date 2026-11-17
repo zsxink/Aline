@@ -8,8 +8,8 @@ use aline_buffer::{HistoryBudget, LineIndexBudget, SrcSelection, TextBudget};
 use aline_markdown::{ParseBudget, ParseConfig};
 use aline_source::StorageBudget;
 use aline_ui::{
-    DocLimits, EditorMode, ReadonlyFileAccess, ReadonlyFileInput, ReadonlyOpenLimits,
-    ReadonlySession,
+    DocError, DocLimits, EditorMode, OpenDisposition, ParseRefreshDisposition, ReadonlyFileAccess,
+    ReadonlyFileInput, ReadonlyOpenLimits, ReadonlySession,
 };
 
 struct Files(&'static [u8]);
@@ -46,12 +46,23 @@ fn limits(editable: bool) -> ReadonlyOpenLimits {
 
 fn open(editable: bool, bytes: &'static [u8]) -> Result<ReadonlySession, Box<dyn Error>> {
     let mut session = ReadonlySession::new(limits(editable));
+    replace_document(&mut session, bytes)?;
+    Ok(session)
+}
+
+fn replace_document(
+    session: &mut ReadonlySession,
+    bytes: &'static [u8],
+) -> Result<(), Box<dyn Error>> {
     let request = session.request_open()?;
     let job = session
         .accept_selection(&request, Some(vec![PathBuf::from("fixture.md")]))?
         .ok_or("missing open job")?;
-    session.accept_open(job.read_with(&Files(bytes)));
-    Ok(session)
+    assert!(matches!(
+        session.accept_open(job.read_with(&Files(bytes))),
+        OpenDisposition::Applied
+    ));
+    Ok(())
 }
 
 #[test]
@@ -77,11 +88,96 @@ fn editable_open_uses_the_shared_document_core() -> Result<(), Box<dyn Error>> {
 #[test]
 fn default_open_limits_keep_the_m1_readonly_contract() -> Result<(), Box<dyn Error>> {
     let mut session = open(false, b"abc")?;
+    assert!(matches!(
+        session.begin_parse_refresh(),
+        Err(DocError::ReadOnly)
+    ));
     let document = session.document_mut().ok_or("missing document")?;
     assert!(!document.is_editable());
     document.switch_mode(EditorMode::Source)?;
     assert_eq!(document.core().buffer_text()?, "abc");
     assert_eq!(document.core().history_node_count(), 0);
+    Ok(())
+}
+
+#[test]
+fn refresh_refuses_superseded_cancelled_and_mode_stale_results() -> Result<(), Box<dyn Error>> {
+    let mut session = open(true, b"abc")?;
+    let first = session.begin_parse_refresh()?;
+    let first_identity = first.identity().clone();
+    let second = session.begin_parse_refresh()?;
+    assert!(!session.cancel_parse_refresh(&first_identity));
+    assert!(matches!(
+        session.accept_parse_refresh(first.run()),
+        ParseRefreshDisposition::Stale
+    ));
+    assert!(matches!(
+        session.accept_parse_refresh(second.run()),
+        ParseRefreshDisposition::Applied
+    ));
+
+    let cancelled = session.begin_parse_refresh()?;
+    assert!(session.cancel_parse_refresh(cancelled.identity()));
+    assert!(matches!(
+        session.accept_parse_refresh(cancelled.run()),
+        ParseRefreshDisposition::Stale
+    ));
+
+    let prior_mode = session.begin_parse_refresh()?.run();
+    let document = session.document_mut().ok_or("missing document")?;
+    let projection = document.parsed().projection().id().clone();
+    document.switch_mode(EditorMode::Source)?;
+    assert!(matches!(
+        session.accept_parse_refresh(prior_mode),
+        ParseRefreshDisposition::Stale
+    ));
+    let document = session.document().ok_or("missing document")?;
+    assert!(document.is_parse_current());
+    assert_eq!(document.parsed().projection().id(), &projection);
+    Ok(())
+}
+
+#[test]
+fn refresh_cannot_publish_in_foreign_replaced_or_closed_documents() -> Result<(), Box<dyn Error>> {
+    fn assert_send<T: Send>() {}
+    assert_send::<aline_ui::ParseRefreshJob>();
+    assert_send::<aline_ui::ParseRefreshCompletion>();
+
+    let mut session = open(true, b"abc")?;
+    let mut other = open(true, b"abc")?;
+    let foreign = other.begin_parse_refresh()?.run();
+    let original = session.begin_parse_refresh()?.run();
+    assert!(matches!(
+        session.accept_parse_refresh(foreign),
+        ParseRefreshDisposition::Stale
+    ));
+    assert!(matches!(
+        session.accept_parse_refresh(original),
+        ParseRefreshDisposition::Applied
+    ));
+
+    let replaced = session.begin_parse_refresh()?.run();
+    replace_document(&mut session, b"new content")?;
+    assert!(matches!(
+        session.accept_parse_refresh(replaced),
+        ParseRefreshDisposition::Stale
+    ));
+    assert_eq!(
+        session
+            .document()
+            .ok_or("missing document")?
+            .core()
+            .buffer_text()?,
+        "new content"
+    );
+
+    let closed = session.begin_parse_refresh()?.run();
+    session.close_document();
+    assert!(matches!(
+        session.accept_parse_refresh(closed),
+        ParseRefreshDisposition::Stale
+    ));
+    assert!(session.document().is_none());
     Ok(())
 }
 
