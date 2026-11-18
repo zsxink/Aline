@@ -41,6 +41,20 @@ EXPECTED_CLIPPY = {
     "todo": "deny",
     "unimplemented": "deny",
 }
+# 2026-11-18 用户准入的最小自包含 FFI（docs/decisions.md §44）：aline-source 不能
+# 同时继承 workspace lints 再覆盖单条（Cargo 1.98.1 实测拒绝），因此逐条镜像根策略，
+# 只把 rust.unsafe_code 从 forbid 放宽为 deny（普通 cargo build 也硬错误，文件级
+# allow 只覆盖 macos.rs）。例外差异必须恰好是这一条。
+UNSAFE_FFI_MEMBER = "aline-source"
+
+
+def ffi_member_text(name, root_lints):
+    """生成准入 FFI 成员的完整清单：镜像根 lint，唯一差异是 unsafe_code = deny。"""
+    rust = dict(root_lints["rust"], unsafe_code="deny")
+    rust_lines = "\n".join('%s = "%s"' % item for item in sorted(rust.items()))
+    clippy_lines = "\n".join('%s = "%s"' % item for item in sorted(root_lints["clippy"].items()))
+    return ('[package]\nname = "%s"\nversion = "0.0.0"\nedition = "2024"\n'
+            '\n[lints.rust]\n%s\n\n[lints.clippy]\n%s\n' % (name, rust_lines, clippy_lines))
 
 # F-08 夹具原文：伪继承成员的 Cargo.toml。真实 Cargo 把 [lints] / workspace = true
 # 读作 description 字符串内容，该成员实际没有 [lints] 表。
@@ -728,6 +742,17 @@ def audit_manifests(root=ROOT):
 def audit_member_manifest(name, manifest):
     parsed = tables(manifest)
     lints = parsed.get("lints")
+    if name == UNSAFE_FFI_MEMBER:
+        # §44 准入例外：不得继承 workspace（Cargo 拒绝继承加单条覆盖并存），
+        # 必须逐条镜像根策略；rust 只允许 unsafe_code = deny，其余值必须一致。
+        expected_rust = dict(EXPECTED_RUST, unsafe_code="deny")
+        rust = parsed.get("lints.rust")
+        clippy = parsed.get("lints.clippy")
+        if (isinstance(lints, dict) and set(lints) == {"rust", "clippy"}
+                and _strict_equal(rust, expected_rust)
+                and _strict_equal(clippy, EXPECTED_CLIPPY)):
+            return
+        raise CheckError("成员未完整继承 workspace lint: " + name + "（准入 FFI 例外核对失败）")
     # 恰好是 {"workspace": true}：子表 [lints.*]、数组表 [[lints]]、其他键都在这里被拒。
     if not isinstance(lints, dict) or set(lints) != {"workspace"} or lints["workspace"] is not True:
         raise CheckError("成员未完整继承 workspace lint: " + name)
@@ -893,6 +918,9 @@ def write_member_project(project, root_lints, decoy):
         manifest = member / "Cargo.toml"
         if name == "aline-buffer":
             manifest.write_text(DECOY_MEMBER_TEXT if decoy else REAL_MEMBER_TEXT)
+        elif name == UNSAFE_FFI_MEMBER:
+            # §44 准入成员：镜像表形状，不能被伪造成 workspace 继承。
+            manifest.write_text(ffi_member_text(name, root_lints))
         else:
             manifest.write_text(
                 '[package]\nname = "%s"\nversion = "0.0.0"\nedition = "2024"\n\n[lints]\nworkspace = true\n' % name)
@@ -1042,28 +1070,56 @@ TABLE_PATH_CASES = [
       "key": "workspace.lints.clippy"}),
 ]
 
-# 成员 [lints] 的三类拒绝路径必须各有独立断言，使弱化 audit_member_manifest
-# 的实现必然变红。期望值按 Cargo 的 [lints] workspace 继承语义手写。
+# 成员 [lints] 的键集/值类型/值真值三类拒绝各有一条独立断言，使弱化
+# audit_member_manifest 的实现必然变红。期望值按 Cargo 的 [lints] workspace
+# 继承语义手写。§44 准入后 aline-source 固定为「逐条镜像 + unsafe_code=deny」，
+# 其余成员仍必须恰好是 {"workspace": true}；两组各有正例与反例。
+_FFI_FIXTURE_ROOT = {"rust": EXPECTED_RUST, "clippy": EXPECTED_CLIPPY}
 MEMBER_CASES = [
-    ("accept-exact-workspace-true",
-     '[package]\nname = "aline-source"\nversion = "0.0.0"\nedition = "2024"\n'
-     '[lints]\nworkspace = true\n', "ok", "", None),
-    ("reject-extra-key",
-     '[package]\nname = "aline-source"\nversion = "0.0.0"\nedition = "2024"\n'
+    ("accept-exact-workspace-true", "aline-buffer",
+     '[package]\nname = "aline-buffer"\nversion = "0.0.0"\nedition = "2024"\n'
+     '[lints]\nworkspace = true\n', "ok", ""),
+    ("reject-extra-key", "aline-buffer",
+     '[package]\nname = "aline-buffer"\nversion = "0.0.0"\nedition = "2024"\n'
      '[lints]\nworkspace = true\nextra = 1\n',
-     "error", "成员未完整继承 workspace lint: aline-source", None),
-    ("reject-workspace-false",
-     '[package]\nname = "aline-source"\nversion = "0.0.0"\nedition = "2024"\n'
+     "error", "成员未完整继承 workspace lint: aline-buffer"),
+    ("reject-workspace-false", "aline-buffer",
+     '[package]\nname = "aline-buffer"\nversion = "0.0.0"\nedition = "2024"\n'
      '[lints]\nworkspace = false\n',
-     "error", "成员未完整继承 workspace lint: aline-source", None),
-    ("reject-workspace-string-true",
-     '[package]\nname = "aline-source"\nversion = "0.0.0"\nedition = "2024"\n'
+     "error", "成员未完整继承 workspace lint: aline-buffer"),
+    ("reject-workspace-string-true", "aline-buffer",
+     '[package]\nname = "aline-buffer"\nversion = "0.0.0"\nedition = "2024"\n'
      '[lints]\nworkspace = "true"\n',
-     "error", "成员未完整继承 workspace lint: aline-source", None),
-    ("reject-workspace-integer-one",
-     '[package]\nname = "aline-source"\nversion = "0.0.0"\nedition = "2024"\n'
+     "error", "成员未完整继承 workspace lint: aline-buffer"),
+    ("reject-workspace-integer-one", "aline-buffer",
+     '[package]\nname = "aline-buffer"\nversion = "0.0.0"\nedition = "2024"\n'
      '[lints]\nworkspace = 1\n',
-     "error", "成员未完整继承 workspace lint: aline-source", None),
+     "error", "成员未完整继承 workspace lint: aline-buffer"),
+    ("accept-ffi-mirror-with-deny-unsafe", UNSAFE_FFI_MEMBER,
+     ffi_member_text(UNSAFE_FFI_MEMBER, _FFI_FIXTURE_ROOT), "ok", ""),
+    # 例外不能退回继承：真实根仍是 forbid，且 Cargo 拒绝继承与单条覆盖并存。
+    ("reject-ffi-workspace-inheritance", UNSAFE_FFI_MEMBER,
+     '[package]\nname = "aline-source"\nversion = "0.0.0"\nedition = "2024"\n'
+     '[lints]\nworkspace = true\n',
+     "error", "成员未完整继承 workspace lint: aline-source"),
+    # forbid 不允许文件级 allow 覆盖，等价于把整个成员锁死；准入形状不是它。
+    ("reject-ffi-forbid-unsafe", UNSAFE_FFI_MEMBER,
+     ffi_member_text(UNSAFE_FFI_MEMBER, _FFI_FIXTURE_ROOT).replace(
+         'unsafe_code = "deny"', 'unsafe_code = "forbid"'),
+     "error", "成员未完整继承 workspace lint: aline-source"),
+    # 放宽到 warn 会退回「仅靠 -D warnings」的门禁，必须拒绝。
+    ("reject-ffi-weakened-unsafe", UNSAFE_FFI_MEMBER,
+     ffi_member_text(UNSAFE_FFI_MEMBER, _FFI_FIXTURE_ROOT).replace(
+         'unsafe_code = "deny"', 'unsafe_code = "warn"'),
+     "error", "成员未完整继承 workspace lint: aline-source"),
+    ("reject-ffi-weakened-clippy", UNSAFE_FFI_MEMBER,
+     ffi_member_text(UNSAFE_FFI_MEMBER, _FFI_FIXTURE_ROOT).replace(
+         'unwrap_used = "deny"', 'unwrap_used = "warn"'),
+     "error", "成员未完整继承 workspace lint: aline-source"),
+    ("reject-ffi-missing-missing-docs", UNSAFE_FFI_MEMBER,
+     ffi_member_text(UNSAFE_FFI_MEMBER, _FFI_FIXTURE_ROOT).replace(
+         'missing_docs = "warn"\n', ''),
+     "error", "成员未完整继承 workspace lint: aline-source"),
 ]
 
 
@@ -1143,11 +1199,11 @@ def run_member_self_checks(directory):
     """成员 [lints] 的键集/值类型/值真值三类拒绝各有一条独立断言。"""
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
-    for index, (label, text, expect, needle, _detail) in enumerate(MEMBER_CASES, 1):
+    for index, (label, member, text, expect, needle) in enumerate(MEMBER_CASES, 1):
         path = directory / ("%02d-%s.toml" % (index, label))
         path.write_text(text)
         try:
-            audit_member_manifest("aline-source", path)
+            audit_member_manifest(member, path)
         except CheckError as error:
             if expect != "error" or needle not in str(error):
                 raise CheckError("成员继承自检不符合预期: %s (%s)" % (label, error))
@@ -1162,7 +1218,7 @@ def run_member_self_checks(directory):
 def run_self_test(output):
     output = output_directory('lint-self-test', output)
     actual_members = audit_manifests()
-    print("八个正式成员均声明 workspace lint 继承", flush=True)
+    print("八个正式成员 lint 声明有效（含 §44 FFI 准入例外形状）", flush=True)
     root_tables = tables(ROOT / "Cargo.toml")
     root_lints = {"rust": root_tables["workspace.lints.rust"], "clippy": root_tables["workspace.lints.clippy"]}
     cargo_home = os.environ.get("CARGO_HOME")

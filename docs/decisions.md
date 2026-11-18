@@ -1388,3 +1388,72 @@ V-07/V-09 的补齐或已知限制收口。本裁决只判 `docs/v1-architecture
   `.../2026-11-13-18/`。本裁决只复读既有原始产物，未新增平台实验。
 - **复审条件。** 若用户否决任一保留项的处理、或后续真实窗口证据推翻 M1 分项
   结论，追加新裁决并保留本条；不改写历史记录。
+
+## 44. 2026-11-18 macOS 受检替换的最小自包含 FFI 准入（RS-04）
+
+用户裁决（2026-11-18，选项「最小自包含 FFI（推荐）」）准入最小、自包含、
+仅 macOS 的集中式 `unsafe extern "C"` 模块，作用域放宽 workspace
+`unsafe_code = "forbid"` 与 `scripts/check_safety.py` 的 unsafe 例外，无第三方
+依赖。本条记录必要性、作用域、有效 lint 配置、守卫例外、独立安全评审与验证；
+不改变源文本即真相、范围补丁编辑等铁律。
+
+- **必要性。** 标准库不提供 fd 级 ACL、`renameatx_np(RENAME_SWAP)`、fd 级
+  xattr；传递依赖 `libc 0.2.191` 暴露 `renameatx_np` 等但不暴露 ACL 函数。
+  W4 的受检替换必须能在 macOS 上读取/复制/验证 ACL，并按身份交换目录项，
+  否则三处失败关闭无法解除（平台探针
+  `logs/validation/qmd-w4/platform-probe/macos-fs-20261118-f638e1/`）。
+- **作用域。** 仅 `crates/aline-source/src/atomic/platform/macos.rs` 一个文件；
+  仅 macOS；只声明探针实测过的签名（2 参数 `acl_get_fd_np`、3 参数
+  `acl_set_fd_np`、`acl_init`/`acl_to_text`/`acl_free`、`openat`/`unlinkat`、
+  `fchown`、`flistxattr`/`fgetxattr`/`fsetxattr`、`renameatx_np`），共 12 个
+  extern 函数。mode 用标准库 `File::set_permissions`；flags 只读
+  `MetadataExt::st_flags` 并在非 0 时失败关闭，不调用 `fchflags`。
+- **有效 lint 配置。** workspace 保持 `unsafe_code = "forbid"`；`aline-source`
+  因 Cargo 不接受 `[lints] workspace = true` 与成员级覆盖共存，逐项镜像
+  workspace lint，并把 `unsafe_code` 设为 `"deny"`；上述文件以文件级
+  `#![allow(unsafe_code)]` 放行。按 `docs/rust-style-guide.md` §10，
+  `forbid` 不能由内部 allow 降级，因此成员策略必须显式取 `deny` 与 workspace
+  `forbid` 形成差异；其余 lint（`missing_docs` 与 clippy deny 清单）逐字保留；
+  文件之外的 `unsafe` 在普通 cargo 构建中仍是硬错误。
+- **守卫例外。** `scripts/check_safety.py` 的 `UNSAFE_ALLOWLIST` 只放行该文件
+  （workspace 扫描时 `allow_unsafe`），`--file` 诊断模式仍拒绝；扫描器仍要求
+  每个 `unsafe` 块有中文 `// SAFETY:` 注释（当前 21 个 `unsafe` 块对应 21 条
+  SAFETY）。`scripts/check_lints.py` 的 `EXPECTED_RUST` 仍为
+  `unsafe_code = "forbid"`，对 FFI 成员例外核对 `deny`，并以夹具拒绝
+  `warn`/`forbid`/workspace 继承/缺少 `missing_docs` 的成员变体。
+- **独立安全评审。** 独立代理只读评审，初审判定
+  **APPROVED WITH FINDINGS**：F1 [Important] 目录 `file_inherit` ACL 的创建
+  窗口可让第三方持有 staging 的持久 fd 并延续到已发布目标；F2–F6 [Minor/Nit]
+  最终窗口同尺寸原地改写、ACL 正向 e2e 缺测、错误分类、staging 清理与失败
+  路径、门禁非 rustc 强制。修复后复评为 F1–F6 全部 fixed、无新
+  Critical/Important；评审另指出 F1 的窄变体（继承条目瞬时存在后消失），按建议
+  在清除前读取 staging 自身 ACL 并失败关闭；最终作用域复评为该变体 fixed、
+  无新 Critical/Important。
+- **实现要点（与评审发现对应）。** 创建前检查父目录 ACL 的 `file_inherit`
+  条目并失败关闭；创建后复验父目录与 staging 自身 ACL，`clear_acl` 只在确认
+  无 ACL 后调用；`RENAME_SWAP` 交换后按 `(dev, ino)` 核验旧目标 inode，并按
+  字节完整比较（`RENAME_SWAP` 会推进两个 inode 的 ctime，本机实测，时间戳
+  不可用），不一致即 swap 回滚；staging 清理经父目录 fd `unlinkat` 并先核对
+  身份；`ENOENT` 分类前 stat 目标，区分外部冲突与内部失败。
+- **测试覆盖。** `checked_replace` 集成测试 8 条：精确字节/mode/xattr 保留、
+  deny-delete 失败关闭、目录 `file_inherit` 失败关闭、仅 `directory_inherit`
+  允许、最终目标保留 allow ACL、非 0 flags 失败关闭、同尺寸同 mtime 预检拦截、
+  特殊路径与预算拒绝；`macos.rs` 单测 4 条：ACL 清除、空/二进制 xattr 往返、
+  xattr 名称解析、空针字节匹配；`replace.rs` 新增同尺寸最终窗口改写回滚与
+  staging 清理拒绝外来替换两条回归。
+- **未覆盖边界（不阻塞准入）。** 不是跨进程 CAS：最终字节比较之后的写入不可
+  检测，回读拉长「已交换但可能回滚」的可见窗口且无取消检查；staging 身份核对
+  与 `unlinkat` 非原子；`openat` 之后失败的 `created=true` 分支无失败注入
+  测试；ERANGE/`fchown`/`fgetxattr`/`fsetxattr`/`com.apple.*`/超大 xattr
+  未覆盖；测试依赖 `staff` 组与系统工具；守卫的 `unsafe` 扫描是 token 级，
+  宏展开内的 `unsafe` 不可见，强制边界依赖 rustc。
+- **验证依据。** `logs/validation/qmd-w4/ffi-gates-20261118-978439/`：
+  `cargo fmt --all --check`、`cargo clippy --workspace --all-targets --
+  -D warnings`、`cargo test --workspace`（70 个测试套件，773 passed / 0 failed
+  / 2 ignored）、`check_engineering.py`、`check_safety.py` 及其自检、
+  `check_lints.py` 及其自检、`check_public_api.py`、`check_ui_catalog.py`、
+  `openspec validate --all --strict`（13 passed）、`git diff --check` 全部
+  通过；初始评审与两轮复评原文见同目录 `raw/08`、`raw/09`、`raw/11`。
+- **复审条件。** 若新增 FFI 函数、扩大文件或平台范围、引入第三方 ACL/平台
+  crate，或平台探针/真实证据推翻上述签名或语义，须追加新裁决并重新做独立
+  安全评审；不改写本条。

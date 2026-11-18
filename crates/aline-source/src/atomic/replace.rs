@@ -134,6 +134,18 @@ pub enum ReplacementDurability {
     Uncertain(io::Error),
 }
 
+/// 替换成功后对 staging 路径的清理事实。
+///
+/// `RENAME_SWAP` 后 staging 路径持有交换前的旧目标 inode；删除它才释放旧目标。
+/// 清理失败不回滚已发布的新目标，宿主须按此事实决定取证或后续清理。
+#[derive(Debug)]
+pub enum ReplacementCleanup {
+    /// staging 路径已不存在（本操作删除成功，或路径在删除前已消失）。
+    Removed,
+    /// staging 路径仍存在；携带删除失败原因。
+    LeftInPlace(io::Error),
+}
+
 /// 既有目标已被替换的事实。后续外部写入仍须重新观察。
 #[derive(Debug)]
 pub struct ReplacementReceipt {
@@ -142,6 +154,7 @@ pub struct ReplacementReceipt {
     replaced_version: DiskVersion,
     version: DiskVersion,
     durability: ReplacementDurability,
+    cleanup: ReplacementCleanup,
 }
 
 impl ReplacementReceipt {
@@ -173,6 +186,11 @@ impl ReplacementReceipt {
     /// 返回已发生发布的目录同步事实。
     pub fn durability(&self) -> &ReplacementDurability {
         &self.durability
+    }
+
+    /// 返回替换成功后 staging 路径的清理事实。
+    pub fn cleanup(&self) -> &ReplacementCleanup {
+        &self.cleanup
     }
 
     /// 从实际发布字节建立基线，即使目录同步失败仍可用于重新观察。
@@ -211,7 +229,7 @@ fn prepare_checked_replace_with(
     staging: &Path,
     budget: IoBudget,
     cancellation: &Cancellation,
-    open_staging: impl FnOnce(&File, &Path) -> Result<File, AtomicFailureKind>,
+    open_staging: impl FnOnce(&File, &Path) -> Result<File, super::platform::StagingOpenFailure>,
 ) -> Result<PreparedReplacement, AtomicFailure> {
     let stage = AtomicStage::Prepare;
     let target = expected.path();
@@ -230,15 +248,19 @@ fn prepare_checked_replace_with(
         .map_err(|_| no_staging(AtomicFailureKind::VersionExhausted))?;
     expected.recheck(stage, cancellation).map_err(no_staging)?;
     check_cancel(cancellation, AtomicStage::Create).map_err(no_staging)?;
-    let mut file = open_staging(&expected.parent, staging).map_err(no_staging)?;
+    let mut file = open_staging(&expected.parent, staging).map_err(|failure| {
+        // 创建后失败同样携带调用方提供的路径；路径不保证仍存在，宿主需自行核对。
+        AtomicFailure::new(failure.kind, failure.created.then(|| staging.to_path_buf()))
+    })?;
+    let created = || Some(staging.to_path_buf());
     // 独占创建可能发生在另一个目录实例中；创建只是准备，此时仍未写入文档字节。
     expected
         .check_parent(AtomicStage::Create)
-        .map_err(no_staging)?;
+        .map_err(|kind| AtomicFailure::new(kind, created()))?;
     check_staging_identity(&file, staging, AtomicStage::Create)?;
     expected
         .check_parent(AtomicStage::Create)
-        .map_err(no_staging)?;
+        .map_err(|kind| AtomicFailure::new(kind, created()))?;
     write_staging_owned(&mut file, encoded.bytes(), staging, budget, cancellation)?;
     Ok(PreparedReplacement {
         prepared: PreparedAtomic {
@@ -255,8 +277,11 @@ fn prepare_checked_replace_with(
 impl PreparedReplacement {
     /// 复验 staging 和目标，保全访问元数据后替换目录项并同步父目录。
     ///
-    /// 当前平台缺少已验证的元数据复制与句柄身份替换实现，因此拒绝发布。
-    /// 若底层报告已替换但回读未能确认归属，返回 `PublishedTargetUnverified`。
+    /// macOS 使用已准入的平台原语（`docs/decisions.md` §44）：先在 staging 上复制并
+    /// 复验目标访问元数据，再以 `RENAME_SWAP` 交换目录项并核对旧目标 inode，最后
+    /// 同步父目录并删除 staging。其他平台仍缺少已验证的元数据复制与句柄身份替换
+    /// 实现，保持失败关闭。若底层报告已替换但回读未能确认归属，返回
+    /// `PublishedTargetUnverified`。
     pub fn publish(self, cancellation: &Cancellation) -> Result<ReplacementReceipt, AtomicFailure> {
         self.publish_with(
             cancellation,
@@ -270,7 +295,7 @@ impl PreparedReplacement {
         self,
         cancellation: &Cancellation,
         transfer: impl FnOnce(&File, &File) -> Result<(), AtomicFailureKind>,
-        replace: impl FnOnce(&File, &File, &Path, &Path) -> Result<(), AtomicFailureKind>,
+        replace: impl FnOnce(&File, &File, &File, &Path, &Path, &[u8]) -> Result<(), AtomicFailureKind>,
         sync_parent: impl FnOnce(&File) -> io::Result<()>,
     ) -> Result<ReplacementReceipt, AtomicFailure> {
         let Self {
@@ -301,7 +326,7 @@ impl PreparedReplacement {
             return Err(owned(AtomicFailureKind::StagingContentChanged));
         }
         // 权限复制、同步和 staging 字节检查可能耗时，发布前复验观察。
-        expected.recheck(stage, cancellation).map_err(owned)?;
+        let latest_target = expected.recheck(stage, cancellation).map_err(owned)?;
         if !same_stamp(
             &check_staging_identity(&file, &staging, stage)?,
             &staging_stamp,
@@ -309,9 +334,21 @@ impl PreparedReplacement {
             return Err(owned(AtomicFailureKind::StagingContentChanged));
         }
         check_cancel(cancellation, stage).map_err(owned)?;
-        // 平台发布器必须单独验证已核验的目录和 staging 句柄。回读只是附加核验；
+        let old_target = latest_target
+            .metadata()
+            .map_err(|source| owned(io_failure(stage)(source)))?;
+        // 平台发布器必须单独验证已核验的目录、最新目标句柄和 staging 句柄，
+        // 并在交换后核对旧目标仍是 `expected.storage` 的字节。回读只是附加核验；
         // 外部进程可能在回读前再次交换目录项，不能靠回读把路径 rename 当作受检发布。
-        replace(&expected.parent, &file, &staging, &target).map_err(owned)?;
+        replace(
+            &expected.parent,
+            &latest_target,
+            &file,
+            &staging,
+            &target,
+            expected.storage.bytes(),
+        )
+        .map_err(owned)?;
         if let Err(cause) = verify_published(&expected, &file, encoded.bytes()) {
             return Err(AtomicFailure::new(
                 AtomicFailureKind::PublishedTargetUnverified {
@@ -325,33 +362,99 @@ impl PreparedReplacement {
             Ok(()) => ReplacementDurability::Synchronized,
             Err(source) => ReplacementDurability::Uncertain(source),
         };
+        // 交换后 staging 路径持有旧目标 inode；只删除身份仍是该 inode 的目录项，
+        // 不改变已发布的新目标。
+        let cleanup = match cleanup_staging(&expected.parent, &staging, &old_target) {
+            Ok(()) => ReplacementCleanup::Removed,
+            Err(source) if source.kind() == io::ErrorKind::NotFound => ReplacementCleanup::Removed,
+            Err(source) => ReplacementCleanup::LeftInPlace(source),
+        };
         Ok(ReplacementReceipt {
             encoded,
             path: target,
             replaced_version: expected.storage.version(),
             version,
             durability,
+            cleanup,
         })
     }
 }
 
+/// macOS 接入已准入的平台原语；其他平台保持失败关闭。
+#[cfg(target_os = "macos")]
+fn transfer_metadata(target: &File, staging: &File) -> Result<(), AtomicFailureKind> {
+    super::platform::transfer_access_state(target, staging)
+}
+
+#[cfg(not(target_os = "macos"))]
 fn transfer_metadata(_: &File, _: &File) -> Result<(), AtomicFailureKind> {
+    // 未验证的 ACL/xattr/flags 复制会扩大或丢失实际访问范围。
     Err(AtomicFailureKind::ReplacementMetadataUnverified)
 }
 
-fn open_staging_checked(_: &File, _: &Path) -> Result<File, AtomicFailureKind> {
+/// macOS 以已核验父目录 fd 独占创建 staging，拒绝继承 ACL 并清除 staging 自身 ACL。
+#[cfg(target_os = "macos")]
+fn open_staging_checked(
+    parent: &File,
+    path: &Path,
+) -> Result<File, super::platform::StagingOpenFailure> {
+    super::platform::open_staging(parent, path)
+}
+
+#[cfg(not(target_os = "macos"))]
+fn open_staging_checked(_: &File, _: &Path) -> Result<File, super::platform::StagingOpenFailure> {
     // 继承 ACL 可能扩大 mode 0600 的 staging 的实际访问范围。
-    Err(AtomicFailureKind::ReplacementMetadataUnverified)
+    Err(super::platform::StagingOpenFailure::not_created(
+        AtomicFailureKind::ReplacementMetadataUnverified,
+    ))
 }
 
+/// macOS 以 `RENAME_SWAP` 发布，交换后核对旧目标 inode 与字节，必要时回滚。
+#[cfg(target_os = "macos")]
+fn publish_existing_checked(
+    parent: &File,
+    current: &File,
+    staging_file: &File,
+    staging: &Path,
+    target: &Path,
+    old_bytes: &[u8],
+) -> Result<(), AtomicFailureKind> {
+    super::platform::publish_existing(parent, current, staging_file, staging, target, old_bytes)
+}
+
+#[cfg(not(target_os = "macos"))]
 fn publish_existing_checked(
     _: &File,
     _: &File,
+    _: &File,
     _: &Path,
     _: &Path,
+    _: &[u8],
 ) -> Result<(), AtomicFailureKind> {
     // 路径 rename 无法约束内核使用已检查的目录和 staging 句柄。
     Err(AtomicFailureKind::ReplacementIdentityUnverified)
+}
+
+/// macOS 经父目录 fd 删除 staging，并先核对它仍是交换前的旧目标 inode。
+#[cfg(target_os = "macos")]
+fn cleanup_staging(parent: &File, staging: &Path, old_target: &Metadata) -> io::Result<()> {
+    super::platform::cleanup_staging(parent, staging, metadata_identity(old_target))
+}
+
+#[cfg(not(target_os = "macos"))]
+fn cleanup_staging(_: &File, staging: &Path, _: &Metadata) -> io::Result<()> {
+    fs::remove_file(staging)
+}
+
+#[cfg(unix)]
+fn metadata_identity(metadata: &Metadata) -> (u64, u64) {
+    use std::os::unix::fs::MetadataExt as _;
+    (metadata.dev(), metadata.ino())
+}
+
+#[cfg(not(unix))]
+fn metadata_identity(_: &Metadata) -> (u64, u64) {
+    (0, 0)
 }
 
 fn verify_published(
@@ -632,7 +735,10 @@ mod tests {
             staging,
             IoBudget::new(1024),
             cancel,
-            |_, path| create_staging(path),
+            |_, path| {
+                create_staging(path)
+                    .map_err(super::super::platform::StagingOpenFailure::not_created)
+            },
         )?)
     }
 
@@ -661,7 +767,7 @@ mod tests {
         let receipt = prepared.publish_with(
             &cancel,
             |_, _| Ok(()),
-            |_, _, from, to| {
+            |_, _, _, from, to, _| {
                 test_path_rename(from, to)?;
                 cancel.cancel();
                 Ok(())
@@ -705,7 +811,7 @@ mod tests {
                     }
                     Ok(())
                 },
-                |_, _, _, _| {
+                |_, _, _, _, _, _| {
                     calls.set(calls.get() + 1);
                     Err(io_failure(stage)(io::Error::from(
                         io::ErrorKind::PermissionDenied,
@@ -741,7 +847,7 @@ mod tests {
                 fs::write(directory.target(), b"EXTERNAL\n")
                     .map_err(io_failure(AtomicStage::Permissions))
             },
-            |_, _, from, to| test_path_rename(from, to),
+            |_, _, _, from, to, _| test_path_rename(from, to),
             File::sync_all,
         );
         let failure = result.err().ok_or("权限处理后检测到外改时必须拒绝发布")?;
@@ -797,30 +903,41 @@ mod tests {
     }
 
     #[test]
-    fn replacement_permission_approval_does_not_enable_a_path_based_publisher() -> TestResult {
-        use std::cell::Cell;
-
+    fn replacement_platform_swap_rolls_back_when_target_changed_after_observation() -> TestResult {
         let directory = TestDir::new()?;
-        let cancel = Cancellation::new();
-        let prepared = prepare(&directory, &cancel)?;
-        let sync_calls = Cell::new(0);
-        let result = prepared.publish_with(
-            &cancel,
-            |_, _| Ok(()),
-            publish_existing_checked,
-            |_| {
-                sync_calls.set(sync_calls.get() + 1);
-                Ok(())
-            },
+        fs::write(directory.target(), ORIGINAL)?;
+        let target_file = File::open(directory.target())?;
+        let staging_file = create_staging(&directory.staging())
+            .map_err(|kind| io::Error::other(format!("{kind:?}")))?;
+        fs::write(directory.staging(), SAVED)?;
+        super::super::platform::transfer_access_state(&target_file, &staging_file)
+            .map_err(|kind| io::Error::other(format!("{kind:?}")))?;
+        // 交换前用另一 inode 顶替目标路径；调用方持有的观察句柄仍指向旧 inode。
+        let external = directory.target().with_extension("external");
+        fs::write(&external, ORIGINAL)?;
+        fs::rename(&external, directory.target())?;
+        let parent = File::open(directory.target().parent().ok_or("测试目标缺少父目录")?)?;
+        let failure = super::super::platform::publish_existing(
+            &parent,
+            &target_file,
+            &staging_file,
+            &directory.staging(),
+            &directory.target(),
+            ORIGINAL,
+        )
+        .err()
+        .ok_or("旧目标观察失效时必须回滚")?;
+        assert!(
+            matches!(
+                failure,
+                AtomicFailureKind::Conflict {
+                    target_exists: true
+                }
+            ),
+            "回滚后必须按外部改写结算: {failure:?}"
         );
-        let failure = result.err().ok_or("没有安全发布实现时必须拒绝")?;
-        assert!(matches!(
-            failure.kind(),
-            AtomicFailureKind::ReplacementIdentityUnverified
-        ));
         assert_eq!(fs::read(directory.target())?, ORIGINAL);
         assert_eq!(fs::read(directory.staging())?, SAVED);
-        assert_eq!(sync_calls.get(), 0);
         Ok(())
     }
 
@@ -842,9 +959,13 @@ mod tests {
             IoBudget::new(1024),
             &cancel,
             |_, path| {
-                fs::rename(&parent, &displaced).map_err(io_failure(AtomicStage::Create))?;
-                fs::create_dir(&parent).map_err(io_failure(AtomicStage::Create))?;
+                let displace = || {
+                    fs::rename(&parent, &displaced).map_err(io_failure(AtomicStage::Create))?;
+                    fs::create_dir(&parent).map_err(io_failure(AtomicStage::Create))
+                };
+                displace().map_err(super::super::platform::StagingOpenFailure::not_created)?;
                 create_staging(path)
+                    .map_err(super::super::platform::StagingOpenFailure::not_created)
             },
         );
 
@@ -853,7 +974,8 @@ mod tests {
             failure.kind(),
             AtomicFailureKind::TargetDirectoryChanged
         ));
-        assert_eq!(failure.staging_path(), None);
+        // 创建已发生；即使未写入任何文档字节，失败也必须携带 staging 路径供清理。
+        assert_eq!(failure.staging_path(), Some(staging.as_path()));
         assert!(fs::read(staging)?.is_empty());
         assert_eq!(fs::read(displaced.join("note.md"))?, ORIGINAL);
         Ok(())
@@ -873,7 +995,7 @@ mod tests {
             let result = prepared.publish_with(
                 &cancel,
                 |_, _| Ok(()),
-                |_, _, from, to| {
+                |_, _, _, from, to, _| {
                     if replace_inode {
                         test_path_rename(from, &from.with_extension("displaced"))?;
                     }
@@ -915,7 +1037,7 @@ mod tests {
         let result = prepared.publish_with(
             &cancel,
             |_, _| Ok(()),
-            |_, _, from, to| {
+            |_, _, _, from, to, _| {
                 test_path_rename(&parent, &displaced)?;
                 fs::create_dir(&parent).map_err(io_failure(AtomicStage::Publish))?;
                 // 连 staging 文件身份与字节都沿用原句柄，单靠目标回读仍不足。
@@ -937,6 +1059,67 @@ mod tests {
         assert_eq!(fs::read(target)?, SAVED);
         assert_eq!(fs::read(displaced.join("note.md"))?, ORIGINAL);
         assert_eq!(sync_calls.get(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn replacement_platform_swap_detects_in_place_rewrite_in_final_window() -> TestResult {
+        // 与 ORIGINAL 同长度，模拟复验后、交换前的原地改写。
+        const REWRITTEN: &[u8] = b"\xef\xbb\xbfbravo\r\n";
+        let directory = TestDir::new()?;
+        fs::write(directory.target(), ORIGINAL)?;
+        let target_file = File::open(directory.target())?;
+        let staging_file = create_staging(&directory.staging())
+            .map_err(|kind| io::Error::other(format!("{kind:?}")))?;
+        fs::write(directory.staging(), SAVED)?;
+        super::super::platform::transfer_access_state(&target_file, &staging_file)
+            .map_err(|kind| io::Error::other(format!("{kind:?}")))?;
+        fs::write(directory.target(), REWRITTEN)?;
+        let parent = File::open(directory.target().parent().ok_or("测试目标缺少父目录")?)?;
+        let failure = super::super::platform::publish_existing(
+            &parent,
+            &target_file,
+            &staging_file,
+            &directory.staging(),
+            &directory.target(),
+            ORIGINAL,
+        )
+        .err()
+        .ok_or("最终窗口内的原地改写必须发现并回滚")?;
+        assert!(
+            matches!(
+                failure,
+                AtomicFailureKind::Conflict {
+                    target_exists: true
+                }
+            ),
+            "回滚后必须按外部改写结算: {failure:?}"
+        );
+        assert_eq!(fs::read(directory.target())?, REWRITTEN);
+        assert_eq!(fs::read(directory.staging())?, SAVED);
+        Ok(())
+    }
+
+    #[test]
+    fn replacement_platform_cleanup_refuses_a_replaced_staging_path() -> TestResult {
+        use std::os::unix::fs::MetadataExt as _;
+
+        let directory = TestDir::new()?;
+        let staging = create_staging(&directory.staging())
+            .map_err(|kind| io::Error::other(format!("{kind:?}")))?;
+        let metadata = staging.metadata()?;
+        drop(staging);
+        fs::remove_file(directory.staging())?;
+        // 同一路径换成另一 inode；清理必须保留它而不是删除。
+        fs::write(directory.staging(), b"foreign")?;
+        let parent = File::open(directory.target().parent().ok_or("测试目标缺少父目录")?)?;
+        let result = super::super::platform::cleanup_staging(
+            &parent,
+            &directory.staging(),
+            (metadata.dev(), metadata.ino()),
+        );
+        assert!(result.is_err(), "身份不符时不得删除 staging 路径");
+        assert_eq!(fs::read(directory.staging())?, b"foreign");
         Ok(())
     }
 }

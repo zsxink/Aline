@@ -9,7 +9,8 @@ mod storage;
 pub use atomic::{
     AtomicFailure, AtomicFailureKind, AtomicStage, BaselineError, Cancellation, ExistingTarget,
     ExistingTargetKind, InvalidInput, IoBudget, PreparedAtomic, PreparedReplacement,
-    ReplacementDurability, ReplacementReceipt, Written, prepare_atomic, prepare_checked_replace,
+    ReplacementCleanup, ReplacementDurability, ReplacementReceipt, Written, prepare_atomic,
+    prepare_checked_replace,
 };
 pub use baseline::SourceBaseline;
 pub use decode::{DecodeError, DecodedSource, LineEnding, StorageMetadata, decode};

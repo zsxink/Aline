@@ -24,11 +24,12 @@ use crate::decode::{DecodeError, decode};
 use crate::encode::EncodedBytes;
 use crate::storage::{BaselineId, DiskVersion, StorageBudget, StorageError, StorageSnapshot};
 
+mod platform;
 mod replace;
 
 pub use replace::{
-    ExistingTarget, PreparedReplacement, ReplacementDurability, ReplacementReceipt,
-    prepare_checked_replace,
+    ExistingTarget, PreparedReplacement, ReplacementCleanup, ReplacementDurability,
+    ReplacementReceipt, prepare_checked_replace,
 };
 
 const WRITE_CHUNK_BYTES: usize = 64 * 1024;

@@ -11,9 +11,13 @@
 
 关联 source 的全部场景、S-5/7/10/12、R-15-07/13，先无头机制后 UI。
 
-- [ ] 2.1 先建目标版本/同 size/mtime 外改、特殊目标、预算、取消及部分写/同步/权限/替换失败回归，再补 source 既有目标受检替换。验收拟新增 `cargo test -p aline-source --test checked_replace` 与 `cargo test -p aline-source --test atomic --test decode_golden`；独立磁盘 bytes 预期，已有 create-only 行为不变。
-  - 已新增独立真实文件拒绝回归。当前 staging 打开、元数据迁移与发布身份验证仍明确失败关闭：权限/ACL 初始状态无法证明、目标元数据不能按句柄逐项迁移复验、发布路径不能保证使用先前验证的 staging 对象；未以路径 rename 绕过。macOS 平台替换机制及文件/目录同步事实仍未取证。
+- [x] 2.1 先建目标版本/同 size/mtime 外改、特殊目标、预算、取消及部分写/同步/权限/替换失败回归，再补 source 既有目标受检替换。验收拟新增 `cargo test -p aline-source --test checked_replace` 与 `cargo test -p aline-source --test atomic --test decode_golden`；独立磁盘 bytes 预期，已有 create-only 行为不变。
+  - 已新增独立真实文件拒绝回归。2026-11-18 用户准入「最小自包含 FFI」后，macOS 平台原语已实现：staging 以 `openat(O_EXCL|O_NOFOLLOW)` 独占创建并清理继承 ACL，目标 mode/uid/gid/ACL/xattr 按 fd 迁移并复验，发布用 `renameatx_np(RENAME_SWAP)` 加 swap 后旧 inode 核对与 swap-back 回滚（非跨进程 CAS）；非 macOS 仍失败关闭，不退回路径 rename 或删除后重建。真实验收：`cargo test -p aline-source --test checked_replace` 6 项通过（同 size/mtime 外改、特殊目标/预算、mode+xattr 保留、目标 `deny delete` ACL 失败关闭、目录 `file_inherit` ACL 清理、非 0 文件 flags 失败关闭），`--test atomic --test decode_golden` 与 create-only 行为不变；目录同步失败按 `PublishedDurabilityUncertain` 结算。准入记录与独立安全评审见 `docs/decisions.md` §44；评审完成前保持未勾选。
+  - 2026-11-18 收口：独立安全评审完成（初始 APPROVED WITH FINDINGS → 修复后 F1–F6 全部 fixed → F1 窄变体修复后最终复评 fixed，无新 Critical/Important），准入记录 `docs/decisions.md` §44，门禁证据 `logs/validation/qmd-w4/ffi-gates-20261118-978439/`。`--test checked_replace` 现 8 项通过（新增 `checked_replace_allows_directory_only_inherited_acl` 与 `checked_replace_preserves_target_allow_acl_on_final_target`），`--test atomic --test decode_golden` 与 create-only 行为不变。按验收勾选 2.1。
 - [ ] 2.2 实测 macOS 目标身份、目录同步、权限/ACL/xattr、替换后同步失败的事实分类及外改竞争窗口；需要新依赖/unsafe 则先准入，不静默绕过。验收：真实文件阶段结果、失败后原文件/恢复材料和残余保证可核查，Windows/Linux/Intel 未测单列；回填 V-08 与 source 中文 rustdoc。
+  - 2026-11-18 平台探针 `macos-fs-20261118-f638e1`（macOS 27.2.1 / arm64 / APFS；证据 `logs/validation/qmd-w4/platform-probe/macos-fs-20261118-f638e1/`，含 `summary.md` + 15 份原始日志）：fd 级 ACL/xattr/flags/mode/uid/gid 可读可写可复验（`acl_get_fd_np` 为 2 参数 ABI）；`renameatx_np(RENAME_SWAP)` 可用且可在 swap 后核对旧 inode/字节并回滚（非跨进程 CAS），`exchangedata` 为 `ENOTSUP`，`clonefile` 只新建且不复制 ACL；任何 `deny delete` ACL（源或目标）使 rename/swap `EACCES`，「先复制目标 ACL 再发布」对这类目标不可实现，只能失败关闭；目录 `fsync`/`F_FULLFSYNC` 本机返回 0、未做故障注入；同 size 改写并恢复 mtime 后 ctime 前进（快筛，非内容证明）。实现需最小 unsafe FFI 或经审查 crate 准入，准入前保持失败关闭。故障注入、Windows/Linux/Intel、网络卷、case-sensitive APFS、并发读者中间态与掉电语义未测，V-08 与 source 中文 rustdoc 回填待实现后完成，故保持未勾选。
+  - 2026-11-18 实现后真实文件阶段补充：ACL/xattr/mode 迁移与发布前复验、staging 继承 ACL 清理、`deny delete` 失败关闭与 swap 回滚均有真实文件回归（`cargo test -p aline-source --test checked_replace`）。目录同步失败仍只有注入单测和探针返回 0，无故障注入；替换后同步失败的事实分类、Windows/Linux/Intel、网络卷、case-sensitive APFS、并发读者与掉电语义未测；V-08 与 source 中文 rustdoc 回填待完成，故保持未勾选。
+  - 2026-11-18 评审收口补充：独立安全评审最终无 Critical/Important（见 `docs/decisions.md` §44 与 `logs/validation/qmd-w4/ffi-gates-20261118-978439/`）；ACL 正向 e2e（最终目标保留 allow ACL）与仅 `directory_inherit` 允许两条真实文件回归已补入 `--test checked_replace`（共 8 项）。故障注入、其他平台与掉电语义等缺口不变，2.2 保持未勾选。
 
 ## 3. 串行保存和外改闭环
 
