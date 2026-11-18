@@ -11,8 +11,7 @@ mod open_block;
 mod persistence;
 mod publication;
 mod readonly_session;
-#[cfg(test)]
-mod recovery_record;
+mod recovery;
 mod resource;
 mod snapshot;
 mod statistics;

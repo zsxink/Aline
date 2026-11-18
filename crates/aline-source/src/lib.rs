@@ -4,6 +4,7 @@ mod atomic;
 mod baseline;
 mod decode;
 mod encode;
+pub mod fs;
 mod storage;
 
 pub use atomic::{
