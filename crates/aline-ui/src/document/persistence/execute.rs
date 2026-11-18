@@ -9,7 +9,7 @@ use aline_source::{ExistingTarget, IoBudget, StorageBudget, prepare_checked_repl
 use super::{FrozenWrite, WriteCompletion, WriteOutcome, WriteStop};
 
 /// 已冻结保存的后台执行包；不借用文档，只读目标并写入 staging。
-pub(in crate::document) struct SaveJob {
+pub(crate) struct SaveJob {
     frozen: FrozenWrite,
     text_budget: TextBudget,
     storage_budget: StorageBudget,
@@ -40,7 +40,7 @@ impl SaveJob {
     /// 固定顺序：观察既有目标 → 复核观察与编码基线 → 编码 → 同目录 staging
     /// 受检替换并发布 → 用实际回执结算。观察失败直接作为未发布完成项返回；
     /// staging 的清理或残留由 source 的替换契约决定，本模块不新增清理路径。
-    pub(in crate::document) fn run(self) -> WriteCompletion {
+    pub(crate) fn run(self) -> WriteCompletion {
         let Self {
             frozen,
             text_budget,

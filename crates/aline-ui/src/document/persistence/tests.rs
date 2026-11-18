@@ -166,6 +166,42 @@ fn persistence_publication_waits_for_latest_confirmed_or_cancelled_input() -> Te
 }
 
 #[test]
+fn persistence_waiting_save_rejects_reassociation() -> TestResult {
+    let (mut doc, mut state) = fixture(b"x\n")?;
+    doc.composition_start("候", 0)?;
+    let SaveRequest::Waiting(handle) = state
+        .request_save(&mut doc, TEXT)
+        .map_err(|error| format!("{error:?}"))?
+    else {
+        return Err("活动组合应等待平台结果".into());
+    };
+    let before = doc.current_snapshot(TEXT)?;
+    assert_eq!(
+        state.replace_association(
+            state.path_generation(),
+            fixture_path("other.md"),
+            &before,
+            baseline(b"x\n", 0)?,
+        ),
+        Err(SaveError::Busy),
+        "等待期间目标不得改变"
+    );
+    state
+        .cancel_save_wait(&mut doc, handle)
+        .map_err(|error| format!("{error:?}"))?;
+    doc.composition_cancel(2)?;
+    assert_eq!(state.status(), SaveStatus::Idle);
+    assert!(
+        matches!(
+            state.request_save(&mut doc, TEXT),
+            Ok(SaveRequest::Queued(_))
+        ),
+        "取消等待后协调器应可继续使用"
+    );
+    Ok(())
+}
+
+#[test]
 fn persistence_publication_cancelled_wait_rejects_late_result_and_preserves_composition()
 -> TestResult {
     for closing in [false, true] {
@@ -1019,6 +1055,72 @@ fn persistence_session_external_change_conflict_preserves_memory_and_disk() -> T
         session.close_document(),
         CloseDisposition::Refused,
         "未结算冲突必须拒绝关闭"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn persistence_conflict_resave_is_rejected_without_queue_residue() -> TestResult {
+    use std::fs;
+
+    let directory = TempSaveDir::create("aline-conflict-resave")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut session = editable_absolute_session(&target)?;
+    open_editing_block(&mut session)?;
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .type_text(1, "a", 0)?;
+    rewrite_same_size_and_mtime(&target)?;
+
+    let SaveCommand::Run(job) = session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .request_save_command()
+    else {
+        return Err("首次保存应生成后台工作".into());
+    };
+    let completion = job.run();
+    assert_eq!(
+        session
+            .document_mut()
+            .ok_or("应存在可编辑文档")?
+            .settle_save_command(completion),
+        SaveResult::Conflict,
+        "外部内容变化必须结算为冲突"
+    );
+
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    assert!(
+        matches!(
+            document.request_save_command(),
+            SaveCommand::Rejected(SaveRejection::Busy)
+        ),
+        "冲突未处理时再次保存必须在入队前拒绝"
+    );
+    let snapshot = document.current_snapshot()?;
+    assert_eq!(
+        document.persistence_close_status(&snapshot),
+        Some(CloseStatus::NeedsDecision),
+        "拒绝后不得残留 queued，否则关闭决策会退化为 Waiting"
+    );
+    assert_eq!(
+        session.close_document(),
+        CloseDisposition::Refused,
+        "冲突未处理仍应拒绝关闭"
+    );
+    assert_eq!(fs::read(&target)?, b"y\n", "再次请求不得覆盖外部内容");
+    assert_eq!(
+        session
+            .document_mut()
+            .ok_or("应存在可编辑文档")?
+            .current_snapshot()?
+            .full_text(TEXT)?,
+        "xa\n",
+        "拒绝保存不得改变内存文本"
     );
     Ok(())
 }

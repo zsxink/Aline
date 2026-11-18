@@ -3,8 +3,10 @@
 //! 不改变历史；实际磁盘阶段在同目录 `execute` 子模块按固定顺序执行。
 //! 冻结快照强持有其已有的资源引用，本模块不管理恢复资源。
 
-// 3.2–3.4 的保存/自动保存/冲突 UI 接线前，保存入口只有 crate 内测试调用；
-// 该豁免只覆盖本模块，待 UI 接线后删除。
+// 重载/关联替换、取消与关闭停止（`replace_association`、`cancel`、
+// `begin_close`）的生产出口分别属于 W4 3.3/4.x；`WriteSettlement` 的
+// operation/snapshot/path 字段也仍只有 crate 内测试读取。该豁免只覆盖本模块，
+// 对应 UI 接线后逐项复核删除。
 #![cfg_attr(not(test), allow(dead_code))]
 
 use std::{
@@ -20,13 +22,58 @@ use aline_source::{
     StorageSnapshot, decode, encode,
 };
 
-use super::{CurrentSnapshot, DocumentId};
+use super::{CurrentSnapshot, DocumentId, WaitHandle};
 
 mod execute;
 mod publication;
 
-pub(super) use execute::SaveJob;
+pub(crate) use execute::SaveJob;
 pub(super) use publication::{SaveRequest, SaveRequestError};
+
+/// 窗口层可命名的保存指令；不暴露协调器内部类型。
+// 变体按裁决保持 `Run(SaveJob)` 直传；保存是低频路径，装箱只增加一次分配，
+// 因此仅对本枚举豁免大小阈值 lint。
+#[allow(clippy::large_enum_variant)]
+pub(crate) enum SaveCommand {
+    /// 已冻结并排队，交给后台执行。
+    Run(SaveJob),
+    /// 组合期内等待平台自然结束；句柄用于取消或结算等待。
+    Wait(WaitHandle),
+    /// 请求被拒绝，按类别映射本地化反馈。
+    Rejected(SaveRejection),
+}
+
+/// 保存请求被拒绝的宿主可辨类别。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum SaveRejection {
+    /// 当前文档只读。
+    ReadOnly,
+    /// 保存队列正忙（在途、已排队或等待中）。
+    Busy,
+    /// 窗口/文档已进入关闭流程。
+    Closing,
+    /// 没有可写的绝对目标路径。
+    NoTarget,
+    /// 不属于宿主可辨类别的内部失败。
+    Internal,
+}
+
+/// 一次保存结算后的稳定分类；窗口层只据此选反馈键。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum SaveResult {
+    /// 已发布且目录同步确认。
+    Saved,
+    /// 已写入但同步/回执/基线不能完全确认。
+    SavedUncertain,
+    /// 目标与保存基线不一致，未发布。
+    Conflict,
+    /// 准备、编码或写盘失败。
+    Failed,
+    /// 本次保存被取消。
+    Cancelled,
+    /// 迟到或外来的完成项；不覆盖当前状态。
+    Stale,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) struct OperationId(u64);
@@ -289,7 +336,7 @@ pub(super) enum WriteOutcome {
     },
 }
 
-pub(super) struct WriteCompletion {
+pub(crate) struct WriteCompletion {
     job: FrozenWrite,
     outcome: WriteOutcome,
 }
@@ -518,6 +565,11 @@ impl PersistenceCoordinator {
     /// 后台观察须记录起点路径代次，采纳时同当前关联复验。
     pub(super) fn path_generation(&self) -> PathGeneration {
         self.target.generation
+    }
+
+    /// 返回当前保存目标的绝对路径；宿主据此在目标同目录生成 staging 候选。
+    pub(super) fn target_path(&self) -> &Path {
+        &self.target.path
     }
 
     /// 显式建立已完成的路径关联。调用者须先在 DocCore 统一提交重载/引用修改，

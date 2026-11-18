@@ -4,6 +4,8 @@ use std::error::Error;
 use std::io::{self, Cursor};
 use std::path::{Path, PathBuf};
 
+use aline_buffer::SelectionSpec;
+
 use crate::EditorMode;
 use crate::{ReadonlyFileAccess, ReadonlyFileInput};
 
@@ -513,4 +515,322 @@ fn find_panel_catalogs_cover_controls_status_and_count() -> Result<(), Box<dyn E
         assert!(count.contains('2') && count.contains('3'));
     }
     Ok(())
+}
+
+/// 本文件内的临时保存目录；不跨模块导出，Drop 时递归清理。
+#[cfg(target_os = "macos")]
+struct WindowSaveDir(PathBuf);
+
+#[cfg(target_os = "macos")]
+impl WindowSaveDir {
+    /// 在系统临时目录下独占创建本测试使用的目录。
+    fn create(prefix: &str) -> Result<Self, Box<dyn Error>> {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+        for attempt in 0..100u32 {
+            let candidate = std::env::temp_dir().join(format!(
+                "{prefix}-{}-{nonce:x}-{attempt}",
+                std::process::id()
+            ));
+            match std::fs::create_dir(&candidate) {
+                Ok(()) => return Ok(Self(candidate)),
+                Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+                Err(error) => return Err(error.into()),
+            }
+        }
+        Err("无法创建保存测试目录".into())
+    }
+}
+
+#[cfg(target_os = "macos")]
+impl Drop for WindowSaveDir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+/// 用 `Files` 适配器按给定字节打开绝对路径上的可编辑文档。
+#[cfg(target_os = "macos")]
+fn open_window_document(
+    state: &mut super::NativeOpenCoordinator,
+    path: &Path,
+    bytes: &[u8],
+) -> Result<(), Box<dyn Error>> {
+    let request = state.request_open()?;
+    let job = state
+        .accept_dialog(&request, Ok(Some(vec![path.to_path_buf()])))
+        .ok_or("应生成打开工作")?;
+    let (next, prepared) = state.read_finished(job.read_with(&Files(bytes)), |_| Ok(()));
+    assert!(next.is_none());
+    assert_eq!(prepared, Some(()));
+    // 打开成功本身会请求回焦；先消费，保存用例只验证保存处理器不新增。
+    assert!(state.take_focus_return(), "打开成功应请求回焦");
+    Ok(())
+}
+
+/// 在全文范围打开旧式输入块；无窗口可编辑打开不会自动打开块。
+#[cfg(target_os = "macos")]
+fn open_window_block(
+    state: &mut super::NativeOpenCoordinator,
+    selection: SelectionSpec,
+) -> Result<(), Box<dyn Error>> {
+    let document = state.session.document_mut().ok_or("应存在可编辑文档")?;
+    let len = document.baseline().source().len();
+    document.edit_core()?.open_block(0..len, selection)?;
+    Ok(())
+}
+
+/// 在打开块的逻辑偏移处输入普通文本。
+#[cfg(target_os = "macos")]
+fn window_type(
+    state: &mut super::NativeOpenCoordinator,
+    at: usize,
+    text: &str,
+) -> Result<(), Box<dyn Error>> {
+    state
+        .session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .type_text(at, text, 0)?;
+    Ok(())
+}
+
+/// 保存前后须逐项保持一致的文档可见状态。
+#[cfg(target_os = "macos")]
+#[derive(Debug, Eq, PartialEq)]
+struct WindowSaveView {
+    text: String,
+    selection: SelectionSpec,
+    version: crate::WorkingVersion,
+    undo_depth: usize,
+    history_nodes: usize,
+}
+
+#[cfg(target_os = "macos")]
+fn window_save_view(
+    state: &mut super::NativeOpenCoordinator,
+) -> Result<WindowSaveView, Box<dyn Error>> {
+    let document = state.session.document_mut().ok_or("应存在可编辑文档")?;
+    let snapshot = document.current_snapshot()?;
+    Ok(WindowSaveView {
+        text: snapshot.full_text(aline_buffer::TextBudget::new(super::MAX_DOCUMENT_BYTES))?,
+        selection: document.core().current_selection(),
+        version: snapshot.version(),
+        undo_depth: document.core().undo_depth(),
+        history_nodes: document.core().history_node_count(),
+    })
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn window_save_publishes_and_reports_saved() -> Result<(), Box<dyn Error>> {
+    use std::fs;
+
+    let directory = WindowSaveDir::create("aline-window-save")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    open_window_document(&mut state, &target, b"x\n")?;
+    open_window_block(&mut state, SelectionSpec::new(0, 0))?;
+    window_type(&mut state, 1, "a")?;
+
+    let before = window_save_view(&mut state)?;
+    let job = state.request_save().ok_or("首次保存应返回后台工作")?;
+    assert_eq!(state.feedback_key(), None);
+    let completion = job.run();
+    assert_eq!(state.settle_save(completion), Some("document.save_saved"));
+    assert_eq!(fs::read(&target)?, b"xa\n");
+    let entries = fs::read_dir(&directory.0)?.collect::<Result<Vec<_>, io::Error>>()?;
+    assert_eq!(entries.len(), 1, "成功保存后目录不应残留 staging");
+    assert_eq!(entries[0].file_name(), "notes.md");
+    assert_eq!(
+        window_save_view(&mut state)?,
+        before,
+        "保存不得改变文档可见状态"
+    );
+    assert!(!state.take_focus_return(), "保存不得设置回焦标记");
+    assert_eq!(
+        state.session.close_document(),
+        crate::CloseDisposition::Closed
+    );
+
+    // 成功保存后重新打开同一路径，继续输入并再次保存。
+    open_window_document(&mut state, &target, b"xa\n")?;
+    open_window_block(&mut state, SelectionSpec::new(0, 0))?;
+    window_type(&mut state, 2, "b")?;
+    let job = state.request_save().ok_or("成功保存后队列应可复用")?;
+    let completion = job.run();
+    assert_eq!(state.settle_save(completion), Some("document.save_saved"));
+    assert_eq!(fs::read(&target)?, b"xab\n");
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn window_save_while_composing_waits_and_cancel_preserves_input() -> Result<(), Box<dyn Error>> {
+    use std::fs;
+
+    let directory = WindowSaveDir::create("aline-window-waiting")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    open_window_document(&mut state, &target, b"x\n")?;
+    open_window_block(&mut state, SelectionSpec::new(0, 1))?;
+    state
+        .session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .composition_start("候", 0)?;
+
+    let before = window_save_view(&mut state)?;
+    assert!(state.request_save().is_none(), "组合期保存应转入等待");
+    assert!(state.save_waiting());
+    assert_eq!(state.feedback_key(), Some("document.save_waiting"));
+
+    assert!(state.cancel_save_wait());
+    assert!(!state.save_waiting());
+    assert_eq!(state.feedback_key(), Some("document.save_cancelled"));
+
+    let document = state.session.document_mut().ok_or("应存在可编辑文档")?;
+    assert!(
+        document.core().composition().is_some(),
+        "取消等待不得结束组合"
+    );
+    assert_eq!(
+        document.core().wait().map(|wait| wait.status()),
+        Some(crate::WaitStatus::Cancelled)
+    );
+    assert_eq!(
+        window_save_view(&mut state)?,
+        before,
+        "取消等待不得改变输入状态"
+    );
+    state
+        .session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .composition_cancel(2)?;
+    assert!(!state.take_focus_return(), "等待与取消不得设置回焦标记");
+    assert_eq!(fs::read(&target)?, b"x\n", "取消等待不得写盘");
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn window_natural_platform_finish_saves_latest_snapshot() -> Result<(), Box<dyn Error>> {
+    use std::fs;
+
+    let cases: [(crate::PublicationOutcome, &[u8]); 2] = [
+        (
+            crate::PublicationOutcome::PlatformConfirmed,
+            "候y\n".as_bytes(),
+        ),
+        (crate::PublicationOutcome::PlatformCancelled, b"x\n"),
+    ];
+    for (outcome, expected) in cases {
+        let directory = WindowSaveDir::create("aline-window-natural")?;
+        let target = directory.0.join("notes.md");
+        fs::write(&target, b"x\n")?;
+        let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+        open_window_document(&mut state, &target, b"x\n")?;
+        // 组合插入使用当前选区；选中首个字符后确认才能得到 `候y\n`。
+        open_window_block(&mut state, SelectionSpec::new(0, 1))?;
+        {
+            let core = state
+                .session
+                .document_mut()
+                .ok_or("应存在可编辑文档")?
+                .edit_core()?;
+            core.composition_start("候", 0)?;
+            core.composition_update("候y", 1)?;
+        }
+        assert!(state.request_save().is_none(), "组合期保存应转入等待");
+        assert!(state.save_waiting());
+        {
+            let core = state
+                .session
+                .document_mut()
+                .ok_or("应存在可编辑文档")?
+                .edit_core()?;
+            match outcome {
+                crate::PublicationOutcome::PlatformConfirmed => {
+                    core.composition_commit(2)?;
+                }
+                crate::PublicationOutcome::PlatformCancelled => {
+                    core.composition_cancel(2)?;
+                }
+            }
+        }
+        let job = state
+            .finish_save_wait(outcome, 3)
+            .ok_or("平台自然结束应继续保存")?;
+        let completion = job.run();
+        assert_eq!(state.settle_save(completion), Some("document.save_saved"));
+        assert_eq!(fs::read(&target)?, expected);
+        assert!(
+            state.finish_save_wait(outcome, 4).is_none(),
+            "等待句柄不得复用"
+        );
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn window_save_request_while_running_is_rejected_and_queue_recovers() -> Result<(), Box<dyn Error>>
+{
+    use std::fs;
+
+    let directory = WindowSaveDir::create("aline-window-busy")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    open_window_document(&mut state, &target, b"x\n")?;
+    open_window_block(&mut state, SelectionSpec::new(0, 0))?;
+    window_type(&mut state, 1, "a")?;
+
+    let job1 = state.request_save().ok_or("首次保存应返回后台工作")?;
+    assert!(state.request_save().is_none(), "保存进行中应拒绝再次请求");
+    assert_eq!(state.feedback_key(), Some("document.save_busy"));
+    let completion = job1.run();
+    assert_eq!(state.settle_save(completion), Some("document.save_saved"));
+    assert_eq!(fs::read(&target)?, b"xa\n");
+
+    let job2 = state.request_save().ok_or("结算后队列应可复用")?;
+    let completion = job2.run();
+    assert_eq!(state.settle_save(completion), Some("document.save_saved"));
+    assert_eq!(fs::read(&target)?, b"xa\n");
+    Ok(())
+}
+
+#[test]
+fn window_save_without_absolute_target_reports_unavailable() -> Result<(), Box<dyn Error>> {
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    let request = state.request_open()?;
+    let job = state
+        .accept_dialog(&request, Ok(Some(vec![PathBuf::from("fixture.md")])))
+        .ok_or("应生成打开工作")?;
+    state.read_finished(job.read_with(&Files(b"x\n")), |_| Ok(()));
+    assert!(
+        state
+            .session
+            .document()
+            .is_some_and(crate::ReadonlyDocument::is_editable),
+        "相对路径仍需以可编辑文档打开"
+    );
+    assert!(state.request_save().is_none());
+    assert_eq!(state.feedback_key(), Some("document.save_unavailable"));
+    assert!(!state.save_waiting());
+    Ok(())
+}
+
+#[test]
+fn save_job_and_completion_are_send() {
+    fn assert_send<T: Send>() {}
+    assert_send::<super::SaveJob>();
+    assert_send::<super::WriteCompletion>();
 }

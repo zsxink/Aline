@@ -7,16 +7,19 @@
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use aline_markdown::{CancelToken, ParseBudget, ParseConfig, Parsed};
-use aline_source::{IoBudget, SourceBaseline, StorageBudget};
+use aline_source::{AtomicFailureKind, IoBudget, SourceBaseline, StorageBudget};
 
 use super::persistence::{
-    CloseStatus, PersistenceCoordinator, SaveError, SaveJob, SaveRequest, SaveRequestError,
-    WriteCompletion, WriteOutcome, WriteSettlement,
+    CloseStatus, OperationId, PersistenceCoordinator, SaveCommand, SaveError, SaveJob,
+    SaveRejection, SaveRequest, SaveRequestError, SaveResult, SaveStatus, WriteCompletion,
+    WriteOutcome, WriteSettlement, WriteStop,
 };
 use super::{
-    DocCore, DocError, DocLimits, EditorMode, InputIdentity, ModeSwitchOutcome, WaitStatus,
+    DocCore, DocError, DocLimits, EditorMode, InputIdentity, ModeSwitchOutcome, PublicationOutcome,
+    WaitHandle, WaitStatus,
 };
 use aline_buffer::SrcSelection;
 
@@ -199,10 +202,6 @@ impl ReadonlyDocument {
     }
 
     /// 请求一次显式保存：组合期进入 ED-01 可取消等待，否则冻结当前快照排队。
-    #[cfg_attr(
-        not(test),
-        allow(dead_code) // 保存菜单与 ED-01 等待界面在 W4 3.2 接线前只有 crate 内测试调用。
-    )]
     pub(in crate::document) fn request_persistence_save(
         &mut self,
     ) -> Result<SaveRequest, SaveRequestError> {
@@ -218,10 +217,6 @@ impl ReadonlyDocument {
 
     /// 取走已排队的保存，生成可离开 UI 线程执行的后台工作；
     /// staging 必须与目标同目录且不存在。
-    #[cfg_attr(
-        not(test),
-        allow(dead_code) // 保存执行排程在 W4 3.2 接线前只有 crate 内测试调用。
-    )]
     pub(in crate::document) fn start_save_job(
         &mut self,
         staging: PathBuf,
@@ -244,10 +239,6 @@ impl ReadonlyDocument {
     }
 
     /// 结算一次真实写盘完成项；采纳成功回执时同时替换文档的磁盘基线。
-    #[cfg_attr(
-        not(test),
-        allow(dead_code) // 回执结算在 W4 3.2 接线前只有 crate 内测试调用。
-    )]
     pub(in crate::document) fn settle_save(
         &mut self,
         completion: WriteCompletion,
@@ -273,12 +264,139 @@ impl ReadonlyDocument {
         Ok(settlement)
     }
 
+    /// 请求一次显式保存：组合期返回等待句柄，否则冻结并生成后台工作。
+    pub(crate) fn request_save_command(&mut self) -> SaveCommand {
+        if !self.editable {
+            return SaveCommand::Rejected(SaveRejection::ReadOnly);
+        }
+        let Some(coordinator) = self.persistence.as_ref() else {
+            return SaveCommand::Rejected(SaveRejection::NoTarget);
+        };
+        // Ruling W4-16：在途保存、冲突与不确定发布都必须在入队前拒绝。
+        // 冲突/不确定时 `start()` 会先于取走 queued 返回 Busy，若此处放行就会
+        // 留下无人消费的 queued 项，并连带拒绝关闭与替换。
+        // `WaitingForComposition` 仍交给协调器 `next_operation` 的既有 Busy 路径。
+        if matches!(
+            coordinator.status(),
+            SaveStatus::Saving | SaveStatus::Conflict | SaveStatus::PublishedUncertain
+        ) {
+            return SaveCommand::Rejected(SaveRejection::Busy);
+        }
+        let staging = match save_staging_candidate(coordinator.target_path()) {
+            Ok(staging) => staging,
+            Err(rejection) => return SaveCommand::Rejected(rejection),
+        };
+        match self.request_persistence_save() {
+            Ok(SaveRequest::Queued(operation)) => {
+                match self.start_queued_save(operation, staging) {
+                    Ok(job) => SaveCommand::Run(job),
+                    Err(rejection) => SaveCommand::Rejected(rejection),
+                }
+            }
+            Ok(SaveRequest::Waiting(handle)) => SaveCommand::Wait(handle),
+            Err(error) => SaveCommand::Rejected(save_request_rejection(&error)),
+        }
+    }
+
+    /// 从已入队操作生成后台工作；失败时回滚 queued 项并映射拒绝类别。
+    ///
+    /// Ruling W4-16：只有 `start()` 拒绝后仍留在队列里的项需要撤回，
+    /// 否则后续 `next_operation` 会永久返回 Busy，关闭/替换也随 `queued` 被拒。
+    fn start_queued_save(
+        &mut self,
+        operation: OperationId,
+        staging: PathBuf,
+    ) -> Result<SaveJob, SaveRejection> {
+        self.start_save_job(staging).map_err(|error| {
+            let rejection = save_request_rejection(&error);
+            if let Some(coordinator) = self.persistence.as_mut() {
+                coordinator.cancel(operation);
+            }
+            rejection
+        })
+    }
+
+    /// 撤销组合期保存等待；只撤发布意图，不改变组合、输入或历史。
+    pub(crate) fn cancel_save_wait(&mut self, handle: WaitHandle) -> Result<(), SaveRejection> {
+        if !self.editable {
+            return Err(SaveRejection::ReadOnly);
+        }
+        let coordinator = self.persistence.as_mut().ok_or(SaveRejection::NoTarget)?;
+        coordinator
+            .cancel_save_wait(&mut self.core, handle)
+            .map_err(|_| SaveRejection::Internal)
+    }
+
+    /// 平台自然结束后按当时快照继续保存；返回可执行工作或拒绝。
+    ///
+    /// 真实平台结束回调属于 W5；在此之前只有 crate 测试的协议 fake 调用。
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn finish_save_wait_command(
+        &mut self,
+        handle: WaitHandle,
+        outcome: PublicationOutcome,
+        now_millis: u64,
+    ) -> SaveCommand {
+        if !self.editable {
+            return SaveCommand::Rejected(SaveRejection::ReadOnly);
+        }
+        let Some(coordinator) = self.persistence.as_ref() else {
+            return SaveCommand::Rejected(SaveRejection::NoTarget);
+        };
+        // Ruling W4-16：先算 staging，再让协调器入队；否则入队后路径失败会
+        // 留下无人消费的 queued 项。
+        let staging = match save_staging_candidate(coordinator.target_path()) {
+            Ok(staging) => staging,
+            Err(rejection) => return SaveCommand::Rejected(rejection),
+        };
+        let operation = {
+            let Some(coordinator) = self.persistence.as_mut() else {
+                return SaveCommand::Rejected(SaveRejection::NoTarget);
+            };
+            match coordinator.finish_save_wait(&mut self.core, handle, outcome, now_millis) {
+                Ok(operation) => operation,
+                Err(error) => return SaveCommand::Rejected(save_request_rejection(&error)),
+            }
+        };
+        match self.start_queued_save(operation, staging) {
+            Ok(job) => SaveCommand::Run(job),
+            Err(rejection) => SaveCommand::Rejected(rejection),
+        }
+    }
+
+    /// 结算一次真实写盘完成项，返回窗口层反馈类别。
+    pub(crate) fn settle_save_command(&mut self, completion: WriteCompletion) -> SaveResult {
+        let settlement = match self.settle_save(completion) {
+            Ok(settlement) => settlement,
+            Err(_) => return SaveResult::Failed,
+        };
+        if !settlement.adopted {
+            // 迟到或外来的完成项不得覆盖当前状态或反馈。
+            return SaveResult::Stale;
+        }
+        // Minor 1 记录：取消完成项在 `apply_outcome` 中一律返回未采纳，因此会先归
+        // `Stale`；`SaveResult::Cancelled` 目前经 adopted 路径不可达。用户主动取消
+        // 走宿主 `cancel_save_wait`。W4 3.3 若复用该分类，需拆分取消与迟到的判定。
+        settlement_result(&settlement.outcome)
+    }
+
     /// 仅供 crate 内测试读取保存协调器状态；不扩大生产 API。
     #[cfg(test)]
     pub(super) fn persistence_status(&self) -> Option<super::persistence::SaveStatus> {
         self.persistence
             .as_ref()
             .map(PersistenceCoordinator::status)
+    }
+
+    /// 仅供 crate 内测试读取关闭决策；用于验证拒绝保存后没有 queued 残留。
+    #[cfg(test)]
+    pub(super) fn persistence_close_status(
+        &self,
+        current: &super::CurrentSnapshot,
+    ) -> Option<CloseStatus> {
+        self.persistence
+            .as_ref()
+            .map(|coordinator| coordinator.close_status(current))
     }
 
     /// 判断已采用解析是否仍属于当前源码和解析配置。
@@ -423,6 +541,66 @@ impl ReadonlyDocument {
                 .full_text(self.limits.text())
                 .is_ok_and(|text| text == self.baseline.source()),
         }
+    }
+}
+
+/// 保存目标同目录的 staging 候选：路径唯一且不预创建，最多尝试 8 个。
+///
+/// 文件名形如 `.<file>.aline-save-<pid>-<nanos>-<attempt>.tmp`；source 在真正
+/// 写入时以独占创建复核，本函数只做词法生成与存在性探测。
+fn save_staging_candidate(target: &Path) -> Result<PathBuf, SaveRejection> {
+    let parent = target.parent().ok_or(SaveRejection::NoTarget)?;
+    let name = target.file_name().ok_or(SaveRejection::NoTarget)?;
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_nanos());
+    for attempt in 0..8u32 {
+        let candidate = parent.join(format!(
+            ".{}.aline-save-{}-{nanos}-{attempt}.tmp",
+            name.to_string_lossy(),
+            std::process::id()
+        ));
+        match candidate.try_exists() {
+            Ok(false) => return Ok(candidate),
+            Ok(true) => {}
+            Err(_) => return Err(SaveRejection::Internal),
+        }
+    }
+    Err(SaveRejection::Internal)
+}
+
+/// 保存入口错误的宿主可辨映射；未知组合一律视为内部失败。
+fn save_request_rejection(error: &SaveRequestError) -> SaveRejection {
+    match error {
+        SaveRequestError::Input(DocError::ReadOnly) => SaveRejection::ReadOnly,
+        SaveRequestError::Queue(SaveError::Busy) => SaveRejection::Busy,
+        SaveRequestError::Queue(SaveError::Closing) => SaveRejection::Closing,
+        SaveRequestError::Queue(SaveError::InvalidPath) => SaveRejection::NoTarget,
+        _ => SaveRejection::Internal,
+    }
+}
+
+/// 已采纳完成项的稳定分类；调用方先排除未采纳的迟到结果。
+fn settlement_result(outcome: &WriteOutcome) -> SaveResult {
+    match outcome {
+        WriteOutcome::NotPublished(WriteStop::Cancelled) => SaveResult::Cancelled,
+        WriteOutcome::NotPublished(WriteStop::Conflict) => SaveResult::Conflict,
+        WriteOutcome::NotPublished(WriteStop::File(failure)) => match failure.kind() {
+            AtomicFailureKind::Cancelled { .. } => SaveResult::Cancelled,
+            AtomicFailureKind::Conflict { .. } => SaveResult::Conflict,
+            _ => SaveResult::Failed,
+        },
+        WriteOutcome::NotPublished(WriteStop::Preparation(_)) => SaveResult::Failed,
+        WriteOutcome::Published {
+            synchronized: true, ..
+        } => SaveResult::Saved,
+        WriteOutcome::Published {
+            synchronized: false,
+            ..
+        }
+        | WriteOutcome::PublishedTargetUnverified(_)
+        | WriteOutcome::PublishedReceiptMismatch(_)
+        | WriteOutcome::PublishedBaselineFailed { .. } => SaveResult::SavedUncertain,
     }
 }
 

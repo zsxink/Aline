@@ -45,18 +45,23 @@ use gpui::{
     div, prelude::*, px, rgb, rgba, size,
 };
 
-use crate::document::{DocumentStatistics, StageTimer, StageTiming};
+use crate::document::{
+    DocumentStatistics, SaveCommand, SaveJob, SaveRejection, SaveResult, StageTimer, StageTiming,
+    WriteCompletion,
+};
 use crate::fonts::{FontEnvironment, FontStatus};
 use crate::{
     DocLimits, DocumentId, EditorMode, ModeSwitchOutcome, OpenDisposition, OpenError,
-    OpenRequestId, ParseRefreshJob, ReadonlyDocument, ReadonlyOpenCompletion, ReadonlyOpenJob,
-    ReadonlyOpenLimits, ReadonlySession,
+    OpenRequestId, ParseRefreshJob, PublicationOutcome, ReadonlyDocument, ReadonlyOpenCompletion,
+    ReadonlyOpenJob, ReadonlyOpenLimits, ReadonlySession, WaitHandle,
 };
 
 gpui::actions!(
     m1_window,
     [
         OpenDocument,
+        SaveDocument,
+        CancelSaveWait,
         CloseDocument,
         FocusNext,
         FocusPrevious,
@@ -108,6 +113,17 @@ pub(super) fn open_limits() -> ReadonlyOpenLimits {
     .with_editing()
 }
 
+/// 窗口层保存宿主状态；只记录阶段与等待句柄，不复制文档队列。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SaveHost {
+    /// 当前没有显式保存请求。
+    Idle,
+    /// 组合期内等待平台自然结束；句柄用于取消或结算。
+    Waiting(WaitHandle),
+    /// 已完成冻结并交给后台执行，等待结算回执。
+    Running,
+}
+
 /// 无 GPUI 的窗口协调规则；会话继续独占文档与请求资格。
 pub(super) struct NativeOpenCoordinator {
     session: ReadonlySession,
@@ -115,6 +131,7 @@ pub(super) struct NativeOpenCoordinator {
     queued: Option<ReadonlyOpenJob>,
     refreshing: bool,
     queued_refresh: Option<ParseRefreshJob>,
+    save_host: SaveHost,
     feedback: Option<&'static str>,
     return_focus: bool,
     closed: bool,
@@ -128,6 +145,7 @@ impl NativeOpenCoordinator {
             queued: None,
             refreshing: false,
             queued_refresh: None,
+            save_host: SaveHost::Idle,
             feedback: None,
             return_focus: false,
             closed: false,
@@ -144,6 +162,111 @@ impl NativeOpenCoordinator {
 
     pub(super) fn take_focus_return(&mut self) -> bool {
         std::mem::take(&mut self.return_focus)
+    }
+
+    /// 请求保存；返回 Some(job) 时窗口负责后台执行。反馈已在内部设置。
+    pub(super) fn request_save(&mut self) -> Option<SaveJob> {
+        if matches!(self.save_host, SaveHost::Running | SaveHost::Waiting(_)) {
+            self.feedback = Some("document.save_busy");
+            return None;
+        }
+        let Some(document) = self.session.document_mut() else {
+            self.feedback = Some("document.save_unavailable");
+            return None;
+        };
+        match document.request_save_command() {
+            SaveCommand::Run(job) => {
+                self.save_host = SaveHost::Running;
+                // 成功进入执行即清除旧错误提示，避免过期反馈留在通知区。
+                self.feedback = None;
+                Some(job)
+            }
+            SaveCommand::Wait(handle) => {
+                self.save_host = SaveHost::Waiting(handle);
+                self.feedback = Some("document.save_waiting");
+                None
+            }
+            SaveCommand::Rejected(rejection) => {
+                self.feedback = Some(save_rejection_key(rejection));
+                None
+            }
+        }
+    }
+
+    /// 取消组合期保存等待；返回是否确实取消了等待。反馈已设置。
+    pub(super) fn cancel_save_wait(&mut self) -> bool {
+        let SaveHost::Waiting(handle) = self.save_host else {
+            return false;
+        };
+        // 无论文档结算结果如何都回到 Idle：句柄已不可复用，避免宿主死锁。
+        self.save_host = SaveHost::Idle;
+        let result = match self.session.document_mut() {
+            Some(document) => document.cancel_save_wait(handle),
+            None => Err(SaveRejection::NoTarget),
+        };
+        match result {
+            Ok(()) => {
+                self.feedback = Some("document.save_cancelled");
+                true
+            }
+            Err(_) => {
+                self.feedback = Some("document.save_failed");
+                false
+            }
+        }
+    }
+
+    /// 平台自然结束；返回 Some(job) 时窗口负责后台执行。反馈已设置。
+    ///
+    /// 真实平台结束回调属于 W5；当前只有 crate 测试直接调用。
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(super) fn finish_save_wait(
+        &mut self,
+        outcome: PublicationOutcome,
+        now_millis: u64,
+    ) -> Option<SaveJob> {
+        let SaveHost::Waiting(handle) = self.save_host else {
+            return None;
+        };
+        let Some(document) = self.session.document_mut() else {
+            self.save_host = SaveHost::Idle;
+            self.feedback = Some("document.save_failed");
+            return None;
+        };
+        match document.finish_save_wait_command(handle, outcome, now_millis) {
+            SaveCommand::Run(job) => {
+                self.save_host = SaveHost::Running;
+                self.feedback = None;
+                Some(job)
+            }
+            // 自然结束后不可能再次进入等待；按内部失败落回空闲。
+            SaveCommand::Wait(_) => {
+                self.save_host = SaveHost::Idle;
+                self.feedback = Some("document.save_failed");
+                None
+            }
+            SaveCommand::Rejected(rejection) => {
+                self.save_host = SaveHost::Idle;
+                self.feedback = Some(save_rejection_key(rejection));
+                None
+            }
+        }
+    }
+
+    /// 结算完成项；返回反馈键（Stale 返回 None）。Running 回到 Idle。
+    pub(super) fn settle_save(&mut self, completion: WriteCompletion) -> Option<&'static str> {
+        if matches!(self.save_host, SaveHost::Running) {
+            self.save_host = SaveHost::Idle;
+        }
+        // 文档已关闭时完成项只能是迟到结果，不产生新反馈。
+        let document = self.session.document_mut()?;
+        let result = document.settle_save_command(completion);
+        save_result_key(result)
+    }
+
+    /// 是否存在组合期保存等待（菜单取消项可用性）。
+    pub(super) fn save_waiting(&self) -> bool {
+        matches!(self.save_host, SaveHost::Waiting(_))
     }
 
     pub(super) fn request_open(&mut self) -> Result<OpenRequestId, OpenError> {
@@ -292,6 +415,27 @@ fn open_error_key(error: &OpenError) -> &'static str {
     }
 }
 
+/// 保存拒绝类别到窗口反馈键的映射。
+fn save_rejection_key(rejection: SaveRejection) -> &'static str {
+    match rejection {
+        SaveRejection::ReadOnly | SaveRejection::NoTarget => "document.save_unavailable",
+        SaveRejection::Busy | SaveRejection::Closing => "document.save_busy",
+        SaveRejection::Internal => "document.save_failed",
+    }
+}
+
+/// 保存结算类别到窗口反馈键；迟到/外来结果不产生反馈。
+fn save_result_key(result: SaveResult) -> Option<&'static str> {
+    match result {
+        SaveResult::Saved => Some("document.save_saved"),
+        SaveResult::SavedUncertain => Some("document.save_uncertain"),
+        SaveResult::Conflict => Some("document.save_conflict"),
+        SaveResult::Failed => Some("document.save_failed"),
+        SaveResult::Cancelled => Some("document.save_cancelled"),
+        SaveResult::Stale => None,
+    }
+}
+
 /// 整篇原文回退没有重写映射，原因始终随当前文档显示。
 fn parse_fallback_key(parsed: &Parsed) -> Option<&'static str> {
     if parsed.rewrite_map().is_some() {
@@ -340,6 +484,8 @@ pub(super) struct NativeWindowCopy {
     title: SharedString,
     empty: SharedString,
     open: SharedString,
+    save: SharedString,
+    cancel_save_wait: SharedString,
     close: SharedString,
     file_menu: SharedString,
     edit_menu: SharedString,
@@ -372,6 +518,14 @@ impl NativeWindowCopy {
             "document.input_applied_after_failure",
             "document.composition_pending",
             "document.refresh_failed",
+            "document.save_saved",
+            "document.save_failed",
+            "document.save_conflict",
+            "document.save_uncertain",
+            "document.save_waiting",
+            "document.save_cancelled",
+            "document.save_busy",
+            "document.save_unavailable",
             "find.failed",
             "find.refused",
             "open_error.selection",
@@ -395,6 +549,8 @@ impl NativeWindowCopy {
             title: text("app.name")?,
             empty: text("window.empty")?,
             open: text("action.open")?,
+            save: text("action.save")?,
+            cancel_save_wait: text("action.cancel_save_wait")?,
             close: text("action.close_document")?,
             file_menu: text("menu.file")?,
             edit_menu: text("menu.edit")?,
@@ -451,13 +607,17 @@ impl NativeWindowCopy {
         ))
     }
 
-    fn install_menu(&self, cx: &App, can_close: bool, can_edit: bool) {
+    fn install_menu(&self, cx: &App, can_close: bool, can_edit: bool, can_cancel_save: bool) {
         let [undo, redo, cut, copy, paste, paste_plain, select_all] = &self.edit_actions;
         cx.set_menus([
             Menu::new(self.title.clone()),
             Menu::new(self.file_menu.clone()).items([
                 MenuItem::action(self.open.clone(), OpenDocument),
+                MenuItem::action(self.save.clone(), SaveDocument).disabled(!can_edit),
                 MenuItem::action(self.close.clone(), CloseDocument).disabled(!can_close),
+                MenuItem::separator(),
+                MenuItem::action(self.cancel_save_wait.clone(), CancelSaveWait)
+                    .disabled(!can_cancel_save),
             ]),
             Menu::new(self.edit_menu.clone()).items([
                 MenuItem::action(undo.clone(), Undo).disabled(!can_edit),
@@ -481,6 +641,8 @@ pub(crate) fn open_initial_window(
 ) -> Result<(), String> {
     cx.bind_keys([
         KeyBinding::new("cmd-o", OpenDocument, Some("M1Window")),
+        KeyBinding::new("cmd-s", SaveDocument, Some("M1Window")),
+        KeyBinding::new("cmd-.", CancelSaveWait, Some("M1Window")),
         KeyBinding::new("cmd-w", CloseDocument, Some("M1Window")),
         KeyBinding::new("tab", FocusNext, Some("M1Window")),
         KeyBinding::new("shift-tab", FocusPrevious, Some("M1Window")),
@@ -508,7 +670,7 @@ pub(crate) fn open_initial_window(
             Some("M1Window"),
         )]);
     }
-    copy.install_menu(cx, false, false);
+    copy.install_menu(cx, false, false, false);
     let bounds = Bounds::centered(None, size(px(960.0), px(640.0)), cx);
     cx.open_window(
         WindowOptions {
@@ -545,6 +707,7 @@ struct NativeDocumentWindow {
     dialog_task: Option<Task<()>>,
     dialog_return_focus: Option<FocusHandle>,
     read_task: Option<Task<()>>,
+    save_task: Option<Task<()>>,
     parse_task: Option<Task<()>>,
     find_panel: Option<(Entity<FindPanel>, Subscription)>,
     find_return_focus: Option<FocusHandle>,
@@ -597,6 +760,7 @@ impl NativeDocumentWindow {
             dialog_task: None,
             dialog_return_focus: None,
             read_task: None,
+            save_task: None,
             parse_task: None,
             find_panel: None,
             find_return_focus: None,
@@ -771,6 +935,43 @@ impl NativeDocumentWindow {
         self.refresh_find(cx);
         window.set_window_title(self.copy.title.as_ref());
         self.focus.focus(window, cx);
+        self.update_menu(cx);
+        cx.notify();
+    }
+
+    /// 显式保存到既有目标；只写反馈与菜单，不触碰焦点。
+    fn save_document(&mut self, _: &SaveDocument, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(job) = self.state.request_save() {
+            self.start_save(job, window, cx);
+        }
+        self.update_menu(cx);
+        cx.notify();
+    }
+
+    /// 后台执行真实写盘；完成后回到窗口结算并显示本地化反馈。
+    fn start_save(&mut self, job: SaveJob, window: &Window, cx: &mut Context<Self>) {
+        let work = cx.background_executor().spawn(async move { job.run() });
+        self.save_task = Some(cx.spawn_in(window, async move |weak, cx| {
+            let completion = work.await;
+            let _ = weak.update_in(cx, |this, _, cx| {
+                this.save_task = None;
+                if let Some(key) = this.state.settle_save(completion) {
+                    this.state.feedback = Some(key);
+                }
+                this.update_menu(cx);
+                cx.notify();
+            });
+        }));
+    }
+
+    /// 取消组合期保存等待；不触碰焦点、组合或输入状态。
+    fn cancel_save_wait_action(
+        &mut self,
+        _: &CancelSaveWait,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.state.cancel_save_wait();
         self.update_menu(cx);
         cx.notify();
     }
@@ -1162,6 +1363,7 @@ impl NativeDocumentWindow {
                 .session()
                 .document()
                 .is_some_and(ReadonlyDocument::is_editable),
+            self.state.save_waiting(),
         );
     }
 }
@@ -1413,6 +1615,8 @@ impl Render for NativeDocumentWindow {
             .track_focus(&self.focus)
             .on_key_down(cx.listener(Self::document_key))
             .on_action(cx.listener(Self::open_document))
+            .on_action(cx.listener(Self::save_document))
+            .on_action(cx.listener(Self::cancel_save_wait_action))
             .on_action(cx.listener(Self::close_document))
             .on_action(cx.listener(Self::open_find))
             .on_action(cx.listener(|this, _: &Cut, window, cx| {
