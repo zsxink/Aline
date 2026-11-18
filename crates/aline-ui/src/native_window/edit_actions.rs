@@ -44,6 +44,9 @@ impl NativeDocumentWindow {
         {
             Ok(effect) => {
                 self.state.feedback = None;
+                if let Some(key) = effect.notice {
+                    self.state.feedback = Some(key);
+                }
                 if let Some(text) = effect.clipboard {
                     cx.write_to_clipboard(ClipboardItem::new_string(text));
                 }
@@ -126,6 +129,7 @@ pub(super) enum EditAction {
 struct EditEffect {
     clipboard: Option<String>,
     refresh: bool,
+    notice: Option<&'static str>,
 }
 
 impl NativeOpenCoordinator {
@@ -137,38 +141,47 @@ impl NativeOpenCoordinator {
     ) -> Result<EditEffect, DocError> {
         let document = self.session.document_mut().ok_or(DocError::ClosedTarget)?;
         let budget = document.text_budget();
-        let core = document.edit_core()?;
-        if core.composition().is_some() {
-            return Err(DocError::CompositionActive);
-        }
-        let before = core.version();
         let mut clipboard = None;
-        match action {
-            EditAction::Cut => {
-                let identity = core.current_input_identity()?;
-                let text = core.cut_selection(&identity, budget, now_millis)?;
-                clipboard = (!text.is_empty()).then_some(text);
+        let (before, changed) = {
+            let core = document.edit_core()?;
+            if core.composition().is_some() {
+                return Err(DocError::CompositionActive);
             }
-            EditAction::Copy => {
-                let text = core.copy_selection(budget)?;
-                clipboard = (!text.is_empty()).then_some(text);
-            }
-            EditAction::Paste => {
-                if let Some(text) = read_clipboard(budget)?.filter(|text| !text.is_empty()) {
+            let before = core.version();
+            match action {
+                EditAction::Cut => {
                     let identity = core.current_input_identity()?;
-                    core.replace_selection(&identity, &text, now_millis)?;
+                    let text = core.cut_selection(&identity, budget, now_millis)?;
+                    clipboard = (!text.is_empty()).then_some(text);
                 }
+                EditAction::Copy => {
+                    let text = core.copy_selection(budget)?;
+                    clipboard = (!text.is_empty()).then_some(text);
+                }
+                EditAction::Paste => {
+                    if let Some(text) = read_clipboard(budget)?.filter(|text| !text.is_empty()) {
+                        let identity = core.current_input_identity()?;
+                        core.replace_selection(&identity, &text, now_millis)?;
+                    }
+                }
+                EditAction::SelectAll => {
+                    let identity = core.current_input_identity()?;
+                    core.select_all(&identity)?;
+                }
+                EditAction::Undo => core.undo()?,
+                EditAction::Redo => core.redo()?,
             }
-            EditAction::SelectAll => {
-                let identity = core.current_input_identity()?;
-                core.select_all(&identity)?;
-            }
-            EditAction::Undo => core.undo()?,
-            EditAction::Redo => core.redo()?,
-        }
+            (before, core.version())
+        };
+        let refresh = before != changed;
+        let notice = (refresh
+            && matches!(action, EditAction::Undo | EditAction::Redo)
+            && document.note_history_move())
+        .then_some("document.reload_undo_paused");
         Ok(EditEffect {
             clipboard,
-            refresh: before != core.version(),
+            refresh,
+            notice,
         })
     }
 

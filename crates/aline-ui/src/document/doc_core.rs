@@ -915,6 +915,23 @@ impl DocCore {
         }
     }
 
+    /// 外部磁盘内容载入：与 `reload` 同一独立 Reload 历史边界，但语义是显式/自动载入，
+    /// 成功 Changed 时关闭打开块与 ED-01 等待（丢弃未提交草稿）。
+    /// 组合活动时 `CompositionActive` 零副作用；文本相同返回 `Unchanged` 且不动块/历史。
+    pub fn reload_external(
+        &mut self,
+        new_text: impl Into<String>,
+        after_selection: SelectionSpec,
+        now_millis: u64,
+    ) -> Result<ReloadOutcome, DocError> {
+        let outcome = self.reload(new_text, after_selection, now_millis)?;
+        if matches!(outcome, ReloadOutcome::Changed { .. }) {
+            self.open = None;
+            self.wait = None;
+        }
+        Ok(outcome)
+    }
+
     fn ensure_ready(&self) -> Result<(), DocError> {
         self.ensure_writable()?;
         let block = self.open.as_ref().ok_or(DocError::NoOpenBlock)?;
@@ -923,7 +940,6 @@ impl DocCore {
         }
         Ok(())
     }
-
     fn is_composition_active(&self) -> bool {
         self.open
             .as_ref()

@@ -39,7 +39,11 @@ pub use snapshot::CurrentSnapshot;
 pub(crate) use readonly_session::{OpenTimings, StageTimer, StageTiming};
 pub(crate) use statistics::DocumentStatistics;
 
-pub(crate) use persistence::{SaveCommand, SaveJob, SaveRejection, SaveResult, WriteCompletion};
+pub(crate) use persistence::{
+    ExternalApplyResult, ExternalCheckCommand, ExternalCheckCompletion, ExternalCheckIntent,
+    ExternalCheckJob, ExternalCheckRejection, ExternalConflictView, ExternalDiskState, SaveCommand,
+    SaveJob, SaveRejection, SaveResult, WriteCompletion,
+};
 
 pub use mode::{EditorMode, ModeSwitchOutcome};
 pub use readonly_session::{

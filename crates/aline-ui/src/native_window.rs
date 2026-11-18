@@ -46,7 +46,9 @@ use gpui::{
 };
 
 use crate::document::{
-    DocumentStatistics, SaveCommand, SaveJob, SaveRejection, SaveResult, StageTimer, StageTiming,
+    DocumentStatistics, ExternalApplyResult, ExternalCheckCommand, ExternalCheckCompletion,
+    ExternalCheckIntent, ExternalCheckJob, ExternalCheckRejection, ExternalConflictView,
+    ExternalDiskState, SaveCommand, SaveJob, SaveRejection, SaveResult, StageTimer, StageTiming,
     WriteCompletion,
 };
 use crate::fonts::{FontEnvironment, FontStatus};
@@ -61,7 +63,12 @@ gpui::actions!(
     [
         OpenDocument,
         SaveDocument,
+        SaveAs,
         CancelSaveWait,
+        LoadDisk,
+        ConfirmOverwrite,
+        RetryExternalCheck,
+        DismissConflict,
         CloseDocument,
         FocusNext,
         FocusPrevious,
@@ -132,10 +139,23 @@ pub(super) struct NativeOpenCoordinator {
     refreshing: bool,
     queued_refresh: Option<ParseRefreshJob>,
     save_host: SaveHost,
+    external_checking: bool,
+    pending_external_refresh: bool,
     feedback: Option<&'static str>,
     return_focus: bool,
     closed: bool,
 }
+
+/// 外改检查结算后窗口应执行的副作用；反馈键已选定。
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(super) struct ExternalHostOutcome {
+    pub(super) feedback: Option<&'static str>,
+    pub(super) refresh: bool,
+    pub(super) start_save: bool,
+}
+
+/// 冲突面板展示数据：状态、保存基线、当前编辑、磁盘文本（不可读时为 None）。
+type ConflictPanelData = (ExternalDiskState, Arc<str>, Arc<str>, Option<Arc<str>>);
 
 impl NativeOpenCoordinator {
     pub(super) fn new(limits: ReadonlyOpenLimits) -> Self {
@@ -146,6 +166,8 @@ impl NativeOpenCoordinator {
             refreshing: false,
             queued_refresh: None,
             save_host: SaveHost::Idle,
+            external_checking: false,
+            pending_external_refresh: false,
             feedback: None,
             return_focus: false,
             closed: false,
@@ -261,12 +283,112 @@ impl NativeOpenCoordinator {
         // 文档已关闭时完成项只能是迟到结果，不产生新反馈。
         let document = self.session.document_mut()?;
         let result = document.settle_save_command(completion);
+        if result == SaveResult::Conflict {
+            // Ruling W4-31：保存冲突后补一次静默检查，刷新磁盘事实。
+            self.pending_external_refresh = true;
+        }
         save_result_key(result)
     }
 
     /// 是否存在组合期保存等待（菜单取消项可用性）。
     pub(super) fn save_waiting(&self) -> bool {
         matches!(self.save_host, SaveHost::Waiting(_))
+    }
+
+    /// 请求外改检查；Some(job) 时窗口后台执行。显式入口设置反馈，Focus 静默。
+    pub(super) fn request_external_check(
+        &mut self,
+        intent: ExternalCheckIntent,
+    ) -> Option<ExternalCheckJob> {
+        let Some(document) = self.session.document_mut() else {
+            if intent != ExternalCheckIntent::Focus {
+                self.feedback = Some("document.save_unavailable");
+            }
+            return None;
+        };
+        match document.request_external_check(intent) {
+            ExternalCheckCommand::Run(job) => {
+                self.external_checking = true;
+                if intent != ExternalCheckIntent::Focus {
+                    self.feedback = None;
+                }
+                Some(job)
+            }
+            ExternalCheckCommand::Rejected(rejection) => {
+                if intent != ExternalCheckIntent::Focus {
+                    self.feedback = Some(external_rejection_key(rejection));
+                }
+                None
+            }
+        }
+    }
+
+    /// 结算完成项；不改 save_host。
+    pub(super) fn external_check_finished(
+        &mut self,
+        completion: ExternalCheckCompletion,
+        now_millis: u64,
+    ) -> ExternalHostOutcome {
+        self.external_checking = false;
+        let intent = completion.intent();
+        let Some(document) = self.session.document_mut() else {
+            return ExternalHostOutcome::default();
+        };
+        let applied = document.apply_external_check(completion, now_millis);
+        let silent = intent == ExternalCheckIntent::Focus
+            && matches!(
+                applied,
+                ExternalApplyResult::Presented(_)
+                    | ExternalApplyResult::Deferred
+                    | ExternalApplyResult::Failed
+            );
+        let outcome = match applied {
+            ExternalApplyResult::Reloaded => ExternalHostOutcome {
+                feedback: Some("document.external_reloaded"),
+                refresh: true,
+                start_save: false,
+            },
+            ExternalApplyResult::Unchanged | ExternalApplyResult::Stale => {
+                ExternalHostOutcome::default()
+            }
+            ExternalApplyResult::OverwriteReady => ExternalHostOutcome {
+                start_save: true,
+                ..ExternalHostOutcome::default()
+            },
+            ExternalApplyResult::Presented(state) => ExternalHostOutcome {
+                feedback: Some(external_state_key(state)),
+                ..ExternalHostOutcome::default()
+            },
+            ExternalApplyResult::Deferred => ExternalHostOutcome {
+                feedback: Some("document.external_deferred"),
+                ..ExternalHostOutcome::default()
+            },
+            ExternalApplyResult::Failed => ExternalHostOutcome {
+                feedback: Some("document.external_failed"),
+                ..ExternalHostOutcome::default()
+            },
+        };
+        if silent {
+            // Ruling W4-33：Focus 静默只覆盖呈现类结果；Reloaded 始终提示来源。
+            ExternalHostOutcome {
+                feedback: None,
+                ..outcome
+            }
+        } else {
+            outcome
+        }
+    }
+
+    /// 取走“保存冲突后补检查”的待办；窗口在保存结算后消费。
+    pub(super) fn take_external_refresh(&mut self) -> bool {
+        std::mem::take(&mut self.pending_external_refresh)
+    }
+
+    /// 收起冲突呈现；冲突状态与暂停不因此改变。
+    pub(super) fn dismiss_external(&mut self) {
+        if let Some(document) = self.session.document_mut() {
+            document.dismiss_external();
+        }
     }
 
     pub(super) fn request_open(&mut self) -> Result<OpenRequestId, OpenError> {
@@ -420,7 +542,52 @@ fn save_rejection_key(rejection: SaveRejection) -> &'static str {
     match rejection {
         SaveRejection::ReadOnly | SaveRejection::NoTarget => "document.save_unavailable",
         SaveRejection::Busy | SaveRejection::Closing => "document.save_busy",
+        SaveRejection::Conflict => "document.save_conflict",
+        SaveRejection::Uncertain => "document.save_uncertain",
         SaveRejection::Internal => "document.save_failed",
+    }
+}
+
+/// 外改检查拒绝类别到窗口反馈键的映射。
+fn external_rejection_key(rejection: ExternalCheckRejection) -> &'static str {
+    match rejection {
+        ExternalCheckRejection::NoTarget => "document.save_unavailable",
+        ExternalCheckRejection::Busy => "document.save_busy",
+        ExternalCheckRejection::Deferred => "document.external_deferred",
+        ExternalCheckRejection::Uncertain => "document.save_uncertain",
+    }
+}
+
+/// 呈现状态到窗口反馈键的映射。
+fn external_state_key(state: ExternalDiskState) -> &'static str {
+    match state {
+        ExternalDiskState::Changed => "document.save_conflict",
+        ExternalDiskState::Missing => "document.external_missing",
+        ExternalDiskState::Unreadable | ExternalDiskState::Unstable => {
+            "document.external_unreadable"
+        }
+        ExternalDiskState::Unsupported => "document.external_unsupported",
+    }
+}
+
+/// 冲突四出口的可用性。
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(super) struct ConflictExits {
+    pub(super) load_disk: bool,
+    pub(super) overwrite: bool,
+    pub(super) retry: bool,
+    pub(super) dismiss: bool,
+}
+
+/// 四出口可用性；载入磁盘/覆盖都要求可解码的 Changed 观察（Ruling W4-23 修正）。
+pub(super) fn conflict_exits(editable: bool, view: Option<&ExternalConflictView>) -> ConflictExits {
+    let loadable =
+        view.is_some_and(|view| view.state == ExternalDiskState::Changed && view.disk.is_some());
+    ConflictExits {
+        load_disk: editable && loadable,
+        overwrite: editable && loadable,
+        retry: editable && view.is_some(),
+        dismiss: view.is_some(),
     }
 }
 
@@ -485,7 +652,12 @@ pub(super) struct NativeWindowCopy {
     empty: SharedString,
     open: SharedString,
     save: SharedString,
+    save_as: SharedString,
     cancel_save_wait: SharedString,
+    load_disk: SharedString,
+    confirm_overwrite: SharedString,
+    retry_external_check: SharedString,
+    dismiss_conflict: SharedString,
     close: SharedString,
     file_menu: SharedString,
     edit_menu: SharedString,
@@ -526,6 +698,17 @@ impl NativeWindowCopy {
             "document.save_cancelled",
             "document.save_busy",
             "document.save_unavailable",
+            "document.external_conflict",
+            "document.external_missing",
+            "document.external_unreadable",
+            "document.external_unsupported",
+            "document.external_reloaded",
+            "document.external_deferred",
+            "document.external_failed",
+            "document.reload_undo_paused",
+            "document.conflict_baseline",
+            "document.conflict_local",
+            "document.conflict_disk",
             "find.failed",
             "find.refused",
             "open_error.selection",
@@ -550,7 +733,12 @@ impl NativeWindowCopy {
             empty: text("window.empty")?,
             open: text("action.open")?,
             save: text("action.save")?,
+            save_as: text("action.save_as")?,
             cancel_save_wait: text("action.cancel_save_wait")?,
+            load_disk: text("action.load_disk")?,
+            confirm_overwrite: text("action.confirm_overwrite")?,
+            retry_external_check: text("action.retry_external_check")?,
+            dismiss_conflict: text("action.dismiss_conflict")?,
             close: text("action.close_document")?,
             file_menu: text("menu.file")?,
             edit_menu: text("menu.edit")?,
@@ -607,17 +795,33 @@ impl NativeWindowCopy {
         ))
     }
 
-    fn install_menu(&self, cx: &App, can_close: bool, can_edit: bool, can_cancel_save: bool) {
+    fn install_menu(
+        &self,
+        cx: &App,
+        can_close: bool,
+        can_edit: bool,
+        can_cancel_save: bool,
+        exits: ConflictExits,
+    ) {
         let [undo, redo, cut, copy, paste, paste_plain, select_all] = &self.edit_actions;
         cx.set_menus([
             Menu::new(self.title.clone()),
             Menu::new(self.file_menu.clone()).items([
                 MenuItem::action(self.open.clone(), OpenDocument),
                 MenuItem::action(self.save.clone(), SaveDocument).disabled(!can_edit),
+                MenuItem::action(self.save_as.clone(), SaveAs).disabled(true),
                 MenuItem::action(self.close.clone(), CloseDocument).disabled(!can_close),
                 MenuItem::separator(),
                 MenuItem::action(self.cancel_save_wait.clone(), CancelSaveWait)
                     .disabled(!can_cancel_save),
+                MenuItem::separator(),
+                MenuItem::action(self.load_disk.clone(), LoadDisk).disabled(!exits.load_disk),
+                MenuItem::action(self.confirm_overwrite.clone(), ConfirmOverwrite)
+                    .disabled(!exits.overwrite),
+                MenuItem::action(self.retry_external_check.clone(), RetryExternalCheck)
+                    .disabled(!exits.retry),
+                MenuItem::action(self.dismiss_conflict.clone(), DismissConflict)
+                    .disabled(!exits.dismiss),
             ]),
             Menu::new(self.edit_menu.clone()).items([
                 MenuItem::action(undo.clone(), Undo).disabled(!can_edit),
@@ -670,7 +874,7 @@ pub(crate) fn open_initial_window(
             Some("M1Window"),
         )]);
     }
-    copy.install_menu(cx, false, false, false);
+    copy.install_menu(cx, false, false, false, ConflictExits::default());
     let bounds = Bounds::centered(None, size(px(960.0), px(640.0)), cx);
     cx.open_window(
         WindowOptions {
@@ -708,6 +912,8 @@ struct NativeDocumentWindow {
     dialog_return_focus: Option<FocusHandle>,
     read_task: Option<Task<()>>,
     save_task: Option<Task<()>>,
+    external_task: Option<Task<()>>,
+    activation_subscription: Option<Subscription>,
     parse_task: Option<Task<()>>,
     find_panel: Option<(Entity<FindPanel>, Subscription)>,
     find_return_focus: Option<FocusHandle>,
@@ -751,7 +957,7 @@ impl NativeDocumentWindow {
             FontStatus::FamilyMissing => Some("font.family_missing"),
             FontStatus::System | FontStatus::Active => None,
         };
-        let state = Self {
+        let mut state = Self {
             copy,
             locale_fallback,
             state,
@@ -761,6 +967,8 @@ impl NativeDocumentWindow {
             dialog_return_focus: None,
             read_task: None,
             save_task: None,
+            external_task: None,
+            activation_subscription: None,
             parse_task: None,
             find_panel: None,
             find_return_focus: None,
@@ -804,6 +1012,14 @@ impl NativeDocumentWindow {
             })
             .detach();
         }
+        // `observe_window_activation` 的激活只标记 active、不立即回调；注册安全，
+        // 且不做初始检查（Ruling W4-30）。
+        let activation = cx.observe_window_activation(window, |this, window, cx| {
+            if window.is_window_active() {
+                this.check_external(ExternalCheckIntent::Focus, window, cx);
+            }
+        });
+        state.activation_subscription = Some(activation);
         state
     }
 
@@ -948,15 +1164,90 @@ impl NativeDocumentWindow {
         cx.notify();
     }
 
+    /// 载入磁盘内容；检查结算后按结果刷新派生视图。
+    fn load_disk(&mut self, _: &LoadDisk, window: &mut Window, cx: &mut Context<Self>) {
+        self.check_external(ExternalCheckIntent::Reload, window, cx);
+    }
+
+    /// 确认以磁盘观察为新基线，随后走既有保存发布本地文本。
+    fn confirm_overwrite(
+        &mut self,
+        _: &ConfirmOverwrite,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.check_external(ExternalCheckIntent::Overwrite, window, cx);
+    }
+
+    /// 用户显式重试磁盘检查。
+    fn retry_external_check(
+        &mut self,
+        _: &RetryExternalCheck,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.check_external(ExternalCheckIntent::Retry, window, cx);
+    }
+
+    /// 收起冲突呈现；冲突状态与暂停保持。
+    fn dismiss_conflict(&mut self, _: &DismissConflict, _: &mut Window, cx: &mut Context<Self>) {
+        self.state.dismiss_external();
+        self.update_menu(cx);
+        cx.notify();
+    }
+
+    /// 宿主串行执行一次外改检查；Focus 入口静默。
+    fn check_external(
+        &mut self,
+        intent: ExternalCheckIntent,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.external_task.is_some() || self.state.external_checking {
+            return; // 宿主串行，同一时刻只跑一次检查
+        }
+        let Some(job) = self.state.request_external_check(intent) else {
+            self.update_menu(cx);
+            cx.notify();
+            return;
+        };
+        let work = cx.background_executor().spawn(async move { job.run() });
+        self.external_task = Some(cx.spawn_in(window, async move |weak, cx| {
+            let completion = work.await;
+            let _ = weak.update_in(cx, |this, window, cx| {
+                this.external_task = None;
+                let now_millis =
+                    u64::try_from(this.started.elapsed().as_millis()).unwrap_or(u64::MAX);
+                let outcome = this.state.external_check_finished(completion, now_millis);
+                if let Some(key) = outcome.feedback {
+                    this.state.feedback = Some(key);
+                }
+                if outcome.refresh {
+                    this.refresh_after_edit(window, cx);
+                }
+                if outcome.start_save
+                    && let Some(job) = this.state.request_save()
+                {
+                    this.start_save(job, window, cx);
+                }
+                this.update_menu(cx);
+                cx.notify();
+            });
+        }));
+    }
+
     /// 后台执行真实写盘；完成后回到窗口结算并显示本地化反馈。
     fn start_save(&mut self, job: SaveJob, window: &Window, cx: &mut Context<Self>) {
         let work = cx.background_executor().spawn(async move { job.run() });
         self.save_task = Some(cx.spawn_in(window, async move |weak, cx| {
             let completion = work.await;
-            let _ = weak.update_in(cx, |this, _, cx| {
+            let _ = weak.update_in(cx, |this, window, cx| {
                 this.save_task = None;
                 if let Some(key) = this.state.settle_save(completion) {
                     this.state.feedback = Some(key);
+                }
+                if this.state.take_external_refresh() {
+                    this.check_external(ExternalCheckIntent::Focus, window, cx);
                 }
                 this.update_menu(cx);
                 cx.notify();
@@ -1356,15 +1647,191 @@ impl NativeDocumentWindow {
     }
 
     fn update_menu(&self, cx: &App) {
-        self.copy.install_menu(
-            cx,
-            self.state.session().document().is_some() || self.state.session().is_loading(),
+        let editable = self
+            .state
+            .session()
+            .document()
+            .is_some_and(ReadonlyDocument::is_editable);
+        let exits = conflict_exits(
+            editable,
             self.state
                 .session()
                 .document()
-                .is_some_and(ReadonlyDocument::is_editable),
-            self.state.save_waiting(),
+                .and_then(ReadonlyDocument::external_view),
         );
+        self.copy.install_menu(
+            cx,
+            self.state.session().document().is_some() || self.state.session().is_loading(),
+            editable,
+            self.state.save_waiting(),
+            exits,
+        );
+    }
+
+    /// 冲突面板的只读预览节：标签 + 限高可滚动文本。
+    fn conflict_preview(
+        &self,
+        id: &'static str,
+        key: &'static str,
+        text: Arc<str>,
+    ) -> gpui::AnyElement {
+        let label = self.copy.errors.get(key).cloned().unwrap_or_default();
+        div()
+            .flex()
+            .flex_col()
+            .gap_1()
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(rgb(tokens::SECONDARY))
+                    .child(label),
+            )
+            .child(
+                div()
+                    .id(id)
+                    .overflow_y_scroll()
+                    .max_h(px(80.0))
+                    .text_xs()
+                    .text_color(rgb(tokens::TEXT))
+                    .child(SharedString::from(text)),
+            )
+            .into_any_element()
+    }
+
+    /// 冲突面板按钮：可用时有焦点、悬停与鼠标/键盘触发；禁用项不聚焦、不响应。
+    fn conflict_button(
+        &self,
+        id: &'static str,
+        label: SharedString,
+        enabled: bool,
+        action: impl Fn(&mut Self, &mut Window, &mut Context<Self>) + Clone + 'static,
+        cx: &mut Context<Self>,
+    ) -> gpui::AnyElement {
+        let click = action.clone();
+        let key = action;
+        div()
+            .id(id)
+            .aria_label(label.clone())
+            .px_2()
+            .rounded_md()
+            .border_1()
+            .border_color(rgb(tokens::BORDER))
+            .text_xs()
+            .text_color(rgb(if enabled {
+                tokens::TEXT
+            } else {
+                tokens::SECONDARY
+            }))
+            .when(enabled, |button| {
+                button
+                    .focusable()
+                    .tab_stop(true)
+                    .role(Role::Button)
+                    .focus(|style| style.border_color(rgb(tokens::ACCENT)))
+                    .cursor_pointer()
+                    .hover(|style| style.bg(rgba(tokens::HOVER)))
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        click(this, window, cx);
+                    }))
+                    .on_key_down(cx.listener(
+                        move |this, event: &gpui::KeyDownEvent, window, cx| {
+                            if event.keystroke.key == "enter" || event.keystroke.key == "space" {
+                                key(this, window, cx);
+                                cx.stop_propagation();
+                            }
+                        },
+                    ))
+            })
+            .child(label)
+            .into_any_element()
+    }
+
+    /// 渲染冲突面板；无视图时不渲染。
+    fn render_conflict_panel(
+        &self,
+        conflict: Option<ConflictPanelData>,
+        exits: ConflictExits,
+        cx: &mut Context<Self>,
+    ) -> Option<gpui::AnyElement> {
+        let (state, baseline, local, disk) = conflict?;
+        let title = self
+            .copy
+            .errors
+            .get(external_state_key(state))
+            .cloned()
+            .unwrap_or_default();
+        let mut panel = div()
+            .w_full()
+            .flex()
+            .flex_col()
+            .gap_1()
+            .px_3()
+            .py_2()
+            .bg(rgb(tokens::NOTICE_SURFACE))
+            .border_b_1()
+            .border_color(rgb(tokens::BORDER))
+            .child(div().text_xs().text_color(rgb(tokens::TEXT)).child(title))
+            .child(self.conflict_preview(
+                "conflict-baseline",
+                "document.conflict_baseline",
+                baseline,
+            ))
+            .child(self.conflict_preview("conflict-local", "document.conflict_local", local));
+        if let Some(disk) = disk {
+            panel =
+                panel.child(self.conflict_preview("conflict-disk", "document.conflict_disk", disk));
+        }
+        let buttons = div()
+            .flex()
+            .flex_wrap()
+            .items_center()
+            .gap_2()
+            .child(self.conflict_button(
+                "conflict-load-disk",
+                self.copy.load_disk.clone(),
+                exits.load_disk,
+                |this, window, cx| {
+                    this.check_external(ExternalCheckIntent::Reload, window, cx);
+                },
+                cx,
+            ))
+            .child(self.conflict_button(
+                "conflict-confirm-overwrite",
+                self.copy.confirm_overwrite.clone(),
+                exits.overwrite,
+                |this, window, cx| {
+                    this.check_external(ExternalCheckIntent::Overwrite, window, cx);
+                },
+                cx,
+            ))
+            .child(self.conflict_button(
+                "conflict-retry",
+                self.copy.retry_external_check.clone(),
+                exits.retry,
+                |this, window, cx| {
+                    this.check_external(ExternalCheckIntent::Retry, window, cx);
+                },
+                cx,
+            ))
+            .child(self.conflict_button(
+                "conflict-save-as",
+                self.copy.save_as.clone(),
+                false,
+                |_, _, _| {},
+                cx,
+            ))
+            .child(self.conflict_button(
+                "conflict-dismiss",
+                self.copy.dismiss_conflict.clone(),
+                exits.dismiss,
+                |this, _, cx| {
+                    this.state.dismiss_external();
+                    this.update_menu(cx);
+                    cx.notify();
+                },
+                cx,
+            ));
+        Some(panel.child(buttons).into_any_element())
     }
 }
 
@@ -1492,6 +1959,21 @@ impl Render for NativeDocumentWindow {
                     )
                 })
         });
+        let conflict_view = self
+            .state
+            .session()
+            .document()
+            .and_then(ReadonlyDocument::external_view);
+        let conflict_exits_now = conflict_exits(editable, conflict_view);
+        let conflict = conflict_view.map(|view| {
+            (
+                view.state,
+                view.baseline.clone(),
+                view.local.clone(),
+                view.disk.clone(),
+            )
+        });
+        let conflict_panel = self.render_conflict_panel(conflict, conflict_exits_now, cx);
         let open_button = div()
             .id("open-document")
             .focusable()
@@ -1600,6 +2082,7 @@ impl Render for NativeDocumentWindow {
                 .flex()
                 .flex_col()
                 .children(notice)
+                .children(conflict_panel)
                 .children(self.find_panel.as_ref().map(|(panel, _)| panel.clone()))
                 .child(content_body),
         );
@@ -1616,6 +2099,10 @@ impl Render for NativeDocumentWindow {
             .on_key_down(cx.listener(Self::document_key))
             .on_action(cx.listener(Self::open_document))
             .on_action(cx.listener(Self::save_document))
+            .on_action(cx.listener(Self::load_disk))
+            .on_action(cx.listener(Self::confirm_overwrite))
+            .on_action(cx.listener(Self::retry_external_check))
+            .on_action(cx.listener(Self::dismiss_conflict))
             .on_action(cx.listener(Self::cancel_save_wait_action))
             .on_action(cx.listener(Self::close_document))
             .on_action(cx.listener(Self::open_find))

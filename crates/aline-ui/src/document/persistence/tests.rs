@@ -1097,9 +1097,9 @@ fn persistence_conflict_resave_is_rejected_without_queue_residue() -> TestResult
     assert!(
         matches!(
             document.request_save_command(),
-            SaveCommand::Rejected(SaveRejection::Busy)
+            SaveCommand::Rejected(SaveRejection::Conflict)
         ),
-        "冲突未处理时再次保存必须在入队前拒绝"
+        "冲突未处理时再次保存必须在入队前按 Conflict 拒绝"
     );
     let snapshot = document.current_snapshot()?;
     assert_eq!(
@@ -1200,4 +1200,685 @@ fn persistence_session_missing_target_settles_conflict_without_recreating_file()
     );
     assert!(!target.exists(), "失败保存不得重建或截断原路径");
     Ok(())
+}
+
+/// 以给定字节替换目标，同时保留原 mtime；用于构造外改观察。
+#[cfg(target_os = "macos")]
+fn rewrite_bytes_same_mtime(target: &Path, bytes: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+    use std::fs::{self, FileTimes, OpenOptions};
+
+    let before = fs::metadata(target)?.modified()?;
+    fs::write(target, bytes)?;
+    OpenOptions::new()
+        .write(true)
+        .open(target)?
+        .set_times(FileTimes::new().set_modified(before))?;
+    assert_eq!(fs::metadata(target)?.modified()?, before);
+    Ok(())
+}
+
+/// 同步执行一次外改检查并结算；拒绝类别视为测试装配错误。
+#[cfg(target_os = "macos")]
+fn run_external_check(
+    session: &mut ReadonlySession,
+    intent: ExternalCheckIntent,
+    now_millis: u64,
+) -> Result<ExternalApplyResult, Box<dyn std::error::Error>> {
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    let ExternalCheckCommand::Run(job) = document.request_external_check(intent) else {
+        return Err("外改检查应生成后台工作".into());
+    };
+    let completion = job.run();
+    let result = session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .apply_external_check(completion, now_millis);
+    Ok(result)
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn external_check_detects_same_size_same_mtime_change_and_reloads_clean_document() -> TestResult {
+    use std::fs;
+
+    let directory = TempSaveDir::create("aline-external-reload")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut session = editable_absolute_session(&target)?;
+    open_editing_block(&mut session)?;
+    rewrite_same_size_and_mtime(&target)?;
+
+    let completion = {
+        let document = session.document_mut().ok_or("应存在可编辑文档")?;
+        let ExternalCheckCommand::Run(job) =
+            document.request_external_check(ExternalCheckIntent::Focus)
+        else {
+            return Err("外改检查应生成后台工作".into());
+        };
+        job.run()
+    };
+    assert!(
+        matches!(
+            completion.observation(),
+            ExternalObservation::Changed { .. }
+        ),
+        "同尺寸同时间戳的不同内容必须观察为 Changed"
+    );
+    let result = session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .apply_external_check(completion, 10);
+    assert_eq!(result, ExternalApplyResult::Reloaded);
+
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    assert_eq!(
+        document.core().buffer_text()?,
+        "y\n",
+        "干净文档应载入磁盘文本"
+    );
+    assert!(!document.core().has_open_block(), "重载应关闭打开块");
+    assert_eq!(document.baseline().source(), "y\n", "重载应采纳磁盘基线");
+    assert!(!document.autosave_paused(), "干净重载不应暂停自动保存");
+    assert!(document.external_view().is_none(), "重载后不应残留冲突视图");
+
+    document.edit_core()?.undo()?;
+    assert!(document.note_history_move(), "撤销越过重载边界应新进入暂停");
+    assert_eq!(
+        document.core().buffer_text()?,
+        "x\n",
+        "撤销应恢复重载前文本"
+    );
+    assert!(
+        document.autosave_paused(),
+        "撤销到重载前内容后自动保存必须暂停"
+    );
+
+    document.edit_core()?.redo()?;
+    assert!(
+        !document.note_history_move(),
+        "重做回磁盘基线不应再次报告新暂停"
+    );
+    assert_eq!(document.core().buffer_text()?, "y\n", "重做应回到磁盘文本");
+    assert!(!document.autosave_paused(), "干净重做后应恢复自动保存");
+    assert!(
+        matches!(document.request_save_command(), SaveCommand::Run(_)),
+        "冲突清除后显式保存应被允许"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn external_conflict_preserves_draft_and_rejects_save_as_conflict() -> TestResult {
+    use std::fs;
+
+    let directory = TempSaveDir::create("aline-external-conflict")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut session = editable_absolute_session(&target)?;
+    open_editing_block(&mut session)?;
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .type_text(1, "a", 0)?;
+    rewrite_same_size_and_mtime(&target)?;
+
+    let result = run_external_check(&mut session, ExternalCheckIntent::Focus, 10)?;
+    assert_eq!(
+        result,
+        ExternalApplyResult::Presented(ExternalDiskState::Changed)
+    );
+
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    {
+        let view = document.external_view().ok_or("应呈现冲突视图")?;
+        assert_eq!(view.state, ExternalDiskState::Changed);
+        assert_eq!(&*view.baseline, "x\n", "基线预览应为保存基线");
+        assert_eq!(&*view.local, "xa\n", "本地预览应含未提交草稿");
+        assert_eq!(view.disk.as_deref(), Some("y\n"), "磁盘预览应为新文本");
+    }
+    assert_eq!(document.core().buffer_text()?, "x\n");
+    assert_eq!(document.core().open_block_draft(), Some("a"));
+    assert!(document.autosave_paused());
+    assert_eq!(document.persistence_status(), Some(SaveStatus::Conflict));
+    assert!(
+        matches!(
+            document.request_save_command(),
+            SaveCommand::Rejected(SaveRejection::Conflict)
+        ),
+        "脏冲突必须按 Conflict 拒绝保存"
+    );
+    assert_eq!(fs::read(&target)?, b"y\n", "呈现冲突不得改写磁盘");
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn external_reload_with_dirty_document_loads_disk_and_keeps_undo_boundary() -> TestResult {
+    use std::fs;
+
+    let directory = TempSaveDir::create("aline-external-dirty-reload")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut session = editable_absolute_session(&target)?;
+    open_editing_block(&mut session)?;
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .type_text(1, "a", 0)?;
+    rewrite_same_size_and_mtime(&target)?;
+
+    assert_eq!(
+        run_external_check(&mut session, ExternalCheckIntent::Focus, 10)?,
+        ExternalApplyResult::Presented(ExternalDiskState::Changed),
+        "Focus 在脏文档上只呈现冲突"
+    );
+    {
+        let document = session.document_mut().ok_or("应存在可编辑文档")?;
+        assert_eq!(
+            document.core().open_block_draft(),
+            Some("a"),
+            "呈现冲突必须保留草稿"
+        );
+        assert_eq!(document.core().buffer_text()?, "x\n");
+        assert!(document.autosave_paused(), "冲突呈现应暂停自动保存");
+    }
+
+    // 先把草稿提交为本地内容，再点击载入：这样旧文本进入 Buffer 历史边界，
+    // 撤销可以取回；未提交草稿本身不在 Buffer 历史中。
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .commit_open_block(15)?;
+
+    assert_eq!(
+        run_external_check(&mut session, ExternalCheckIntent::Reload, 20)?,
+        ExternalApplyResult::Reloaded,
+        "脏文档的显式载入必须实际加载磁盘内容"
+    );
+    {
+        let document = session.document_mut().ok_or("应存在可编辑文档")?;
+        assert_eq!(
+            document.core().buffer_text()?,
+            "y\n",
+            "显式载入应替换本地文本"
+        );
+        assert_eq!(
+            document.baseline().source(),
+            "y\n",
+            "显式载入应采纳新磁盘基线"
+        );
+        assert!(!document.core().has_open_block(), "重载应关闭打开块");
+        assert!(document.external_view().is_none(), "载入后不应残留冲突视图");
+        assert!(!document.autosave_paused(), "载入完成后不应处于暂停");
+        assert_eq!(
+            document.persistence_status(),
+            Some(SaveStatus::Idle),
+            "载入完成后保存状态应回到 Idle"
+        );
+        let snapshot = document.current_snapshot()?;
+        assert_eq!(
+            document.persistence_is_dirty(&snapshot),
+            Some(false),
+            "载入后应相对新磁盘基线为干净"
+        );
+
+        document.edit_core()?.undo()?;
+        assert!(document.note_history_move(), "撤销越过载入边界应新进入暂停");
+        assert_eq!(
+            document.core().buffer_text()?,
+            "xa\n",
+            "撤销应取回载入前的本地内容"
+        );
+        assert!(
+            document.autosave_paused(),
+            "撤销到载入前内容后必须暂停自动保存"
+        );
+
+        document.edit_core()?.redo()?;
+        assert!(
+            !document.note_history_move(),
+            "重做回新基线不应再次报告暂停"
+        );
+        assert_eq!(document.core().buffer_text()?, "y\n");
+        assert!(
+            !document.autosave_paused(),
+            "重做回磁盘文本后应恢复自动保存"
+        );
+        let snapshot = document.current_snapshot()?;
+        assert_eq!(
+            document.persistence_is_dirty(&snapshot),
+            Some(false),
+            "重做后应相对新磁盘基线为干净"
+        );
+    }
+    assert_eq!(fs::read(&target)?, b"y\n", "载入磁盘不得改写磁盘");
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn external_overwrite_adopts_disk_baseline_then_saves_local_text() -> TestResult {
+    use std::fs;
+
+    let directory = TempSaveDir::create("aline-external-overwrite")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut session = editable_absolute_session(&target)?;
+    open_editing_block(&mut session)?;
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .type_text(1, "a", 0)?;
+    rewrite_same_size_and_mtime(&target)?;
+    assert_eq!(
+        run_external_check(&mut session, ExternalCheckIntent::Focus, 10)?,
+        ExternalApplyResult::Presented(ExternalDiskState::Changed)
+    );
+
+    assert_eq!(
+        run_external_check(&mut session, ExternalCheckIntent::Overwrite, 11)?,
+        ExternalApplyResult::OverwriteReady
+    );
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    assert_eq!(
+        document.baseline().source(),
+        "y\n",
+        "覆盖确认应采纳磁盘基线"
+    );
+    let SaveCommand::Run(job) = document.request_save_command() else {
+        return Err("覆盖确认后显式保存应生成后台工作".into());
+    };
+    let completion = job.run();
+    let result = session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .settle_save_command(completion);
+    assert_eq!(result, SaveResult::Saved, "覆盖确认后应成功发布本地文本");
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    assert_eq!(fs::read(&target)?, b"xa\n", "发布后磁盘应等于本地全文");
+    assert_eq!(document.baseline().source(), "xa\n");
+    assert!(!document.autosave_paused());
+    assert!(document.external_view().is_none());
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn external_overwrite_conflicts_again_when_disk_changes_before_publish() -> TestResult {
+    use std::fs;
+
+    let directory = TempSaveDir::create("aline-external-overwrite-race")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut session = editable_absolute_session(&target)?;
+    open_editing_block(&mut session)?;
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .type_text(1, "a", 0)?;
+    rewrite_same_size_and_mtime(&target)?;
+    assert_eq!(
+        run_external_check(&mut session, ExternalCheckIntent::Focus, 10)?,
+        ExternalApplyResult::Presented(ExternalDiskState::Changed)
+    );
+    assert_eq!(
+        run_external_check(&mut session, ExternalCheckIntent::Overwrite, 11)?,
+        ExternalApplyResult::OverwriteReady
+    );
+    rewrite_bytes_same_mtime(&target, b"z\n")?;
+
+    let SaveCommand::Run(job) = session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .request_save_command()
+    else {
+        return Err("覆盖确认后显式保存应生成后台工作".into());
+    };
+    let completion = job.run();
+    let result = session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .settle_save_command(completion);
+    assert_eq!(result, SaveResult::Conflict, "发布前磁盘再变化必须再次冲突");
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    assert_eq!(fs::read(&target)?, b"z\n", "冲突时不得覆盖磁盘");
+    assert_eq!(
+        document.current_snapshot()?.full_text(TEXT)?,
+        "xa\n",
+        "冲突时内存全文必须保留"
+    );
+    assert_eq!(document.persistence_status(), Some(SaveStatus::Conflict));
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn external_missing_target_keeps_memory_and_offers_retry_without_overwrite() -> TestResult {
+    use std::fs;
+
+    let directory = TempSaveDir::create("aline-external-missing")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut session = editable_absolute_session(&target)?;
+    open_editing_block(&mut session)?;
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .type_text(1, "a", 0)?;
+    fs::remove_file(&target)?;
+
+    assert_eq!(
+        run_external_check(&mut session, ExternalCheckIntent::Focus, 10)?,
+        ExternalApplyResult::Presented(ExternalDiskState::Missing)
+    );
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    {
+        let view = document.external_view().ok_or("应呈现缺失视图")?;
+        assert_eq!(view.state, ExternalDiskState::Missing);
+        assert!(view.disk.is_none(), "缺失目标不得提供磁盘预览");
+        assert_eq!(&*view.baseline, "x\n", "基线仍是保存基线");
+    }
+    assert_eq!(document.current_snapshot()?.full_text(TEXT)?, "xa\n");
+    assert!(document.autosave_paused());
+
+    assert_eq!(
+        run_external_check(&mut session, ExternalCheckIntent::Overwrite, 11)?,
+        ExternalApplyResult::Presented(ExternalDiskState::Missing),
+        "缺失目标不能作为可采纳基线"
+    );
+    assert_eq!(
+        session
+            .document()
+            .ok_or("应存在可编辑文档")?
+            .baseline()
+            .source(),
+        "x\n"
+    );
+    assert!(
+        matches!(
+            session
+                .document_mut()
+                .ok_or("应存在可编辑文档")?
+                .request_save_command(),
+            SaveCommand::Rejected(SaveRejection::Conflict)
+        ),
+        "缺失目标下的脏文档必须按 Conflict 拒绝保存"
+    );
+
+    fs::write(&target, b"x\n")?;
+    assert_eq!(
+        run_external_check(&mut session, ExternalCheckIntent::Retry, 12)?,
+        ExternalApplyResult::Unchanged
+    );
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    assert!(document.external_view().is_none());
+    assert!(!document.autosave_paused());
+    assert_eq!(document.persistence_status(), Some(SaveStatus::Idle));
+    assert!(
+        matches!(document.request_save_command(), SaveCommand::Run(_)),
+        "磁盘恢复基线后应允许显式保存"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn external_unsupported_encoding_is_presented_without_disk_text() -> TestResult {
+    use std::fs;
+
+    let directory = TempSaveDir::create("aline-external-unsupported")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut session = editable_absolute_session(&target)?;
+    open_editing_block(&mut session)?;
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .type_text(1, "a", 0)?;
+    rewrite_bytes_same_mtime(&target, &[0xFF, b'\n'])?;
+
+    assert_eq!(
+        run_external_check(&mut session, ExternalCheckIntent::Focus, 10)?,
+        ExternalApplyResult::Presented(ExternalDiskState::Unsupported)
+    );
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    {
+        let view = document.external_view().ok_or("应呈现不支持视图")?;
+        assert_eq!(view.state, ExternalDiskState::Unsupported);
+        assert!(view.disk.is_none(), "不可解码时不得提供磁盘预览");
+    }
+    assert_eq!(document.current_snapshot()?.full_text(TEXT)?, "xa\n");
+    assert_eq!(document.baseline().source(), "x\n");
+    assert!(
+        matches!(
+            document.request_save_command(),
+            SaveCommand::Rejected(SaveRejection::Conflict)
+        ),
+        "不可解码冲突必须按 Conflict 拒绝保存"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn external_directory_target_is_presented_without_disk_text() -> TestResult {
+    use std::fs;
+
+    let directory = TempSaveDir::create("aline-external-directory")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut session = editable_absolute_session(&target)?;
+    open_editing_block(&mut session)?;
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .type_text(1, "a", 0)?;
+    fs::remove_file(&target)?;
+    fs::create_dir(&target)?;
+
+    assert_eq!(
+        run_external_check(&mut session, ExternalCheckIntent::Focus, 10)?,
+        ExternalApplyResult::Presented(ExternalDiskState::Unsupported)
+    );
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    assert_eq!(document.current_snapshot()?.full_text(TEXT)?, "xa\n");
+    {
+        let view = document.external_view().ok_or("应呈现目录视图")?;
+        assert_eq!(view.state, ExternalDiskState::Unsupported);
+        assert!(view.disk.is_none(), "目录目标不得提供磁盘预览");
+    }
+
+    fs::remove_dir(&target)?;
+    fs::write(&target, b"x\n")?;
+    assert_eq!(
+        run_external_check(&mut session, ExternalCheckIntent::Retry, 11)?,
+        ExternalApplyResult::Unchanged
+    );
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    assert!(document.external_view().is_none());
+    assert!(!document.autosave_paused());
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn external_unreadable_target_is_presented_without_disk_text() -> TestResult {
+    use std::fs;
+    use std::os::unix::fs::PermissionsExt;
+
+    let directory = TempSaveDir::create("aline-external-unreadable")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut session = editable_absolute_session(&target)?;
+    open_editing_block(&mut session)?;
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .type_text(1, "a", 0)?;
+    fs::set_permissions(&target, fs::Permissions::from_mode(0o000))?;
+
+    let result = run_external_check(&mut session, ExternalCheckIntent::Focus, 10);
+    fs::set_permissions(&target, fs::Permissions::from_mode(0o600))?;
+    assert_eq!(
+        result?,
+        ExternalApplyResult::Presented(ExternalDiskState::Unreadable)
+    );
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    {
+        let view = document.external_view().ok_or("应呈现不可读视图")?;
+        assert_eq!(view.state, ExternalDiskState::Unreadable);
+        assert!(view.disk.is_none(), "不可读目标不得提供磁盘预览");
+    }
+    assert_eq!(document.current_snapshot()?.full_text(TEXT)?, "xa\n");
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn external_check_is_deferred_during_composition_without_side_effects() -> TestResult {
+    use std::fs;
+
+    let directory = TempSaveDir::create("aline-external-composition")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut session = editable_absolute_session(&target)?;
+    open_editing_block(&mut session)?;
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .type_text(1, "a", 0)?;
+    rewrite_same_size_and_mtime(&target)?;
+
+    let job = {
+        let document = session.document_mut().ok_or("应存在可编辑文档")?;
+        let ExternalCheckCommand::Run(job) =
+            document.request_external_check(ExternalCheckIntent::Reload)
+        else {
+            return Err("组合前外改检查应生成后台工作".into());
+        };
+        job
+    };
+    let completion = job.run();
+    {
+        let document = session.document_mut().ok_or("应存在可编辑文档")?;
+        document.edit_core()?.composition_start("候", 2)?;
+    }
+    let (version, selection, depth, draft, buffer) = {
+        let document = session.document_mut().ok_or("应存在可编辑文档")?;
+        (
+            document.core().version(),
+            document.core().current_selection(),
+            document.core().undo_depth(),
+            document.core().open_block_draft().map(str::to_owned),
+            document.core().buffer_text()?,
+        )
+    };
+    for intent in [ExternalCheckIntent::Focus, ExternalCheckIntent::Reload] {
+        let document = session.document_mut().ok_or("应存在可编辑文档")?;
+        assert!(
+            matches!(
+                document.request_external_check(intent),
+                ExternalCheckCommand::Rejected(ExternalCheckRejection::Deferred)
+            ),
+            "组合活动时请求必须 Deferred"
+        );
+    }
+    assert_eq!(
+        session
+            .document_mut()
+            .ok_or("应存在可编辑文档")?
+            .apply_external_check(completion, 20),
+        ExternalApplyResult::Deferred
+    );
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    assert_eq!(document.core().version(), version, "Deferred 不得改变版本");
+    assert_eq!(
+        document.core().current_selection(),
+        selection,
+        "Deferred 不得改变选区"
+    );
+    assert_eq!(document.core().undo_depth(), depth, "Deferred 不得改变历史");
+    assert_eq!(
+        document.core().open_block_draft().map(str::to_owned),
+        draft,
+        "Deferred 不得改变草稿"
+    );
+    assert_eq!(document.core().buffer_text()?, buffer);
+    assert!(document.external_view().is_none(), "Deferred 不得呈现冲突");
+    assert!(!document.autosave_paused(), "Deferred 不得设置暂停");
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn external_dismiss_keeps_conflict_and_pause_until_disk_matches_baseline() -> TestResult {
+    use std::fs;
+
+    let directory = TempSaveDir::create("aline-external-dismiss")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut session = editable_absolute_session(&target)?;
+    open_editing_block(&mut session)?;
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .type_text(1, "a", 0)?;
+    rewrite_same_size_and_mtime(&target)?;
+    assert_eq!(
+        run_external_check(&mut session, ExternalCheckIntent::Focus, 10)?,
+        ExternalApplyResult::Presented(ExternalDiskState::Changed)
+    );
+
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    document.dismiss_external();
+    assert!(document.external_view().is_none(), "Dismiss 只清视图");
+    assert!(document.autosave_paused(), "Dismiss 不清暂停");
+    assert!(
+        matches!(
+            document.request_save_command(),
+            SaveCommand::Rejected(SaveRejection::Conflict)
+        ),
+        "Dismiss 不清冲突状态"
+    );
+
+    assert_eq!(
+        run_external_check(&mut session, ExternalCheckIntent::Focus, 11)?,
+        ExternalApplyResult::Presented(ExternalDiskState::Changed),
+        "再次检查应重新呈现仍存在的冲突"
+    );
+    fs::write(&target, b"x\n")?;
+    assert_eq!(
+        run_external_check(&mut session, ExternalCheckIntent::Focus, 12)?,
+        ExternalApplyResult::Unchanged
+    );
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    assert!(document.external_view().is_none());
+    assert!(!document.autosave_paused());
+    assert_eq!(document.persistence_status(), Some(SaveStatus::Idle));
+    assert!(matches!(
+        document.request_save_command(),
+        SaveCommand::Run(_)
+    ));
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn external_check_completion_is_send() {
+    fn assert_send<T: Send>() {}
+
+    assert_send::<ExternalCheckJob>();
+    assert_send::<ExternalCheckCompletion>();
 }

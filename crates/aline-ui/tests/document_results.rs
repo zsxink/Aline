@@ -418,3 +418,63 @@ fn case_8_4_17_file_coordination_has_no_doc_core_entry() -> Result<(), Box<dyn s
     assert_idle(&doc);
     Ok(())
 }
+
+#[test]
+fn case_reload_external_rejects_composition_without_side_effects()
+-> Result<(), Box<dyn std::error::Error>> {
+    // W4 3.3：组合进行中调用 reload_external 只返回拒绝，块、草稿、选区、
+    // 版本与历史全部保持原样。
+    let mut doc = p_a()?;
+    doc.composition_start("候", 20)?;
+    let before = capture(&mut doc)?;
+    let result = doc.reload_external("xZ\n", collapsed(2), 30);
+    assert!(matches!(result, Err(DocError::CompositionActive)));
+    let after = capture(&mut doc)?;
+    assert_eq!(after, before);
+    assert_eq!(after.revision, before.revision);
+    assert_eq!(after.draft_generation, before.draft_generation);
+    assert_eq!(after.buffer_anchor, before.buffer_anchor);
+    assert_eq!(after.buffer_head, before.buffer_head);
+    assert_eq!(after.undo, before.undo);
+    assert_eq!(after.redo, before.redo);
+    assert_eq!(after.nodes, before.nodes);
+    assert_open(&doc, 1, Some("候"), 5, 5);
+    Ok(())
+}
+
+#[test]
+fn case_reload_external_closes_block_and_discards_draft_on_change()
+-> Result<(), Box<dyn std::error::Error>> {
+    // W4 3.3：外部载入 Changed 关闭打开块并丢弃草稿；撤销回到重载前文本，
+    // 草稿不单独形成历史步骤。
+    let mut doc = p_a()?;
+    let outcome = doc.reload_external("xZ\n", collapsed(2), 30)?;
+    assert!(matches!(
+        outcome,
+        aline_buffer::ReloadOutcome::Changed { .. }
+    ));
+    assert!(!doc.has_open_block());
+    assert_buffer(&doc, "xZ\n")?;
+    doc.undo()?;
+    assert_buffer(&doc, "x\n")?;
+    assert_closed(&doc);
+    Ok(())
+}
+
+#[test]
+fn case_reload_external_unchanged_keeps_block_and_redo() -> Result<(), Box<dyn std::error::Error>> {
+    // W4 3.3：文本相同返回 Unchanged，块开合状态与 undo/redo 深度不变。
+    let mut doc = after_8_4_09()?;
+    doc.undo()?;
+    let before_open = doc.has_open_block();
+    let before_undo = doc.undo_depth();
+    let before_redo = doc.redo_depth();
+    let text = doc.buffer_text()?;
+    let outcome = doc.reload_external(text.as_str(), collapsed(0), 30)?;
+    assert!(matches!(outcome, aline_buffer::ReloadOutcome::Unchanged));
+    assert_eq!(doc.has_open_block(), before_open);
+    assert_eq!(doc.undo_depth(), before_undo);
+    assert_eq!(doc.redo_depth(), before_redo);
+    assert_buffer(&doc, "x\n")?;
+    Ok(())
+}

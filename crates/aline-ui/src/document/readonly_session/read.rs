@@ -245,6 +245,10 @@ impl ReadonlyOpenJob {
                 limits: self.limits.document,
                 persistence,
                 storage_budget: self.limits.storage,
+                external: None,
+                external_pause: false,
+                reload_pause: false,
+                reload_mark: None,
             },
             timings,
         ))

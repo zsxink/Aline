@@ -13,15 +13,17 @@ use aline_markdown::{CancelToken, ParseBudget, ParseConfig, Parsed};
 use aline_source::{AtomicFailureKind, IoBudget, SourceBaseline, StorageBudget};
 
 use super::persistence::{
-    CloseStatus, OperationId, PersistenceCoordinator, SaveCommand, SaveError, SaveJob,
-    SaveRejection, SaveRequest, SaveRequestError, SaveResult, SaveStatus, WriteCompletion,
-    WriteOutcome, WriteSettlement, WriteStop,
+    CloseStatus, ExternalApplyResult, ExternalCheckCommand, ExternalCheckCompletion,
+    ExternalCheckIntent, ExternalCheckJob, ExternalCheckRejection, ExternalConflictView,
+    ExternalDiskState, ExternalObservation, OperationId, PersistenceCoordinator, SaveCommand,
+    SaveError, SaveJob, SaveRejection, SaveRequest, SaveRequestError, SaveResult, SaveStatus,
+    WriteCompletion, WriteOutcome, WriteSettlement, WriteStop, clamped_selection, preview,
 };
 use super::{
     DocCore, DocError, DocLimits, EditorMode, InputIdentity, ModeSwitchOutcome, PublicationOutcome,
     WaitHandle, WaitStatus,
 };
-use aline_buffer::SrcSelection;
+use aline_buffer::{ReloadOutcome, SrcSelection};
 
 mod read;
 mod refresh;
@@ -166,6 +168,14 @@ pub struct ReadonlyDocument {
     persistence: Option<PersistenceCoordinator>,
     /// 保存编码与 I/O 预算，来自打开时注入的存储预算。
     storage_budget: StorageBudget,
+    /// 仅呈现的外部冲突视图；Dismiss 只清视图，不清冲突状态与暂停。
+    external: Option<ExternalConflictView>,
+    /// 外部删除/不可读/未解码或脏冲突期间的粘性自动保存暂停。
+    external_pause: bool,
+    /// 撤销越过重载边界的粘性暂停。
+    reload_pause: bool,
+    /// 最近一次 Changed 重载后的 `undo_depth()`。
+    reload_mark: Option<usize>,
 }
 impl ReadonlyDocument {
     /// 返回用户选择的文件路径，供标题等显式 UI 使用。
@@ -260,8 +270,277 @@ impl ReadonlyDocument {
             //（synchronized=false）也与协调器保存基线保持一致，关闭 guard
             // 仍按 PublishedUncertain 要求用户处理。PublishedBaselineFailed 不替换。
             self.baseline = storage.clone();
+            // Ruling W4-32：显式保存成功后恢复正常自动保存策略。
+            self.external = None;
+            self.external_pause = false;
+            self.reload_pause = false;
+            self.reload_mark = None;
         }
         Ok(settlement)
+    }
+
+    /// 请求一次外改检查；只读/无目标 → NoTarget，组合 → Deferred，在途/不确定按类别拒绝。
+    pub(crate) fn request_external_check(
+        &self,
+        intent: ExternalCheckIntent,
+    ) -> ExternalCheckCommand {
+        if !self.editable {
+            return ExternalCheckCommand::Rejected(ExternalCheckRejection::NoTarget);
+        }
+        let Some(coordinator) = self.persistence.as_ref() else {
+            return ExternalCheckCommand::Rejected(ExternalCheckRejection::NoTarget);
+        };
+        if self.core.composition().is_some() {
+            return ExternalCheckCommand::Rejected(ExternalCheckRejection::Deferred);
+        }
+        match coordinator.status() {
+            SaveStatus::Saving => {
+                return ExternalCheckCommand::Rejected(ExternalCheckRejection::Busy);
+            }
+            SaveStatus::WaitingForComposition => {
+                return ExternalCheckCommand::Rejected(ExternalCheckRejection::Deferred);
+            }
+            SaveStatus::PublishedUncertain => {
+                return ExternalCheckCommand::Rejected(ExternalCheckRejection::Uncertain);
+            }
+            SaveStatus::Idle | SaveStatus::Failed | SaveStatus::Conflict => {}
+        }
+        ExternalCheckCommand::Run(ExternalCheckJob::new(
+            intent,
+            coordinator.saved_baseline().clone(),
+            coordinator.target_path().to_path_buf(),
+            self.storage_budget,
+            IoBudget::new(self.storage_budget.max_bytes()),
+        ))
+    }
+
+    /// 按冻结顺序结算后台观察；任何未通过复验的完成项都零副作用。
+    pub(crate) fn apply_external_check(
+        &mut self,
+        completion: ExternalCheckCompletion,
+        now_millis: u64,
+    ) -> ExternalApplyResult {
+        if !self.editable || self.persistence.is_none() {
+            return ExternalApplyResult::Stale;
+        }
+        if self.core.composition().is_some() {
+            return ExternalApplyResult::Deferred;
+        }
+        let status = self
+            .persistence
+            .as_ref()
+            .map(PersistenceCoordinator::status);
+        if matches!(
+            status,
+            Some(
+                SaveStatus::Saving
+                    | SaveStatus::WaitingForComposition
+                    | SaveStatus::PublishedUncertain
+            )
+        ) {
+            return ExternalApplyResult::Stale;
+        }
+        let stale_association = self.persistence.as_ref().is_none_or(|coordinator| {
+            completion.path() != coordinator.target_path()
+                || coordinator.saved_baseline().id() != completion.expected().id()
+        });
+        if stale_association {
+            return ExternalApplyResult::Stale;
+        }
+        let snapshot = match self.current_snapshot() {
+            Ok(snapshot) => snapshot,
+            Err(_) => return ExternalApplyResult::Failed,
+        };
+        let dirty = self
+            .persistence
+            .as_ref()
+            .is_some_and(|coordinator| coordinator.is_dirty(&snapshot));
+        let local_preview = match snapshot.full_text(self.limits.text()) {
+            Ok(text) => preview(&text),
+            Err(_) => return ExternalApplyResult::Failed,
+        };
+        match completion.observation() {
+            ExternalObservation::Unchanged => {
+                self.external = None;
+                self.external_pause = false;
+                if let Some(coordinator) = self.persistence.as_mut() {
+                    coordinator.clear_external_conflict();
+                }
+                ExternalApplyResult::Unchanged
+            }
+            ExternalObservation::Changed { baseline } => {
+                if completion.intent() == ExternalCheckIntent::Overwrite {
+                    if !self.adopt_disk_baseline(baseline.clone()) {
+                        return ExternalApplyResult::Stale;
+                    }
+                    self.baseline = baseline.clone();
+                    self.external = None;
+                    self.external_pause = false;
+                    return ExternalApplyResult::OverwriteReady;
+                }
+                // Ruling W4-34：显式「载入磁盘」是用户的确认动作，脏文档也直接走
+                // 同一条重载路径并建立可撤销历史边界；只有 Focus/Retry 在脏时重新
+                // 呈现冲突，等待用户选择出口。
+                if dirty
+                    && matches!(
+                        completion.intent(),
+                        ExternalCheckIntent::Focus | ExternalCheckIntent::Retry
+                    )
+                {
+                    let marked = self
+                        .persistence
+                        .as_mut()
+                        .is_some_and(PersistenceCoordinator::mark_external_conflict);
+                    if !marked {
+                        return ExternalApplyResult::Stale;
+                    }
+                    let Some(baseline_preview) = self.saved_baseline_preview() else {
+                        return ExternalApplyResult::Stale;
+                    };
+                    self.external = Some(ExternalConflictView {
+                        state: ExternalDiskState::Changed,
+                        baseline: baseline_preview,
+                        local: local_preview,
+                        disk: Some(preview(baseline.source())),
+                    });
+                    self.external_pause = true;
+                    return ExternalApplyResult::Presented(ExternalDiskState::Changed);
+                }
+                let selection = clamped_selection(self.core.current_selection(), baseline.source());
+                match self
+                    .core
+                    .reload_external(baseline.source().to_owned(), selection, now_millis)
+                {
+                    Ok(ReloadOutcome::Changed { .. }) => {
+                        if !self.adopt_disk_baseline(baseline.clone()) {
+                            return ExternalApplyResult::Stale;
+                        }
+                        self.baseline = baseline.clone();
+                        self.reload_mark = Some(self.core.undo_depth());
+                        self.reload_pause = false;
+                        self.external = None;
+                        self.external_pause = false;
+                        ExternalApplyResult::Reloaded
+                    }
+                    Ok(ReloadOutcome::Unchanged) => {
+                        if !self.adopt_disk_baseline(baseline.clone()) {
+                            return ExternalApplyResult::Stale;
+                        }
+                        self.baseline = baseline.clone();
+                        self.external = None;
+                        self.external_pause = false;
+                        ExternalApplyResult::Unchanged
+                    }
+                    Err(DocError::CompositionActive) => ExternalApplyResult::Deferred,
+                    Err(_) => ExternalApplyResult::Failed,
+                }
+            }
+            ExternalObservation::Missing => {
+                self.present_external(ExternalDiskState::Missing, dirty, local_preview)
+            }
+            ExternalObservation::Unreadable => {
+                self.present_external(ExternalDiskState::Unreadable, dirty, local_preview)
+            }
+            ExternalObservation::Unstable => {
+                self.present_external(ExternalDiskState::Unstable, dirty, local_preview)
+            }
+            ExternalObservation::Unsupported => {
+                self.present_external(ExternalDiskState::Unsupported, dirty, local_preview)
+            }
+            ExternalObservation::Cancelled => ExternalApplyResult::Stale,
+            ExternalObservation::Failed => ExternalApplyResult::Failed,
+        }
+    }
+
+    /// 返回仅用于呈现的冲突视图。
+    pub(crate) fn external_view(&self) -> Option<&ExternalConflictView> {
+        self.external.as_ref()
+    }
+
+    /// 收起冲突呈现；冲突状态与自动保存暂停保持到磁盘重新等于基线或显式保存。
+    pub(crate) fn dismiss_external(&mut self) {
+        self.external = None;
+    }
+
+    /// 3.4 的自动保存计时器消费此查询；3.3 生产代码不调用。
+    #[cfg_attr(not(test), allow(dead_code))] // Ruling W4-21：3.4 消费
+    pub(crate) fn autosave_paused(&self) -> bool {
+        self.reload_pause || self.external_pause
+    }
+
+    /// 在 Undo/Redo 成功（版本发生变化）后由宿主调用。
+    /// 返回是否“新进入”重载撤销暂停。
+    pub(crate) fn note_history_move(&mut self) -> bool {
+        let Some(mark) = self.reload_mark else {
+            return false;
+        };
+        if self.core.undo_depth() < mark {
+            let newly = !self.reload_pause;
+            self.reload_pause = true;
+            return newly;
+        }
+        if self.reload_pause {
+            let clean = self.current_snapshot().ok().is_some_and(|snapshot| {
+                self.persistence
+                    .as_ref()
+                    .is_none_or(|coordinator| !coordinator.is_dirty(&snapshot))
+            });
+            if clean {
+                self.reload_pause = false;
+            }
+        }
+        false
+    }
+
+    /// 采纳完整磁盘观察为基线；成功后由调用方替换展示基线并清理暂停标记。
+    fn adopt_disk_baseline(&mut self, baseline: SourceBaseline) -> bool {
+        let Some(generation) = self
+            .persistence
+            .as_ref()
+            .map(PersistenceCoordinator::path_generation)
+        else {
+            return false;
+        };
+        self.persistence.as_mut().is_some_and(|coordinator| {
+            coordinator
+                .adopt_external_baseline(generation, baseline)
+                .is_ok()
+        })
+    }
+
+    /// 保存基线的截断预览；只在确认协调器存在后调用。
+    fn saved_baseline_preview(&self) -> Option<Arc<str>> {
+        self.persistence
+            .as_ref()
+            .map(|coordinator| preview(coordinator.saved_baseline().source()))
+    }
+
+    /// 呈现删除/不可读/不支持/不稳定；脏文档同时进入冲突状态。
+    fn present_external(
+        &mut self,
+        state: ExternalDiskState,
+        dirty: bool,
+        local: Arc<str>,
+    ) -> ExternalApplyResult {
+        if dirty
+            && !self
+                .persistence
+                .as_mut()
+                .is_some_and(PersistenceCoordinator::mark_external_conflict)
+        {
+            return ExternalApplyResult::Stale;
+        }
+        let Some(baseline) = self.saved_baseline_preview() else {
+            return ExternalApplyResult::Stale;
+        };
+        self.external = Some(ExternalConflictView {
+            state,
+            baseline,
+            local,
+            disk: None,
+        });
+        self.external_pause = true;
+        ExternalApplyResult::Presented(state)
     }
 
     /// 请求一次显式保存：组合期返回等待句柄，否则冻结并生成后台工作。
@@ -276,11 +555,13 @@ impl ReadonlyDocument {
         // 冲突/不确定时 `start()` 会先于取走 queued 返回 Busy，若此处放行就会
         // 留下无人消费的 queued 项，并连带拒绝关闭与替换。
         // `WaitingForComposition` 仍交给协调器 `next_operation` 的既有 Busy 路径。
-        if matches!(
-            coordinator.status(),
-            SaveStatus::Saving | SaveStatus::Conflict | SaveStatus::PublishedUncertain
-        ) {
-            return SaveCommand::Rejected(SaveRejection::Busy);
+        match coordinator.status() {
+            SaveStatus::Saving => return SaveCommand::Rejected(SaveRejection::Busy),
+            SaveStatus::Conflict => return SaveCommand::Rejected(SaveRejection::Conflict),
+            SaveStatus::PublishedUncertain => {
+                return SaveCommand::Rejected(SaveRejection::Uncertain);
+            }
+            SaveStatus::Idle | SaveStatus::WaitingForComposition | SaveStatus::Failed => {}
         }
         let staging = match save_staging_candidate(coordinator.target_path()) {
             Ok(staging) => staging,
@@ -386,6 +667,14 @@ impl ReadonlyDocument {
         self.persistence
             .as_ref()
             .map(PersistenceCoordinator::status)
+    }
+
+    /// 仅供 crate 内测试读取当前是否脏；不扩大生产 API。
+    #[cfg(test)]
+    pub(super) fn persistence_is_dirty(&self, current: &super::CurrentSnapshot) -> Option<bool> {
+        self.persistence
+            .as_ref()
+            .map(|coordinator| coordinator.is_dirty(current))
     }
 
     /// 仅供 crate 内测试读取关闭决策；用于验证拒绝保存后没有 queued 残留。

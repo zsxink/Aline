@@ -337,6 +337,8 @@ TA-02 已确定自动重载与“载入磁盘”都是独立可撤销边界。�
 
 **2026-10-31 M0 历史编排记录（组 8）：** DocCore 的待定输入、组合确认、Undo/Redo 与模拟 `reload` 共享同一 Buffer/History；重载以节点数和 Undo/Redo 行为验证独立边界，未为测试新增历史可变访问器，`Reload` 来源仍属间接可观察。快照、模式协议与恢复读取不另建子编辑器历史。真实磁盘基线/保存点消费、外改提示及 TA-02 的自动保存暂停/恢复尚未接线；无头重载不能替代文件保存闭环。证据见[组 8 回填记录（历史）](https://github.com/zsxink/Aline/blob/59d601242775db5e08f53d03a5d2b5c46154eaf0/docs/validation/m0-engine-foundation/group-8/step-8.5/report.md)。
 
+**2026-11-18 W4 3.3 实现记录：** `DocCore::reload_external` 已实现，Changed 关闭打开块并丢弃草稿、Unchanged 不动块/历史；外部载入与撤销重载的实际暂停/恢复由会话层 `reload_pause`/`note_history_move` 承担，磁盘基线不随 Undo/Redo 回退；自动保存计时器仍属 3.4。
+
 ### 9.4 查找、替换与格式化
 
 查找按当前源码，含隐藏标记、HTML 注释及链接目标；结果含源范围、实际匹配文本、WorkingVersion 和 query_generation。替换前重验版本与命中文本；Unicode 大小写、环回、空查询及退出焦点样例由 V-07 固化，不静默退为 ASCII-only。不可见命中 reveal 原始块，MD-11 命中切 Source。

@@ -834,3 +834,182 @@ fn save_job_and_completion_are_send() {
     assert_send::<super::SaveJob>();
     assert_send::<super::WriteCompletion>();
 }
+
+/// 以 "y\n" 替换目标并保留原 mtime；本文件私有，不能复用 persistence 测试实现。
+#[cfg(target_os = "macos")]
+fn rewrite_window_target_same_mtime(target: &Path) -> Result<(), Box<dyn Error>> {
+    use std::fs::{self, FileTimes, OpenOptions};
+
+    let before = fs::metadata(target)?.modified()?;
+    fs::write(target, b"y\n")?;
+    OpenOptions::new()
+        .write(true)
+        .open(target)?
+        .set_times(FileTimes::new().set_modified(before))?;
+    assert_eq!(fs::metadata(target)?.modified()?, before);
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn window_save_conflict_requests_and_presents_external_check() -> Result<(), Box<dyn Error>> {
+    use std::fs;
+
+    let directory = WindowSaveDir::create("aline-window-external-conflict")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    open_window_document(&mut state, &target, b"x\n")?;
+    open_window_block(&mut state, SelectionSpec::new(0, 0))?;
+    window_type(&mut state, 1, "a")?;
+    rewrite_window_target_same_mtime(&target)?;
+
+    let job = state.request_save().ok_or("首次保存应返回后台工作")?;
+    let completion = job.run();
+    assert_eq!(
+        state.settle_save(completion),
+        Some("document.save_conflict")
+    );
+    assert!(
+        state.take_external_refresh(),
+        "保存冲突后应排队一次静默外改检查"
+    );
+
+    let job = state
+        .request_external_check(super::ExternalCheckIntent::Focus)
+        .ok_or("冲突后的静默检查应生成后台工作")?;
+    let completion = job.run();
+    let outcome = state.external_check_finished(completion, 10);
+    assert_eq!(outcome.feedback, None, "Focus 检查必须静默");
+    assert!(!outcome.refresh);
+    assert!(!outcome.start_save);
+    let view = state
+        .session()
+        .document()
+        .ok_or("应存在可编辑文档")?
+        .external_view()
+        .ok_or("应呈现外改冲突")?;
+    assert_eq!(view.state, super::ExternalDiskState::Changed);
+
+    assert!(state.request_save().is_none(), "冲突未处理时保存应被拒绝");
+    assert_eq!(state.feedback_key(), Some("document.save_conflict"));
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn window_focus_auto_reload_still_reports_source() -> Result<(), Box<dyn Error>> {
+    use std::fs;
+
+    let directory = WindowSaveDir::create("aline-window-focus-reload")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    open_window_document(&mut state, &target, b"x\n")?;
+    rewrite_window_target_same_mtime(&target)?;
+
+    let job = state
+        .request_external_check(super::ExternalCheckIntent::Focus)
+        .ok_or("干净文档的 Focus 检查应生成后台工作")?;
+    let completion = job.run();
+    let outcome = state.external_check_finished(completion, 10);
+    assert_eq!(
+        outcome.feedback,
+        Some("document.external_reloaded"),
+        "Ruling W4-33：Focus 自动重载仍须提示来源"
+    );
+    assert!(outcome.refresh);
+    assert!(!outcome.start_save);
+    let document = state.session().document().ok_or("应存在可编辑文档")?;
+    assert_eq!(document.core().buffer_text()?, "y\n");
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn window_external_check_is_silent_without_a_document() -> Result<(), Box<dyn Error>> {
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    assert!(
+        state
+            .request_external_check(super::ExternalCheckIntent::Focus)
+            .is_none()
+    );
+    assert_eq!(state.feedback_key(), None, "Focus 在无文档时必须静默");
+    assert!(
+        state
+            .request_external_check(super::ExternalCheckIntent::Retry)
+            .is_none()
+    );
+    assert_eq!(
+        state.feedback_key(),
+        Some("document.save_unavailable"),
+        "显式入口在无文档时应反馈不可保存"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn window_overwrite_ready_starts_save_and_publishes() -> Result<(), Box<dyn Error>> {
+    use std::fs;
+
+    let directory = WindowSaveDir::create("aline-window-external-overwrite")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    open_window_document(&mut state, &target, b"x\n")?;
+    open_window_block(&mut state, SelectionSpec::new(0, 0))?;
+    window_type(&mut state, 1, "a")?;
+    rewrite_window_target_same_mtime(&target)?;
+
+    let job = state.request_save().ok_or("首次保存应返回后台工作")?;
+    assert_eq!(state.settle_save(job.run()), Some("document.save_conflict"));
+    state.take_external_refresh();
+    let job = state
+        .request_external_check(super::ExternalCheckIntent::Focus)
+        .ok_or("静默检查应生成后台工作")?;
+    state.external_check_finished(job.run(), 10);
+
+    let job = state
+        .request_external_check(super::ExternalCheckIntent::Overwrite)
+        .ok_or("覆盖检查应生成后台工作")?;
+    let outcome = state.external_check_finished(job.run(), 11);
+    assert!(outcome.start_save, "OverwriteReady 应触发既有保存");
+    assert_eq!(outcome.feedback, None);
+    let job = state.request_save().ok_or("覆盖后应允许保存")?;
+    assert_eq!(state.settle_save(job.run()), Some("document.save_saved"));
+    assert_eq!(fs::read(&target)?, b"xa\n", "覆盖确认后应发布本地文本");
+    Ok(())
+}
+
+#[test]
+fn conflict_exits_follow_view_state() {
+    use std::sync::Arc;
+
+    use super::{ConflictExits, ExternalConflictView, ExternalDiskState, conflict_exits};
+
+    assert_eq!(conflict_exits(false, None), ConflictExits::default());
+    assert_eq!(conflict_exits(true, None), ConflictExits::default());
+    let changed = ExternalConflictView {
+        state: ExternalDiskState::Changed,
+        baseline: Arc::from("x\n"),
+        local: Arc::from("xa\n"),
+        disk: Some(Arc::from("y\n")),
+    };
+    let exits = conflict_exits(true, Some(&changed));
+    assert!(exits.load_disk);
+    assert!(exits.overwrite);
+    assert!(exits.retry);
+    assert!(exits.dismiss);
+    let missing = ExternalConflictView {
+        state: ExternalDiskState::Missing,
+        baseline: Arc::from("x\n"),
+        local: Arc::from("xa\n"),
+        disk: None,
+    };
+    let exits = conflict_exits(true, Some(&missing));
+    assert!(!exits.load_disk);
+    assert!(!exits.overwrite);
+    assert!(exits.retry);
+    assert!(exits.dismiss);
+}

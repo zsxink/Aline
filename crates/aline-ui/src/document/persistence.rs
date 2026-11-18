@@ -3,10 +3,9 @@
 //! 不改变历史；实际磁盘阶段在同目录 `execute` 子模块按固定顺序执行。
 //! 冻结快照强持有其已有的资源引用，本模块不管理恢复资源。
 
-// 重载/关联替换、取消与关闭停止（`replace_association`、`cancel`、
-// `begin_close`）的生产出口分别属于 W4 3.3/4.x；`WriteSettlement` 的
-// operation/snapshot/path 字段也仍只有 crate 内测试读取。该豁免只覆盖本模块，
-// 对应 UI 接线后逐项复核删除。
+// `cancel` 已在 W4 3.2 有生产出口；剩余豁免是 `replace_association` 的生产出口
+// （属于 W4 4.2），以及 `WriteSettlement` 的 operation/snapshot/path 字段仍只有
+// crate 内测试读取。该豁免只覆盖本模块，对应 UI 接线后逐项复核删除。
 #![cfg_attr(not(test), allow(dead_code))]
 
 use std::{
@@ -25,9 +24,15 @@ use aline_source::{
 use super::{CurrentSnapshot, DocumentId, WaitHandle};
 
 mod execute;
+mod external;
 mod publication;
 
 pub(crate) use execute::SaveJob;
+pub(crate) use external::{
+    ExternalApplyResult, ExternalCheckCommand, ExternalCheckCompletion, ExternalCheckIntent,
+    ExternalCheckJob, ExternalCheckRejection, ExternalConflictView, ExternalDiskState,
+    ExternalObservation, clamped_selection, preview,
+};
 pub(super) use publication::{SaveRequest, SaveRequestError};
 
 /// 窗口层可命名的保存指令；不暴露协调器内部类型。
@@ -50,6 +55,10 @@ pub(crate) enum SaveRejection {
     ReadOnly,
     /// 保存队列正忙（在途、已排队或等待中）。
     Busy,
+    /// 保存基线冲突待用户处理。
+    Conflict,
+    /// 不确定发布待用户处理。
+    Uncertain,
     /// 窗口/文档已进入关闭流程。
     Closing,
     /// 没有可写的绝对目标路径。
@@ -570,6 +579,57 @@ impl PersistenceCoordinator {
     /// 返回当前保存目标的绝对路径；宿主据此在目标同目录生成 staging 候选。
     pub(super) fn target_path(&self) -> &Path {
         &self.target.path
+    }
+
+    /// 返回当前保存基线；外改检查以它为比较对象。
+    pub(super) fn saved_baseline(&self) -> &SourceBaseline {
+        &self.target.saved.storage
+    }
+
+    /// 仅在完全空闲且非不确定发布时把状态置为 Conflict；用于“已发现有本地修改的
+    /// 外部变化”，让后续保存/关闭按既有冲突路径处理。返回是否生效。
+    pub(super) fn mark_external_conflict(&mut self) -> bool {
+        if self.active.is_some() || self.queued.is_some() || self.waiting.is_some() || self.closing
+        {
+            return false;
+        }
+        if self.status == SaveStatus::PublishedUncertain {
+            return false;
+        }
+        self.status = SaveStatus::Conflict;
+        true
+    }
+
+    /// 磁盘重新等于保存基线时解除外部冲突；不改其它状态。
+    pub(super) fn clear_external_conflict(&mut self) {
+        if self.status == SaveStatus::Conflict {
+            self.status = SaveStatus::Idle;
+        }
+    }
+
+    /// 采纳用户刚确认的完整磁盘观察为保存基线（确认覆盖 / 载入磁盘）。
+    /// 守卫与 `replace_association` 相同，但绝不改路径、不 bump 代次、不做内容等价检查，
+    /// 也不得替换出更晚的磁盘事实（调用方已按 `BaselineId` 复验）。成功后状态回 Idle。
+    pub(super) fn adopt_external_baseline(
+        &mut self,
+        expected: PathGeneration,
+        baseline: SourceBaseline,
+    ) -> Result<(), SaveError> {
+        if self.active.is_some() || self.queued.is_some() || self.waiting.is_some() {
+            return Err(SaveError::Busy);
+        }
+        if self.closing {
+            return Err(SaveError::Closing);
+        }
+        if self.target.generation != expected {
+            return Err(SaveError::StaleAssociation);
+        }
+        self.target.saved = SavedBaseline {
+            logical: None,
+            storage: baseline,
+        };
+        self.status = SaveStatus::Idle;
+        Ok(())
     }
 
     /// 显式建立已完成的路径关联。调用者须先在 DocCore 统一提交重载/引用修改，
