@@ -258,6 +258,9 @@ impl ReadonlyOpenJob {
                 pending_migration: None,
                 next_association: 0,
                 parse_budget: self.limits.parse,
+                recovered_origin: None,
+                deferred_recovery: None,
+                recovery_pending_arm: false,
             },
             timings,
         ))

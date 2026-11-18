@@ -41,16 +41,24 @@ pub(crate) use statistics::DocumentStatistics;
 
 pub(crate) use recovery::{
     PreparedRecovery, RecoveryAction, RecoveryCloseJob, RecoveryConfig, RecoveryConfigError,
-    RecoveryPrepareJob, RecoveryPublishJob, RecoverySettlement, RecoveryStart,
+    RecoveryDiscardCompletion, RecoveryDiscardJob, RecoveryDocumentId, RecoveryGenerationStatus,
+    RecoveryLineageDisposition, RecoveryPrepareJob, RecoveryPublishJob, RecoveryResourceSource,
+    RecoveryRestoreCompletion, RecoveryRestoreJob, RecoveryScan, RecoverySettlement, RecoveryStart,
+    RecoveryStore, RecoveryStoreError, RestoredRecovery, RetireOutcome, UnavailableResources,
+    create_default_root,
 };
-/// 恢复根与存储仅由 crate 内测试直接构造；生产根接线归 4.2。
+/// 恢复根仅由 crate 内测试直接构造；生产根接线归 4.2。
 #[cfg(test)]
-pub(crate) use recovery::{RecoveryRoot, RecoveryStore, UnavailableResources};
+pub(crate) use recovery::{
+    RecoveredDocument, RecoveredPath, RecoveryGenerationInput, RecoveryGenerationScan,
+    RecoveryLineageScan, RecoveryPath, RecoveryPublishOutcome, RecoveryResourceInput,
+    RecoveryRestoreError, RecoveryRoot,
+};
 
 pub(crate) use persistence::{
     ExternalApplyResult, ExternalCheckCommand, ExternalCheckCompletion, ExternalCheckIntent,
     ExternalCheckJob, ExternalCheckRejection, ExternalConflictView, ExternalDiskState, SaveCommand,
-    SaveJob, SaveRejection, SaveResult, WriteCompletion,
+    SaveJob, SaveRejection, SaveResult, WriteCompletion, WriteKind,
 };
 
 /// 4.2b 首次保存/另存为动作消费的关联命令；窗口接线前只由 crate 内测试驱动。

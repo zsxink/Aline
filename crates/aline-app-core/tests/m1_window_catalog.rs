@@ -46,6 +46,22 @@ fn native_window_copy_exists_in_both_catalogs() {
                 "document.conflict_disk",
                 "document.recovery_failed",
                 "document.recovery_incomplete",
+                "document.save_resources_failed",
+                "document.save_migration_retry",
+                "document.save_target_failed",
+                "document.resource_insert_failed",
+                "document.recovery_disabled",
+                "document.recovery_panel_title",
+                "document.recovery_restore",
+                "document.recovery_restore_failed",
+                "document.recovery_discard",
+                "document.recovery_discard_prompt",
+                "document.recovery_discard_confirm",
+                "document.recovery_discard_cancel",
+                "document.recovery_discard_failed",
+                "document.recovery_scan_failed",
+                "document.recovery_restored",
+                "document.recovery_unnamed",
                 "action.visual_view",
                 "action.source_view",
                 "menu.file",
@@ -104,6 +120,21 @@ fn status_counts_interpolate_the_single_count_placeholder() {
                 matches!(pending, Ok(value) if !value.contains('{') && !value.trim().is_empty()),
                 "status.pending must be a literal in {locale:?}"
             );
+            // 带插值的恢复键不能经 `t()` 读取，改由 `t_with` 断言插值与必填。
+            for (key, placeholder) in [
+                ("document.recovery_record", "id"),
+                ("document.recovery_unrecoverable", "count"),
+            ] {
+                let translated = translator.t_with(key, &[(placeholder, "7")]);
+                assert!(
+                    matches!(translated, Ok(value) if value.contains('7') && !value.contains('{')),
+                    "missing {placeholder} interpolation for {key} in {locale:?}"
+                );
+                assert!(
+                    translator.t_with(key, &[]).is_err(),
+                    "{placeholder} placeholder must be required for {key} in {locale:?}"
+                );
+            }
         }
     }
 }

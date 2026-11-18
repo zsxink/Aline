@@ -2,12 +2,33 @@
 
 use std::error::Error;
 use std::io::{self, Cursor};
+use std::num::NonZeroU64;
 use std::path::{Path, PathBuf};
 
 use aline_buffer::SelectionSpec;
 
 use crate::EditorMode;
 use crate::{ReadonlyFileAccess, ReadonlyFileInput};
+
+use super::recovery_panel::{
+    RecoveryPanelAction, RecoveryPanelEntryStatus, RecoveryPanelState, RecoveryPanelStep,
+};
+use super::recovery_runtime::production_recovery_with;
+use crate::document::{
+    RecoveredDocument, RecoveredPath, RecoveryDocumentId, RecoveryGenerationScan,
+    RecoveryGenerationStatus, RecoveryLineageDisposition, RecoveryLineageScan, RecoveryScan,
+    RestoredRecovery, WriteKind,
+};
+#[cfg(target_os = "macos")]
+use crate::document::{
+    RecoveryConfig, RecoveryDiscardCompletion, RecoveryGenerationInput, RecoveryPublishOutcome,
+    RecoveryResourceInput, RecoveryRestoreCompletion, RecoveryRestoreError, RecoveryRoot,
+    RecoveryStore, ResourceError, RetireOutcome, TempRoot, UnavailableResources,
+};
+#[cfg(target_os = "macos")]
+use aline_source::Cancellation;
+#[cfg(target_os = "macos")]
+use std::sync::Arc;
 
 struct Files<'a>(&'a [u8]);
 impl<'a> ReadonlyFileAccess for Files<'a> {
@@ -1209,5 +1230,1170 @@ fn recovery_slot_close_rejects_late_completions_and_stays_empty() -> Result<(), 
     assert!(!slot.finish_timer(timer), "关闭后迟到计时完成应被拒绝");
     assert!(!slot.finish_work(work), "关闭后迟到工作完成应被拒绝");
     assert!(slot.can_arm(), "关闭后槽应保持空闲");
+    Ok(())
+}
+
+// ---- 4.2b 另存为/恢复接线（W4-56/57/58） ----
+
+/// 把只实现 `Debug` 的内部错误折算为测试动态错误。
+fn ok<T, E: std::fmt::Debug>(result: Result<T, E>) -> Result<T, Box<dyn Error>> {
+    result.map_err(|error| format!("{error:?}").into())
+}
+
+fn non_zero(value: u64) -> Result<NonZeroU64, Box<dyn Error>> {
+    NonZeroU64::new(value).ok_or_else(|| "代次/身份必须非零".into())
+}
+
+fn recovered_identity(value: u64) -> Result<RecoveryDocumentId, Box<dyn Error>> {
+    Ok(RecoveryDocumentId::from_raw_for_test(non_zero(value)?))
+}
+
+/// 纯合成恢复记录；不触碰存储，用于另存为与恢复面板状态用例。
+fn synthetic_recovered(
+    source: &str,
+    generation: u64,
+    path: RecoveredPath,
+) -> Result<RecoveredDocument, Box<dyn Error>> {
+    Ok(RecoveredDocument {
+        document: recovered_identity(1)?,
+        generation: non_zero(generation)?,
+        path_generation: 7,
+        captured_composition: false,
+        path,
+        anchor_byte: 0,
+        head_byte: 0,
+        source: source.to_owned(),
+        logical_saved: None,
+        baseline: None,
+        resources: Vec::new(),
+    })
+}
+
+fn synthetic_restored(
+    source: &str,
+    generation: u64,
+    path: RecoveredPath,
+) -> Result<RestoredRecovery, Box<dyn Error>> {
+    Ok(RestoredRecovery {
+        recovered: synthetic_recovered(source, generation, path)?,
+        temp_document: None,
+    })
+}
+
+/// 在协调器会话中原子发布一条合成恢复文档。
+fn open_synthetic_recovered(
+    state: &mut super::NativeOpenCoordinator,
+    source: &str,
+) -> Result<(), Box<dyn Error>> {
+    let restored = synthetic_restored(source, 1, RecoveredPath::Unlinked)?;
+    state
+        .session_mut()
+        .open_recovered(restored)
+        .map_err(|error| format!("{error:?}"))?;
+    Ok(())
+}
+
+/// 便于对只读/可编辑两种窗口预算复用同一打开路径。
+fn coordinator_limits(editable: bool) -> crate::ReadonlyOpenLimits {
+    let bytes = 64 * 1024;
+    let limits = crate::ReadonlyOpenLimits::new(
+        aline_source::StorageBudget::new(bytes),
+        crate::DocLimits::new(
+            aline_buffer::TextBudget::new(bytes),
+            aline_buffer::LineIndexBudget::new(1024),
+            aline_buffer::HistoryBudget::new(32, bytes),
+        ),
+        aline_markdown::ParseConfig::m0(),
+        aline_markdown::ParseBudget::m0(),
+    );
+    if editable {
+        limits.with_editing()
+    } else {
+        limits
+    }
+}
+
+/// 用内存读取器打开任意路径；不依赖真实文件，可跨平台使用。
+fn open_memory_document(
+    state: &mut super::NativeOpenCoordinator,
+    path: &Path,
+    bytes: &[u8],
+) -> Result<(), Box<dyn Error>> {
+    let request = state.request_open()?;
+    let job = state
+        .accept_dialog(&request, Ok(Some(vec![path.to_path_buf()])))
+        .ok_or("应生成打开工作")?;
+    let (next, prepared) = state.read_finished(job.read_with(&Files(bytes)), |_| Ok(()));
+    assert!(next.is_none());
+    assert_eq!(prepared, Some(()));
+    assert!(state.take_focus_return());
+    Ok(())
+}
+
+fn scan_generation(
+    value: u64,
+    status: RecoveryGenerationStatus,
+) -> Result<RecoveryGenerationScan, Box<dyn Error>> {
+    Ok(RecoveryGenerationScan {
+        generation: non_zero(value)?,
+        status,
+        payload_bytes: value,
+    })
+}
+
+fn scan_lineage(
+    document: u64,
+    disposition: RecoveryLineageDisposition,
+    generations: Vec<RecoveryGenerationScan>,
+) -> Result<RecoveryLineageScan, Box<dyn Error>> {
+    Ok(RecoveryLineageScan {
+        document: recovered_identity(document)?,
+        disposition,
+        retired_through: None,
+        generations,
+        reservations: Vec::new(),
+        defects: Vec::new(),
+    })
+}
+
+fn synthetic_scan(lineages: Vec<RecoveryLineageScan>) -> RecoveryScan {
+    RecoveryScan {
+        root_payload_bytes: 0,
+        lineages,
+        defects: Vec::new(),
+    }
+}
+
+#[test]
+fn save_as_menu_enabled_only_for_editable_idle_document() -> Result<(), Box<dyn Error>> {
+    let mut readonly = super::NativeOpenCoordinator::new(coordinator_limits(false));
+    assert!(!readonly.save_as_enabled(), "无文档时另存为不可用");
+    open_memory_document(&mut readonly, Path::new("fixture.md"), b"x\n")?;
+    assert!(!readonly.save_as_enabled(), "只读文档不得另存为");
+
+    let mut editable = super::NativeOpenCoordinator::new(coordinator_limits(true));
+    open_synthetic_recovered(&mut editable, "x\n")?;
+    assert!(editable.save_as_enabled(), "空闲可编辑恢复文档应可另存为");
+    editable.save_host = super::SaveHost::Running { automatic: false };
+    assert!(!editable.save_as_enabled(), "保存执行中不得另存为");
+    editable.save_host = super::SaveHost::Idle;
+    assert!(editable.save_as_enabled(), "回到空闲后恢复可用性");
+    Ok(())
+}
+
+#[test]
+fn save_as_action_accepts_picked_path_and_rejects_cancel() -> Result<(), Box<dyn Error>> {
+    let mut state = super::NativeOpenCoordinator::new(coordinator_limits(true));
+    open_synthetic_recovered(&mut state, "x\n")?;
+
+    let cancelled = state.accept_save_target(WriteKind::SaveAs, Ok(None), 0);
+    assert!(cancelled.is_none());
+    assert_eq!(state.feedback_key(), Some("document.save_cancelled"));
+    assert!(matches!(state.save_host, super::SaveHost::Idle));
+    assert!(state.session().document().is_some_and(|document| {
+        !document.association_active() && document.path() == Path::new("recovered.md")
+    }));
+
+    let failed = state.accept_save_target(WriteKind::SaveAs, Err(()), 0);
+    assert!(failed.is_none());
+    assert_eq!(state.feedback_key(), Some("document.save_target_failed"));
+    assert!(matches!(state.save_host, super::SaveHost::Idle));
+    assert!(
+        state
+            .session()
+            .document()
+            .is_some_and(|document| !document.association_active())
+    );
+
+    let target =
+        std::env::temp_dir().join(format!("aline-save-as-recovered-{}.md", std::process::id()));
+    let accepted = state.accept_save_target(WriteKind::SaveAs, Ok(Some(target.clone())), 0);
+    assert!(matches!(accepted, Some(super::SaveIntent::Migrate(_))));
+    assert!(matches!(
+        state.save_host,
+        super::SaveHost::Running { automatic: false }
+    ));
+    assert!(state.feedback_key().is_none());
+    assert!(
+        state
+            .session()
+            .document()
+            .is_some_and(|document| document.association_active()),
+        "选择目标后关联应处于活动态"
+    );
+    Ok(())
+}
+
+#[test]
+fn cancel_association_copy_returns_to_idle_and_ignores_late_completion()
+-> Result<(), Box<dyn Error>> {
+    let mut state = super::NativeOpenCoordinator::new(coordinator_limits(true));
+    open_synthetic_recovered(&mut state, "x\n")?;
+    let target = std::env::temp_dir().join(format!(
+        "aline-cancel-association-{}.md",
+        std::process::id()
+    ));
+
+    let job = match state.accept_save_target(WriteKind::SaveAs, Ok(Some(target.clone())), 0) {
+        Some(super::SaveIntent::Migrate(job)) => job,
+        _ => return Err("选择目标后应进入迁移复制".into()),
+    };
+    assert!(matches!(
+        state.save_host,
+        super::SaveHost::Running { automatic: false }
+    ));
+    assert!(
+        state
+            .session()
+            .document()
+            .is_some_and(|document| document.association_active()),
+        "复制阶段关联应活动"
+    );
+    assert!(state.save_cancel_enabled(), "复制阶段取消菜单应可用");
+    assert!(state.save_busy());
+
+    assert!(state.cancel_save_wait());
+    assert_eq!(state.feedback_key(), Some("document.save_cancelled"));
+    assert!(matches!(state.save_host, super::SaveHost::Idle));
+    assert!(!state.save_cancel_enabled());
+    assert!(!state.save_busy());
+    assert!(state.save_as_enabled(), "取消后应可再次保存");
+    {
+        let document = state.session().document().ok_or("应存在恢复文档")?;
+        assert!(!document.association_active());
+        assert_eq!(document.path(), Path::new("recovered.md"));
+        assert_eq!(document.core().buffer_text()?, "x\n");
+    }
+
+    // 迟到的迁移完成不得改路径、清文档或覆盖取消反馈。
+    let late = job.run();
+    assert!(state.association_finished(late, 1).is_none());
+    assert_eq!(state.feedback_key(), Some("document.save_cancelled"));
+    assert!(matches!(state.save_host, super::SaveHost::Idle));
+    {
+        let document = state.session().document().ok_or("应存在恢复文档")?;
+        assert!(!document.association_active());
+        assert_eq!(document.path(), Path::new("recovered.md"));
+        assert_eq!(document.core().buffer_text()?, "x\n");
+    }
+
+    // 取消后同一目标可再次发起保存，并再次取消回到空闲。
+    assert!(matches!(
+        state.accept_save_target(WriteKind::SaveAs, Ok(Some(target)), 2),
+        Some(super::SaveIntent::Migrate(_))
+    ));
+    assert!(matches!(
+        state.save_host,
+        super::SaveHost::Running { automatic: false }
+    ));
+    assert!(state.cancel_save_wait());
+    assert!(matches!(state.save_host, super::SaveHost::Idle));
+    assert!(
+        state
+            .session()
+            .document()
+            .is_some_and(|document| !document.association_active())
+    );
+    Ok(())
+}
+
+#[test]
+fn save_as_target_without_home_reports_unavailable() -> Result<(), Box<dyn Error>> {
+    let mut state = super::NativeOpenCoordinator::new(coordinator_limits(true));
+    open_synthetic_recovered(&mut state, "x\n")?;
+    assert!(state.save_target_plan(None).is_none());
+    assert_eq!(state.feedback_key(), Some("document.save_target_failed"));
+    let document = state.session().document().ok_or("应存在恢复文档")?;
+    assert_eq!(document.path(), Path::new("recovered.md"));
+    assert!(document.recovered_original_path().is_none());
+    assert!(!document.association_active());
+    Ok(())
+}
+
+#[test]
+fn untitled_save_action_requests_target_instead_of_no_target() -> Result<(), Box<dyn Error>> {
+    let mut state = super::NativeOpenCoordinator::new(coordinator_limits(true));
+    open_synthetic_recovered(&mut state, "x\n")?;
+    assert!(matches!(
+        state.request_save_intent(),
+        Some(super::SaveIntent::ChooseTarget(WriteKind::Create))
+    ));
+    assert!(state.feedback_key().is_none());
+    assert!(matches!(state.save_host, super::SaveHost::Idle));
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+struct RecoveryFixture {
+    dir: WindowSaveDir,
+    store: RecoveryStore,
+}
+
+#[cfg(target_os = "macos")]
+impl RecoveryFixture {
+    fn new(prefix: &str) -> Result<Self, Box<dyn Error>> {
+        use std::fs;
+
+        let dir = WindowSaveDir::create(prefix)?;
+        let root_path = dir.0.join("recovery");
+        fs::create_dir(&root_path)?;
+        let root = ok(RecoveryRoot::open(&root_path))?;
+        let store = ok(RecoveryStore::open(root))?;
+        Ok(Self { dir, store })
+    }
+
+    fn path(&self) -> &Path {
+        &self.dir.0
+    }
+
+    fn lineage(&self) -> Result<RecoveryDocumentId, Box<dyn Error>> {
+        ok(self.store.open_lineage(100))
+    }
+
+    fn publish(
+        &self,
+        document: RecoveryDocumentId,
+        source: &str,
+        resources: Vec<RecoveryResourceInput>,
+    ) -> Result<NonZeroU64, Box<dyn Error>> {
+        publish_record(&self.store, document, source, resources)
+    }
+
+    fn temp_root(&self) -> Result<TempRoot, Box<dyn Error>> {
+        use std::fs;
+
+        let home = self.dir.0.join("home");
+        fs::create_dir_all(home.join("Library/Application Support"))?;
+        ok(TempRoot::open_or_create(&home))
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn publish_record(
+    store: &RecoveryStore,
+    document: RecoveryDocumentId,
+    source: &str,
+    resources: Vec<RecoveryResourceInput>,
+) -> Result<NonZeroU64, Box<dyn Error>> {
+    let input = RecoveryGenerationInput {
+        path_generation: 7,
+        captured_composition: false,
+        path: crate::document::RecoveryPath::Unlinked,
+        anchor_byte: 0,
+        head_byte: 0,
+        source: source.to_owned(),
+        logical_saved: None,
+        baseline: None,
+        resources,
+    };
+    let cancellation = Cancellation::new();
+    match ok(store.publish(document, input, &cancellation))? {
+        RecoveryPublishOutcome::Published { generation, .. } => Ok(generation),
+        other => Err(format!("期望 Published，实际 {other:?}").into()),
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn publish_active_recovery(state: &mut super::NativeOpenCoordinator) -> Result<(), Box<dyn Error>> {
+    let job = match state.recovery_start(0) {
+        Some(super::RecoveryStart::Prepare(job)) => job,
+        other => return Err(format!("期望准备阶段，实际 {other:?}").into()),
+    };
+    let prepared = job.run();
+    let job = match state.recovery_prepared(prepared, 0) {
+        Some(super::RecoveryStart::Publish(job)) => job,
+        other => return Err(format!("期望发布阶段，实际 {other:?}").into()),
+    };
+    let settlement = job.run();
+    state.recovery_settled(settlement, 0);
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn stage_window_image(
+    state: &mut super::NativeOpenCoordinator,
+    name: &str,
+    bytes: &[u8],
+) -> Result<String, Box<dyn Error>> {
+    open_window_block(state, SelectionSpec::new(0, 0))?;
+    let reference = state
+        .session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .stage_temp_image(name, bytes, 4096)
+        .map_err(|error| format!("{error:?}"))?;
+    let locator = reference.locator().to_owned();
+    state
+        .session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .leave_block(1)?;
+    Ok(locator)
+}
+
+#[cfg(target_os = "macos")]
+fn locator_path(root: &TempRoot, locator: &str) -> Option<PathBuf> {
+    let rest = locator.strip_prefix("aline-temp:")?;
+    let (document, file) = rest.split_once('/')?;
+    Some(root.path().join(document).join(file))
+}
+
+#[cfg(target_os = "macos")]
+fn regular_file_count(path: &Path) -> Result<usize, Box<dyn Error>> {
+    let mut count = 0;
+    for entry in std::fs::read_dir(path)? {
+        let entry = entry?;
+        let metadata = entry.metadata()?;
+        if metadata.is_dir() {
+            count += regular_file_count(&entry.path())?;
+        } else if metadata.is_file() {
+            count += 1;
+        }
+    }
+    Ok(count)
+}
+
+#[cfg(target_os = "macos")]
+fn configure_window_recovery(
+    state: &mut super::NativeOpenCoordinator,
+    store: &RecoveryStore,
+    root: TempRoot,
+) -> Result<(), Box<dyn Error>> {
+    state
+        .configure_recovery(Some(RecoveryConfig {
+            store: store.clone(),
+            resources: Arc::new(UnavailableResources),
+        }))
+        .map_err(|error| format!("{error:?}"))?;
+    state.session_mut().configure_temp_root(Some(root));
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn close_cancels_autosave_and_recovery_before_release() -> Result<(), Box<dyn Error>> {
+    use std::fs;
+
+    let fixture = RecoveryFixture::new("aline-window-close-cancel")?;
+    let target = fixture.path().join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let root = fixture.temp_root()?;
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    configure_window_recovery(&mut state, &fixture.store, root)?;
+    open_window_document(&mut state, &target, b"x\n")?;
+    assert_eq!(state.arm_recovery(0), Some(10_000));
+    open_window_block(&mut state, SelectionSpec::new(0, 0))?;
+    window_type(&mut state, 1, "a")?;
+    publish_active_recovery(&mut state)?;
+    state
+        .session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .undo()?;
+    state
+        .session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .note_document_activity(0);
+    {
+        let document = state.session.document().ok_or("应存在可编辑文档")?;
+        assert_eq!(document.autosave_deadline(), Some(1_000));
+        assert_eq!(document.recovery_deadline(), Some(10_000));
+    }
+
+    let observed = state
+        .close_document_with(|document| {
+            (document.autosave_deadline(), document.association_active())
+        })
+        .map_err(|()| "关闭应获准")?;
+    assert_eq!(observed, Some((None, false)));
+    let (recoveries, cleanups) = state.take_retired();
+    assert!(!recoveries.is_empty(), "关闭应先排队恢复退役");
+    assert!(cleanups.is_empty(), "未暂存资源时无清理任务");
+    assert!(state.session().document().is_none());
+    assert!(state.arm_recovery(0).is_none());
+    for job in recoveries {
+        job.run();
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn close_refusal_does_not_cancel_recovery_or_cleanup() -> Result<(), Box<dyn Error>> {
+    use std::fs;
+
+    let fixture = RecoveryFixture::new("aline-window-close-refuse")?;
+    let target = fixture.path().join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let root = fixture.temp_root()?;
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    configure_window_recovery(&mut state, &fixture.store, root.clone())?;
+    open_window_document(&mut state, &target, b"x\n")?;
+    assert_eq!(state.arm_recovery(0), Some(10_000));
+    let locator = stage_window_image(&mut state, "pic.png", b"png-bytes")?;
+    open_window_block(&mut state, SelectionSpec::new(0, 0))?;
+    window_type(&mut state, 1, "a")?;
+    state
+        .session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .note_document_activity(0);
+
+    assert!(state.close_document_with(|_| ()).is_err());
+    assert_eq!(state.feedback_key(), Some("document.close_pending_changes"));
+    assert!(state.session().document().is_some(), "拒绝关闭必须保留文档");
+    let (recoveries, cleanups) = state.take_retired();
+    assert!(recoveries.is_empty());
+    assert!(cleanups.is_empty());
+    let document = state.session.document().ok_or("应存在可编辑文档")?;
+    assert_eq!(document.autosave_deadline(), Some(1_000));
+    assert_eq!(document.recovery_deadline(), Some(10_000));
+    let resource_path = locator_path(&root, &locator).ok_or("locator 应可解析")?;
+    assert!(resource_path.is_file(), "拒绝关闭不得删除临时资源");
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn close_success_spawns_cleanup_only_after_retirement() -> Result<(), Box<dyn Error>> {
+    use std::fs;
+
+    let fixture = RecoveryFixture::new("aline-window-close-cleanup")?;
+    let target = fixture.path().join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let root = fixture.temp_root()?;
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    configure_window_recovery(&mut state, &fixture.store, root.clone())?;
+    open_window_document(&mut state, &target, b"x\n")?;
+    assert_eq!(state.arm_recovery(0), Some(10_000));
+    open_window_block(&mut state, SelectionSpec::new(0, 0))?;
+    window_type(&mut state, 1, "a")?;
+    publish_active_recovery(&mut state)?;
+    state
+        .session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .undo()?;
+    // 直接暂存资源而不新开输入块：发布时资源尚未写入记录，关闭后的清理
+    // 才能验证“退役谱系后删除临时文件”。
+    let reference = state
+        .session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .stage_temp_image("pic.png", b"png-bytes", 4096)
+        .map_err(|error| format!("{error:?}"))?;
+    let locator = reference.locator().to_owned();
+    let resource_path = locator_path(&root, &locator).ok_or("locator 应可解析")?;
+    assert!(resource_path.is_file());
+
+    assert!(state.close_document_with(|_| ()).is_ok(), "关闭应获准");
+    let (recoveries, cleanups) = state.take_retired();
+    assert!(!recoveries.is_empty());
+    assert!(!cleanups.is_empty(), "暂存资源应生成清理任务");
+    // 先退役恢复谱系，再清理临时资源；清理任务在退役后执行才能删除。
+    for job in recoveries {
+        job.run();
+    }
+    let scan = ok(fixture.store.scan())?;
+    assert!(
+        scan.recoverable_lineages()
+            .iter()
+            .all(|lineage| lineage.document.directory_name() != locator_document(&locator)),
+        "退役后扫描不得再列出该谱系"
+    );
+    let outcome = cleanups
+        .into_iter()
+        .map(super::ResourceCleanupJob::run)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        outcome,
+        vec![crate::document::CleanupOutcome::Cleaned],
+        "退役后清理应成功"
+    );
+    assert_eq!(
+        regular_file_count(root.path())?,
+        0,
+        "临时根不得残留普通文件"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn locator_document(locator: &str) -> String {
+    locator
+        .strip_prefix("aline-temp:")
+        .and_then(|rest| rest.split_once('/'))
+        .map_or_else(String::new, |(document, _)| document.to_owned())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn startup_creates_recovery_dirs_and_scans_once() -> Result<(), Box<dyn Error>> {
+    use std::fs;
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+    let directory = WindowSaveDir::create("aline-window-startup")?;
+    let home = directory.0.join("home");
+    fs::create_dir_all(home.join("Library/Application Support"))?;
+    let runtime = production_recovery_with(Some(&home), true);
+    assert!(runtime.config.is_some(), "macOS 注入 HOME 时应启用恢复");
+    assert!(runtime.feedback.is_none());
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    let store = state
+        .install_recovery_runtime(runtime)
+        .ok_or("启用后应安装存储")?;
+
+    let recovery_dir = home.join("Library/Application Support/Aline/recovery");
+    let temporary_dir = home.join("Library/Application Support/Aline/temporary");
+    for path in [&recovery_dir, &temporary_dir] {
+        let metadata = fs::metadata(path)?;
+        assert!(metadata.is_dir());
+        assert_eq!(
+            metadata.permissions().mode() & 0o777,
+            0o700,
+            "生产目录必须为 0700"
+        );
+        assert_eq!(metadata.uid(), fs::metadata(&home)?.uid());
+    }
+
+    assert_eq!(state.begin_startup_scan(), Some(1));
+    assert!(state.begin_startup_scan().is_none(), "扫描只能启动一次");
+    let document = ok(store.open_lineage(100))?;
+    publish_record(&store, document, "recovered\n", Vec::new())?;
+    let scan = ok(store.scan())?;
+    assert!(state.startup_scan_finished(1, Ok(scan.clone())));
+    assert_eq!(state.panel.entries().len(), 1);
+    assert!(state.panel.is_visible());
+    assert!(
+        !state.startup_scan_finished(1, Ok(scan)),
+        "重复代次不得再次安装"
+    );
+    assert_eq!(state.panel.entries().len(), 1);
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn startup_without_home_disables_recovery_and_keeps_editing_available() -> Result<(), Box<dyn Error>>
+{
+    use std::fs;
+
+    let runtime = production_recovery_with(None, true);
+    assert!(runtime.config.is_none());
+    assert!(runtime.temp_root.is_none());
+    assert_eq!(runtime.feedback, Some("document.recovery_disabled"));
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    assert!(state.install_recovery_runtime(runtime).is_none());
+    assert_eq!(state.feedback_key(), Some("document.recovery_disabled"));
+    assert!(state.begin_startup_scan().is_none());
+    assert!(!state.panel.is_visible());
+
+    let directory = WindowSaveDir::create("aline-window-no-home")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    open_window_document(&mut state, &target, b"x\n")?;
+    open_window_block(&mut state, SelectionSpec::new(0, 0))?;
+    window_type(&mut state, 1, "a")?;
+    let job = state.request_save().ok_or("应返回保存工作")?;
+    assert_eq!(
+        state.settle_save(job.run()).feedback,
+        Some("document.save_saved")
+    );
+    assert_eq!(fs::read(&target)?, b"xa\n");
+    Ok(())
+}
+
+#[test]
+fn non_macos_runtime_is_disabled_without_side_effects() -> Result<(), Box<dyn Error>> {
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let nanos = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+    let home = std::env::temp_dir().join(format!(
+        "aline-non-macos-runtime-{}-{nanos}",
+        std::process::id()
+    ));
+    fs::create_dir(&home)?;
+    let runtime = production_recovery_with(Some(&home), false);
+    let result = {
+        assert!(runtime.config.is_none());
+        assert!(runtime.temp_root.is_none());
+        assert_eq!(runtime.feedback, Some("document.recovery_disabled"));
+        assert!(!home.join("Library").exists(), "禁用平台不得创建目录");
+        Ok(())
+    };
+    let _ = fs::remove_dir_all(&home);
+    result
+}
+
+#[test]
+fn startup_scan_lists_only_recoverable_records() -> Result<(), Box<dyn Error>> {
+    let scan = synthetic_scan(vec![
+        scan_lineage(
+            1,
+            RecoveryLineageDisposition::Active,
+            vec![scan_generation(1, RecoveryGenerationStatus::Complete)?],
+        )?,
+        scan_lineage(
+            2,
+            RecoveryLineageDisposition::Active,
+            vec![scan_generation(1, RecoveryGenerationStatus::Incomplete)?],
+        )?,
+        scan_lineage(
+            3,
+            RecoveryLineageDisposition::Blocked,
+            vec![scan_generation(1, RecoveryGenerationStatus::Complete)?],
+        )?,
+        scan_lineage(
+            4,
+            RecoveryLineageDisposition::Active,
+            vec![scan_generation(1, RecoveryGenerationStatus::UnknownFormat)?],
+        )?,
+    ]);
+    let mut panel = RecoveryPanelState::default();
+    assert!(panel.install_scan(1, &scan));
+    assert_eq!(panel.entries().len(), 1);
+    assert_eq!(panel.entries()[0].document, recovered_identity(1)?);
+    assert_eq!(panel.unrecoverable(), 3);
+    assert!(panel.is_visible());
+    Ok(())
+}
+
+#[test]
+fn startup_scan_reports_unrecoverable_records_without_actions() -> Result<(), Box<dyn Error>> {
+    let scan = synthetic_scan(vec![
+        scan_lineage(
+            2,
+            RecoveryLineageDisposition::Active,
+            vec![scan_generation(1, RecoveryGenerationStatus::Incomplete)?],
+        )?,
+        scan_lineage(
+            3,
+            RecoveryLineageDisposition::Blocked,
+            vec![scan_generation(1, RecoveryGenerationStatus::Complete)?],
+        )?,
+        scan_lineage(
+            4,
+            RecoveryLineageDisposition::Active,
+            vec![scan_generation(1, RecoveryGenerationStatus::UnknownFormat)?],
+        )?,
+    ]);
+    let mut panel = RecoveryPanelState::default();
+    assert!(panel.install_scan(1, &scan));
+    assert!(panel.entries().is_empty(), "不可恢复项不得生成动作行");
+    assert_eq!(panel.unrecoverable(), 3);
+    assert!(panel.is_visible(), "仅报告也需要可见");
+    assert!(panel.confirming().is_none());
+    assert!(!panel.is_busy());
+    Ok(())
+}
+
+#[test]
+fn corrupt_latest_generation_lists_earlier_complete_and_reports_defect()
+-> Result<(), Box<dyn Error>> {
+    let scan = synthetic_scan(vec![scan_lineage(
+        1,
+        RecoveryLineageDisposition::Active,
+        vec![
+            scan_generation(1, RecoveryGenerationStatus::Complete)?,
+            scan_generation(2, RecoveryGenerationStatus::Corrupt)?,
+        ],
+    )?]);
+    let mut panel = RecoveryPanelState::default();
+    assert!(panel.install_scan(1, &scan));
+    assert_eq!(panel.entries().len(), 1);
+    assert_eq!(panel.entries()[0].generation, non_zero(1)?);
+    assert_eq!(panel.unrecoverable(), 1, "损坏代只报告不列出");
+    let corrupted = non_zero(2)?;
+    assert!(
+        panel
+            .entries()
+            .iter()
+            .all(|entry| entry.generation != corrupted),
+        "不得列出损坏代"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn recovery_panel_restore_reads_latest_complete_generation() -> Result<(), Box<dyn Error>> {
+    let fixture = RecoveryFixture::new("aline-panel-restore")?;
+    let document = fixture.lineage()?;
+    let first = fixture.publish(document, "one\n", Vec::new())?;
+    let second = fixture.publish(document, "two\n", Vec::new())?;
+    assert!(second > first);
+    let scan = ok(fixture.store.scan())?;
+    let mut panel = RecoveryPanelState::default();
+    assert!(panel.install_scan(1, &scan));
+    assert_eq!(panel.entries().len(), 1);
+    assert_eq!(panel.entries()[0].generation, second);
+
+    let job = match panel.request(
+        RecoveryPanelAction::Restore { document },
+        &fixture.store,
+        None,
+    ) {
+        RecoveryPanelStep::Read(job) => job,
+        _ => return Err("恢复请求应生成读取任务".into()),
+    };
+    assert_eq!(job.document(), document);
+    let stale = RecoveryRestoreCompletion {
+        document,
+        operation: job.operation().wrapping_add(1),
+        result: Ok(synthetic_restored("stale", 1, RecoveredPath::Unlinked)?),
+    };
+    assert!(matches!(
+        panel.restore_finished(stale),
+        RecoveryPanelStep::Ignore
+    ));
+    assert!(panel.is_busy(), "迟到完成不得清除在途状态");
+
+    let completion = job.run();
+    let restored = match panel.restore_finished(completion) {
+        RecoveryPanelStep::Recovered(restored) => restored,
+        _ => return Err("恢复完成应返回已恢复文档".into()),
+    };
+    assert_eq!(restored.recovered.source, "two\n");
+    assert_eq!(
+        panel.entries()[0].status,
+        RecoveryPanelEntryStatus::Restored
+    );
+    assert_eq!(panel.feedback_key(), Some("document.recovery_restored"));
+    assert!(!panel.is_busy());
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn recovery_panel_restore_failure_keeps_record_and_reports() -> Result<(), Box<dyn Error>> {
+    let fixture = RecoveryFixture::new("aline-panel-restore-fail")?;
+    let document = fixture.lineage()?;
+    let locator = "aline-temp:0000000000000005/0000000000000001.png".to_owned();
+    publish_record(
+        &fixture.store,
+        document,
+        "with-image\n",
+        vec![RecoveryResourceInput {
+            reference: locator,
+            bytes: b"img".to_vec(),
+        }],
+    )?;
+    let scan = ok(fixture.store.scan())?;
+    let mut panel = RecoveryPanelState::default();
+    assert!(panel.install_scan(1, &scan));
+    let job = match panel.request(
+        RecoveryPanelAction::Restore { document },
+        &fixture.store,
+        None,
+    ) {
+        RecoveryPanelStep::Read(job) => job,
+        _ => return Err("恢复请求应生成读取任务".into()),
+    };
+    let completion = job.run();
+    assert!(matches!(
+        completion.result,
+        Err(RecoveryRestoreError::Resources(
+            ResourceError::UnsupportedPlatform
+        ))
+    ));
+    assert!(matches!(
+        panel.restore_finished(completion),
+        RecoveryPanelStep::Ignore
+    ));
+    assert_eq!(panel.entries().len(), 1);
+    assert_eq!(
+        panel.entries()[0].status,
+        RecoveryPanelEntryStatus::Available
+    );
+    assert_eq!(
+        panel.feedback_key(),
+        Some("document.recovery_restore_failed")
+    );
+    assert!(!panel.is_busy());
+    let scan = ok(fixture.store.scan())?;
+    assert_eq!(
+        scan.recoverable_lineages()
+            .iter()
+            .filter(|lineage| lineage.document == document)
+            .count(),
+        1,
+        "失败必须保留记录"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn recovery_panel_discard_requires_confirmation() -> Result<(), Box<dyn Error>> {
+    let fixture = RecoveryFixture::new("aline-panel-discard-confirm")?;
+    let document = fixture.lineage()?;
+    fixture.publish(document, "keep\n", Vec::new())?;
+    let scan = ok(fixture.store.scan())?;
+    let mut panel = RecoveryPanelState::default();
+    assert!(panel.install_scan(1, &scan));
+
+    assert!(matches!(
+        panel.request(
+            RecoveryPanelAction::RequestDiscard { document },
+            &fixture.store,
+            None,
+        ),
+        RecoveryPanelStep::Ignore
+    ));
+    assert_eq!(panel.confirming(), Some(document));
+    assert_eq!(panel.entries().len(), 1);
+    assert_eq!(ok(fixture.store.scan())?, scan, "确认前存储不得变化");
+
+    assert!(matches!(
+        panel.request(RecoveryPanelAction::CancelDiscard, &fixture.store, None),
+        RecoveryPanelStep::Ignore
+    ));
+    assert!(panel.confirming().is_none());
+    assert_eq!(panel.entries().len(), 1);
+    assert_eq!(ok(fixture.store.scan())?, scan);
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn recovery_panel_discard_success_hides_after_store_retirement() -> Result<(), Box<dyn Error>> {
+    let fixture = RecoveryFixture::new("aline-panel-discard-ok")?;
+    let first = fixture.lineage()?;
+    fixture.publish(first, "first\n", Vec::new())?;
+    let scan = ok(fixture.store.scan())?;
+    let mut panel = RecoveryPanelState::default();
+    assert!(panel.install_scan(1, &scan));
+
+    assert!(matches!(
+        panel.request(
+            RecoveryPanelAction::RequestDiscard { document: first },
+            &fixture.store,
+            None,
+        ),
+        RecoveryPanelStep::Ignore
+    ));
+    let job = match panel.request(RecoveryPanelAction::ConfirmDiscard, &fixture.store, None) {
+        RecoveryPanelStep::Discard(job) => job,
+        _ => return Err("确认后应生成丢弃任务".into()),
+    };
+    let completion = job.run();
+    panel.discard_finished(completion);
+    assert!(panel.entries().is_empty());
+    assert!(panel.feedback_key().is_none());
+    let scan = ok(fixture.store.scan())?;
+    assert!(
+        scan.recoverable_lineages()
+            .iter()
+            .all(|lineage| lineage.document != first),
+        "退役后扫描不得再列出该谱系"
+    );
+
+    // `AlreadyRetired` 同样是成功退役；合成完成项验证该分支也移除条目。
+    let second = fixture.lineage()?;
+    fixture.publish(second, "second\n", Vec::new())?;
+    let scan = ok(fixture.store.scan())?;
+    assert!(panel.install_scan(2, &scan));
+    assert!(matches!(
+        panel.request(
+            RecoveryPanelAction::RequestDiscard { document: second },
+            &fixture.store,
+            None,
+        ),
+        RecoveryPanelStep::Ignore
+    ));
+    let job = match panel.request(RecoveryPanelAction::ConfirmDiscard, &fixture.store, None) {
+        RecoveryPanelStep::Discard(job) => job,
+        _ => return Err("确认后应生成丢弃任务".into()),
+    };
+    let completion = RecoveryDiscardCompletion {
+        document: second,
+        operation: job.operation(),
+        result: Ok(RetireOutcome::AlreadyRetired { through: 0 }),
+    };
+    panel.discard_finished(completion);
+    assert!(panel.entries().is_empty());
+    assert!(panel.feedback_key().is_none());
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn recovery_panel_discard_failure_keeps_record_and_reports() -> Result<(), Box<dyn Error>> {
+    let fixture = RecoveryFixture::new("aline-panel-discard-fail")?;
+    let document = fixture.lineage()?;
+    fixture.publish(document, "keep\n", Vec::new())?;
+    let scan = ok(fixture.store.scan())?;
+    let mut panel = RecoveryPanelState::default();
+    assert!(panel.install_scan(1, &scan));
+
+    assert!(matches!(
+        panel.request(
+            RecoveryPanelAction::RequestDiscard { document },
+            &fixture.store,
+            None,
+        ),
+        RecoveryPanelStep::Ignore
+    ));
+    let job = match panel.request(RecoveryPanelAction::ConfirmDiscard, &fixture.store, None) {
+        RecoveryPanelStep::Discard(job) => job,
+        _ => return Err("确认后应生成丢弃任务".into()),
+    };
+    let lock = ok(fixture.store.hold_owner_lock_for_test(document))?;
+    let completion = job.run();
+    drop(lock);
+    assert!(completion.result.is_err(), "锁占用应使丢弃失败");
+    panel.discard_finished(completion);
+    assert_eq!(panel.entries().len(), 1, "失败必须保留条目");
+    assert_eq!(
+        panel.feedback_key(),
+        Some("document.recovery_discard_failed")
+    );
+    assert!(!panel.is_busy());
+    let active = fixture
+        .path()
+        .join("recovery/v1/active")
+        .join(document.directory_name());
+    assert!(active.is_dir(), "失败不得删除谱系目录");
+    assert_eq!(
+        ok(fixture.store.scan())?
+            .recoverable_lineages()
+            .iter()
+            .filter(|lineage| lineage.document == document)
+            .count(),
+        1
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn recovery_panel_discard_is_per_document_without_bulk_entry() -> Result<(), Box<dyn Error>> {
+    let fixture = RecoveryFixture::new("aline-panel-per-document")?;
+    let first = fixture.lineage()?;
+    let second = fixture.lineage()?;
+    fixture.publish(first, "first\n", Vec::new())?;
+    fixture.publish(second, "second\n", Vec::new())?;
+    let scan = ok(fixture.store.scan())?;
+    let mut panel = RecoveryPanelState::default();
+    assert!(panel.install_scan(1, &scan));
+    assert_eq!(panel.entries().len(), 2);
+
+    // 穷举面板动作：每个变体至多携带一个文档，不存在批量入口。
+    let actions = [
+        RecoveryPanelAction::Restore { document: first },
+        RecoveryPanelAction::Restore { document: second },
+        RecoveryPanelAction::RequestDiscard { document: first },
+        RecoveryPanelAction::RequestDiscard { document: second },
+        RecoveryPanelAction::ConfirmDiscard,
+        RecoveryPanelAction::CancelDiscard,
+    ];
+    for action in actions {
+        match action {
+            RecoveryPanelAction::Restore { document }
+            | RecoveryPanelAction::RequestDiscard { document } => {
+                assert!(document == first || document == second);
+            }
+            RecoveryPanelAction::ConfirmDiscard | RecoveryPanelAction::CancelDiscard => {}
+        }
+    }
+
+    assert!(matches!(
+        panel.request(
+            RecoveryPanelAction::RequestDiscard { document: first },
+            &fixture.store,
+            None,
+        ),
+        RecoveryPanelStep::Ignore
+    ));
+    let job = match panel.request(RecoveryPanelAction::ConfirmDiscard, &fixture.store, None) {
+        RecoveryPanelStep::Discard(job) => job,
+        _ => return Err("确认后应生成丢弃任务".into()),
+    };
+    panel.discard_finished(job.run());
+    assert_eq!(panel.entries().len(), 1);
+    assert_eq!(panel.entries()[0].document, second);
+    let scan = ok(fixture.store.scan())?;
+    assert!(
+        scan.recoverable_lineages()
+            .iter()
+            .all(|lineage| lineage.document != first)
+    );
+    assert!(
+        scan.recoverable_lineages()
+            .iter()
+            .any(|lineage| lineage.document == second)
+    );
+
+    // 另一条必须重新确认，不会沿用上一条的确认态。
+    assert!(matches!(
+        panel.request(
+            RecoveryPanelAction::RequestDiscard { document: second },
+            &fixture.store,
+            None,
+        ),
+        RecoveryPanelStep::Ignore
+    ));
+    assert_eq!(panel.confirming(), Some(second));
+    assert_eq!(panel.entries().len(), 1);
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn recovery_panel_marks_restored_record_for_later_discard() -> Result<(), Box<dyn Error>> {
+    let fixture = RecoveryFixture::new("aline-panel-restored")?;
+    let document = fixture.lineage()?;
+    fixture.publish(document, "restored\n", Vec::new())?;
+    let scan = ok(fixture.store.scan())?;
+    let mut panel = RecoveryPanelState::default();
+    assert!(panel.install_scan(1, &scan));
+    let job = match panel.request(
+        RecoveryPanelAction::Restore { document },
+        &fixture.store,
+        None,
+    ) {
+        RecoveryPanelStep::Read(job) => job,
+        _ => return Err("恢复请求应生成读取任务".into()),
+    };
+    assert!(matches!(
+        panel.restore_finished(job.run()),
+        RecoveryPanelStep::Recovered(_)
+    ));
+    panel.mark_restored(document);
+    assert_eq!(
+        panel.entries()[0].status,
+        RecoveryPanelEntryStatus::Restored
+    );
+    assert!(
+        !super::recovery_panel::recovery_panel_visible(true, panel.is_visible()),
+        "文档打开期间面板隐藏"
+    );
+    assert!(
+        super::recovery_panel::recovery_panel_visible(false, panel.is_visible()),
+        "文档关闭后恢复面板可见"
+    );
+
+    assert!(matches!(
+        panel.request(
+            RecoveryPanelAction::Restore { document },
+            &fixture.store,
+            None,
+        ),
+        RecoveryPanelStep::Ignore
+    ));
+    assert!(matches!(
+        panel.request(
+            RecoveryPanelAction::RequestDiscard { document },
+            &fixture.store,
+            None,
+        ),
+        RecoveryPanelStep::Ignore
+    ));
+    assert_eq!(panel.confirming(), Some(document), "已恢复条目只允许丢弃");
     Ok(())
 }

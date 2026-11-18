@@ -11,6 +11,7 @@ mod control;
 mod coordinator;
 mod record;
 mod resource;
+mod restore;
 mod root;
 mod scan;
 mod schedule;
@@ -28,6 +29,10 @@ pub(crate) use resource::{
     RecoveryConfig, RecoveryConfigError, RecoveryResourceError, RecoveryResourceSource,
     UnavailableResources,
 };
+pub(crate) use restore::{
+    RecoveryDiscardCompletion, RecoveryDiscardJob, RecoveryRestoreCompletion, RecoveryRestoreError,
+    RecoveryRestoreJob, RestoredRecovery,
+};
 pub(crate) use schedule::{RecoveryAction, RecoveryScheduler};
 
 pub(crate) use control::{ControlError, NextId, Reservation};
@@ -35,7 +40,7 @@ pub(crate) use record::{
     MAX_GENERATION_RESOURCE_BYTES, MAX_REFERENCE_BYTES, MAX_RESOURCE_BYTES, MAX_RESOURCE_COUNT,
     RecordDefect, RecordError,
 };
-pub(crate) use root::{RecoveryRoot, RootError};
+pub(crate) use root::{RECOVERY_DIR, RecoveryRoot, RootError, create_default_root};
 pub(crate) use scan::{
     RecoveryGenerationScan, RecoveryGenerationStatus, RecoveryLineageDisposition,
     RecoveryLineageScan, RecoveryScan, RecoveryScanDefect,

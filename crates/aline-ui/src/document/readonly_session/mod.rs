@@ -44,11 +44,13 @@ use super::{
 };
 mod autosave;
 mod read;
+mod recovered;
 mod refresh;
 mod timing;
 pub(crate) use autosave::AutosaveAction;
 use autosave::AutosaveScheduler;
 pub use read::{ReadonlyFileAccess, ReadonlyFileInput};
+use recovered::RecoveredOrigin;
 pub use refresh::{ParseRefreshCompletion, ParseRefreshDisposition, ParseRefreshJob};
 pub(crate) use timing::{StageTimer, StageTiming};
 
@@ -288,6 +290,12 @@ pub struct ReadonlyDocument {
     /// 打开时注入的解析预算；引用重写重新解析时复用。
     #[cfg_attr(not(test), allow(dead_code))]
     parse_budget: ParseBudget,
+    /// 恢复专用来源；普通打开为 None。
+    recovered_origin: Option<RecoveredOrigin>,
+    /// 恢复文档在首次关联成功前不挂接的恢复配置。
+    deferred_recovery: Option<RecoveryConfig>,
+    /// 首次关联成功后由宿主消费一次的恢复布防标志。
+    recovery_pending_arm: bool,
 }
 impl ReadonlyDocument {
     /// 返回用户选择的文件路径，供标题等显式 UI 使用。
@@ -887,16 +895,6 @@ impl ReadonlyDocument {
             })
     }
 
-    /// 取走文档关闭后的资源清理任务；先捕获恢复上下文再退役恢复谱系。
-    pub(crate) fn retire_for_close(
-        &mut self,
-    ) -> (Option<RecoveryCloseJob>, Option<ResourceCleanupJob>) {
-        let recovery_context = self.recovery_cleanup_context();
-        let cleanup = self.retire_resources(recovery_context);
-        let recovery = self.take_recovery_close();
-        (recovery, cleanup)
-    }
-
     /// 捕获清理任务所需的恢复引用上下文；不移动资源目录，供替换在
     /// `prepare` 成功后再退役旧文档资源。
     pub(crate) fn recovery_cleanup_context(&self) -> Option<(RecoveryStore, RecoveryDocumentId)> {
@@ -986,6 +984,7 @@ impl ReadonlyDocument {
                 self.reload_mark = None;
                 self.association = None;
                 self.pending_migration = None;
+                self.attach_deferred_recovery();
             } else if self.association.is_some() {
                 match &settlement.outcome {
                     WriteOutcome::PublishedTargetUnverified(_)
@@ -1001,6 +1000,7 @@ impl ReadonlyDocument {
                         self.reload_mark = None;
                         self.association = None;
                         self.pending_migration = None;
+                        self.attach_deferred_recovery();
                     }
                     WriteOutcome::NotPublished(_) => {
                         // 写入失败/冲突：保留已完成的迁移映射供同一目标重试。
@@ -1011,6 +1011,30 @@ impl ReadonlyDocument {
             }
         }
         Ok(settlement)
+    }
+
+    /// 首次关联写盘成功后才授予恢复挂接；普通保存不重置既有恢复会话。
+    fn attach_deferred_recovery(&mut self) {
+        if self.recovery.is_some() {
+            return;
+        }
+        let Some(config) = self.deferred_recovery.take() else {
+            return;
+        };
+        self.recovery = Some(RecoverySession::new(config));
+        self.recovery_pending_arm = true;
+    }
+
+    /// 取走首次关联成功的一次性布防标志；宿主只在为 true 时布防恢复计时。
+    pub(crate) fn take_recovery_pending_arm(&mut self) -> bool {
+        let pending = self.recovery_pending_arm;
+        self.recovery_pending_arm = false;
+        pending
+    }
+
+    /// 关联等待/复制/写盘或待重试迁移是否活动。
+    pub(crate) fn association_active(&self) -> bool {
+        self.association.is_some() || self.pending_migration.is_some()
     }
 
     /// 请求一次外改检查；只读/无目标 → NoTarget，组合 → Deferred，在途/不确定按类别拒绝。
@@ -2105,26 +2129,27 @@ impl ReadonlySession {
                 {
                     return Ok((OpenDisposition::RejectedUnresolvedDocument, None));
                 }
-                // 替换前先取消旧文档在途恢复并退役谱系；清理所需的恢复引用上下文
-                // 必须在退役前捕获，但资源目录要等新文档准备成功后才移动。
-                let mut recovery_context = None;
-                if let Some(old) = self.document.as_mut() {
-                    recovery_context = old.recovery_cleanup_context();
-                    if let Some(job) = old.take_recovery_close() {
-                        self.retired_recoveries.push(job);
-                    }
-                }
+                // 替换前先捕获旧文档的恢复引用上下文；取消与退役必须等新文档
+                // 准备成功后再执行，否则 prepare 失败会误伤仍在使用的旧会话。
+                let recovery_context = self
+                    .document
+                    .as_ref()
+                    .and_then(ReadonlyDocument::recovery_cleanup_context);
                 if let Some(config) = self.recovery.clone() {
                     document.attach_recovery(config);
                 }
                 document.apply_resource_config(self.image_settings.clone(), self.temp_root.clone());
                 let prepared = prepare(&mut document)?;
-                // 只有新文档准备成功才退役旧文档资源；`prepare` 失败时旧文档仍是当前
-                // 文档，必须继续持有目录与条目，否则后台清理会删掉其仍在引用的临时图片。
-                if let Some(old) = self.document.as_mut()
-                    && let Some(job) = old.retire_resources(recovery_context)
-                {
-                    self.retired_cleanups.push(job);
+                // 只有新文档准备成功才取消旧恢复并退役旧文档资源；`prepare` 失败时旧文档
+                // 仍是当前文档，必须继续持有目录、条目与恢复会话。
+                if let Some(old) = self.document.as_mut() {
+                    old.cancel_autosave();
+                    if let Some(job) = old.take_recovery_close() {
+                        self.retired_recoveries.push(job);
+                    }
+                    if let Some(job) = old.retire_resources(recovery_context) {
+                        self.retired_cleanups.push(job);
+                    }
                 }
                 self.document = Some(document);
                 Ok((OpenDisposition::Applied, Some(prepared)))
@@ -2144,15 +2169,18 @@ impl ReadonlySession {
             if document.close_status() != CloseStatus::Ready {
                 return Err(CloseDisposition::Refused);
             }
-            let value = before_close(document);
-            // 关闭获准后先取消在途恢复/资源并在后台退役，再释放文档。
-            let (recovery, cleanup) = document.retire_for_close();
-            if let Some(job) = recovery {
+            // 释放准备（W4-53）：先取消计时与关联、捕获恢复上下文并退役谱系、
+            // 构造资源清理任务，最后才让证据回调看到已收口的文档。
+            document.cancel_autosave();
+            document.cancel_association();
+            let recovery_context = document.recovery_cleanup_context();
+            if let Some(job) = document.take_recovery_close() {
                 self.retired_recoveries.push(job);
             }
-            if let Some(job) = cleanup {
+            if let Some(job) = document.retire_resources(recovery_context) {
                 self.retired_cleanups.push(job);
             }
+            let value = before_close(document);
             Some(value)
         } else {
             None

@@ -253,6 +253,12 @@ fn map_fs_io(error: FsError) -> RootError {
 pub(crate) struct RecoveryDocumentId(NonZeroU64);
 
 impl RecoveryDocumentId {
+    /// 仅供 crate 内测试构造稳定身份；生产身份只能由存储分配。
+    #[cfg(test)]
+    pub(crate) const fn from_raw_for_test(value: NonZeroU64) -> Self {
+        Self(value)
+    }
+
     pub(crate) const fn get(self) -> NonZeroU64 {
         self.0
     }

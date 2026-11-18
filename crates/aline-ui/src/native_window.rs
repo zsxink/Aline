@@ -14,6 +14,8 @@ mod readonly_evidence;
 mod readonly_hit;
 mod readonly_layout;
 mod readonly_reader;
+mod recovery_panel;
+mod recovery_runtime;
 mod recovery_slot;
 mod shell;
 mod tokens;
@@ -29,9 +31,13 @@ use readonly_content::{NavigationIntent, navigation_intent};
 use readonly_hit::{HitError, HitTarget, PreparedLayout};
 use readonly_layout::LayoutError;
 use readonly_reader::{ContentCopy, ReaderSurface, SourceNavigationTarget};
+use recovery_panel::{
+    RecoveryPanelAction, RecoveryPanelEntryStatus, RecoveryPanelState, RecoveryPanelStep,
+};
+use recovery_runtime::{RecoveryRuntime, production_recovery};
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Instant;
@@ -47,12 +53,15 @@ use gpui::{
 };
 
 use crate::document::{
-    AutosaveAction, DocumentStatistics, ExternalApplyResult, ExternalCheckCommand,
-    ExternalCheckCompletion, ExternalCheckIntent, ExternalCheckJob, ExternalCheckRejection,
-    ExternalConflictView, ExternalDiskState, PreparedRecovery, RecoveryAction, RecoveryCloseJob,
-    RecoveryConfig, RecoveryConfigError, RecoveryPrepareJob, RecoveryPublishJob,
-    RecoverySettlement, RecoveryStart, SaveCommand, SaveJob, SaveRejection, SaveResult, StageTimer,
-    StageTiming, WriteCompletion,
+    AssociationCommand, AssociationOutcome, AssociationStep, AutosaveAction, DocumentStatistics,
+    ExternalApplyResult, ExternalCheckCommand, ExternalCheckCompletion, ExternalCheckIntent,
+    ExternalCheckJob, ExternalCheckRejection, ExternalConflictView, ExternalDiskState,
+    PreparedRecovery, RecoveryAction, RecoveryCloseJob, RecoveryConfig, RecoveryConfigError,
+    RecoveryDocumentId, RecoveryPrepareJob, RecoveryPublishJob, RecoveryRestoreCompletion,
+    RecoveryRestoreJob, RecoveryScan, RecoverySettlement, RecoveryStart, RecoveryStore,
+    ResourceCleanupJob, ResourceMigrationJob, RestoredRecovery, SaveCommand, SaveJob,
+    SaveRejection, SaveResult, SaveTargetCommand, StageTimer, StageTiming, TempRoot,
+    WriteCompletion, WriteKind,
 };
 use crate::fonts::{FontEnvironment, FontStatus};
 use crate::{
@@ -147,6 +156,13 @@ pub(super) struct NativeOpenCoordinator {
     feedback: Option<&'static str>,
     return_focus: bool,
     closed: bool,
+    /// 启动恢复面板的纯状态；渲染与任务派生由窗口负责。
+    panel: RecoveryPanelState,
+    /// 生产恢复存储与临时根；仅在配置成功时存在。
+    recovery_store: Option<RecoveryStore>,
+    recovery_temp_root: Option<TempRoot>,
+    /// 启动扫描代次；0 表示尚未开始，保证每窗口只扫描一次。
+    startup_scan_generation: u64,
 }
 
 /// 外改检查结算后窗口应执行的副作用；反馈键已选定。
@@ -167,6 +183,17 @@ pub(super) struct SaveSettlement {
     pub(super) automatic: bool,
 }
 
+/// 保存入口派生给窗口的下一步；目标对话框与迁移任务都由窗口装配。
+#[allow(clippy::large_enum_variant)]
+pub(super) enum SaveIntent {
+    /// 后台执行一次写盘。
+    Save(SaveJob),
+    /// 后台执行一次图片迁移，完成后交回协调器复验。
+    Migrate(ResourceMigrationJob),
+    /// 打开系统保存位置选择器。
+    ChooseTarget(WriteKind),
+}
+
 /// 冲突面板展示数据：状态、保存基线、当前编辑、磁盘文本（不可读时为 None）。
 type ConflictPanelData = (ExternalDiskState, Arc<str>, Arc<str>, Option<Arc<str>>);
 
@@ -184,11 +211,20 @@ impl NativeOpenCoordinator {
             feedback: None,
             return_focus: false,
             closed: false,
+            panel: RecoveryPanelState::default(),
+            recovery_store: None,
+            recovery_temp_root: None,
+            startup_scan_generation: 0,
         }
     }
 
     pub(super) fn session(&self) -> &ReadonlySession {
         &self.session
+    }
+
+    /// 仅供窗口层在原子采纳路径上执行恢复文档构造与准备。
+    pub(super) fn session_mut(&mut self) -> &mut ReadonlySession {
+        &mut self.session
     }
 
     pub(super) fn feedback_key(&self) -> Option<&'static str> {
@@ -253,13 +289,34 @@ impl NativeOpenCoordinator {
         }
     }
 
-    /// 取消组合期保存等待；返回是否确实取消了等待。反馈已设置。
+    /// 取消保存等待或首次关联复制；返回是否确实取消了。反馈已设置。
     pub(super) fn cancel_save_wait(&mut self) -> bool {
+        if matches!(self.save_host, SaveHost::Running { .. }) {
+            // 迁移/关联写盘复用 `Running` 表达忙态；只有关联活动时可取消，
+            // 普通保存仍在后台执行，取消菜单不得声称已取消。
+            let Some(document) = self.session.document_mut() else {
+                return false;
+            };
+            if !document.association_active() {
+                return false;
+            }
+            document.cancel_association();
+            self.save_host = SaveHost::Idle;
+            self.feedback = Some("document.save_cancelled");
+            return true;
+        }
         let SaveHost::Waiting(handle) = self.save_host else {
             return false;
         };
         // 无论文档结算结果如何都回到 Idle：句柄已不可复用，避免宿主死锁。
         self.save_host = SaveHost::Idle;
+        if let Some(document) = self.session.document_mut()
+            && document.association_wait_matches(handle)
+        {
+            document.cancel_association();
+            self.feedback = Some("document.save_cancelled");
+            return true;
+        }
         let result = match self.session.document_mut() {
             Some(document) => document.cancel_save_wait(handle),
             None => Err(SaveRejection::NoTarget),
@@ -285,9 +342,53 @@ impl NativeOpenCoordinator {
         outcome: PublicationOutcome,
         now_millis: u64,
     ) -> Option<SaveJob> {
+        match self.finish_save_wait_intent(outcome, now_millis) {
+            Some(SaveIntent::Save(job)) => Some(job),
+            Some(SaveIntent::Migrate(_)) | Some(SaveIntent::ChooseTarget(_)) | None => None,
+        }
+    }
+
+    /// 平台自然结束后按意图返回；关联等待可转入迁移任务。
+    pub(super) fn finish_save_wait_intent(
+        &mut self,
+        outcome: PublicationOutcome,
+        now_millis: u64,
+    ) -> Option<SaveIntent> {
         let SaveHost::Waiting(handle) = self.save_host else {
             return None;
         };
+        let association = match self.session.document_mut() {
+            Some(document) if document.association_wait_matches(handle) => {
+                Some(document.finish_association_wait(handle, outcome, now_millis))
+            }
+            Some(_) => None,
+            None => {
+                self.save_host = SaveHost::Idle;
+                self.feedback = Some("document.save_failed");
+                return None;
+            }
+        };
+        if let Some(command) = association {
+            return match command {
+                AssociationCommand::Run(job) => Some(SaveIntent::Migrate(job)),
+                AssociationCommand::Save(command) => self.apply_save_command(command),
+                AssociationCommand::Cancelled => {
+                    self.save_host = SaveHost::Idle;
+                    self.feedback = Some("document.save_cancelled");
+                    None
+                }
+                AssociationCommand::Wait(_) => {
+                    self.save_host = SaveHost::Idle;
+                    self.feedback = Some("document.save_failed");
+                    None
+                }
+                AssociationCommand::Rejected(rejection) => {
+                    self.save_host = SaveHost::Idle;
+                    self.feedback = Some(save_rejection_key(rejection));
+                    None
+                }
+            };
+        }
         let Some(document) = self.session.document_mut() else {
             self.save_host = SaveHost::Idle;
             self.feedback = Some("document.save_failed");
@@ -297,7 +398,7 @@ impl NativeOpenCoordinator {
             SaveCommand::Run(job) => {
                 self.save_host = SaveHost::Running { automatic: false };
                 self.feedback = None;
-                Some(job)
+                Some(SaveIntent::Save(job))
             }
             // 自然结束后不可能再次进入等待；按内部失败落回空闲。
             SaveCommand::Wait(_) => {
@@ -347,6 +448,282 @@ impl NativeOpenCoordinator {
     /// 是否存在组合期保存等待（菜单取消项可用性）。
     pub(super) fn save_waiting(&self) -> bool {
         matches!(self.save_host, SaveHost::Waiting(_))
+    }
+
+    /// 取消菜单是否可用：组合期等待或首次保存/另存为关联（复制/写盘）活动。
+    pub(super) fn save_cancel_enabled(&self) -> bool {
+        self.save_waiting()
+            || self
+                .session
+                .document()
+                .is_some_and(ReadonlyDocument::association_active)
+    }
+
+    /// 保存类入口（含另存为）是否应被禁用；关联态同样视为忙碌。
+    pub(super) fn save_busy(&self) -> bool {
+        !matches!(self.save_host, SaveHost::Idle)
+            || self
+                .session
+                .document()
+                .is_some_and(ReadonlyDocument::association_active)
+    }
+
+    /// 另存为菜单项可用性：仅可编辑且空闲文档可另存为。
+    pub(super) fn save_as_enabled(&self) -> bool {
+        self.session
+            .document()
+            .is_some_and(ReadonlyDocument::is_editable)
+            && !self.save_busy()
+    }
+
+    /// 计算保存位置选择器参数；无可用初始目录时失败并反馈。
+    /// 恢复文档优先用展示原路径的父目录，未命名记录才回退 HOME。
+    pub(super) fn save_target_plan(&mut self, home: Option<&Path>) -> Option<(PathBuf, String)> {
+        let current = self.session.document().map(|document| {
+            document
+                .recovered_original_path()
+                .cloned()
+                .unwrap_or_else(|| document.path().to_path_buf())
+        });
+        let plan = target_dialog_plan(current.as_deref(), home);
+        if plan.is_none() {
+            self.feedback = Some("document.save_target_failed");
+        }
+        plan
+    }
+
+    /// 取走关闭/替换后待执行的两类任务：恢复退役在前，资源清理在后。
+    pub(super) fn take_retired(&mut self) -> (Vec<RecoveryCloseJob>, Vec<ResourceCleanupJob>) {
+        (
+            self.take_retired_recoveries(),
+            self.session.take_retired_cleanups(),
+        )
+    }
+
+    /// 装配生产恢复运行时；失败返回 None 并保留反馈键。
+    /// 存储句柄同时留在协调器内，供扫描、恢复与丢弃任务克隆使用。
+    pub(super) fn install_recovery_runtime(
+        &mut self,
+        runtime: RecoveryRuntime,
+    ) -> Option<RecoveryStore> {
+        let RecoveryRuntime {
+            config,
+            temp_root,
+            feedback,
+        } = runtime;
+        if let Some(key) = feedback {
+            self.feedback = Some(key);
+        }
+        let config = config?;
+        let store = config.store.clone();
+        if self.session.configure_recovery(Some(config)).is_err() {
+            self.feedback = Some("document.recovery_disabled");
+            return None;
+        }
+        self.session.configure_temp_root(temp_root.clone());
+        self.recovery_temp_root = temp_root;
+        self.recovery_store = Some(store.clone());
+        Some(store)
+    }
+
+    /// 启动扫描只允许开始一次；返回本次扫描代次。
+    pub(super) fn begin_startup_scan(&mut self) -> Option<u64> {
+        if self.startup_scan_generation != 0 || self.recovery_store.is_none() {
+            return None;
+        }
+        self.startup_scan_generation = 1;
+        Some(1)
+    }
+
+    /// 采纳启动扫描；代次不符或存储失败都不改动现有面板条目。
+    pub(super) fn startup_scan_finished(
+        &mut self,
+        generation: u64,
+        result: Result<RecoveryScan, crate::document::RecoveryStoreError>,
+    ) -> bool {
+        if self.startup_scan_generation != generation {
+            return false;
+        }
+        match result {
+            Ok(scan) => {
+                let installed = self.panel.install_scan(generation, &scan);
+                if installed {
+                    self.feedback = self.panel.feedback_key();
+                }
+                installed
+            }
+            Err(_) => {
+                self.feedback = Some("document.recovery_scan_failed");
+                false
+            }
+        }
+    }
+
+    /// 手工保存入口：无目标时请求选择器，待重试迁移优先重试。
+    pub(super) fn request_save_intent(&mut self) -> Option<SaveIntent> {
+        if !matches!(self.save_host, SaveHost::Idle) {
+            self.feedback = Some("document.save_busy");
+            return None;
+        }
+        let Some(document) = self.session.document_mut() else {
+            self.feedback = Some("document.save_unavailable");
+            return None;
+        };
+        let command = document.request_save_or_target();
+        self.apply_save_target_command(command)
+    }
+
+    /// 另存为入口：总是先请求新目标。
+    pub(super) fn request_save_as_intent(&mut self) -> Option<SaveIntent> {
+        if !matches!(self.save_host, SaveHost::Idle) {
+            self.feedback = Some("document.save_busy");
+            return None;
+        }
+        let Some(document) = self.session.document_mut() else {
+            self.feedback = Some("document.save_unavailable");
+            return None;
+        };
+        let command = document.request_save_as_target();
+        self.apply_save_target_command(command)
+    }
+
+    fn apply_save_target_command(&mut self, command: SaveTargetCommand) -> Option<SaveIntent> {
+        match command {
+            SaveTargetCommand::Save(command) => self.apply_save_command(command),
+            SaveTargetCommand::ChooseTarget { kind } => Some(SaveIntent::ChooseTarget(kind)),
+            SaveTargetCommand::RetryAssociation => self.retry_association_intent(),
+        }
+    }
+
+    /// 保存命令到宿主意图的唯一映射；反馈在此选定。
+    fn apply_save_command(&mut self, command: SaveCommand) -> Option<SaveIntent> {
+        match command {
+            SaveCommand::Run(job) => {
+                self.save_host = SaveHost::Running { automatic: false };
+                self.feedback = None;
+                Some(SaveIntent::Save(job))
+            }
+            SaveCommand::Wait(handle) => {
+                self.save_host = SaveHost::Waiting(handle);
+                self.feedback = Some("document.save_waiting");
+                None
+            }
+            SaveCommand::Rejected(rejection) => {
+                self.feedback = Some(save_rejection_key(rejection));
+                None
+            }
+        }
+    }
+
+    /// 用保留的迁移材料重试；迁移任务、写盘与失败反馈统一在此选定。
+    fn retry_association_intent(&mut self) -> Option<SaveIntent> {
+        let Some(document) = self.session.document_mut() else {
+            self.feedback = Some("document.save_unavailable");
+            return None;
+        };
+        match document.retry_association() {
+            Ok(AssociationStep::Run(job)) => {
+                self.save_host = SaveHost::Running { automatic: false };
+                self.feedback = None;
+                Some(SaveIntent::Migrate(job))
+            }
+            Ok(AssociationStep::Write(job)) => {
+                self.save_host = SaveHost::Running { automatic: false };
+                self.feedback = None;
+                Some(SaveIntent::Save(job))
+            }
+            Ok(AssociationStep::Settled(outcome)) => {
+                self.save_host = SaveHost::Idle;
+                self.feedback = association_outcome_key(outcome);
+                None
+            }
+            Err(rejection) => {
+                self.feedback = Some(save_rejection_key(rejection));
+                None
+            }
+        }
+    }
+
+    /// 采纳系统选择器结果；取消/失败不创建关联，反馈已设置。
+    pub(super) fn accept_save_target(
+        &mut self,
+        kind: WriteKind,
+        selection: Result<Option<PathBuf>, ()>,
+        now_millis: u64,
+    ) -> Option<SaveIntent> {
+        let target = match selection {
+            Err(()) => {
+                self.feedback = Some("document.save_target_failed");
+                return None;
+            }
+            Ok(None) => {
+                self.feedback = Some("document.save_cancelled");
+                return None;
+            }
+            Ok(Some(path)) => path,
+        };
+        let Some(document) = self.session.document_mut() else {
+            self.feedback = Some("document.save_unavailable");
+            return None;
+        };
+        match document.begin_association_save(kind, target, now_millis) {
+            AssociationCommand::Run(job) => {
+                self.save_host = SaveHost::Running { automatic: false };
+                self.feedback = None;
+                Some(SaveIntent::Migrate(job))
+            }
+            AssociationCommand::Wait(handle) => {
+                self.save_host = SaveHost::Waiting(handle);
+                self.feedback = Some("document.save_waiting");
+                None
+            }
+            AssociationCommand::Save(command) => self.apply_save_command(command),
+            AssociationCommand::Cancelled => {
+                self.feedback = Some("document.save_cancelled");
+                None
+            }
+            AssociationCommand::Rejected(rejection) => {
+                self.feedback = Some(save_rejection_key(rejection));
+                None
+            }
+        }
+    }
+
+    /// 复验后台迁移结果；写盘任务交回窗口继续执行。
+    pub(super) fn association_finished(
+        &mut self,
+        completion: crate::document::MigrationCompletion,
+        now_millis: u64,
+    ) -> Option<SaveIntent> {
+        let Some(document) = self.session.document_mut() else {
+            self.save_host = SaveHost::Idle;
+            return None;
+        };
+        match document.association_prepared(completion, now_millis) {
+            AssociationStep::Run(job) => Some(SaveIntent::Migrate(job)),
+            AssociationStep::Write(job) => {
+                self.save_host = SaveHost::Running { automatic: false };
+                self.feedback = None;
+                Some(SaveIntent::Save(job))
+            }
+            AssociationStep::Settled(AssociationOutcome::Stale) => {
+                // 取消后或已被新关联取代的迟到完成：不改宿主状态、不覆盖反馈、
+                // 不改路径或文档；后续保存可继续使用当前空闲/在途状态。
+                None
+            }
+            AssociationStep::Settled(outcome) => {
+                self.save_host = SaveHost::Idle;
+                self.feedback = association_outcome_key(outcome);
+                None
+            }
+        }
+    }
+
+    /// 首次关联成功后，宿主消费一次恢复布防请求。
+    pub(super) fn take_recovery_pending_arm(&mut self) -> bool {
+        self.session
+            .document_mut()
+            .is_some_and(ReadonlyDocument::take_recovery_pending_arm)
     }
 
     /// 请求外改检查；Some(job) 时窗口后台执行。显式入口设置反馈，Focus 静默。
@@ -675,6 +1052,16 @@ fn save_rejection_key(rejection: SaveRejection) -> &'static str {
     }
 }
 
+/// 关联结算类别到窗口反馈键；成功写盘反馈由保存结算另行给出。
+fn association_outcome_key(outcome: AssociationOutcome) -> Option<&'static str> {
+    match outcome {
+        AssociationOutcome::NeedsRetry => Some("document.save_migration_retry"),
+        AssociationOutcome::Failed => Some("document.save_resources_failed"),
+        AssociationOutcome::Cancelled => Some("document.save_cancelled"),
+        AssociationOutcome::Stale => None,
+    }
+}
+
 /// 外改检查拒绝类别到窗口反馈键的映射。
 fn external_rejection_key(rejection: ExternalCheckRejection) -> &'static str {
     match rejection {
@@ -763,6 +1150,38 @@ fn layout_error_key(error: LayoutError) -> &'static str {
     }
 }
 
+/// 保存选择器完整参数：初始目录与建议名都可用时才返回。
+pub(super) fn target_dialog_plan(
+    current: Option<&Path>,
+    home: Option<&Path>,
+) -> Option<(PathBuf, String)> {
+    Some((
+        target_initial_directory(current, home)?,
+        target_suggested_name(current),
+    ))
+}
+
+/// 保存选择器初始目录：绝对路径父目录优先，其次 HOME；都不可用返回 None。
+pub(super) fn target_initial_directory(
+    current: Option<&Path>,
+    home: Option<&Path>,
+) -> Option<PathBuf> {
+    current
+        .filter(|path| path.is_absolute())
+        .and_then(Path::parent)
+        .map(Path::to_path_buf)
+        .or_else(|| home.map(Path::to_path_buf))
+}
+
+/// 保存选择器建议名：当前绝对路径文件名，否则固定 `untitled.md`。
+pub(super) fn target_suggested_name(current: Option<&Path>) -> String {
+    current
+        .filter(|path| path.is_absolute())
+        .and_then(Path::file_name)
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "untitled.md".to_owned())
+}
+
 /// 取出只读文档冻结的源码文本，作为统计的不可变输入；不含窗口或可变核心。
 fn statistics_source(document: &ReadonlyDocument) -> Option<String> {
     let snapshot = document.parsed().snapshot();
@@ -797,6 +1216,13 @@ pub(super) struct NativeWindowCopy {
     source_view: SharedString,
     cancel_navigation: SharedString,
     statistics_pending: SharedString,
+    recovery_title: SharedString,
+    recovery_restore: SharedString,
+    recovery_discard: SharedString,
+    recovery_discard_prompt: SharedString,
+    recovery_discard_confirm: SharedString,
+    recovery_discard_cancel: SharedString,
+    recovery_unnamed: SharedString,
     content: ContentCopy,
     errors: BTreeMap<&'static str, SharedString>,
 }
@@ -838,6 +1264,15 @@ impl NativeWindowCopy {
             "document.conflict_disk",
             "document.recovery_failed",
             "document.recovery_incomplete",
+            "document.save_resources_failed",
+            "document.save_migration_retry",
+            "document.save_target_failed",
+            "document.resource_insert_failed",
+            "document.recovery_disabled",
+            "document.recovery_restore_failed",
+            "document.recovery_discard_failed",
+            "document.recovery_scan_failed",
+            "document.recovery_restored",
             "find.failed",
             "find.refused",
             "open_error.selection",
@@ -888,6 +1323,13 @@ impl NativeWindowCopy {
             source_view: text("action.source_view")?,
             cancel_navigation: text("action.cancel_navigation")?,
             statistics_pending: text("status.pending")?,
+            recovery_title: text("document.recovery_panel_title")?,
+            recovery_restore: text("document.recovery_restore")?,
+            recovery_discard: text("document.recovery_discard")?,
+            recovery_discard_prompt: text("document.recovery_discard_prompt")?,
+            recovery_discard_confirm: text("document.recovery_discard_confirm")?,
+            recovery_discard_cancel: text("document.recovery_discard_cancel")?,
+            recovery_unnamed: text("document.recovery_unnamed")?,
             content: ContentCopy::new(
                 text("content.front_matter")?,
                 text("content.footnote")?,
@@ -924,11 +1366,30 @@ impl NativeWindowCopy {
         ))
     }
 
+    /// 恢复记录标题按 `{id}` 现取；缺键或占位符错误时返回 Err。
+    fn recovery_record_label(&self, id: u64) -> Result<SharedString, String> {
+        let id = id.to_string();
+        self.translator
+            .t_with("document.recovery_record", &[("id", &id)])
+            .map(SharedString::from)
+            .map_err(|error| error.to_string())
+    }
+
+    /// 不可恢复计数按 `{count}` 现取；缺键或占位符错误时返回 Err。
+    fn recovery_unrecoverable_label(&self, count: usize) -> Result<SharedString, String> {
+        let count = count.to_string();
+        self.translator
+            .t_with("document.recovery_unrecoverable", &[("count", &count)])
+            .map(SharedString::from)
+            .map_err(|error| error.to_string())
+    }
+
     fn install_menu(
         &self,
         cx: &App,
         can_close: bool,
         can_edit: bool,
+        can_save_as: bool,
         can_cancel_save: bool,
         exits: ConflictExits,
     ) {
@@ -938,7 +1399,7 @@ impl NativeWindowCopy {
             Menu::new(self.file_menu.clone()).items([
                 MenuItem::action(self.open.clone(), OpenDocument),
                 MenuItem::action(self.save.clone(), SaveDocument).disabled(!can_edit),
-                MenuItem::action(self.save_as.clone(), SaveAs).disabled(true),
+                MenuItem::action(self.save_as.clone(), SaveAs).disabled(!can_save_as),
                 MenuItem::action(self.close.clone(), CloseDocument).disabled(!can_close),
                 MenuItem::separator(),
                 MenuItem::action(self.cancel_save_wait.clone(), CancelSaveWait)
@@ -975,6 +1436,7 @@ pub(crate) fn open_initial_window(
     cx.bind_keys([
         KeyBinding::new("cmd-o", OpenDocument, Some("M1Window")),
         KeyBinding::new("cmd-s", SaveDocument, Some("M1Window")),
+        KeyBinding::new("cmd-shift-s", SaveAs, Some("M1Window")),
         KeyBinding::new("cmd-.", CancelSaveWait, Some("M1Window")),
         KeyBinding::new("cmd-w", CloseDocument, Some("M1Window")),
         KeyBinding::new("tab", FocusNext, Some("M1Window")),
@@ -1003,7 +1465,7 @@ pub(crate) fn open_initial_window(
             Some("M1Window"),
         )]);
     }
-    copy.install_menu(cx, false, false, false, ConflictExits::default());
+    copy.install_menu(cx, false, false, false, false, ConflictExits::default());
     let bounds = Bounds::centered(None, size(px(960.0), px(640.0)), cx);
     cx.open_window(
         WindowOptions {
@@ -1045,6 +1507,10 @@ struct NativeDocumentWindow {
     /// 恢复计时槽代次；与 `recovery_task` 一一对应，迟到回调不得清除新任务。
     recovery_slot: recovery_slot::RecoverySlot,
     recovery_task: Option<Task<()>>,
+    /// 启动扫描任务；每窗口只派生一次。
+    startup_scan_task: Option<Task<()>>,
+    /// 启动恢复面板的恢复/丢弃任务；面板保证同时只有一个。
+    recovery_panel_task: Option<Task<()>>,
     external_task: Option<Task<()>>,
     activation_subscription: Option<Subscription>,
     parse_task: Option<Task<()>>,
@@ -1103,6 +1569,8 @@ impl NativeDocumentWindow {
             autosave_task: None,
             recovery_slot: recovery_slot::RecoverySlot::new(),
             recovery_task: None,
+            startup_scan_task: None,
+            recovery_panel_task: None,
             external_task: None,
             activation_subscription: None,
             parse_task: None,
@@ -1156,6 +1624,23 @@ impl NativeDocumentWindow {
             }
         });
         state.activation_subscription = Some(activation);
+        // 生产恢复只接 HOME：配置失败也不影响内存文档与保存。启动只扫描一次。
+        let home = std::env::var_os("HOME").map(PathBuf::from);
+        let runtime = production_recovery(home.as_deref());
+        if let Some(store) = state.state.install_recovery_runtime(runtime)
+            && let Some(generation) = state.state.begin_startup_scan()
+        {
+            let work = cx.background_executor().spawn(async move { store.scan() });
+            state.startup_scan_task = Some(cx.spawn_in(window, async move |weak, cx| {
+                let result = work.await;
+                let _ = weak.update_in(cx, |this, _, cx| {
+                    this.startup_scan_task = None;
+                    this.state.startup_scan_finished(generation, result);
+                    this.update_menu(cx);
+                    cx.notify();
+                });
+            }));
+        }
         state
     }
 
@@ -1242,14 +1727,8 @@ impl NativeDocumentWindow {
                     // 先作废旧恢复任务槽，再为新文档布防；旧计时迟到回调随后被拒绝。
                     this.reset_recovery_tasks();
                     this.arm_recovery(window, cx);
-                    // 替换前会话已取消旧恢复；退役任务在后台执行，失败保留谱系。
-                    for job in this.state.take_retired_recoveries() {
-                        cx.background_executor()
-                            .spawn(async move {
-                                job.run();
-                            })
-                            .detach();
-                    }
+                    // 替换前会话已取消旧恢复；退役与清理任务在同一后台链执行。
+                    this.drain_retired(cx);
                 }
                 if let Some((reader, generation)) = prepared {
                     reader.schedule_height_hint(window, cx);
@@ -1302,11 +1781,70 @@ impl NativeDocumentWindow {
         cx.notify();
     }
 
-    /// 显式保存到既有目标；只写反馈与菜单，不触碰焦点。
+    /// 显式保存：已有目标直接写盘，无目标或待重试迁移走各自入口。
     fn save_document(&mut self, _: &SaveDocument, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(job) = self.state.request_save() {
-            self.start_save(job, window, cx);
+        if let Some(intent) = self.state.request_save_intent() {
+            self.run_save_intent(intent, window, cx);
         }
+        self.update_menu(cx);
+        cx.notify();
+    }
+
+    /// 另存为：总是先请求系统选择器；忙碌/只读由协调器反馈。
+    fn save_as(&mut self, _: &SaveAs, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(intent) = self.state.request_save_as_intent() {
+            self.run_save_intent(intent, window, cx);
+        }
+        self.update_menu(cx);
+        cx.notify();
+    }
+
+    /// 保存意图分派：写盘、图片迁移与目标选择器都在宿主派生。
+    fn run_save_intent(&mut self, intent: SaveIntent, window: &mut Window, cx: &mut Context<Self>) {
+        match intent {
+            SaveIntent::Save(job) => self.start_save(job, window, cx),
+            SaveIntent::Migrate(job) => self.start_association(job, window, cx),
+            SaveIntent::ChooseTarget(kind) => self.begin_target_dialog(kind, window, cx),
+        }
+    }
+
+    /// 打开保存位置选择器；初始目录与建议名在进入异步前算好。
+    fn begin_target_dialog(
+        &mut self,
+        kind: WriteKind,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.dialog_task.is_some() {
+            return;
+        }
+        let home = std::env::var_os("HOME").map(PathBuf::from);
+        let Some((directory, suggested)) = self.state.save_target_plan(home.as_deref()) else {
+            self.update_menu(cx);
+            cx.notify();
+            return;
+        };
+        let selection = cx.prompt_for_new_path(&directory, Some(&suggested));
+        let return_focus = window.focused(cx);
+        self.dialog_return_focus = return_focus.clone();
+        self.dialog_task = Some(cx.spawn_in(window, async move |weak, cx| {
+            let selection = match selection.await {
+                Ok(Ok(selection)) => Ok(selection),
+                _ => Err(()),
+            };
+            let _ = weak.update_in(cx, |this, window, cx| {
+                this.dialog_task = None;
+                let now = this.now_millis();
+                if let Some(intent) = this.state.accept_save_target(kind, selection, now) {
+                    this.run_save_intent(intent, window, cx);
+                }
+                if let Some(focus) = this.dialog_return_focus.take().or(return_focus.clone()) {
+                    focus.focus(window, cx);
+                }
+                this.update_menu(cx);
+                cx.notify();
+            });
+        }));
         self.update_menu(cx);
         cx.notify();
     }
@@ -1602,6 +2140,28 @@ impl NativeDocumentWindow {
             .detach();
     }
 
+    /// 后台执行图片迁移；完成后复验引用再决定写盘或反馈。
+    fn start_association(
+        &mut self,
+        job: ResourceMigrationJob,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) {
+        let work = cx.background_executor().spawn(async move { job.run() });
+        self.save_task = Some(cx.spawn_in(window, async move |weak, cx| {
+            let completion = work.await;
+            let _ = weak.update_in(cx, |this, window, cx| {
+                this.save_task = None;
+                let now = this.now_millis();
+                if let Some(intent) = this.state.association_finished(completion, now) {
+                    this.run_save_intent(intent, window, cx);
+                }
+                this.update_menu(cx);
+                cx.notify();
+            });
+        }));
+    }
+
     /// 后台执行真实写盘；完成后回到窗口结算并显示本地化反馈。
     fn start_save(&mut self, job: SaveJob, window: &Window, cx: &mut Context<Self>) {
         let work = cx.background_executor().spawn(async move { job.run() });
@@ -1612,6 +2172,11 @@ impl NativeDocumentWindow {
                 let settlement = this.state.settle_save(completion);
                 if let Some(key) = settlement.feedback {
                     this.state.feedback = Some(key);
+                }
+                // 首次关联成功后才创建恢复会话：宿主在此消费一次布防。
+                if this.state.take_recovery_pending_arm() {
+                    this.reset_recovery_tasks();
+                    this.arm_recovery(window, cx);
                 }
                 if this.state.take_external_refresh() {
                     this.check_external(ExternalCheckIntent::Focus, window, cx);
@@ -1634,6 +2199,200 @@ impl NativeDocumentWindow {
         self.state.cancel_save_wait();
         self.update_menu(cx);
         cx.notify();
+    }
+
+    /// 面板“恢复”按钮：只读该代记录，成功后由窗口原子采纳内存文档。
+    fn recovery_restore(
+        &mut self,
+        document: RecoveryDocumentId,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.recovery_panel_action(RecoveryPanelAction::Restore { document }, window, cx);
+    }
+
+    /// 面板“丢弃”按钮：先进入二次确认，不直接退役。
+    fn recovery_request_discard(
+        &mut self,
+        document: RecoveryDocumentId,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.recovery_panel_action(RecoveryPanelAction::RequestDiscard { document }, window, cx);
+    }
+
+    fn recovery_cancel_discard(&mut self, window: &Window, cx: &mut Context<Self>) {
+        self.recovery_panel_action(RecoveryPanelAction::CancelDiscard, window, cx);
+    }
+
+    /// 确认丢弃：只有确认态匹配的条目才派生 `RecoveryStore::discard`。
+    fn recovery_confirm_discard(&mut self, window: &Window, cx: &mut Context<Self>) {
+        self.recovery_panel_action(RecoveryPanelAction::ConfirmDiscard, window, cx);
+    }
+
+    /// 所有面板动作的入口；同一时刻只允许一个在途操作。
+    fn recovery_panel_action(
+        &mut self,
+        action: RecoveryPanelAction,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.recovery_panel_task.is_some() {
+            return;
+        }
+        let Some(store) = self.state.recovery_store.clone() else {
+            return;
+        };
+        let temp_root = self.state.recovery_temp_root.clone();
+        match self.state.panel.request(action, &store, temp_root) {
+            RecoveryPanelStep::Read(job) => self.start_recovery_restore(job, window, cx),
+            RecoveryPanelStep::Discard(job) => self.start_recovery_discard(job, window, cx),
+            RecoveryPanelStep::Ignore | RecoveryPanelStep::Recovered(_) => {
+                self.state.feedback = self.state.panel.feedback_key();
+                self.update_menu(cx);
+                cx.notify();
+            }
+        }
+    }
+
+    /// 后台读取一代恢复记录；完成后构造内存文档或保留记录报告失败。
+    fn start_recovery_restore(
+        &mut self,
+        job: RecoveryRestoreJob,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) {
+        let work = cx.background_executor().spawn(async move { job.run() });
+        self.recovery_panel_task = Some(cx.spawn_in(window, async move |weak, cx| {
+            let completion: RecoveryRestoreCompletion = work.await;
+            let _ = weak.update_in(cx, |this, window, cx| {
+                this.recovery_panel_task = None;
+                let document = completion.document;
+                match this.state.panel.restore_finished(completion) {
+                    RecoveryPanelStep::Recovered(restored) => {
+                        this.open_recovered_document(document, restored, window, cx);
+                    }
+                    _ => {
+                        this.state.feedback = this.state.panel.feedback_key();
+                        this.update_menu(cx);
+                        cx.notify();
+                    }
+                }
+            });
+        }));
+    }
+
+    /// 后台丢弃一代恢复记录；只有退役成功才隐藏条目。
+    fn start_recovery_discard(
+        &mut self,
+        job: crate::document::RecoveryDiscardJob,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) {
+        let work = cx.background_executor().spawn(async move { job.run() });
+        self.recovery_panel_task = Some(cx.spawn_in(window, async move |weak, cx| {
+            let completion = work.await;
+            let _ = weak.update_in(cx, |this, _, cx| {
+                this.recovery_panel_task = None;
+                this.state.panel.discard_finished(completion);
+                this.state.feedback = this.state.panel.feedback_key();
+                this.update_menu(cx);
+                cx.notify();
+            });
+        }));
+    }
+
+    /// 把恢复结果构造成当前可编辑文档；不授予路径代次、不布防自动保存/恢复。
+    fn open_recovered_document(
+        &mut self,
+        document: RecoveryDocumentId,
+        restored: RestoredRecovery,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.invalidate_statistics();
+        let generation = self.next_reader_generation.checked_add(1);
+        let mut layout_timing = StageTiming::default();
+        let mut adopt_started = None;
+        let result = self
+            .state
+            .session_mut()
+            .open_recovered_with(restored, |candidate| {
+                let generation = generation.ok_or(LayoutError::GenerationExhausted)?;
+                let viewport_width = f32::from(window.viewport_size().width);
+                let metrics = content_metrics(viewport_width, viewport_width);
+                let layout_started = StageTimer::start();
+                let result = ReaderSurface::new(candidate, generation, self.evidence.clone())
+                    .and_then(|mut reader| {
+                        reader.prepare(candidate, window, metrics, &self.fonts)?;
+                        Ok((reader, generation))
+                    });
+                layout_timing = layout_started.finish();
+                adopt_started = Some(StageTimer::start());
+                result
+            });
+        let adopt_timing = adopt_started.map_or_else(StageTiming::default, StageTimer::finish);
+        match result {
+            Ok((open, Some((reader, generation)))) => {
+                // 新文档接管窗口：旧状态与在途输入全部作废；恢复/自动保存等待首次关联。
+                self.clear_input_state();
+                self.reset_recovery_tasks();
+                self.state.panel.mark_restored(document);
+                reader.schedule_height_hint(window, cx);
+                self.reader = Some(reader);
+                self.next_reader_generation = generation;
+                self.loaded_name = Some(
+                    open.original_path
+                        .as_deref()
+                        .and_then(Path::file_name)
+                        .map(|name| SharedString::from(name.to_string_lossy().into_owned()))
+                        .unwrap_or_else(|| self.copy.recovery_unnamed.clone()),
+                );
+                if let Some(name) = &self.loaded_name {
+                    window.set_window_title(name.as_ref());
+                }
+                self.refresh_find(cx);
+                self.state.feedback = Some("document.recovery_restored");
+                if let (Some(evidence), Some(adopted)) =
+                    (&self.evidence, self.state.session().document())
+                    && let Err(error) = evidence.borrow_mut().opened(adopted)
+                {
+                    eprintln!("m1-readonly-evidence recovered open failed: {error}");
+                }
+                self.probe_read_finished(
+                    crate::document::OpenTimings::default(),
+                    layout_timing,
+                    adopt_timing,
+                    true,
+                );
+                self.refresh_statistics(window, cx);
+            }
+            Ok((_, None)) => {}
+            Err(_) => {
+                self.state.panel.restore_open_failed(document);
+                self.state.feedback = Some("document.recovery_restore_failed");
+            }
+        }
+        self.update_menu(cx);
+        cx.notify();
+    }
+
+    /// 取走关闭/替换后待退役的恢复任务与资源清理任务，按序在同一后台链执行。
+    fn drain_retired(&mut self, cx: &mut App) {
+        let (recoveries, cleanups) = self.state.take_retired();
+        if recoveries.is_empty() && cleanups.is_empty() {
+            return;
+        }
+        cx.background_executor()
+            .spawn(async move {
+                for job in recoveries {
+                    job.run();
+                }
+                for job in cleanups {
+                    job.run();
+                }
+            })
+            .detach();
     }
 
     /// 关闭前捕获当前核心，关闭后在后台读磁盘并只创建证据文件。
@@ -1663,20 +2422,11 @@ impl NativeDocumentWindow {
                 .detach();
         }
         // 关闭成功：取消待办自动保存与恢复计时，丢弃正文帧与排队输入；在途结果按文档身份被拒绝。
+        // 会话已在释放前取消自动保存/关联并构造退役与清理任务。
         self.autosave_task = None;
         self.reset_recovery_tasks();
-        if let Some(document) = self.state.session.document_mut() {
-            document.cancel_autosave();
-            document.cancel_recovery();
-        }
-        // 关闭路径已取消会话；退役任务在后台执行，失败保留谱系（W4-53）。
-        for job in self.state.take_retired_recoveries() {
-            cx.background_executor()
-                .spawn(async move {
-                    job.run();
-                })
-                .detach();
-        }
+        // 退役完成后才执行资源清理；同一后台链保证顺序（W4-53）。
+        self.drain_retired(cx);
         self.clear_input_state();
         true
     }
@@ -2046,7 +2796,8 @@ impl NativeDocumentWindow {
             cx,
             self.state.session().document().is_some() || self.state.session().is_loading(),
             editable,
-            self.state.save_waiting(),
+            self.state.save_as_enabled(),
+            self.state.save_cancel_enabled(),
             exits,
         );
     }
@@ -2084,7 +2835,7 @@ impl NativeDocumentWindow {
     /// 冲突面板按钮：可用时有焦点、悬停与鼠标/键盘触发；禁用项不聚焦、不响应。
     fn conflict_button(
         &self,
-        id: &'static str,
+        id: impl Into<gpui::ElementId>,
         label: SharedString,
         enabled: bool,
         action: impl Fn(&mut Self, &mut Window, &mut Context<Self>) + Clone + 'static,
@@ -2127,6 +2878,123 @@ impl NativeDocumentWindow {
             })
             .child(label)
             .into_any_element()
+    }
+
+    /// 渲染启动恢复面板（W4-56）：逐文档恢复/丢弃，无批量入口；
+    /// 不可恢复项只报告，丢弃需二次确认。仅在无文档时显示。
+    fn render_recovery_panel(&self, cx: &mut Context<Self>) -> Option<gpui::AnyElement> {
+        if !self.state.panel.is_visible() {
+            return None;
+        }
+        let busy = self.state.panel.is_busy();
+        let mut panel = div()
+            .w_full()
+            .flex()
+            .flex_col()
+            .gap_2()
+            .px_4()
+            .py_3()
+            .border_b_1()
+            .border_color(rgb(tokens::BORDER))
+            .bg(rgb(tokens::NOTICE_SURFACE))
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(rgb(tokens::TEXT))
+                    .child(self.copy.recovery_title.clone()),
+            );
+        if let Some(message) = self
+            .state
+            .panel
+            .feedback_key()
+            .and_then(|key| self.copy.errors.get(key))
+        {
+            panel = panel.child(
+                div()
+                    .text_xs()
+                    .text_color(rgb(tokens::SECONDARY))
+                    .child(message.clone()),
+            );
+        }
+        let unrecoverable = self.state.panel.unrecoverable();
+        if unrecoverable > 0
+            && let Ok(label) = self.copy.recovery_unrecoverable_label(unrecoverable)
+        {
+            panel = panel.child(
+                div()
+                    .text_xs()
+                    .text_color(rgb(tokens::SECONDARY))
+                    .child(label),
+            );
+        }
+        let confirming = self.state.panel.confirming();
+        for entry in self.state.panel.entries() {
+            let id = entry.document.get().get();
+            let document_id = entry.document;
+            let status = entry.status;
+            let label = self
+                .copy
+                .recovery_record_label(id)
+                .unwrap_or_else(|_| self.copy.recovery_title.clone());
+            let mut row = div()
+                .flex()
+                .flex_wrap()
+                .items_center()
+                .gap_2()
+                .child(div().text_xs().text_color(rgb(tokens::TEXT)).child(label))
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(rgb(tokens::SECONDARY))
+                        .child(SharedString::from(format!("{} B", entry.payload_bytes))),
+                );
+            if confirming == Some(entry.document) {
+                row = row
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(rgb(tokens::SECONDARY))
+                            .child(self.copy.recovery_discard_prompt.clone()),
+                    )
+                    .child(self.conflict_button(
+                        SharedString::from(format!("recovery-confirm-{id}")),
+                        self.copy.recovery_discard_confirm.clone(),
+                        !busy,
+                        |this, window, cx| this.recovery_confirm_discard(window, cx),
+                        cx,
+                    ))
+                    .child(self.conflict_button(
+                        SharedString::from(format!("recovery-cancel-{id}")),
+                        self.copy.recovery_discard_cancel.clone(),
+                        !busy,
+                        |this, window, cx| this.recovery_cancel_discard(window, cx),
+                        cx,
+                    ));
+            } else {
+                if status == RecoveryPanelEntryStatus::Available {
+                    row = row.child(self.conflict_button(
+                        SharedString::from(format!("recovery-restore-{id}")),
+                        self.copy.recovery_restore.clone(),
+                        !busy,
+                        move |this, window, cx| {
+                            this.recovery_restore(document_id, window, cx);
+                        },
+                        cx,
+                    ));
+                }
+                row = row.child(self.conflict_button(
+                    SharedString::from(format!("recovery-discard-{id}")),
+                    self.copy.recovery_discard.clone(),
+                    !busy,
+                    move |this, window, cx| {
+                        this.recovery_request_discard(document_id, window, cx);
+                    },
+                    cx,
+                ));
+            }
+            panel = panel.child(row);
+        }
+        Some(panel.into_any_element())
     }
 
     /// 渲染冲突面板；无视图时不渲染。
@@ -2357,6 +3225,13 @@ impl Render for NativeDocumentWindow {
             )
         });
         let conflict_panel = self.render_conflict_panel(conflict, conflict_exits_now, cx);
+        let recovery_panel =
+            if recovery_panel::recovery_panel_visible(document_open, self.state.panel.is_visible())
+            {
+                self.render_recovery_panel(cx)
+            } else {
+                None
+            };
         let open_button = div()
             .id("open-document")
             .focusable()
@@ -2384,24 +3259,30 @@ impl Render for NativeDocumentWindow {
             .child(self.copy.open.clone());
         let content_body = match reader_element {
             Some(reader) => div().flex_1().min_h_0().w_full().child(reader),
-            None => div()
-                .flex_1()
-                .min_h_0()
-                .w_full()
-                .flex()
-                .flex_col()
-                .justify_center()
-                .items_center()
-                .gap_3()
-                .when(!document_open, |body| {
+            None => {
+                let mut body = div().flex_1().min_h_0().w_full().flex().flex_col();
+                if let Some(panel) = recovery_panel {
+                    body = body.child(panel);
+                }
+                body.when(!document_open, |body| {
                     body.child(
                         div()
-                            .text_xl()
-                            .text_color(rgb(tokens::TEXT))
-                            .child(self.copy.empty.clone()),
+                            .flex_1()
+                            .flex()
+                            .flex_col()
+                            .justify_center()
+                            .items_center()
+                            .gap_3()
+                            .child(
+                                div()
+                                    .text_xl()
+                                    .text_color(rgb(tokens::TEXT))
+                                    .child(self.copy.empty.clone()),
+                            )
+                            .child(open_button),
                     )
-                    .child(open_button)
-                }),
+                })
+            }
         };
         let toolbar = shell::toolbar_row()
             .child(shell::brand(self.brand.clone(), self.copy.title.clone()))
@@ -2482,6 +3363,7 @@ impl Render for NativeDocumentWindow {
             .on_key_down(cx.listener(Self::document_key))
             .on_action(cx.listener(Self::open_document))
             .on_action(cx.listener(Self::save_document))
+            .on_action(cx.listener(Self::save_as))
             .on_action(cx.listener(Self::load_disk))
             .on_action(cx.listener(Self::confirm_overwrite))
             .on_action(cx.listener(Self::retry_external_check))
