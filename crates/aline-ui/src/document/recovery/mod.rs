@@ -31,7 +31,10 @@ pub(crate) use resource::{
 pub(crate) use schedule::{RecoveryAction, RecoveryScheduler};
 
 pub(crate) use control::{ControlError, NextId, Reservation};
-pub(crate) use record::{RecordDefect, RecordError};
+pub(crate) use record::{
+    MAX_GENERATION_RESOURCE_BYTES, MAX_REFERENCE_BYTES, MAX_RESOURCE_BYTES, MAX_RESOURCE_COUNT,
+    RecordDefect, RecordError,
+};
 pub(crate) use root::{RecoveryRoot, RootError};
 pub(crate) use scan::{
     RecoveryGenerationScan, RecoveryGenerationStatus, RecoveryLineageDisposition,

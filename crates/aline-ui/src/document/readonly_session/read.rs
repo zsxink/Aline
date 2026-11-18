@@ -251,6 +251,13 @@ impl ReadonlyOpenJob {
                 reload_mark: None,
                 autosave: super::AutosaveScheduler::default(),
                 recovery: None,
+                resources: None,
+                temp_root: None,
+                image_settings: super::ImageSettings::default(),
+                association: None,
+                pending_migration: None,
+                next_association: 0,
+                parse_budget: self.limits.parse,
             },
             timings,
         ))

@@ -8,6 +8,12 @@ use aline_source::DiskVersion;
 // 以下导入只被 macOS 真实文件会话测试使用；条件导入避免其他平台测试构建
 // 出现未使用导入并在 `-D warnings` 下失败。
 #[cfg(target_os = "macos")]
+use crate::document::readonly_session::{
+    AssociationCommand, AssociationOutcome, AssociationStep, ReadonlyFileAccess, ReadonlyFileInput,
+};
+#[cfg(target_os = "macos")]
+use crate::document::resources::{ImageDirectory, ImageSettings, MigrationCompletion, TempRoot};
+#[cfg(target_os = "macos")]
 use crate::document::{CloseDisposition, OpenDisposition, ReadonlyOpenLimits, ReadonlySession};
 #[cfg(target_os = "macos")]
 use aline_markdown::{ParseBudget, ParseConfig};
@@ -719,6 +725,15 @@ fn persistence_state_refuses_reobserved_same_length_changed_content() -> TestRes
 /// 打开真实绝对路径上的可编辑会话；目标必须已存在。
 #[cfg(target_os = "macos")]
 fn editable_absolute_session(path: &Path) -> Result<ReadonlySession, Box<dyn std::error::Error>> {
+    editable_absolute_session_with(path, ImageSettings::default())
+}
+
+/// 同上，但在打开前注入图片目录设置（打开后不可更改）。
+#[cfg(target_os = "macos")]
+fn editable_absolute_session_with(
+    path: &Path,
+    settings: ImageSettings,
+) -> Result<ReadonlySession, Box<dyn std::error::Error>> {
     let limits = ReadonlyOpenLimits::new(
         StorageBudget::new(4096),
         DocLimits::new(
@@ -731,6 +746,9 @@ fn editable_absolute_session(path: &Path) -> Result<ReadonlySession, Box<dyn std
     )
     .with_editing();
     let mut session = ReadonlySession::new(limits);
+    session
+        .configure_image_settings(settings)
+        .map_err(|error| format!("{error:?}"))?;
     let request = session.request_open()?;
     let job = session
         .accept_selection(&request, Some(vec![path.to_path_buf()]))?
@@ -2270,5 +2288,617 @@ fn autosave_cancel_clears_pending_deadline() -> TestResult {
     document.cancel_autosave();
     assert_eq!(document.autosave_deadline(), None);
     assert_eq!(document.autosave_poll(1000), AutosaveAction::Idle);
+    Ok(())
+}
+
+// ---- 4.2a 首次保存/另存为关联（临时资源迁移 + 写盘） ----
+
+/// 固定字节读取器：只用于无窗口的未命名文档打开，不访问真实文件。
+#[cfg(target_os = "macos")]
+struct BytesFiles(Vec<u8>);
+
+#[cfg(target_os = "macos")]
+impl ReadonlyFileAccess for BytesFiles {
+    type Reader = std::io::Cursor<Vec<u8>>;
+
+    fn open(&self, _path: &Path) -> std::io::Result<ReadonlyFileInput<Self::Reader>> {
+        let len = u64::try_from(self.0.len()).unwrap_or(u64::MAX);
+        Ok(ReadonlyFileInput::new(
+            std::io::Cursor::new(self.0.clone()),
+            len,
+            true,
+        ))
+    }
+}
+
+/// 打开未命名（相对路径、无保存协调器）的可编辑会话；可选注入受检临时根。
+#[cfg(target_os = "macos")]
+fn untitled_editable_session(
+    root: Option<TempRoot>,
+) -> Result<ReadonlySession, Box<dyn std::error::Error>> {
+    let limits = ReadonlyOpenLimits::new(
+        StorageBudget::new(4096),
+        DocLimits::new(
+            TextBudget::new(4096),
+            LineIndexBudget::new(128),
+            HistoryBudget::new(16, 4096),
+        ),
+        ParseConfig::m0(),
+        ParseBudget::m0(),
+    )
+    .with_editing();
+    let mut session = ReadonlySession::new(limits);
+    session.configure_temp_root(root);
+    let request = session.request_open()?;
+    let job = session
+        .accept_selection(&request, Some(vec![PathBuf::from("untitled.md")]))?
+        .ok_or("应生成打开工作")?;
+    assert!(
+        matches!(
+            session.accept_open(job.read_with(&BytesFiles(b"x\n".to_vec()))),
+            OpenDisposition::Applied
+        ),
+        "未命名可编辑文档应发布"
+    );
+    Ok(session)
+}
+
+/// 在系统临时目录下建立测试 HOME 并打开 `Aline/temporary` 受检临时根。
+#[cfg(target_os = "macos")]
+fn temp_resource_root(home: &Path) -> Result<TempRoot, Box<dyn std::error::Error>> {
+    std::fs::create_dir_all(home.join("Library/Application Support"))?;
+    Ok(TempRoot::open_or_create(home).map_err(|error| format!("{error:?}"))?)
+}
+
+#[cfg(target_os = "macos")]
+fn stage_image(
+    session: &mut ReadonlySession,
+    name: &str,
+    bytes: &[u8],
+) -> Result<String, Box<dyn std::error::Error>> {
+    {
+        let document = session.document_mut().ok_or("应存在可编辑文档")?;
+        let len = document.current_snapshot()?.full_text(TEXT)?.len();
+        document
+            .edit_core()?
+            .open_block(0..len, SelectionSpec::new(0, 0))?;
+    }
+    let reference = session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .stage_temp_image(name, bytes, 4096)
+        .map_err(|error| format!("{error:?}"))?;
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .leave_block(1)?;
+    Ok(reference.locator().to_owned())
+}
+
+/// 在文档末尾（换行之前）插入文本；块保持打开，后续关联命令在同一草稿上继续。
+#[cfg(target_os = "macos")]
+fn append_text(
+    session: &mut ReadonlySession,
+    text: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    let source = document.current_snapshot()?.full_text(TEXT)?;
+    let len = source.len();
+    let at = if source.ends_with('\n') { len - 1 } else { len };
+    let core = document.edit_core()?;
+    core.open_block(0..len, SelectionSpec::new(0, 0))?;
+    core.type_text(at, text, 0)?;
+    core.leave_block(1)?;
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn current_text(session: &mut ReadonlySession) -> Result<String, Box<dyn std::error::Error>> {
+    Ok(session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .current_snapshot()?
+        .full_text(TEXT)?)
+}
+
+/// 开始一次关联并同步执行复制阶段，返回迁移完成项。
+#[cfg(target_os = "macos")]
+fn association_copy(
+    session: &mut ReadonlySession,
+    kind: WriteKind,
+    target: &Path,
+) -> Result<MigrationCompletion, Box<dyn std::error::Error>> {
+    let command = session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .begin_association_save(kind, target.to_path_buf(), 0);
+    match command {
+        AssociationCommand::Run(job) => Ok(job.run()),
+        AssociationCommand::Save(_) => Err("该目标应进入关联迁移而非直接保存".into()),
+        AssociationCommand::Wait(_) => Err("无组合输入时应直接复制".into()),
+        AssociationCommand::Cancelled => Err("关联不应在开始前取消".into()),
+        AssociationCommand::Rejected(rejection) => Err(format!("关联被拒: {rejection:?}").into()),
+    }
+}
+
+/// 复核迁移完成项并按需重写引用，返回已冻结的后台写盘工作。
+#[cfg(target_os = "macos")]
+fn association_write_job(
+    session: &mut ReadonlySession,
+    completion: MigrationCompletion,
+) -> Result<SaveJob, Box<dyn std::error::Error>> {
+    match session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .association_prepared(completion, 1)
+    {
+        AssociationStep::Write(job) => Ok(job),
+        AssociationStep::Run(_) => Err("复制完成项不应再次要求复制".into()),
+        AssociationStep::Settled(outcome) => Err(format!("关联未进入写盘: {outcome:?}").into()),
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn run_association_write(
+    session: &mut ReadonlySession,
+    job: SaveJob,
+) -> Result<WriteSettlement, Box<dyn std::error::Error>> {
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .settle_save(job.run())
+        .map_err(|error| format!("{error:?}").into())
+}
+
+/// 统计临时根下普通文件数；用于确认失败后材料仍在。
+#[cfg(target_os = "macos")]
+fn resource_file_count(root: &Path) -> Result<usize, Box<dyn std::error::Error>> {
+    fn walk(path: &Path) -> Result<usize, Box<dyn std::error::Error>> {
+        let mut count = 0;
+        for entry in std::fs::read_dir(path)? {
+            let entry = entry?;
+            let metadata = entry.metadata()?;
+            if metadata.is_dir() {
+                count += walk(&entry.path())?;
+            } else if metadata.is_file() {
+                count += 1;
+            }
+        }
+        Ok(count)
+    }
+    walk(root)
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn untitled_first_save_associates_path_only_after_write() -> TestResult {
+    let directory = TempSaveDir::create("aline-assoc-first")?;
+    let target = directory.0.join("out/notes.md");
+    std::fs::create_dir_all(target.parent().ok_or("target parent")?)?;
+    let mut session = untitled_editable_session(None)?;
+
+    let completion = association_copy(&mut session, WriteKind::Create, &target)?;
+    let job = association_write_job(&mut session, completion)?;
+    assert!(!target.exists(), "写盘完成前目标文件不得出现");
+    let settlement = run_association_write(&mut session, job)?;
+    assert!(settlement.adopted);
+    assert_eq!(
+        settlement.association.as_ref().map(|(path, _)| path),
+        Some(&target)
+    );
+    assert_eq!(std::fs::read(&target)?, b"x\n");
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    assert_eq!(document.path(), target, "成功后路径应改为关联目标");
+    assert_eq!(document.persistence_is_creating(), Some(false));
+    let snapshot = document.current_snapshot()?;
+    assert_eq!(document.persistence_is_dirty(&snapshot), Some(false));
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn untitled_first_save_failure_keeps_relative_path_and_materials() -> TestResult {
+    use std::os::unix::fs::PermissionsExt;
+
+    let directory = TempSaveDir::create("aline-assoc-fail")?;
+    let home = directory.0.join("home");
+    let root = temp_resource_root(&home)?;
+    let mut session = untitled_editable_session(Some(root.clone()))?;
+    let locator = stage_image(&mut session, "pic.png", b"png")?;
+    append_text(&mut session, &locator)?;
+    let text_before = current_text(&mut session)?;
+
+    let locked = directory.0.join("locked");
+    std::fs::create_dir(&locked)?;
+    let target = locked.join("notes.md");
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o500))?;
+    let completion = association_copy(&mut session, WriteKind::Create, &target);
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o700))?;
+    let completion = completion?;
+    assert!(completion.result.is_err(), "只读父目录上的迁移必须失败");
+    match session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .association_prepared(completion, 1)
+    {
+        AssociationStep::Settled(AssociationOutcome::Failed) => {}
+        _ => return Err("迁移失败应结算为 Failed".into()),
+    }
+
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    assert_eq!(document.path(), Path::new("untitled.md"));
+    assert_eq!(current_text(&mut session)?, text_before);
+    assert_eq!(
+        resource_file_count(root.path())?,
+        1,
+        "失败后临时资源必须保留"
+    );
+    assert!(!target.exists());
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn first_save_continue_typing_writes_latest_text() -> TestResult {
+    let directory = TempSaveDir::create("aline-assoc-typing")?;
+    let target = directory.0.join("out/notes.md");
+    std::fs::create_dir_all(target.parent().ok_or("target parent")?)?;
+    let mut session = untitled_editable_session(None)?;
+
+    let completion = association_copy(&mut session, WriteKind::Create, &target)?;
+    append_text(&mut session, "B")?;
+    let job = association_write_job(&mut session, completion)?;
+    let settlement = run_association_write(&mut session, job)?;
+    assert!(settlement.adopted);
+    assert_eq!(std::fs::read(&target)?, b"xB\n");
+    assert_eq!(current_text(&mut session)?, "xB\n");
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn first_save_new_resource_during_preparation_requests_retry() -> TestResult {
+    let directory = TempSaveDir::create("aline-assoc-new-resource")?;
+    let home = directory.0.join("home");
+    let root = temp_resource_root(&home)?;
+    let target = directory.0.join("out/notes.md");
+    std::fs::create_dir_all(target.parent().ok_or("target parent")?)?;
+    let mut session = untitled_editable_session(Some(root))?;
+    let first = stage_image(&mut session, "first.png", b"first")?;
+    append_text(&mut session, &first)?;
+
+    let completion = association_copy(&mut session, WriteKind::Create, &target)?;
+    // 复制完成后、复核前新增一张被文本引用的图片，必须要求重试。
+    let second = stage_image(&mut session, "second.png", b"second")?;
+    append_text(&mut session, &second)?;
+    match session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .association_prepared(completion, 1)
+    {
+        AssociationStep::Settled(AssociationOutcome::NeedsRetry) => {}
+        _ => return Err("新增引用应要求重试".into()),
+    }
+    assert!(!target.exists(), "要求重试时不得写盘");
+    Ok(())
+}
+
+/// 写盘失败（非冲突）后瞬时 association 清除、pending_migration 保留；
+/// `retry_association` 直接重写盘且不再重搬资产（W4-63）。
+#[cfg(target_os = "macos")]
+#[test]
+fn first_save_write_failure_keeps_pending_migration_for_retry() -> TestResult {
+    use std::os::unix::fs::PermissionsExt;
+
+    let directory = TempSaveDir::create("aline-assoc-retry")?;
+    let home = directory.0.join("home");
+    let root = temp_resource_root(&home)?;
+    let target = directory.0.join("out/notes.md");
+    let out = target.parent().ok_or("target parent")?;
+    std::fs::create_dir_all(out)?;
+    let mut session = untitled_editable_session(Some(root))?;
+    let locator = stage_image(&mut session, "pic.png", b"png")?;
+    append_text(&mut session, &locator)?;
+
+    let completion = association_copy(&mut session, WriteKind::Create, &target)?;
+    let job = association_write_job(&mut session, completion)?;
+    // 迁移已把资产复制到目标目录；把目录设为只读，令真正写盘失败。
+    std::fs::set_permissions(out, std::fs::Permissions::from_mode(0o500))?;
+    let completion = job.run();
+    std::fs::set_permissions(out, std::fs::Permissions::from_mode(0o700))?;
+    let settlement = session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .settle_save(completion)
+        .map_err(|error| format!("{error:?}"))?;
+    assert!(settlement.adopted);
+    assert!(matches!(settlement.outcome, WriteOutcome::NotPublished(_)));
+    assert!(!target.exists(), "写盘失败不得留下目标文件");
+    {
+        let document = session.document_mut().ok_or("应存在可编辑文档")?;
+        assert_eq!(document.path(), Path::new("untitled.md"));
+        assert_eq!(document.close_status(), CloseStatus::NeedsDecision);
+    }
+
+    let retry = session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .retry_association()
+        .map_err(|rejection| format!("重试被拒: {rejection:?}"))?;
+    let job = match retry {
+        AssociationStep::Write(job) => job,
+        _ => return Err("引用已重写后重试应直接写盘".into()),
+    };
+    let settlement = run_association_write(&mut session, job)?;
+    assert!(settlement.adopted);
+    assert_eq!(std::fs::read(&target)?, b"x./assets/pic.png\n");
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    assert_eq!(document.path(), target);
+    assert_eq!(document.close_status(), CloseStatus::Ready);
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn first_save_undoes_reference_rewrite_without_deleting_temp() -> TestResult {
+    let directory = TempSaveDir::create("aline-assoc-undo")?;
+    let home = directory.0.join("home");
+    let root = temp_resource_root(&home)?;
+    let target = directory.0.join("out/notes.md");
+    std::fs::create_dir_all(target.parent().ok_or("target parent")?)?;
+    let mut session = untitled_editable_session(Some(root.clone()))?;
+    let locator = stage_image(&mut session, "pic.png", b"png")?;
+    append_text(&mut session, &locator)?;
+
+    let completion = association_copy(&mut session, WriteKind::Create, &target)?;
+    let job = association_write_job(&mut session, completion)?;
+    let settlement = run_association_write(&mut session, job)?;
+    assert!(settlement.adopted);
+    let rewritten = current_text(&mut session)?;
+    assert!(rewritten.contains("./assets/pic.png"));
+    assert!(!rewritten.contains(&locator));
+
+    {
+        let core = session
+            .document_mut()
+            .ok_or("应存在可编辑文档")?
+            .edit_core()?;
+        core.undo()?;
+    }
+    assert!(
+        current_text(&mut session)?.contains(&locator),
+        "Undo 应回到临时 locator"
+    );
+    assert_eq!(resource_file_count(root.path())?, 1, "临时文件不得被删除");
+    {
+        let core = session
+            .document_mut()
+            .ok_or("应存在可编辑文档")?
+            .edit_core()?;
+        core.redo()?;
+    }
+    assert!(
+        current_text(&mut session)?.contains("./assets/pic.png"),
+        "Redo 应回到新引用"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn save_as_copies_relative_assets_and_keeps_original() -> TestResult {
+    let directory = TempSaveDir::create("aline-assoc-saveas")?;
+    let old = directory.0.join("old");
+    std::fs::create_dir_all(old.join("assets"))?;
+    let original = old.join("notes.md");
+    std::fs::write(&original, b"x\n![x](./assets/pic.png)\n")?;
+    std::fs::write(old.join("assets/pic.png"), b"png")?;
+    assert!(old.join("assets/pic.png").exists(), "源资产应存在");
+    let mut session =
+        editable_absolute_session(&original).map_err(|error| format!("打开失败: {error}"))?;
+
+    let target = directory.0.join("new/notes.md");
+    std::fs::create_dir_all(target.parent().ok_or("target parent")?)?;
+    let completion = association_copy(&mut session, WriteKind::SaveAs, &target)
+        .map_err(|error| format!("复制阶段失败: {error}"))?;
+    match completion.result.as_ref() {
+        Ok(migration) => assert!(
+            !migration.copied.is_empty(),
+            "SaveAs 应发现已存在的相对资产，copied={:?} mappings={:?}",
+            migration.copied,
+            migration.mappings
+        ),
+        Err(error) => return Err(format!("SaveAs 迁移失败: {error:?}").into()),
+    }
+    let job = association_write_job(&mut session, completion)
+        .map_err(|error| format!("准备写盘失败: {error}"))?;
+    let settlement = run_association_write(&mut session, job)
+        .map_err(|error| format!("写盘结算失败: {error}"))?;
+    assert!(settlement.adopted);
+    assert_eq!(
+        std::fs::read(&original).map_err(|error| format!("旧文件读取失败: {error}"))?,
+        b"x\n![x](./assets/pic.png)\n",
+        "旧文件 bytes 不得改变"
+    );
+    assert_eq!(
+        std::fs::read(directory.0.join("new/assets/pic.png"))
+            .map_err(|error| format!("新资产读取失败: {error}"))?,
+        b"png"
+    );
+    assert_eq!(std::fs::read(&target)?, b"x\n![x](./assets/pic.png)\n");
+    assert_eq!(session.document().ok_or("应存在可编辑文档")?.path(), target);
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn save_as_absolute_setting_does_not_copy() -> TestResult {
+    let directory = TempSaveDir::create("aline-assoc-absolute")?;
+    let old = directory.0.join("old");
+    std::fs::create_dir_all(old.join("assets"))?;
+    let original = old.join("notes.md");
+    std::fs::write(&original, b"x\n![x](./assets/pic.png)\n")?;
+    std::fs::write(old.join("assets/pic.png"), b"png")?;
+    let absolute = directory.0.join("absolute-assets");
+    let settings = ImageSettings {
+        directory: ImageDirectory::Absolute(absolute.clone()),
+    };
+    let mut session = editable_absolute_session_with(&original, settings)?;
+
+    let target = directory.0.join("new/notes.md");
+    std::fs::create_dir_all(target.parent().ok_or("target parent")?)?;
+    let completion = association_copy(&mut session, WriteKind::SaveAs, &target)?;
+    let job = association_write_job(&mut session, completion)?;
+    let settlement = run_association_write(&mut session, job)?;
+    assert!(settlement.adopted);
+    assert!(
+        !target
+            .parent()
+            .ok_or("target parent")?
+            .join("assets")
+            .exists()
+    );
+    assert!(!absolute.join("pic.png").exists(), "绝对目录不应产生新副本");
+    assert_eq!(std::fs::read(&target)?, b"x\n![x](./assets/pic.png)\n");
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn save_as_does_not_move_handwritten_external_reference() -> TestResult {
+    let directory = TempSaveDir::create("aline-assoc-handwritten")?;
+    let old = directory.0.join("old");
+    std::fs::create_dir_all(old.join("images"))?;
+    let original = old.join("notes.md");
+    std::fs::write(&original, b"x\n![x](images/hand.png)\n")?;
+    std::fs::write(old.join("images/hand.png"), b"hand")?;
+    let mut session = editable_absolute_session(&original)?;
+
+    let target = directory.0.join("new/notes.md");
+    std::fs::create_dir_all(target.parent().ok_or("target parent")?)?;
+    let completion = association_copy(&mut session, WriteKind::SaveAs, &target)?;
+    let job = association_write_job(&mut session, completion)?;
+    let settlement = run_association_write(&mut session, job)?;
+    assert!(settlement.adopted);
+    assert!(
+        !directory.0.join("new/images/hand.png").exists(),
+        "手写外部引用不得被迁移"
+    );
+    assert_eq!(std::fs::read(&target)?, b"x\n![x](images/hand.png)\n");
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn save_as_typing_during_write_leaves_document_dirty_with_new_path() -> TestResult {
+    let directory = TempSaveDir::create("aline-assoc-dirty")?;
+    let target = directory.0.join("out/notes.md");
+    std::fs::create_dir_all(target.parent().ok_or("target parent")?)?;
+    let mut session = untitled_editable_session(None)?;
+
+    let completion = association_copy(&mut session, WriteKind::Create, &target)?;
+    let job = association_write_job(&mut session, completion)?;
+    // 写盘工作已冻结后继续输入；磁盘写旧快照，内存保持新文本。
+    append_text(&mut session, "B")?;
+    let settlement = run_association_write(&mut session, job)?;
+    assert!(settlement.adopted);
+    assert_eq!(std::fs::read(&target)?, b"x\n");
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    assert_eq!(document.path(), target, "路径应在成功发布后更新");
+    let snapshot = document.current_snapshot()?;
+    assert_eq!(document.persistence_is_dirty(&snapshot), Some(true));
+    assert_eq!(snapshot.full_text(TEXT)?, "xB\n");
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn association_cancelled_before_copy_keeps_target_unassociated() -> TestResult {
+    let directory = TempSaveDir::create("aline-assoc-cancel")?;
+    let home = directory.0.join("home");
+    let root = temp_resource_root(&home)?;
+    let target = directory.0.join("out/notes.md");
+    std::fs::create_dir_all(target.parent().ok_or("target parent")?)?;
+    let mut session = untitled_editable_session(Some(root))?;
+    let locator = stage_image(&mut session, "pic.png", b"png")?;
+    append_text(&mut session, &locator)?;
+
+    let command = session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .begin_association_save(WriteKind::Create, target.clone(), 0);
+    let AssociationCommand::Run(job) = command else {
+        return Err("应先生成迁移工作".into());
+    };
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .cancel_association();
+    let completion = job.run();
+    assert!(completion.cancelled, "取消后迁移任务应观察取消标志");
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    assert_eq!(document.path(), Path::new("untitled.md"));
+    assert!(!target.exists());
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn close_status_waits_for_association_and_reports_pending_migration() -> TestResult {
+    let directory = TempSaveDir::create("aline-assoc-close")?;
+    let home = directory.0.join("home");
+    let root = temp_resource_root(&home)?;
+    let target = directory.0.join("out/notes.md");
+    std::fs::create_dir_all(target.parent().ok_or("target parent")?)?;
+    let mut session = untitled_editable_session(Some(root))?;
+    let locator = stage_image(&mut session, "pic.png", b"png")?;
+    append_text(&mut session, &locator)?;
+
+    let completion = association_copy(&mut session, WriteKind::Create, &target)?;
+    let _job = association_write_job(&mut session, completion)?;
+    assert_eq!(
+        session
+            .document_mut()
+            .ok_or("应存在可编辑文档")?
+            .close_status(),
+        CloseStatus::Waiting,
+        "写盘关联在途必须等待"
+    );
+
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .cancel_association();
+    assert_eq!(
+        session
+            .document_mut()
+            .ok_or("应存在可编辑文档")?
+            .close_status(),
+        CloseStatus::NeedsDecision,
+        "保留迁移映射时应要求用户决定"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn close_status_is_ready_after_saved_association() -> TestResult {
+    let directory = TempSaveDir::create("aline-assoc-ready")?;
+    let target = directory.0.join("out/notes.md");
+    std::fs::create_dir_all(target.parent().ok_or("target parent")?)?;
+    let mut session = untitled_editable_session(None)?;
+
+    let completion = association_copy(&mut session, WriteKind::Create, &target)?;
+    let job = association_write_job(&mut session, completion)?;
+    let settlement = run_association_write(&mut session, job)?;
+    assert!(settlement.adopted);
+    assert_eq!(
+        session
+            .document_mut()
+            .ok_or("应存在可编辑文档")?
+            .close_status(),
+        CloseStatus::Ready
+    );
     Ok(())
 }

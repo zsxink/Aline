@@ -180,6 +180,19 @@ impl RecoverySession {
         }
     }
 
+    /// 只读清理上下文：克隆存储与当前谱系身份；未分配谱系时为 `None`。
+    pub(crate) fn cleanup_context(&self) -> Option<(RecoveryStore, RecoveryDocumentId)> {
+        self.document.map(|document| (self.store.clone(), document))
+    }
+
+    /// 读取指定谱系全部保留代的资源引用；只读，异常由调用方 fail closed。
+    pub(crate) fn referenced_resources(
+        &self,
+        document: RecoveryDocumentId,
+    ) -> Result<std::collections::BTreeSet<String>, RecoveryStoreError> {
+        self.store.referenced_resources(document)
+    }
+
     /// 返回本次会话身份；迟到任务据此判断归属。
     pub(crate) fn id(&self) -> &RecoverySessionId {
         &self.id

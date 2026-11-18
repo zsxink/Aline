@@ -85,6 +85,19 @@ pub(crate) enum SaveResult {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum WriteKind {
+    Existing,
+    Create,
+    SaveAs,
+}
+
+#[derive(Clone, Debug)]
+pub(super) enum WriteMode {
+    Existing,
+    Associate { kind: WriteKind, overwrite: bool },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) struct OperationId(u64);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -128,7 +141,7 @@ pub(super) enum SaveStatus {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) enum CloseStatus {
+pub(crate) enum CloseStatus {
     Waiting,
     NeedsDecision,
     Ready,
@@ -180,6 +193,8 @@ pub(super) fn saved_equivalent(
 struct QueuedWrite {
     operation: OperationId,
     snapshot: CurrentSnapshot,
+    kind: WriteKind,
+    path: PathBuf,
 }
 
 struct ActiveWrite {
@@ -191,6 +206,7 @@ struct Target {
     path: PathBuf,
     generation: PathGeneration,
     saved: SavedBaseline,
+    creating: bool,
 }
 
 pub(super) struct FrozenWrite {
@@ -201,6 +217,7 @@ pub(super) struct FrozenWrite {
     generation: PathGeneration,
     storage: SourceBaseline,
     logical: Option<TextSnapshot>,
+    mode: WriteMode,
     cancellation: Cancellation,
 }
 
@@ -220,6 +237,10 @@ impl EncodedWrite {
 impl FrozenWrite {
     pub(super) fn path(&self) -> &Path {
         &self.path
+    }
+
+    pub(super) fn mode(&self) -> &WriteMode {
+        &self.mode
     }
 
     pub(super) fn baseline(&self) -> &SourceBaseline {
@@ -328,6 +349,53 @@ impl FrozenWrite {
         WriteCompletion { job: self, outcome }
     }
 
+    /// Create/SaveAs 覆盖既有目标时的回执复验：目标路径、被替换版本、bytes 与
+    /// 新版本都必须来自本次观察，而不是旧目标基线。
+    pub(super) fn finish_associate(
+        self,
+        encoded: &EncodedWrite,
+        expected_version: aline_source::DiskVersion,
+        result: Result<ReplacementReceipt, AtomicFailure>,
+    ) -> WriteCompletion {
+        let outcome = match result {
+            Ok(receipt) => {
+                if !Arc::ptr_eq(&self.owner, &encoded.owner)
+                    || self.operation != encoded.operation
+                    || receipt.target_path() != self.path
+                    || receipt.replaced_version() != expected_version
+                    || expected_version.next().ok() != Some(receipt.version())
+                    || receipt.bytes() != encoded.bytes().bytes()
+                {
+                    WriteOutcome::PublishedReceiptMismatch(receipt)
+                } else {
+                    let synchronized =
+                        matches!(receipt.durability(), ReplacementDurability::Synchronized);
+                    let budget = StorageBudget::new(receipt.bytes().len());
+                    match StorageSnapshot::new(receipt.bytes().to_vec(), receipt.version(), budget)
+                        .map_err(BaselineError::from)
+                        .and_then(|storage| {
+                            decode(&storage, budget)
+                                .map(|decoded| decoded.into_baseline())
+                                .map_err(BaselineError::from)
+                        }) {
+                        Ok(storage) => WriteOutcome::Published {
+                            storage,
+                            synchronized,
+                        },
+                        Err(error) => WriteOutcome::PublishedBaselineFailed { receipt, error },
+                    }
+                }
+            }
+            Err(failure) => match failure.kind() {
+                AtomicFailureKind::PublishedTargetUnverified { .. } => {
+                    WriteOutcome::PublishedTargetUnverified(failure)
+                }
+                _ => WriteOutcome::NotPublished(WriteStop::File(failure)),
+            },
+        };
+        WriteCompletion { job: self, outcome }
+    }
+
     /// 只有写入前停止时可用。请求取消本身不生成完成项。
     pub(super) fn stop_before_write(self, error: PrepareError) -> WriteCompletion {
         let stop = match error {
@@ -347,6 +415,9 @@ pub(super) enum WriteStop {
     Cancelled,
     Conflict,
     File(AtomicFailure),
+    /// 新建目标失败的底层原因；4.2a 只按分类转为 Failed，载荷留待后续诊断消费。
+    #[allow(dead_code)]
+    Create(aline_source::fs::FsError),
     Preparation(PrepareError),
 }
 
@@ -363,6 +434,11 @@ pub(super) enum WriteOutcome {
         receipt: ReplacementReceipt,
         error: BaselineError,
     },
+    /// 新建目标已写出，但实际 bytes 无法建立保存基线。
+    PublishedNewBaselineFailed {
+        path: PathBuf,
+        error: BaselineError,
+    },
 }
 
 pub(crate) struct WriteCompletion {
@@ -376,6 +452,8 @@ pub(super) struct WriteSettlement {
     pub(super) snapshot: CurrentSnapshot,
     pub(super) path: PathBuf,
     pub(super) adopted: bool,
+    /// 关联成功时的目标路径与基线；会话据此更新展示路径。
+    pub(super) association: Option<(PathBuf, SourceBaseline)>,
     pub(super) outcome: WriteOutcome,
 }
 
@@ -391,6 +469,7 @@ impl WriteSettlement {
                 AtomicFailureKind::PublishedTargetUnverified { target, .. } => Some(target),
                 _ => None,
             },
+            WriteOutcome::PublishedNewBaselineFailed { path, .. } => Some(path),
             WriteOutcome::NotPublished(_) => None,
         }
     }
@@ -406,8 +485,14 @@ impl WriteSettlement {
             WriteOutcome::NotPublished(WriteStop::Preparation(PrepareError::Encoding(error))) => {
                 Some(error)
             }
-            WriteOutcome::PublishedBaselineFailed { error, .. } => Some(error),
-            _ => None,
+            WriteOutcome::PublishedBaselineFailed { error, .. }
+            | WriteOutcome::PublishedNewBaselineFailed { error, .. } => Some(error),
+            WriteOutcome::NotPublished(WriteStop::Create(_))
+            | WriteOutcome::NotPublished(WriteStop::Cancelled)
+            | WriteOutcome::NotPublished(WriteStop::Conflict) => None,
+            WriteOutcome::NotPublished(WriteStop::Preparation(PrepareError::Cancelled))
+            | WriteOutcome::NotPublished(WriteStop::Preparation(PrepareError::Conflict)) => None,
+            WriteOutcome::Published { .. } | WriteOutcome::PublishedReceiptMismatch(_) => None,
         }
     }
 }
@@ -443,6 +528,38 @@ impl PersistenceCoordinator {
                     logical: None,
                     storage: baseline,
                 },
+                creating: false,
+            },
+            last_operation: 0,
+            waiting: None,
+            queued: None,
+            active: None,
+            status: SaveStatus::Idle,
+            closing: false,
+        })
+    }
+
+    /// 未命名/无目标文档的首个协调器；`path` 是用户刚选定的绝对目标，
+    /// `encoding_baseline` 只用于 BOM/行尾策略，不代表目标已存在。
+    pub(super) fn new_untitled(
+        document: DocumentId,
+        path: PathBuf,
+        encoding_baseline: SourceBaseline,
+    ) -> Result<Self, SaveError> {
+        if !path.is_absolute() {
+            return Err(SaveError::InvalidPath);
+        }
+        Ok(Self {
+            owner: Arc::new(()),
+            document,
+            target: Target {
+                path,
+                generation: PathGeneration(0),
+                saved: SavedBaseline {
+                    logical: None,
+                    storage: encoding_baseline,
+                },
+                creating: true,
             },
             last_operation: 0,
             waiting: None,
@@ -466,10 +583,18 @@ impl PersistenceCoordinator {
             .ok_or(SaveError::Exhausted)
     }
 
-    fn enqueue(&mut self, operation: OperationId, snapshot: CurrentSnapshot) {
+    fn enqueue(
+        &mut self,
+        operation: OperationId,
+        snapshot: CurrentSnapshot,
+        kind: WriteKind,
+        path: PathBuf,
+    ) {
         self.queued = Some(QueuedWrite {
             operation,
             snapshot,
+            kind,
+            path,
         });
         self.last_operation = operation.0;
     }
@@ -493,14 +618,22 @@ impl PersistenceCoordinator {
             operation: queued.operation,
             cancellation: cancellation.clone(),
         });
+        let mode = match queued.kind {
+            WriteKind::Existing => WriteMode::Existing,
+            kind => WriteMode::Associate {
+                kind,
+                overwrite: true,
+            },
+        };
         Ok(FrozenWrite {
             owner: self.owner.clone(),
             operation: queued.operation,
             snapshot: queued.snapshot,
-            path: self.target.path.clone(),
+            path: queued.path,
             generation: self.target.generation,
             storage: self.target.saved.storage.clone(),
             logical: self.target.saved.logical.clone(),
+            mode,
             cancellation,
         })
     }
@@ -537,15 +670,32 @@ impl PersistenceCoordinator {
         let mut adopted = false;
         if matches_active {
             self.active = None;
-            if job.generation == self.target.generation && job.path == self.target.path {
+            let same_target = match &job.mode {
+                WriteMode::Existing => {
+                    job.generation == self.target.generation && job.path == self.target.path
+                }
+                WriteMode::Associate { .. } => job.generation == self.target.generation,
+            };
+            if same_target {
                 adopted = self.apply_outcome(&job, &outcome);
             }
         }
+        let association = if adopted {
+            match (&job.mode, &outcome) {
+                (WriteMode::Associate { .. }, WriteOutcome::Published { storage, .. }) => {
+                    Some((job.path.clone(), storage.clone()))
+                }
+                _ => None,
+            }
+        } else {
+            None
+        };
         WriteSettlement {
             operation: job.operation,
             snapshot: job.snapshot,
             path: job.path,
             adopted,
+            association,
             outcome,
         }
     }
@@ -556,10 +706,22 @@ impl PersistenceCoordinator {
                 storage,
                 synchronized,
             } => {
-                self.target.saved = SavedBaseline {
-                    logical: Some(job.snapshot.text().clone()),
-                    storage: storage.clone(),
-                };
+                match &job.mode {
+                    WriteMode::Existing => {
+                        self.target.saved = SavedBaseline {
+                            logical: Some(job.snapshot.text().clone()),
+                            storage: storage.clone(),
+                        };
+                    }
+                    WriteMode::Associate { kind, .. } => {
+                        if self
+                            .associate_new_target_inner(*kind, job.path.clone(), storage.clone())
+                            .is_err()
+                        {
+                            return false;
+                        }
+                    }
+                }
                 if *synchronized {
                     SaveStatus::Idle
                 } else {
@@ -568,7 +730,8 @@ impl PersistenceCoordinator {
             }
             WriteOutcome::PublishedTargetUnverified(_)
             | WriteOutcome::PublishedReceiptMismatch(_)
-            | WriteOutcome::PublishedBaselineFailed { .. } => SaveStatus::PublishedUncertain,
+            | WriteOutcome::PublishedBaselineFailed { .. }
+            | WriteOutcome::PublishedNewBaselineFailed { .. } => SaveStatus::PublishedUncertain,
             WriteOutcome::NotPublished(WriteStop::Cancelled) => return false,
             WriteOutcome::NotPublished(WriteStop::Conflict) => SaveStatus::Conflict,
             WriteOutcome::NotPublished(WriteStop::File(error)) => match error.kind() {
@@ -576,9 +739,53 @@ impl PersistenceCoordinator {
                 AtomicFailureKind::Conflict { .. } => SaveStatus::Conflict,
                 _ => SaveStatus::Failed,
             },
-            WriteOutcome::NotPublished(WriteStop::Preparation(_)) => SaveStatus::Failed,
+            WriteOutcome::NotPublished(WriteStop::Create(_))
+            | WriteOutcome::NotPublished(WriteStop::Preparation(_)) => SaveStatus::Failed,
         };
         true
+    }
+
+    /// 仅在 Create/SaveAs 成功后调用；不要求当前文本等于写入基线。
+    #[allow(dead_code)]
+    pub(super) fn associate_new_target(
+        &mut self,
+        kind: WriteKind,
+        path: PathBuf,
+        baseline: SourceBaseline,
+    ) -> Result<(), SaveError> {
+        self.associate_new_target_inner(kind, path, baseline)
+    }
+
+    fn associate_new_target_inner(
+        &mut self,
+        kind: WriteKind,
+        path: PathBuf,
+        baseline: SourceBaseline,
+    ) -> Result<(), SaveError> {
+        if !path.is_absolute() {
+            return Err(SaveError::InvalidPath);
+        }
+        let generation = match kind {
+            WriteKind::SaveAs => PathGeneration(
+                self.target
+                    .generation
+                    .0
+                    .checked_add(1)
+                    .ok_or(SaveError::Exhausted)?,
+            ),
+            WriteKind::Create | WriteKind::Existing => self.target.generation,
+        };
+        self.target = Target {
+            path,
+            generation,
+            saved: SavedBaseline {
+                logical: None,
+                storage: baseline,
+            },
+            creating: false,
+        };
+        self.status = SaveStatus::Idle;
+        Ok(())
     }
 
     pub(super) fn status(&self) -> SaveStatus {
@@ -589,6 +796,12 @@ impl PersistenceCoordinator {
         } else {
             self.status
         }
+    }
+
+    /// 仅供 crate 内测试读取当前目标是否仍处于首次创建状态。
+    #[cfg(test)]
+    pub(super) fn is_creating(&self) -> bool {
+        self.target.creating
     }
 
     /// 后台观察须记录起点路径代次，采纳时同当前关联复验。
@@ -698,6 +911,7 @@ impl PersistenceCoordinator {
             path,
             generation: PathGeneration(next),
             saved,
+            creating: false,
         };
         self.status = SaveStatus::Idle;
         Ok(())

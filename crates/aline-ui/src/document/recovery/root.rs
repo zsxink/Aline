@@ -13,6 +13,8 @@ use std::io;
 use std::num::NonZeroU64;
 use std::path::{Path, PathBuf};
 
+use aline_source::fs::{self as platform_fs, FsError};
+
 #[cfg(target_os = "macos")]
 use std::os::unix::fs::MetadataExt;
 
@@ -153,6 +155,96 @@ fn map_io(error: io::Error) -> RootError {
         RootError::Missing
     } else {
         RootError::Io(error)
+    }
+}
+
+/// 受检创建生产恢复根：`Aline` 与 `recovery` 逐级独占创建或验证，最后复用根打开
+/// 验证。仅 macOS 实现；其他平台失败关闭且不写盘。
+pub(crate) fn create_default_root(home: &Path) -> Result<RecoveryRoot, RootError> {
+    #[cfg(target_os = "macos")]
+    {
+        if !home.is_absolute() {
+            return Err(RootError::InvalidPath);
+        }
+        let home_metadata = fs::symlink_metadata(home).map_err(map_io)?;
+        if home_metadata.file_type().is_symlink() {
+            return Err(RootError::Symlink);
+        }
+        if !home_metadata.is_dir() {
+            return Err(RootError::NotDirectory);
+        }
+        let owner_uid = home_metadata.uid();
+        let base = home.join("Library/Application Support");
+        let base_metadata = fs::symlink_metadata(&base).map_err(map_io)?;
+        if base_metadata.file_type().is_symlink() {
+            return Err(RootError::Symlink);
+        }
+        if !base_metadata.is_dir() {
+            return Err(RootError::NotDirectory);
+        }
+        let actual = base_metadata.uid();
+        if actual != owner_uid {
+            return Err(RootError::ForeignOwner {
+                expected: owner_uid,
+                actual,
+            });
+        }
+        let app = base.join("Aline");
+        create_or_verify(&app, owner_uid)?;
+        let recovery = app.join(RECOVERY_DIR);
+        create_or_verify(&recovery, owner_uid)?;
+        RecoveryRoot::open_with_expected_uid_inner(&recovery, owner_uid)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = home;
+        Err(RootError::UnsupportedPlatform)
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn create_or_verify(path: &Path, owner_uid: u32) -> Result<(), RootError> {
+    match platform_fs::create_directory_exclusive(path) {
+        Ok(_) => {
+            let parent = path.parent().ok_or(RootError::InvalidPath)?;
+            platform_fs::sync_directory(parent).map_err(map_fs_io)?;
+            Ok(())
+        }
+        Err(FsError::AlreadyExists) => verify_owned_directory(path, owner_uid),
+        Err(error) => Err(map_fs_io(error)),
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn verify_owned_directory(path: &Path, owner_uid: u32) -> Result<(), RootError> {
+    let metadata = fs::symlink_metadata(path).map_err(map_io)?;
+    if metadata.file_type().is_symlink() {
+        return Err(RootError::Symlink);
+    }
+    if !metadata.is_dir() {
+        return Err(RootError::NotDirectory);
+    }
+    let actual = metadata.uid();
+    if actual != owner_uid {
+        return Err(RootError::ForeignOwner {
+            expected: owner_uid,
+            actual,
+        });
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn map_fs_io(error: FsError) -> RootError {
+    match error {
+        FsError::UnsupportedPlatform => RootError::UnsupportedPlatform,
+        FsError::InvalidPath | FsError::NotFound => RootError::Missing,
+        FsError::NotOrdinary => RootError::NotDirectory,
+        FsError::Symlink => RootError::Symlink,
+        FsError::AlreadyExists | FsError::WouldBlock | FsError::IdentityChanged => {
+            RootError::Io(io::Error::other("recovery root creation failed"))
+        }
+        FsError::Io { .. } => RootError::Io(io::Error::other("recovery root creation failed")),
     }
 }
 

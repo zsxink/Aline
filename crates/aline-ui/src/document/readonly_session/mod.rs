@@ -21,15 +21,27 @@ use super::persistence::{
 };
 use super::recovery::{
     PreparedRecovery, RecoveryAcceptOutcome, RecoveryAction, RecoveryBegin, RecoveryBeginOutcome,
-    RecoveryCloseJob, RecoveryConfig, RecoveryConfigError, RecoveryPath, RecoverySession,
-    RecoverySettlement, RecoveryStart,
+    RecoveryCloseJob, RecoveryConfig, RecoveryConfigError, RecoveryDocumentId, RecoveryPath,
+    RecoverySession, RecoverySettlement, RecoveryStart, RecoveryStore,
 };
 use super::{
-    DocCore, DocError, DocLimits, EditorMode, InputIdentity, ModeSwitchOutcome, PublicationOutcome,
-    WaitHandle, WaitStatus,
+    DocCore, DocError, DocLimits, EditorMode, InputIdentity, ModeSwitchOutcome, PublicationKind,
+    PublicationOutcome, WaitHandle, WaitStatus,
 };
-use aline_buffer::{ReloadOutcome, SrcSelection, TextSnapshot};
+use aline_buffer::{PatchBudget, ReloadOutcome, SrcSelection, TextSnapshot};
+use aline_edit::{
+    EditBudget, EditCommand, EditContext, EditMode, PlanOutcome, SourceEdit, plan_change,
+};
+use aline_markdown::parse_with_cancel;
+use aline_source::Cancellation;
 
+use super::persistence::WriteKind;
+use super::recovery::MAX_RESOURCE_COUNT;
+use super::{
+    ImageSettings, ImageSettingsError, MigrationCompletion, MigrationError, ResourceCatalog,
+    ResourceCleanupJob, ResourceError, ResourceMapping, ResourceMigrationJob, TempRoot,
+    locator_spans,
+};
 mod autosave;
 mod read;
 mod refresh;
@@ -162,6 +174,78 @@ impl std::error::Error for OpenError {
     }
 }
 
+/// 保存入口的下一步；首次保存/另存为先要求宿主选择目标。
+// 命令枚举只在宿主入口短时存在，按值携带写盘任务避免额外一次装箱。
+#[allow(clippy::large_enum_variant)]
+#[allow(dead_code)]
+pub(crate) enum SaveTargetCommand {
+    Save(SaveCommand),
+    ChooseTarget { kind: WriteKind },
+    RetryAssociation,
+}
+
+/// 关联（迁移+写盘）阶段的命令；宿主据此等待、派生任务或反馈。
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) enum AssociationCommand {
+    Run(ResourceMigrationJob),
+    /// 载荷句柄由宿主等待匹配消费；测试只匹配变体。
+    #[allow(dead_code)]
+    Wait(WaitHandle),
+    /// 载荷保存命令由宿主执行；测试只匹配变体。
+    #[allow(dead_code)]
+    Save(SaveCommand),
+    Cancelled,
+    Rejected(SaveRejection),
+}
+
+/// 迁移完成后的下一步。
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) enum AssociationStep {
+    /// 载荷由宿主派生后台复制；测试只在重试入口生成，不读取内部任务。
+    #[allow(dead_code)]
+    Run(ResourceMigrationJob),
+    Write(SaveJob),
+    Settled(AssociationOutcome),
+}
+
+/// 关联流程的结算分类；宿主只按类别选反馈键。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) enum AssociationOutcome {
+    NeedsRetry,
+    Failed,
+    Cancelled,
+    Stale,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[cfg_attr(not(test), allow(dead_code))]
+enum AssociationPhase {
+    Waiting,
+    Copying,
+    Writing,
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+struct AssociationState {
+    operation: u64,
+    kind: WriteKind,
+    target: PathBuf,
+    cancellation: Cancellation,
+    phase: AssociationPhase,
+    wait: Option<WaitHandle>,
+    save_operation: Option<OperationId>,
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+struct PendingMigration {
+    target: PathBuf,
+    kind: WriteKind,
+    /// 上一次引用映射；重试直接复用已重写文本，不再重新扫描。
+    #[allow(dead_code)]
+    mappings: Vec<ResourceMapping>,
+}
+
 /// 已完整构造且可阅读的单文档；存储基线与 DocCore 共同保留读取事实。
 pub struct ReadonlyDocument {
     path: PathBuf,
@@ -188,6 +272,22 @@ pub struct ReadonlyDocument {
     autosave: AutosaveScheduler,
     /// 独立 10 秒恢复会话；只在可编辑文档挂接，与自动保存互不共享状态。
     recovery: Option<RecoverySession>,
+    /// 文档私有临时资源目录；首次插图时懒创建，未插图文档不创建目录。
+    resources: Option<ResourceCatalog>,
+    /// 会话注入的受检临时根；无根时插图返回 `UnsupportedPlatform`。
+    temp_root: Option<TempRoot>,
+    /// 内部图片资产设置；4.2 不提供 UI、不持久化。
+    image_settings: ImageSettings,
+    /// 首次保存/另存为的资源迁移与写盘关联。
+    association: Option<AssociationState>,
+    /// 已完成的引用迁移；写入失败时保留，供同一目标重试。
+    pending_migration: Option<PendingMigration>,
+    /// 关联操作序号；迟到完成项按此丢弃。
+    #[cfg_attr(not(test), allow(dead_code))]
+    next_association: u64,
+    /// 打开时注入的解析预算；引用重写重新解析时复用。
+    #[cfg_attr(not(test), allow(dead_code))]
+    parse_budget: ParseBudget,
 }
 impl ReadonlyDocument {
     /// 返回用户选择的文件路径，供标题等显式 UI 使用。
@@ -230,11 +330,598 @@ impl ReadonlyDocument {
         if !self.editable {
             return Err(SaveRequestError::Input(DocError::ReadOnly));
         }
+        if self.association.is_some() || self.pending_migration.is_some() {
+            return Err(SaveRequestError::Queue(SaveError::Busy));
+        }
         let coordinator = self
             .persistence
             .as_mut()
             .ok_or(SaveRequestError::Queue(SaveError::InvalidPath))?;
         coordinator.request_save(&mut self.core, self.limits.text())
+    }
+
+    /// 写入一条临时图片并登记到 `DocCore`，不插入 Markdown、不改选区与历史。
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn stage_temp_image(
+        &mut self,
+        display_name: &str,
+        bytes: &[u8],
+        max_bytes: u64,
+    ) -> Result<super::ResourceReference, ResourceError> {
+        if !self.editable {
+            return Err(ResourceError::NotEditable);
+        }
+        let identity = self.input_identity().map_err(ResourceError::Doc)?;
+        if self.resources.is_none() {
+            let root = self
+                .temp_root
+                .clone()
+                .ok_or(ResourceError::UnsupportedPlatform)?;
+            let nanos = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map_or(0, |elapsed| {
+                    u64::try_from(elapsed.as_nanos()).unwrap_or(u64::MAX)
+                });
+            self.resources = Some(ResourceCatalog::new(
+                self.core.document_id().clone(),
+                &root,
+                nanos,
+            )?);
+        }
+        let Some(catalog) = self.resources.as_mut() else {
+            return Err(ResourceError::Io);
+        };
+        let entry = catalog.stage(display_name, bytes, max_bytes)?;
+        if let Err(error) =
+            self.core
+                .retain_resource(&identity, entry.reference.clone(), MAX_RESOURCE_COUNT)
+        {
+            let removed = catalog.remove(entry.id);
+            if let Some(removed) = removed {
+                let _ = catalog.discard_file(&removed);
+            }
+            return Err(ResourceError::Doc(error));
+        }
+        Ok(entry.reference)
+    }
+
+    /// 首次保存/另存为入口：迁移意图优先重试；已有目标直接保存；无目标要求选择。
+    #[allow(dead_code)]
+    pub(crate) fn request_save_or_target(&mut self) -> SaveTargetCommand {
+        if self.association.is_some() {
+            return SaveTargetCommand::Save(SaveCommand::Rejected(SaveRejection::Busy));
+        }
+        if !self.editable {
+            return SaveTargetCommand::Save(SaveCommand::Rejected(SaveRejection::ReadOnly));
+        }
+        if self.pending_migration.is_some() {
+            return SaveTargetCommand::RetryAssociation;
+        }
+        if self.persistence.is_some() {
+            return SaveTargetCommand::Save(self.request_save_command());
+        }
+        SaveTargetCommand::ChooseTarget {
+            kind: WriteKind::Create,
+        }
+    }
+
+    /// 另存为总是先请宿主选择目标；选定后交给 `begin_association_save`。
+    #[allow(dead_code)]
+    pub(crate) fn request_save_as_target(&mut self) -> SaveTargetCommand {
+        if self.association.is_some() {
+            return SaveTargetCommand::Save(SaveCommand::Rejected(SaveRejection::Busy));
+        }
+        if !self.editable {
+            return SaveTargetCommand::Save(SaveCommand::Rejected(SaveRejection::ReadOnly));
+        }
+        SaveTargetCommand::ChooseTarget {
+            kind: WriteKind::SaveAs,
+        }
+    }
+
+    /// 用重试时保留的材料重新规划迁移或直接重新入队写盘；不重新选择路径。
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn retry_association(&mut self) -> Result<AssociationStep, SaveRejection> {
+        if !self.editable {
+            return Err(SaveRejection::ReadOnly);
+        }
+        if self.association.is_some() || self.core.composition().is_some() {
+            return Err(SaveRejection::Busy);
+        }
+        let (target, kind) = match self.pending_migration.as_ref() {
+            Some(pending) => (pending.target.clone(), pending.kind),
+            None => return Err(SaveRejection::NoTarget),
+        };
+        let snapshot = self
+            .current_snapshot()
+            .map_err(|_| SaveRejection::Internal)?;
+        let source = snapshot
+            .full_text(self.limits.text())
+            .map_err(|_| SaveRejection::Internal)?;
+        let has_locator = self.resources.as_ref().is_some_and(|catalog| {
+            catalog
+                .entries()
+                .iter()
+                .any(|entry| source.contains(&entry.locator))
+        });
+        let operation = self.next_association;
+        self.next_association = self.next_association.wrapping_add(1);
+        let cancellation = Cancellation::new();
+        if has_locator {
+            let job =
+                self.freeze_migration(operation, kind, target.clone(), cancellation.clone())?;
+            self.association = Some(AssociationState {
+                operation,
+                kind,
+                target,
+                cancellation,
+                phase: AssociationPhase::Copying,
+                wait: None,
+                save_operation: None,
+            });
+            return Ok(AssociationStep::Run(job));
+        }
+        let (job, save_operation) = self.enqueue_association_write(kind, target.clone())?;
+        self.association = Some(AssociationState {
+            operation,
+            kind,
+            target,
+            cancellation,
+            phase: AssociationPhase::Writing,
+            wait: None,
+            save_operation: Some(save_operation),
+        });
+        Ok(AssociationStep::Write(job))
+    }
+
+    /// 关联等待是否仍属于当前状态；迟到句柄不得结算新关联。
+    #[allow(dead_code)]
+    pub(crate) fn association_wait_matches(&self, handle: WaitHandle) -> bool {
+        self.association.as_ref().is_some_and(|state| {
+            state.phase == AssociationPhase::Waiting && state.wait == Some(handle)
+        })
+    }
+
+    /// 平台自然结束关联等待：确认后进入复制阶段，取消则清理状态。
+    #[allow(dead_code)]
+    pub(crate) fn finish_association_wait(
+        &mut self,
+        handle: WaitHandle,
+        outcome: PublicationOutcome,
+        now_millis: u64,
+    ) -> AssociationCommand {
+        let Some(state) = self.association.as_ref() else {
+            return AssociationCommand::Rejected(SaveRejection::Internal);
+        };
+        if state.phase != AssociationPhase::Waiting || state.wait != Some(handle) {
+            return AssociationCommand::Rejected(SaveRejection::Internal);
+        }
+        let operation = state.operation;
+        let kind = state.kind;
+        let target = state.target.clone();
+        let cancellation = state.cancellation.clone();
+        if self
+            .core
+            .finish_publication(handle, outcome, now_millis)
+            .is_err()
+        {
+            return AssociationCommand::Rejected(SaveRejection::Internal);
+        }
+        if outcome == PublicationOutcome::PlatformCancelled {
+            self.association = None;
+            return AssociationCommand::Cancelled;
+        }
+        let job = match self.freeze_migration(operation, kind, target, cancellation) {
+            Ok(job) => job,
+            Err(rejection) => {
+                self.association = None;
+                return AssociationCommand::Rejected(rejection);
+            }
+        };
+        if let Some(state) = self.association.as_mut() {
+            state.phase = AssociationPhase::Copying;
+            state.wait = None;
+        }
+        AssociationCommand::Run(job)
+    }
+
+    /// 开始一次首次保存/另存为关联：校验目标、组合等待或冻结迁移输入。
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn begin_association_save(
+        &mut self,
+        kind: WriteKind,
+        target: PathBuf,
+        _now_millis: u64,
+    ) -> AssociationCommand {
+        if !self.editable {
+            return AssociationCommand::Rejected(SaveRejection::ReadOnly);
+        }
+        if self.association.is_some() || self.pending_migration.is_some() {
+            return AssociationCommand::Rejected(SaveRejection::Busy);
+        }
+        if !target.is_absolute() {
+            return AssociationCommand::Rejected(SaveRejection::NoTarget);
+        }
+        match std::fs::symlink_metadata(&target) {
+            Ok(metadata) if metadata.is_dir() => {
+                return AssociationCommand::Rejected(SaveRejection::NoTarget);
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(_) => return AssociationCommand::Rejected(SaveRejection::NoTarget),
+        }
+        // 无协调器（未命名/恢复文档）时首次保存一律按 Create；展示路径不构成关联。
+        let kind = if self.persistence.is_none() {
+            WriteKind::Create
+        } else {
+            kind
+        };
+        if self.persistence.is_some() && target == self.path {
+            return AssociationCommand::Save(self.request_save_command());
+        }
+        let operation = self.next_association;
+        self.next_association = self.next_association.wrapping_add(1);
+        let cancellation = Cancellation::new();
+        if self.core.composition().is_some() {
+            let handle = match self.core.begin_publication_wait(PublicationKind::Save) {
+                Ok(handle) => handle,
+                Err(_) => return AssociationCommand::Rejected(SaveRejection::Internal),
+            };
+            self.association = Some(AssociationState {
+                operation,
+                kind,
+                target,
+                cancellation,
+                phase: AssociationPhase::Waiting,
+                wait: Some(handle),
+                save_operation: None,
+            });
+            return AssociationCommand::Wait(handle);
+        }
+        let job = match self.freeze_migration(operation, kind, target.clone(), cancellation.clone())
+        {
+            Ok(job) => job,
+            Err(rejection) => return AssociationCommand::Rejected(rejection),
+        };
+        self.association = Some(AssociationState {
+            operation,
+            kind,
+            target,
+            cancellation,
+            phase: AssociationPhase::Copying,
+            wait: None,
+            save_operation: None,
+        });
+        AssociationCommand::Run(job)
+    }
+
+    /// 取消等待或复制任务；已排队/在途写盘按协调器取消，不删除临时资源。
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn cancel_association(&mut self) {
+        let Some(state) = self.association.take() else {
+            return;
+        };
+        // 复制阶段也必须取消同一迁移任务的取消句柄，否则任务会无主继续写盘。
+        state.cancellation.cancel();
+        if state.phase == AssociationPhase::Waiting
+            && let Some(handle) = state.wait
+        {
+            let _ = self.core.request_cancel_wait(handle);
+        }
+        if let Some(operation) = state.save_operation
+            && let Some(coordinator) = self.persistence.as_mut()
+        {
+            coordinator.cancel(operation);
+        }
+    }
+
+    /// 冻结迁移输入；临时根缺失时条目为空，SaveAs 仍可复制既有相对资产。
+    #[cfg_attr(not(test), allow(dead_code))]
+    fn freeze_migration(
+        &mut self,
+        operation: u64,
+        kind: WriteKind,
+        target: PathBuf,
+        cancellation: Cancellation,
+    ) -> Result<ResourceMigrationJob, SaveRejection> {
+        let snapshot = self
+            .current_snapshot()
+            .map_err(|_| SaveRejection::Internal)?;
+        let (entries, temp_directory) = match self.resources.as_ref() {
+            Some(catalog) => (
+                catalog.entries().to_vec(),
+                catalog.directory().to_path_buf(),
+            ),
+            None => (Vec::new(), PathBuf::new()),
+        };
+        let current_dir = if self.path.is_absolute() {
+            self.path.parent().map(Path::to_path_buf)
+        } else {
+            None
+        };
+        Ok(ResourceMigrationJob::new(
+            self.core.document_id().clone(),
+            operation,
+            kind,
+            target,
+            current_dir,
+            snapshot,
+            entries,
+            self.image_settings.clone(),
+            temp_directory,
+            self.limits.text(),
+            cancellation,
+        ))
+    }
+
+    /// 迁移完成后按关联目标入队并生成后台写盘工作。
+    #[cfg_attr(not(test), allow(dead_code))]
+    fn enqueue_association_write(
+        &mut self,
+        kind: WriteKind,
+        target: PathBuf,
+    ) -> Result<(SaveJob, OperationId), SaveRejection> {
+        if self.persistence.is_none() {
+            let coordinator = PersistenceCoordinator::new_untitled(
+                self.core.document_id().clone(),
+                target.clone(),
+                self.baseline.clone(),
+            )
+            .map_err(|_| SaveRejection::Internal)?;
+            self.persistence = Some(coordinator);
+        }
+        let staging = save_staging_candidate(&target)?;
+        let request = {
+            let coordinator = self.persistence.as_mut().ok_or(SaveRejection::Internal)?;
+            match kind {
+                WriteKind::SaveAs => {
+                    coordinator.request_save_as(&mut self.core, self.limits.text(), target.clone())
+                }
+                WriteKind::Create | WriteKind::Existing => {
+                    coordinator.request_save(&mut self.core, self.limits.text())
+                }
+            }
+        };
+        let operation = match request {
+            Ok(SaveRequest::Queued(operation)) => operation,
+            Ok(SaveRequest::Waiting(_)) => return Err(SaveRejection::Busy),
+            Err(error) => return Err(save_request_rejection(&error)),
+        };
+        let job = self.start_queued_save(operation, staging)?;
+        Ok((job, operation))
+    }
+
+    /// 按固定顺序复核迁移完成项：过期/取消/新引用/编辑拒绝/入队写盘。
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn association_prepared(
+        &mut self,
+        completion: MigrationCompletion,
+        now_millis: u64,
+    ) -> AssociationStep {
+        let Some(state) = self.association.as_ref() else {
+            return AssociationStep::Settled(AssociationOutcome::Stale);
+        };
+        if &completion.document != self.core.document_id()
+            || completion.operation != state.operation
+        {
+            return AssociationStep::Settled(AssociationOutcome::Stale);
+        }
+        if completion.cancelled {
+            self.association = None;
+            return AssociationStep::Settled(AssociationOutcome::Cancelled);
+        }
+        let migration = match completion.result {
+            Ok(migration) => migration,
+            Err(error) => {
+                self.association = None;
+                return AssociationStep::Settled(if error == MigrationError::StaleResourceSet {
+                    AssociationOutcome::NeedsRetry
+                } else {
+                    AssociationOutcome::Failed
+                });
+            }
+        };
+        let identity = match self.input_identity() {
+            Ok(identity) => identity,
+            Err(_) => {
+                self.association = None;
+                return AssociationStep::Settled(AssociationOutcome::NeedsRetry);
+            }
+        };
+        let snapshot = match self.current_snapshot() {
+            Ok(snapshot) => snapshot,
+            Err(_) => {
+                self.association = None;
+                return AssociationStep::Settled(AssociationOutcome::NeedsRetry);
+            }
+        };
+        let source = match snapshot.full_text(self.limits.text()) {
+            Ok(source) => source,
+            Err(_) => {
+                self.association = None;
+                return AssociationStep::Settled(AssociationOutcome::NeedsRetry);
+            }
+        };
+        let mappings = &migration.mappings;
+        let new_locator = self.resources.as_ref().is_some_and(|catalog| {
+            catalog.entries().iter().any(|entry| {
+                source.contains(&entry.locator)
+                    && !mappings.iter().any(|mapping| mapping.from == entry.locator)
+            })
+        });
+        if new_locator {
+            self.association = None;
+            return AssociationStep::Settled(AssociationOutcome::NeedsRetry);
+        }
+        let spans = locator_spans(&source, mappings);
+        if !spans.is_empty() {
+            let edits = spans
+                .iter()
+                .map(|(range, index)| {
+                    let mapping = &mappings[*index];
+                    SourceEdit::new(range.clone(), mapping.from.clone(), mapping.to.clone())
+                })
+                .collect();
+            let parsed_local;
+            let parsed =
+                if self.is_parse_current() && self.parsed.snapshot().id() == snapshot.text().id() {
+                    &self.parsed
+                } else {
+                    let cancel = CancelToken::new();
+                    match parse_with_cancel(
+                        snapshot.text(),
+                        self.parsed.config(),
+                        self.parse_budget,
+                        &cancel,
+                    ) {
+                        Ok(parsed) => {
+                            parsed_local = parsed;
+                            &parsed_local
+                        }
+                        Err(_) => {
+                            self.association = None;
+                            return AssociationStep::Settled(AssociationOutcome::NeedsRetry);
+                        }
+                    }
+                };
+            let inserted: usize = spans
+                .iter()
+                .map(|(_, index)| mappings[*index].to.len())
+                .sum();
+            let output = source.len().saturating_add(inserted);
+            let budget = EditBudget::new(
+                PatchBudget::new(spans.len(), inserted, output),
+                self.limits.text(),
+                self.parse_budget,
+            );
+            let command = EditCommand::replace(edits);
+            let context = EditContext::new(match self.core.mode() {
+                EditorMode::Visual => EditMode::Visual,
+                EditorMode::Source => EditMode::Source,
+            });
+            match plan_change(
+                snapshot.text(),
+                parsed,
+                snapshot.selection(),
+                &context,
+                &command,
+                budget,
+            ) {
+                Ok(PlanOutcome::Changed(plan)) => {
+                    if self
+                        .core
+                        .apply_change(&identity, parsed, &plan, now_millis)
+                        .is_err()
+                    {
+                        self.association = None;
+                        return AssociationStep::Settled(AssociationOutcome::NeedsRetry);
+                    }
+                }
+                Ok(PlanOutcome::Unchanged(_)) => {}
+                Err(_) => {
+                    self.association = None;
+                    return AssociationStep::Settled(AssociationOutcome::NeedsRetry);
+                }
+            }
+        }
+        let (target, kind) = match self.association.as_ref() {
+            Some(state) => (state.target.clone(), state.kind),
+            None => return AssociationStep::Settled(AssociationOutcome::Stale),
+        };
+        match self.enqueue_association_write(kind, target.clone()) {
+            Ok((job, operation)) => {
+                if let Some(state) = self.association.as_mut() {
+                    state.phase = AssociationPhase::Writing;
+                    state.save_operation = Some(operation);
+                }
+                self.pending_migration = Some(PendingMigration {
+                    target,
+                    kind,
+                    mappings: migration.mappings,
+                });
+                AssociationStep::Write(job)
+            }
+            Err(_) => {
+                self.association = None;
+                AssociationStep::Settled(AssociationOutcome::Failed)
+            }
+        }
+    }
+
+    /// 关闭就绪判定：关联等待、组合、待重试迁移与保存协调器统一在此收口。
+    pub(crate) fn close_status(&mut self) -> CloseStatus {
+        if self.association.is_some() {
+            return CloseStatus::Waiting;
+        }
+        if self.core.composition().is_some()
+            || self
+                .core
+                .wait()
+                .is_some_and(|wait| wait.status() == WaitStatus::Pending)
+        {
+            return CloseStatus::Waiting;
+        }
+        if self.pending_migration.is_some() {
+            return CloseStatus::NeedsDecision;
+        }
+        if self.persistence.is_none() {
+            let Ok(snapshot) = self.current_snapshot() else {
+                return CloseStatus::NeedsDecision;
+            };
+            return if snapshot
+                .full_text(self.limits.text())
+                .is_ok_and(|text| text == self.baseline.source())
+            {
+                CloseStatus::Ready
+            } else {
+                CloseStatus::NeedsDecision
+            };
+        }
+        let Ok(snapshot) = self.current_snapshot() else {
+            return CloseStatus::NeedsDecision;
+        };
+        self.persistence
+            .as_ref()
+            .map_or(CloseStatus::NeedsDecision, |coordinator| {
+                coordinator.close_status(&snapshot)
+            })
+    }
+
+    /// 取走文档关闭后的资源清理任务；先捕获恢复上下文再退役恢复谱系。
+    pub(crate) fn retire_for_close(
+        &mut self,
+    ) -> (Option<RecoveryCloseJob>, Option<ResourceCleanupJob>) {
+        let recovery_context = self.recovery_cleanup_context();
+        let cleanup = self.retire_resources(recovery_context);
+        let recovery = self.take_recovery_close();
+        (recovery, cleanup)
+    }
+
+    /// 捕获清理任务所需的恢复引用上下文；不移动资源目录，供替换在
+    /// `prepare` 成功后再退役旧文档资源。
+    pub(crate) fn recovery_cleanup_context(&self) -> Option<(RecoveryStore, RecoveryDocumentId)> {
+        self.recovery
+            .as_ref()
+            .and_then(RecoverySession::cleanup_context)
+    }
+
+    /// 取走资源目录并生成清理任务；只有文档确定释放后才能交给后台执行。
+    pub(crate) fn retire_resources(
+        &mut self,
+        recovery: Option<(RecoveryStore, RecoveryDocumentId)>,
+    ) -> Option<ResourceCleanupJob> {
+        let catalog = self.resources.take()?;
+        Some(ResourceCleanupJob::new(
+            catalog.directory().to_path_buf(),
+            catalog.entries().to_vec(),
+            recovery,
+        ))
+    }
+
+    /// 会话打开文档后注入资源设置与受检临时根；普通打开只注入一次。
+    fn apply_resource_config(&mut self, settings: ImageSettings, root: Option<TempRoot>) {
+        self.image_settings = settings;
+        self.temp_root = root;
     }
 
     /// 取走已排队的保存，生成可离开 UI 线程执行的后台工作；
@@ -287,6 +974,41 @@ impl ReadonlyDocument {
             self.external_pause = false;
             self.reload_pause = false;
             self.reload_mark = None;
+        }
+        if settlement.adopted {
+            if let Some((path, baseline)) = settlement.association.clone() {
+                // 首次保存/另存为已发布：展示路径与实际基线一起改为新目标。
+                self.path = path;
+                self.baseline = baseline;
+                self.external = None;
+                self.external_pause = false;
+                self.reload_pause = false;
+                self.reload_mark = None;
+                self.association = None;
+                self.pending_migration = None;
+            } else if self.association.is_some() {
+                match &settlement.outcome {
+                    WriteOutcome::PublishedTargetUnverified(_)
+                    | WriteOutcome::PublishedReceiptMismatch(_)
+                    | WriteOutcome::PublishedBaselineFailed { .. }
+                    | WriteOutcome::PublishedNewBaselineFailed { .. } => {
+                        // 已发布但基线不可确认：路径随实际目标更新，保留关闭 guard 的
+                        // PublishedUncertain 判定；没有可采纳的基线可替换。
+                        self.path = settlement.path.clone();
+                        self.external = None;
+                        self.external_pause = false;
+                        self.reload_pause = false;
+                        self.reload_mark = None;
+                        self.association = None;
+                        self.pending_migration = None;
+                    }
+                    WriteOutcome::NotPublished(_) => {
+                        // 写入失败/冲突：保留已完成的迁移映射供同一目标重试。
+                        self.association = None;
+                    }
+                    WriteOutcome::Published { .. } => {}
+                }
+            }
         }
         Ok(settlement)
     }
@@ -498,6 +1220,10 @@ impl ReadonlyDocument {
 
     /// 结算到期的自动保存；不执行保存，只返回动作。
     pub(crate) fn autosave_poll(&mut self, now_millis: u64) -> AutosaveAction {
+        // 关联/迁移期间不得绕过引用迁移把临时 locator 写入目标文件。
+        if self.association.is_some() || self.pending_migration.is_some() {
+            return AutosaveAction::NoTarget;
+        }
         if !self.editable || self.persistence.is_none() {
             return AutosaveAction::NoTarget;
         }
@@ -781,6 +1507,10 @@ impl ReadonlyDocument {
         if !self.editable {
             return SaveCommand::Rejected(SaveRejection::ReadOnly);
         }
+        // 关联/迁移期间不得绕过引用迁移直接写目标。
+        if self.association.is_some() || self.pending_migration.is_some() {
+            return SaveCommand::Rejected(SaveRejection::Busy);
+        }
         let Some(coordinator) = self.persistence.as_ref() else {
             return SaveCommand::Rejected(SaveRejection::NoTarget);
         };
@@ -900,6 +1630,14 @@ impl ReadonlyDocument {
         self.persistence
             .as_ref()
             .map(PersistenceCoordinator::status)
+    }
+
+    /// 仅供 crate 内测试读取首次保存是否已完成关联。
+    #[cfg(test)]
+    pub(super) fn persistence_is_creating(&self) -> Option<bool> {
+        self.persistence
+            .as_ref()
+            .map(PersistenceCoordinator::is_creating)
     }
 
     /// 仅供 crate 内测试读取当前是否脏；不扩大生产 API。
@@ -1037,33 +1775,6 @@ impl ReadonlyDocument {
         self.core.accept_document_result(identity)?;
         self.current_snapshot()
     }
-
-    fn can_discard_for_replacement(&mut self) -> bool {
-        if !self.editable {
-            return true;
-        }
-        if self.core.composition().is_some()
-            || self
-                .core
-                .wait()
-                .is_some_and(|wait| wait.status() == WaitStatus::Pending)
-        {
-            return false;
-        }
-        let Ok(snapshot) = self.current_snapshot() else {
-            return false;
-        };
-        match &self.persistence {
-            // 可编辑文档的关闭/替换一律以协调器的最新状态为准：在途保存、
-            // 未结算失败/冲突/不确定发布或相对保存基线有修改都须先由用户处理。
-            Some(coordinator) => coordinator.close_status(&snapshot) == CloseStatus::Ready,
-            // 没有绝对目标路径的可编辑文档只可能来自注入读取器或测试，
-            // 此时没有可写目标关联，退回原有的打开基线全文比较。
-            None => snapshot
-                .full_text(self.limits.text())
-                .is_ok_and(|text| text == self.baseline.source()),
-        }
-    }
 }
 
 /// 保存目标同目录的 staging 候选：路径唯一且不预创建，最多尝试 8 个。
@@ -1113,6 +1824,7 @@ fn settlement_result(outcome: &WriteOutcome) -> SaveResult {
             _ => SaveResult::Failed,
         },
         WriteOutcome::NotPublished(WriteStop::Preparation(_)) => SaveResult::Failed,
+        WriteOutcome::NotPublished(WriteStop::Create(_)) => SaveResult::Failed,
         WriteOutcome::Published {
             synchronized: true, ..
         } => SaveResult::Saved,
@@ -1122,7 +1834,8 @@ fn settlement_result(outcome: &WriteOutcome) -> SaveResult {
         }
         | WriteOutcome::PublishedTargetUnverified(_)
         | WriteOutcome::PublishedReceiptMismatch(_)
-        | WriteOutcome::PublishedBaselineFailed { .. } => SaveResult::SavedUncertain,
+        | WriteOutcome::PublishedBaselineFailed { .. }
+        | WriteOutcome::PublishedNewBaselineFailed { .. } => SaveResult::SavedUncertain,
     }
 }
 
@@ -1195,6 +1908,12 @@ pub struct ReadonlySession {
     recovery: Option<RecoveryConfig>,
     /// 关闭/替换后待后台退役的恢复谱系；由宿主取走执行。
     retired_recoveries: Vec<RecoveryCloseJob>,
+    /// 下一次打开文档时注入的资源目录设置；打开期间不可更改。
+    image_settings: ImageSettings,
+    /// 下一次打开文档时注入的受检临时根；无根时插图失败关闭。
+    temp_root: Option<TempRoot>,
+    /// 关闭/替换后待后台执行的临时资源清理任务。
+    retired_cleanups: Vec<ResourceCleanupJob>,
 }
 impl ReadonlySession {
     /// 建立无文档状态，不创建编辑块、任务或文件句柄。
@@ -1208,7 +1927,40 @@ impl ReadonlySession {
             alive: true,
             recovery: None,
             retired_recoveries: Vec::new(),
+            image_settings: ImageSettings::default(),
+            temp_root: None,
+            retired_cleanups: Vec::new(),
         }
+    }
+
+    /// 配置下一次打开使用的图片资产目录；文档打开期间拒绝更改。
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn configure_image_settings(
+        &mut self,
+        settings: ImageSettings,
+    ) -> Result<(), ImageSettingsError> {
+        if self.document.is_some() {
+            return Err(ImageSettingsError::DocumentOpen);
+        }
+        settings
+            .validate()
+            .map_err(|_| ImageSettingsError::Invalid)?;
+        self.image_settings = settings;
+        Ok(())
+    }
+
+    /// 注入下一次打开使用的受检临时根；文档打开期间忽略。
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn configure_temp_root(&mut self, root: Option<TempRoot>) {
+        if self.document.is_none() {
+            self.temp_root = root;
+        }
+    }
+
+    /// 取走关闭/替换后待执行的临时资源清理任务；宿主在文档释放后运行。
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn take_retired_cleanups(&mut self) -> Vec<ResourceCleanupJob> {
+        std::mem::take(&mut self.retired_cleanups)
     }
     /// 返回当前完整 Ready 文档；加载候选不会覆盖它。
     pub fn document(&self) -> Option<&ReadonlyDocument> {
@@ -1349,20 +2101,31 @@ impl ReadonlySession {
                 if self
                     .document
                     .as_mut()
-                    .is_some_and(|current| !current.can_discard_for_replacement())
+                    .is_some_and(|current| current.close_status() != CloseStatus::Ready)
                 {
                     return Ok((OpenDisposition::RejectedUnresolvedDocument, None));
                 }
-                // 替换前先取消旧文档在途恢复并排队退役，再挂接新文档。
-                if let Some(old) = self.document.as_mut()
-                    && let Some(job) = old.take_recovery_close()
-                {
-                    self.retired_recoveries.push(job);
+                // 替换前先取消旧文档在途恢复并退役谱系；清理所需的恢复引用上下文
+                // 必须在退役前捕获，但资源目录要等新文档准备成功后才移动。
+                let mut recovery_context = None;
+                if let Some(old) = self.document.as_mut() {
+                    recovery_context = old.recovery_cleanup_context();
+                    if let Some(job) = old.take_recovery_close() {
+                        self.retired_recoveries.push(job);
+                    }
                 }
                 if let Some(config) = self.recovery.clone() {
                     document.attach_recovery(config);
                 }
+                document.apply_resource_config(self.image_settings.clone(), self.temp_root.clone());
                 let prepared = prepare(&mut document)?;
+                // 只有新文档准备成功才退役旧文档资源；`prepare` 失败时旧文档仍是当前
+                // 文档，必须继续持有目录与条目，否则后台清理会删掉其仍在引用的临时图片。
+                if let Some(old) = self.document.as_mut()
+                    && let Some(job) = old.retire_resources(recovery_context)
+                {
+                    self.retired_cleanups.push(job);
+                }
                 self.document = Some(document);
                 Ok((OpenDisposition::Applied, Some(prepared)))
             }
@@ -1378,13 +2141,17 @@ impl ReadonlySession {
         before_close: impl FnOnce(&ReadonlyDocument) -> T,
     ) -> Result<Option<T>, CloseDisposition> {
         let close_value = if let Some(document) = self.document.as_mut() {
-            if !document.can_discard_for_replacement() {
+            if document.close_status() != CloseStatus::Ready {
                 return Err(CloseDisposition::Refused);
             }
             let value = before_close(document);
-            // 关闭获准后先取消在途恢复并排队退役，再释放文档。
-            if let Some(job) = document.take_recovery_close() {
+            // 关闭获准后先取消在途恢复/资源并在后台退役，再释放文档。
+            let (recovery, cleanup) = document.retire_for_close();
+            if let Some(job) = recovery {
                 self.retired_recoveries.push(job);
+            }
+            if let Some(job) = cleanup {
+                self.retired_cleanups.push(job);
             }
             Some(value)
         } else {
@@ -1430,7 +2197,13 @@ mod tests {
     use std::path::{Path, PathBuf};
 
     use super::*;
+    #[cfg(target_os = "macos")]
+    use crate::document::resources::CleanupOutcome;
+    #[cfg(target_os = "macos")]
+    use aline_buffer::SelectionSpec;
     use aline_buffer::{HistoryBudget, LineIndexBudget, TextBudget};
+    #[cfg(target_os = "macos")]
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     struct Files(&'static [u8]);
 
@@ -1567,6 +2340,163 @@ mod tests {
 
         assert_eq!(session.close_document(), CloseDisposition::Closed);
         assert!(session.document().is_none());
+        Ok(())
+    }
+
+    /// 系统临时目录下的测试 HOME；Drop 时递归清理，绝不使用真实 HOME。
+    #[cfg(target_os = "macos")]
+    struct TempHome(PathBuf);
+
+    #[cfg(target_os = "macos")]
+    impl TempHome {
+        fn create(prefix: &str) -> Result<Self, Box<dyn Error>> {
+            let nanos = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+            for attempt in 0..100u32 {
+                let path = std::env::temp_dir().join(format!(
+                    "aline-{prefix}-{}-{nanos:x}-{attempt}",
+                    std::process::id()
+                ));
+                match std::fs::create_dir(&path) {
+                    Ok(()) => {
+                        std::fs::create_dir_all(path.join("Library/Application Support"))?;
+                        return Ok(Self(path));
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                    Err(error) => return Err(error.into()),
+                }
+            }
+            Err("无法创建测试 HOME".into())
+        }
+
+        fn path(&self) -> &Path {
+            &self.0
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    impl Drop for TempHome {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    /// 打开一个挂接受检临时根的可编辑会话；使用相对路径，不创建保存协调器。
+    #[cfg(target_os = "macos")]
+    fn editable_resource_session(home: &Path) -> Result<ReadonlySession, Box<dyn Error>> {
+        let max = 4096;
+        let limits = ReadonlyOpenLimits::new(
+            StorageBudget::new(max),
+            DocLimits::new(
+                TextBudget::new(max),
+                LineIndexBudget::new(128),
+                HistoryBudget::new(16, max),
+            ),
+            ParseConfig::m0(),
+            ParseBudget::m0(),
+        )
+        .with_editing();
+        let mut session = ReadonlySession::new(limits);
+        let root = TempRoot::open_or_create(home).map_err(|error| format!("{error:?}"))?;
+        session.configure_temp_root(Some(root));
+        let request = session.request_open()?;
+        let job = session
+            .accept_selection(&request, Some(vec![PathBuf::from("fixture.md")]))?
+            .ok_or("missing open job")?;
+        assert!(matches!(
+            session.accept_open(job.read_with(&Files(b"base"))),
+            OpenDisposition::Applied
+        ));
+        Ok(session)
+    }
+
+    /// 替换准备失败时旧文档仍持有资源目录，不得产生可删除其临时图片的清理任务；
+    /// 准备成功后才按序退役旧资源。
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn replacement_retires_old_resources_only_after_prepare_succeeds() -> Result<(), Box<dyn Error>>
+    {
+        let home = TempHome::create("replace-resources")?;
+        let mut session = editable_resource_session(home.path())?;
+        {
+            let document = session.document_mut().ok_or("document")?;
+            let len = document
+                .current_snapshot()?
+                .full_text(TextBudget::new(4096))?
+                .len();
+            document
+                .edit_core()?
+                .open_block(0..len, SelectionSpec::new(0, 0))?;
+        }
+        session
+            .document_mut()
+            .ok_or("document")?
+            .stage_temp_image("pic.png", b"png", 4096)
+            .map_err(|error| format!("{error:?}"))?;
+        session
+            .document_mut()
+            .ok_or("document")?
+            .edit_core()?
+            .leave_block(1)?;
+        let old_id = session
+            .document()
+            .ok_or("document")?
+            .core
+            .document_id()
+            .clone();
+        let temp_file = {
+            let document = session.document().ok_or("document")?;
+            let catalog = document.resources.as_ref().ok_or("resources")?;
+            let entry = catalog.entries().first().ok_or("resource entry")?;
+            catalog.directory().join(&entry.file_name)
+        };
+        assert!(temp_file.is_file());
+
+        let request = session.request_open()?;
+        let replacement = session
+            .accept_selection(&request, Some(vec![PathBuf::from("replacement.md")]))?
+            .ok_or("replacement job")?;
+        let failed = session
+            .accept_open_with(replacement.read_with(&Files(b"replacement")), |_| {
+                Err::<(), _>("prepare failed")
+            });
+        assert_eq!(failed.err(), Some("prepare failed"));
+        assert!(
+            session.take_retired_cleanups().is_empty(),
+            "prepare 失败时不得生成会删除旧文档资源的清理任务"
+        );
+        {
+            let document = session.document().ok_or("preserved document")?;
+            assert_eq!(document.core.document_id(), &old_id);
+            assert_eq!(document.path(), Path::new("fixture.md"));
+            let catalog = document.resources.as_ref().ok_or("resources preserved")?;
+            assert_eq!(catalog.entries().len(), 1);
+        }
+        assert!(temp_file.is_file(), "旧文档资源文件必须仍在");
+
+        let request = session.request_open()?;
+        let replacement = session
+            .accept_selection(&request, Some(vec![PathBuf::from("replacement.md")]))?
+            .ok_or("replacement job")?;
+        let applied = session
+            .accept_open_with(replacement.read_with(&Files(b"replacement")), |_| {
+                Ok::<(), &'static str>(())
+            });
+        assert!(matches!(applied, Ok((OpenDisposition::Applied, Some(())))));
+        let cleanup = session
+            .take_retired_cleanups()
+            .into_iter()
+            .next()
+            .ok_or("cleanup job")?;
+        assert!(temp_file.exists(), "清理任务执行前旧文件仍在");
+        assert_eq!(cleanup.run(), CleanupOutcome::Cleaned);
+        assert!(!temp_file.exists(), "替换成功后旧资源应被清理");
+        assert!(
+            session
+                .document()
+                .ok_or("new document")?
+                .resources
+                .is_none()
+        );
         Ok(())
     }
 }

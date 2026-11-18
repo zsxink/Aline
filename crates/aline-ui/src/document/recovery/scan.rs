@@ -63,6 +63,33 @@ pub(crate) struct RecoveryScanDefect {
     pub(crate) defect: RecoveryDefect,
 }
 
+impl RecoveryScan {
+    /// 只列出 Active 且至少有一个完整代的谱系；损坏代不进入列表。
+    // 4.2b 启动扫描与恢复面板消费；4.2a 由 crate 内测试覆盖。
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn recoverable_lineages(&self) -> Vec<&RecoveryLineageScan> {
+        self.lineages
+            .iter()
+            .filter(|lineage| {
+                lineage.disposition == RecoveryLineageDisposition::Active
+                    && lineage.latest_complete().is_some()
+            })
+            .collect()
+    }
+}
+
+impl RecoveryLineageScan {
+    /// 返回最高代的完整 generation；更高代的损坏/未知格式不参与选择。
+    // 4.2b 恢复面板消费；4.2a 由 crate 内测试覆盖。
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn latest_complete(&self) -> Option<&RecoveryGenerationScan> {
+        self.generations
+            .iter()
+            .filter(|generation| generation.status == RecoveryGenerationStatus::Complete)
+            .max_by_key(|generation| generation.generation)
+    }
+}
+
 pub(super) fn scan_store(store: &RecoveryStore) -> Result<RecoveryScan, RecoveryStoreError> {
     let _quota = store.lock_quota()?;
     store.sync_quota_scope(None)?;

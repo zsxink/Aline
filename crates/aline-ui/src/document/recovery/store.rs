@@ -1259,6 +1259,51 @@ impl RecoveryStore {
         Ok(generations)
     }
 
+    /// 只读取该谱系全部保留代 manifest 的资源表引用；任一记录损坏/未知格式
+    /// 返回错误，调用方据此放弃清理（fail closed）。
+    pub(crate) fn referenced_resources(
+        &self,
+        document: RecoveryDocumentId,
+    ) -> Result<std::collections::BTreeSet<String>, RecoveryStoreError> {
+        let mut references = std::collections::BTreeSet::new();
+        for generation in self.list_generation_ids(document)? {
+            let path = self.generation_dir(document, generation).join("manifest");
+            let manifest = fs::read(&path).map_err(|error| RecoveryStoreError::Io {
+                operation: RecoveryOperation::ReadManifest,
+                source: error,
+            })?;
+            if manifest.len() > MAX_MANIFEST_BYTES {
+                return Err(RecoveryStoreError::Budget(RecoveryBudget::Manifest));
+            }
+            let record =
+                RecoveryRecord::decode(&manifest).map_err(|error| match error.defect() {
+                    RecordDefect::UnknownFormat => {
+                        RecoveryStoreError::UnknownFormat { path: path.clone() }
+                    }
+                    _ => RecoveryStoreError::Protocol {
+                        document,
+                        defect: RecoveryDefect::RecordCorrupt,
+                    },
+                })?;
+            let RecoveryRecord::Snapshot(snapshot) = record else {
+                return Err(RecoveryStoreError::Protocol {
+                    document,
+                    defect: RecoveryDefect::RecordCorrupt,
+                });
+            };
+            if snapshot.document_id() != document.get() || snapshot.generation() != generation {
+                return Err(RecoveryStoreError::Protocol {
+                    document,
+                    defect: RecoveryDefect::RecordCorrupt,
+                });
+            }
+            for resource in snapshot.resources() {
+                references.insert(resource.reference().to_owned());
+            }
+        }
+        Ok(references)
+    }
+
     pub(super) fn list_reservations(
         &self,
         document: RecoveryDocumentId,

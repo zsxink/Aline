@@ -13,6 +13,7 @@ mod publication;
 mod readonly_session;
 mod recovery;
 mod resource;
+mod resources;
 mod snapshot;
 mod statistics;
 
@@ -50,6 +51,25 @@ pub(crate) use persistence::{
     ExternalApplyResult, ExternalCheckCommand, ExternalCheckCompletion, ExternalCheckIntent,
     ExternalCheckJob, ExternalCheckRejection, ExternalConflictView, ExternalDiskState, SaveCommand,
     SaveJob, SaveRejection, SaveResult, WriteCompletion,
+};
+
+/// 4.2b 首次保存/另存为动作消费的关联命令；窗口接线前只由 crate 内测试驱动。
+#[allow(unused_imports)]
+pub(crate) use readonly_session::{
+    AssociationCommand, AssociationOutcome, AssociationStep, SaveTargetCommand,
+};
+/// 4.2b 窗口与恢复接线将消费的资源面；接线前仅由 crate 内测试命名。
+#[allow(unused_imports)]
+pub(crate) use resources::{
+    CleanupOutcome, DiscoveredAsset, ImageDirectory, ResourceMigration, TEMPORARY_DIR,
+    TempDocumentId, TempResource, TempResourceId, TempResourceSource, TempRootError,
+    default_temp_root, discover_relative_assets, materialize_recovered, rewrite_locators,
+};
+/// 4.2a 会话已消费的资源面；从这里导入避免会话与资源模块直接耦合。
+pub(crate) use resources::{
+    ImageSettings, ImageSettingsError, MigrationCompletion, MigrationError, ResourceCatalog,
+    ResourceCleanupJob, ResourceError, ResourceMapping, ResourceMigrationJob, TempRoot,
+    locator_spans,
 };
 
 pub use mode::{EditorMode, ModeSwitchOutcome};
