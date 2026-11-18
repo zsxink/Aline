@@ -250,6 +250,7 @@ impl ReadonlyOpenJob {
                 reload_pause: false,
                 reload_mark: None,
                 autosave: super::AutosaveScheduler::default(),
+                recovery: None,
             },
             timings,
         ))

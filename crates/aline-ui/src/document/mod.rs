@@ -38,6 +38,14 @@ pub use snapshot::CurrentSnapshot;
 pub(crate) use readonly_session::{AutosaveAction, OpenTimings, StageTimer, StageTiming};
 pub(crate) use statistics::DocumentStatistics;
 
+pub(crate) use recovery::{
+    PreparedRecovery, RecoveryAction, RecoveryCloseJob, RecoveryConfig, RecoveryConfigError,
+    RecoveryPrepareJob, RecoveryPublishJob, RecoverySettlement, RecoveryStart,
+};
+/// 恢复根与存储仅由 crate 内测试直接构造；生产根接线归 4.2。
+#[cfg(test)]
+pub(crate) use recovery::{RecoveryRoot, RecoveryStore, UnavailableResources};
+
 pub(crate) use persistence::{
     ExternalApplyResult, ExternalCheckCommand, ExternalCheckCompletion, ExternalCheckIntent,
     ExternalCheckJob, ExternalCheckRejection, ExternalConflictView, ExternalDiskState, SaveCommand,

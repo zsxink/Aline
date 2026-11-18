@@ -105,6 +105,8 @@ reload_undo_paused = "已撤销到重载前的内容；自动保存已暂停，�
 conflict_baseline = "保存基线"
 conflict_local = "当前编辑"
 conflict_disk = "磁盘内容"
+recovery_failed = "恢复副本写入失败；内存中的内容仍保留。"
+recovery_incomplete = "恢复副本未发布：部分引用的资源不可用。"
 
 [open_error]
 selection = "请选择且仅选择一个 Markdown 文档。"

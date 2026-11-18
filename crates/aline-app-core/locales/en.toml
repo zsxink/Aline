@@ -105,6 +105,8 @@ reload_undo_paused = "Undo reverted to pre-reload content; autosave is paused un
 conflict_baseline = "Saved baseline"
 conflict_local = "Current edits"
 conflict_disk = "Disk content"
+recovery_failed = "The recovery copy could not be written; your content remains in memory."
+recovery_incomplete = "The recovery copy was not published because some referenced resources are unavailable."
 
 [open_error]
 selection = "Choose exactly one Markdown document."

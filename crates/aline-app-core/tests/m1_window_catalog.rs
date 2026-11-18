@@ -44,6 +44,8 @@ fn native_window_copy_exists_in_both_catalogs() {
                 "document.conflict_baseline",
                 "document.conflict_local",
                 "document.conflict_disk",
+                "document.recovery_failed",
+                "document.recovery_incomplete",
                 "action.visual_view",
                 "action.source_view",
                 "menu.file",

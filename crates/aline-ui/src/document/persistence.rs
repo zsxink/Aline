@@ -90,6 +90,13 @@ pub(super) struct OperationId(u64);
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) struct PathGeneration(u64);
 
+impl PathGeneration {
+    /// 返回路径代次数值，供恢复准备记录起点。
+    pub(super) const fn value(self) -> u64 {
+        self.0
+    }
+}
+
 #[derive(Debug, Eq, PartialEq)]
 pub(super) enum SaveError {
     ForeignDocument,
@@ -155,6 +162,19 @@ impl SavedBaseline {
             .flat_map(str::bytes)
             .eq(saved.iter_chunks()?.flat_map(str::bytes)))
     }
+}
+
+/// 以给定逻辑保存视图与存储基线判断当前文本是否仍等价；复用唯一比较实现。
+pub(super) fn saved_equivalent(
+    logical: Option<&TextSnapshot>,
+    storage: &SourceBaseline,
+    current: &TextSnapshot,
+) -> Result<bool, BufferError> {
+    SavedBaseline {
+        logical: logical.cloned(),
+        storage: storage.clone(),
+    }
+    .equivalent(current)
 }
 
 struct QueuedWrite {
@@ -584,6 +604,11 @@ impl PersistenceCoordinator {
     /// 返回当前保存基线；外改检查以它为比较对象。
     pub(super) fn saved_baseline(&self) -> &SourceBaseline {
         &self.target.saved.storage
+    }
+
+    /// 返回最近一次保存采纳的逻辑视图；恢复准备据此判断是否与保存点等价。
+    pub(super) fn saved_logical(&self) -> Option<&TextSnapshot> {
+        self.target.saved.logical.as_ref()
     }
 
     /// 仅在完全空闲且非不确定发布时把状态置为 Conflict；用于“已发现有本地修改的

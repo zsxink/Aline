@@ -36,7 +36,8 @@
 
 关联恢复资源与关闭 requirements、SAFE-08/IMAGE-07/08、R-6-06/15-08～12。
 
-- [ ] 4.1 实现独立 10 秒恢复目标、当前输入/版本和资源齐备后发布，注入损坏/部分写/资源不可读与重复重试。验收拟新增 `cargo test -p aline-ui --test persistence_recovery`，9999/10000ms、未命名/命名、组合当前输入、恢复写失败不假报保护；恢复先入内存、磁盘 bytes 不变。
+- [x] 4.1 实现独立 10 秒恢复目标、当前输入/版本和资源齐备后发布，注入损坏/部分写/资源不可读与重复重试。验收拟新增 `cargo test -p aline-ui --test persistence_recovery`，9999/10000ms、未命名/命名、组合当前输入、恢复写失败不假报保护；恢复先入内存、磁盘 bytes 不变。
+  - 2026-11-19 完成（主 Agent 自复核；按 W4-40 拆为 4.1a/4.1b 串行，仍对应本勾选）。4.1a（commit `6a0fad82`）：V1 记录编码（24-byte 头、CRC-32/ISO-HDLC、Snapshot/Retired）、`NextId`/`Reservation` 控制记录、受检根（0700/0600、非 symlink、owner uid）、三阶段 publish（quota→owner 锁序、high-water 先同步、reservation、逐级目录同步、manifest 最后提交、重取双锁结算）、配额/两代保留/退役、启动扫描与只回收确认 V1 半成品、`recover`/`discard` 只入内存；`aline-source::fs` 新增 W4-50 两个 macOS 原语，非 macOS 失败关闭。4.1b（同一任务提交）：纯 `RecoveryScheduler`（9999/10000ms、饱和、消费）、`RecoveryResourceSource`/`RecoveryConfig`/`UnavailableResources`、两阶段 `RecoveryPrepareJob`/`RecoveryPublishJob`（全文物化、整段 bytes 比较与资源读取只在后台，W4-54）、会话/尝试/阶段防陈旧完成、关闭/替换先取消再退役（W4-53）、`ReadonlyDocument`/`ReadonlySession` 挂接（只读文档永不挂接、未命名 `Unlinked`、组合期直接记录）、宿主计时槽与纯状态 `RecoverySlot`（替换后重新布防、迟到完成不清新任务）、双语 `document.recovery_failed`/`recovery_incomplete`。测试按 W4-40 落在 crate 内，未新增 `--test persistence_recovery`；`cargo test -p aline-ui` 515 passed / 0 failed / 2 ignored，`cargo test --workspace` 889 passed / 0 failed / 2 ignored；fmt、clippy、五项守卫与 `git diff --check` 全绿。任务评审 0 Critical、3 Important，fix round 1 全部 ADDRESSED（限定范围复审无新增 Critical/Important）；延迟 Minor 交最终整支评审。证据：`logs/validation/qmd-w4/recovery-4.1a-20261119-003228/`、`logs/validation/qmd-w4/recovery-4.1b-20261119-023450/`。真实窗口计时生命周期与真实资源源留 4.2。
 - [ ] 4.2 接临时图片保全及首次保存/另存为最小逐步发布，当前/历史/恢复/在途引用均阻止早删；接单文档统一关闭 guard。验收拟新增 `cargo test -p aline-ui --test persistence_resources`，复制/写盘失败、取消、重试、继续输入、关闭/恢复后未保存保留和恢复图片可读；同步架构 §7.4 与 V-08 实际状态。
 
 ## 5. 集成、独立审查和真实证据

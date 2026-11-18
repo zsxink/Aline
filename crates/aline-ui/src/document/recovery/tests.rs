@@ -1,26 +1,42 @@
-//! W4 4.1a 恢复层测试：根/存储/扫描/恢复/退役的真实文件行为。所有真实文件
-//! 测试只在 macOS 运行，使用自建临时目录，绝不写入真实 HOME；不使用
+//! W4 4.1a/4.1b 恢复层测试：根/存储/扫描/恢复/退役的真实文件行为，以及
+//! 会话协调器的准备、发布、跳过、取消与关闭退役。所有真实文件测试只在
+//! macOS 运行，使用自建临时目录，绝不写入真实 HOME；不使用
 //! `unwrap/expect/panic`，失败一律经 `Result<(), Box<dyn Error>>` 返回。
 
 #![cfg(all(test, target_os = "macos"))]
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fs;
+use std::io::{self, Cursor};
 use std::num::NonZeroU64;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use aline_source::Cancellation;
+use aline_buffer::{HistoryBudget, LineIndexBudget, SelectionSpec, TextBudget};
+use aline_markdown::{ParseBudget, ParseConfig};
+use aline_source::{Cancellation, StorageBudget};
+
+use crate::{
+    DocLimits, OpenDisposition, ReadonlyDocument, ReadonlyFileAccess, ReadonlyFileInput,
+    ReadonlyOpenLimits, ReadonlySession, ResourceReference,
+};
 
 use super::control::{NextId, Reservation};
+use super::coordinator::{
+    PreparedRecovery, RECOVERY_FAILED_KEY, RECOVERY_INCOMPLETE_KEY, RecoverySkip, RecoveryStart,
+};
 use super::record::{
     MAX_ACTIVE_LINEAGES, MAX_COMPLETE_GENERATIONS, MAX_GENERATION_RESOURCE_BYTES,
     MAX_INCOMPLETE_RESERVATIONS, MAX_MANIFEST_BYTES, MAX_RESOURCE_BYTES, MAX_TEXT_BYTES,
     NEXT_ID_BYTES, RECOVERY_INTERVAL_MILLIS, RESERVATION_BYTES, RETIRED_MANIFEST_BYTES,
     ROOT_PAYLOAD_LIMIT, RecoveryRecord,
+};
+use super::resource::{
+    RecoveryConfig, RecoveryConfigError, RecoveryResourceError, RecoveryResourceSource,
 };
 use super::root::{RECOVERY_DIR, RecoveryRoot, RootError, default_recovery_root};
 use super::scan::{RecoveryGenerationStatus, RecoveryLineageDisposition};
@@ -1257,4 +1273,681 @@ fn second_generation() -> Result<NonZeroU64, Box<dyn Error>> {
 
 fn first_generation() -> Result<NonZeroU64, Box<dyn Error>> {
     Ok(NonZeroU64::new(1).ok_or("1")?)
+}
+
+// ---- 4.1b 会话协调器：准备、发布、跳过、取消与关闭退役 ----
+
+/// 读取器适配：只提供调用方给定的字节，不触碰真实文件。
+struct Files<'a>(&'a [u8]);
+impl<'a> ReadonlyFileAccess for Files<'a> {
+    type Reader = Cursor<&'a [u8]>;
+    fn open(&self, _: &Path) -> io::Result<ReadonlyFileInput<Self::Reader>> {
+        Ok(ReadonlyFileInput::new(
+            Cursor::new(self.0),
+            self.0.len() as u64,
+            true,
+        ))
+    }
+}
+
+/// 恢复测试的打开预算；全部为测试注入值，不声明发布阈值。
+fn recovery_limits(editable: bool) -> ReadonlyOpenLimits {
+    let bytes = 64 * 1024;
+    let limits = ReadonlyOpenLimits::new(
+        StorageBudget::new(bytes),
+        DocLimits::new(
+            TextBudget::new(bytes),
+            LineIndexBudget::new(1024),
+            HistoryBudget::new(32, bytes),
+        ),
+        ParseConfig::m0(),
+        ParseBudget::m0(),
+    );
+    if editable {
+        limits.with_editing()
+    } else {
+        limits
+    }
+}
+
+fn recovery_config(
+    store: &RecoveryStore,
+    resources: Arc<dyn RecoveryResourceSource>,
+) -> RecoveryConfig {
+    RecoveryConfig {
+        store: store.clone(),
+        resources,
+    }
+}
+
+/// 以给定字节打开一个可编辑/只读恢复会话；恢复配置在打开前注入。
+fn open_recovery_session(
+    store: &RecoveryStore,
+    resources: Arc<dyn RecoveryResourceSource>,
+    path: &Path,
+    bytes: &[u8],
+    editable: bool,
+) -> Result<ReadonlySession, Box<dyn Error>> {
+    let mut session = ReadonlySession::new(recovery_limits(editable));
+    session
+        .configure_recovery(Some(recovery_config(store, resources)))
+        .map_err(|error| format!("{error:?}"))?;
+    let request = session.request_open()?;
+    let job = session
+        .accept_selection(&request, Some(vec![path.to_path_buf()]))?
+        .ok_or("应生成打开工作")?;
+    if !matches!(
+        session.accept_open(job.read_with(&Files(bytes))),
+        OpenDisposition::Applied
+    ) {
+        return Err("打开应成功应用".into());
+    }
+    Ok(session)
+}
+
+/// 经本地真实读取器打开恢复会话；源文件必须已存在。
+fn open_recovery_session_real(
+    store: &RecoveryStore,
+    resources: Arc<dyn RecoveryResourceSource>,
+    path: &Path,
+) -> Result<ReadonlySession, Box<dyn Error>> {
+    let mut session = ReadonlySession::new(recovery_limits(true));
+    session
+        .configure_recovery(Some(recovery_config(store, resources)))
+        .map_err(|error| format!("{error:?}"))?;
+    let request = session.request_open()?;
+    let job = session
+        .accept_selection(&request, Some(vec![path.to_path_buf()]))?
+        .ok_or("应生成打开工作")?;
+    if !matches!(session.accept_open(job.run()), OpenDisposition::Applied) {
+        return Err("打开应成功应用".into());
+    }
+    Ok(session)
+}
+
+/// 在全文范围打开旧式输入块；恢复测试需要可编辑草稿或组合。
+fn open_recovery_block(document: &mut ReadonlyDocument) -> Result<(), Box<dyn Error>> {
+    let len = document.baseline().source().len();
+    document
+        .edit_core()?
+        .open_block(0..len, SelectionSpec::new(0, 0))?;
+    Ok(())
+}
+
+fn recovery_type(
+    document: &mut ReadonlyDocument,
+    at: usize,
+    text: &str,
+) -> Result<(), Box<dyn Error>> {
+    document.edit_core()?.type_text(at, text, 0)?;
+    Ok(())
+}
+
+/// 驱动一次完整的准备→发布→结算；返回最终反馈键。
+fn run_recovery(
+    document: &mut ReadonlyDocument,
+    now: u64,
+) -> Result<Option<&'static str>, Box<dyn Error>> {
+    let start = document.recovery_start(now).ok_or("恢复会话应可开始")?;
+    let job = match start {
+        RecoveryStart::Prepare(job) => job,
+        other => return Err(format!("期望准备阶段，实际 {other:?}").into()),
+    };
+    let prepared = job.run();
+    match document.recovery_prepared(prepared, now) {
+        Some(RecoveryStart::Publish(job)) => {
+            let settlement = job.run();
+            Ok(document.recovery_settled(settlement, now))
+        }
+        Some(RecoveryStart::Settled { feedback }) => Ok(feedback),
+        Some(RecoveryStart::Prepare(_)) => Err("准备结果不应再次准备".into()),
+        Some(RecoveryStart::Retire(_)) => Err("准备结果不应直接退役".into()),
+        None => Err("准备结果应被当前会话采纳".into()),
+    }
+}
+
+fn sole_lineage(store: &RecoveryStore) -> Result<RecoveryDocumentId, Box<dyn Error>> {
+    let scan = store.scan().map_err(|error| format!("{error:?}"))?;
+    let mut lineages = scan.lineages;
+    if lineages.len() != 1 {
+        return Err(format!("期望 1 个谱系，实际 {}", lineages.len()).into());
+    }
+    Ok(lineages.remove(0).document)
+}
+
+fn complete_generations(store: &RecoveryStore) -> Result<Vec<NonZeroU64>, Box<dyn Error>> {
+    let scan = store.scan().map_err(|error| format!("{error:?}"))?;
+    let mut generations = Vec::new();
+    for lineage in scan.lineages {
+        for generation in lineage.generations {
+            if generation.status == RecoveryGenerationStatus::Complete {
+                generations.push(generation.generation);
+            }
+        }
+    }
+    Ok(generations)
+}
+
+/// 测试资源源：按引用键返回给定分类，未知引用一律不可用。
+enum FakeResource {
+    Bytes(Vec<u8>),
+    Unavailable,
+    Corrupt,
+    TooLarge,
+}
+
+struct FakeResources {
+    entries: BTreeMap<String, FakeResource>,
+}
+
+impl FakeResources {
+    fn new(entries: impl IntoIterator<Item = (String, FakeResource)>) -> Self {
+        Self {
+            entries: entries.into_iter().collect(),
+        }
+    }
+}
+
+impl RecoveryResourceSource for FakeResources {
+    fn read(&self, reference: &str, budget: usize) -> Result<Vec<u8>, RecoveryResourceError> {
+        match self.entries.get(reference) {
+            Some(FakeResource::Bytes(bytes)) if bytes.len() <= budget => Ok(bytes.clone()),
+            Some(FakeResource::Bytes(_) | FakeResource::TooLarge) => {
+                Err(RecoveryResourceError::TooLarge)
+            }
+            Some(FakeResource::Corrupt) => Err(RecoveryResourceError::Corrupt),
+            Some(FakeResource::Unavailable) | None => Err(RecoveryResourceError::Unavailable),
+        }
+    }
+}
+
+#[test]
+fn recovery_session_skips_clean_document_without_lineage() -> Result<(), Box<dyn Error>> {
+    let temp = TempRecoveryDir::new()?;
+    let store = open_store(&temp)?;
+    let path = temp.path.join("clean.md");
+    let mut session = open_recovery_session(
+        &store,
+        Arc::new(FakeResources::new([])),
+        &path,
+        b"alpha\n",
+        true,
+    )?;
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    // 清理判定在后台准备任务内完成（W4-54），因此由准备结果给出静默跳过。
+    let start = document.recovery_start(0).ok_or("恢复会话应可开始")?;
+    let job = match start {
+        RecoveryStart::Prepare(job) => job,
+        other => return Err(format!("期望准备阶段，实际 {other:?}").into()),
+    };
+    let prepared = job.run();
+    assert!(matches!(
+        &prepared,
+        PreparedRecovery::Skipped {
+            skip: RecoverySkip::Clean,
+            ..
+        }
+    ));
+    match document.recovery_prepared(prepared, 0) {
+        Some(RecoveryStart::Settled { feedback }) => assert_eq!(feedback, None),
+        other => return Err(format!("期望静默结算，实际 {other:?}").into()),
+    }
+    let scan = store.scan().map_err(|error| format!("{error:?}"))?;
+    assert!(scan.lineages.is_empty(), "未分配谱系");
+    Ok(())
+}
+
+#[test]
+fn recovery_session_publishes_untitled_document_without_path() -> Result<(), Box<dyn Error>> {
+    let temp = TempRecoveryDir::new()?;
+    let store = open_store(&temp)?;
+    let path = temp.path.join("untitled.md");
+    let mut session = open_recovery_session(
+        &store,
+        Arc::new(FakeResources::new([])),
+        &path,
+        b"abc\n",
+        true,
+    )?;
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    document.detach_persistence_for_test();
+    open_recovery_block(document)?;
+    recovery_type(document, 0, "x")?;
+    assert_eq!(run_recovery(document, 0)?, None);
+
+    let scan = store.scan().map_err(|error| format!("{error:?}"))?;
+    assert_eq!(scan.lineages.len(), 1);
+    let lineage = &scan.lineages[0];
+    assert_eq!(lineage.disposition, RecoveryLineageDisposition::Active);
+    let generation = lineage
+        .generations
+        .iter()
+        .find(|generation| generation.status == RecoveryGenerationStatus::Complete)
+        .ok_or("应存在完整代")?
+        .generation;
+    let recovered = store
+        .recover(lineage.document, generation)
+        .map_err(|error| format!("{error:?}"))?;
+    assert!(matches!(recovered.path, RecoveredPath::Unlinked));
+    assert_eq!(recovered.path_generation, 0);
+    assert!(!recovered.captured_composition);
+    assert_eq!(recovered.source, "xabc\n");
+    Ok(())
+}
+
+#[test]
+fn recovery_session_skips_unchanged_version_and_snapshot() -> Result<(), Box<dyn Error>> {
+    let temp = TempRecoveryDir::new()?;
+    let store = open_store(&temp)?;
+    let path = temp.path.join("unchanged.md");
+    let mut session = open_recovery_session(
+        &store,
+        Arc::new(FakeResources::new([])),
+        &path,
+        b"abc\n",
+        true,
+    )?;
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    open_recovery_block(document)?;
+    recovery_type(document, 0, "a")?;
+    assert_eq!(run_recovery(document, 0)?, None);
+    assert_eq!(complete_generations(&store)?.len(), 1);
+
+    match document.recovery_start(1) {
+        Some(RecoveryStart::Settled { feedback }) => assert_eq!(feedback, None),
+        other => return Err(format!("期望未变化跳过，实际 {other:?}").into()),
+    }
+    assert_eq!(complete_generations(&store)?.len(), 1);
+    Ok(())
+}
+
+#[test]
+fn recovery_session_records_composition_candidates() -> Result<(), Box<dyn Error>> {
+    let temp = TempRecoveryDir::new()?;
+    let store = open_store(&temp)?;
+    let path = temp.path.join("composing.md");
+    let mut session = open_recovery_session(
+        &store,
+        Arc::new(FakeResources::new([])),
+        &path,
+        b"abc\n",
+        true,
+    )?;
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    open_recovery_block(document)?;
+    document.edit_core()?.composition_start("候", 0)?;
+    // 组合活动不延后准备：同一轮即可准备并发布候选文本。
+    assert_eq!(run_recovery(document, 0)?, None);
+
+    let scan = store.scan().map_err(|error| format!("{error:?}"))?;
+    let lineage = scan.lineages.first().ok_or("应存在谱系")?;
+    let generation = lineage
+        .generations
+        .iter()
+        .find(|generation| generation.status == RecoveryGenerationStatus::Complete)
+        .ok_or("应存在完整代")?
+        .generation;
+    let recovered = store
+        .recover(lineage.document, generation)
+        .map_err(|error| format!("{error:?}"))?;
+    assert!(recovered.captured_composition);
+    assert!(
+        recovered.source.contains("候"),
+        "恢复文本应包含组合候选：{}",
+        recovered.source
+    );
+    Ok(())
+}
+
+#[test]
+fn recovery_session_discards_prepared_when_version_changes() -> Result<(), Box<dyn Error>> {
+    let temp = TempRecoveryDir::new()?;
+    let store = open_store(&temp)?;
+    let path = temp.path.join("changing.md");
+    let mut session = open_recovery_session(
+        &store,
+        Arc::new(FakeResources::new([])),
+        &path,
+        b"abc\n",
+        true,
+    )?;
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    open_recovery_block(document)?;
+    recovery_type(document, 0, "a")?;
+    let mut retained = None;
+    // 连续 3 次在准备冻结后、采纳前继续输入；每次都必须复用同一谱系，不得增长。
+    for round in 0..3 {
+        let start = document.recovery_start(0).ok_or("恢复会话应可开始")?;
+        let job = match start {
+            RecoveryStart::Prepare(job) => job,
+            other => return Err(format!("期望准备阶段，实际 {other:?}").into()),
+        };
+        recovery_type(document, 1, "b")?;
+        let prepared = job.run();
+        match document.recovery_prepared(prepared, 0) {
+            Some(RecoveryStart::Settled { feedback }) => assert_eq!(feedback, None),
+            other => return Err(format!("期望版本变化结算，实际 {other:?}").into()),
+        }
+        let scan = store.scan().map_err(|error| format!("{error:?}"))?;
+        assert!(
+            scan.lineages.len() <= 1,
+            "第 {round} 次版本变化后谱系不得增长，实际 {}",
+            scan.lineages.len()
+        );
+        let current = sole_lineage(&store)?;
+        if let Some(first) = retained {
+            assert_eq!(current, first, "版本变化后应复用同一谱系");
+        } else {
+            retained = Some(current);
+        }
+    }
+    assert!(complete_generations(&store)?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn recovery_session_retires_stale_prepared_lineage() -> Result<(), Box<dyn Error>> {
+    let temp = TempRecoveryDir::new()?;
+    let store = open_store(&temp)?;
+    let path = temp.path.join("stale.md");
+    let mut session = open_recovery_session(
+        &store,
+        Arc::new(FakeResources::new([])),
+        &path,
+        b"abc\n",
+        true,
+    )?;
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    open_recovery_block(document)?;
+    recovery_type(document, 0, "a")?;
+    let start = document.recovery_start(0).ok_or("恢复会话应可开始")?;
+    let job = match start {
+        RecoveryStart::Prepare(job) => job,
+        other => return Err(format!("期望准备阶段，实际 {other:?}").into()),
+    };
+    // 模拟旧尝试的迟到完成：标签仍属同一会话，但尝试号已不属于当前在途尝试。
+    let prepared = match job.run() {
+        PreparedRecovery::Ready(mut ready) => {
+            ready.tag.attempt = ready.tag.attempt.saturating_add(1);
+            PreparedRecovery::Ready(ready)
+        }
+        _ => return Err("期望已分配谱系的准备结果".into()),
+    };
+    match document.recovery_prepared(prepared, 0) {
+        Some(RecoveryStart::Retire(job)) => {
+            job.run();
+        }
+        _ => return Err("迟到准备应返回后台退役任务".into()),
+    }
+    let scan = store.scan().map_err(|error| format!("{error:?}"))?;
+    assert!(scan.lineages.is_empty(), "迟到准备的谱系应被退役");
+    Ok(())
+}
+
+#[test]
+fn recovery_close_with_in_flight_prepare_leaves_no_lineage() -> Result<(), Box<dyn Error>> {
+    let temp = TempRecoveryDir::new()?;
+    let store = open_store(&temp)?;
+    let path = temp.path.join("closing.md");
+    let mut session = open_recovery_session(
+        &store,
+        Arc::new(FakeResources::new([])),
+        &path,
+        b"abc\n",
+        true,
+    )?;
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    open_recovery_block(document)?;
+    recovery_type(document, 0, "a")?;
+    let start = document.recovery_start(0).ok_or("恢复会话应可开始")?;
+    let job = match start {
+        RecoveryStart::Prepare(job) => job,
+        other => return Err(format!("期望准备阶段，实际 {other:?}").into()),
+    };
+    // 关闭发生在后台准备完成前：会话尚未持有谱系，取消由准备任务自行收尾。
+    let close = document.take_recovery_close();
+    assert!(close.is_none(), "谱系尚未分配时无退役任务");
+    let prepared = job.run();
+    assert!(matches!(&prepared, PreparedRecovery::Cancelled { .. }));
+    let scan = store.scan().map_err(|error| format!("{error:?}"))?;
+    assert!(scan.lineages.is_empty(), "关闭后在途准备不得留下活动谱系");
+    Ok(())
+}
+
+#[test]
+fn recovery_close_retires_prepared_completed_before_callback() -> Result<(), Box<dyn Error>> {
+    let temp = TempRecoveryDir::new()?;
+    let store = open_store(&temp)?;
+    let path = temp.path.join("late.md");
+    let mut session = open_recovery_session(
+        &store,
+        Arc::new(FakeResources::new([])),
+        &path,
+        b"abc\n",
+        true,
+    )?;
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    open_recovery_block(document)?;
+    recovery_type(document, 0, "a")?;
+    let start = document.recovery_start(0).ok_or("恢复会话应可开始")?;
+    let job = match start {
+        RecoveryStart::Prepare(job) => job,
+        other => return Err(format!("期望准备阶段，实际 {other:?}").into()),
+    };
+    // 后台准备已完成、完成回调尚未处理；此时关闭应仍能退役已分配的谱系。
+    let prepared = job.run();
+    let close = document.take_recovery_close();
+    assert!(close.is_none(), "未采纳的准备尚未记入会话谱系");
+    let close = prepared
+        .into_close_job()
+        .ok_or("已分配谱系的准备结果应可退役")?;
+    close.run();
+    let scan = store.scan().map_err(|error| format!("{error:?}"))?;
+    assert!(scan.lineages.is_empty(), "关闭后迟到准备的谱系应被退役");
+    Ok(())
+}
+
+#[test]
+fn recovery_session_reports_incomplete_for_unreadable_resource() -> Result<(), Box<dyn Error>> {
+    let temp = TempRecoveryDir::new()?;
+    let store = open_store(&temp)?;
+    let path = temp.path.join("missing-resource.md");
+    let resources = Arc::new(FakeResources::new([(
+        "img.png".to_owned(),
+        FakeResource::Unavailable,
+    )]));
+    let mut session = open_recovery_session(&store, resources, &path, b"abc\n", true)?;
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    open_recovery_block(document)?;
+    recovery_type(document, 0, "x")?;
+    let identity = document.input_identity()?;
+    let reference = ResourceReference::new(document.core().document_id().clone(), "img.png");
+    document
+        .edit_core()?
+        .retain_resource(&identity, reference, 16)?;
+
+    assert_eq!(run_recovery(document, 0)?, Some(RECOVERY_INCOMPLETE_KEY));
+    assert!(complete_generations(&store)?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn recovery_session_reports_failure_for_corrupt_resource() -> Result<(), Box<dyn Error>> {
+    let temp = TempRecoveryDir::new()?;
+    let store = open_store(&temp)?;
+    let path = temp.path.join("corrupt-resource.md");
+    let resources = Arc::new(FakeResources::new([(
+        "img.png".to_owned(),
+        FakeResource::Corrupt,
+    )]));
+    let mut session = open_recovery_session(&store, resources, &path, b"abc\n", true)?;
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    open_recovery_block(document)?;
+    recovery_type(document, 0, "x")?;
+    let identity = document.input_identity()?;
+    let reference = ResourceReference::new(document.core().document_id().clone(), "img.png");
+    document
+        .edit_core()?
+        .retain_resource(&identity, reference, 16)?;
+
+    // 任何资源读取失败都只让本次准备不完整，不发布、不清旧代。
+    assert_eq!(run_recovery(document, 0)?, Some(RECOVERY_INCOMPLETE_KEY));
+    assert!(complete_generations(&store)?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn recovery_session_retains_old_generation_when_publish_fails() -> Result<(), Box<dyn Error>> {
+    let temp = TempRecoveryDir::new()?;
+    let store = open_store(&temp)?;
+    let path = temp.path.join("locked.md");
+    let mut session = open_recovery_session(
+        &store,
+        Arc::new(FakeResources::new([])),
+        &path,
+        b"abc\n",
+        true,
+    )?;
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    open_recovery_block(document)?;
+    recovery_type(document, 0, "a")?;
+    assert_eq!(run_recovery(document, 0)?, None);
+    let document_id = sole_lineage(&store)?;
+    let first = complete_generations(&store)?;
+    assert_eq!(first.len(), 1);
+
+    let held = store
+        .hold_owner_lock_for_test(document_id)
+        .map_err(|error| format!("{error:?}"))?;
+    recovery_type(document, 1, "b")?;
+    let start = document.recovery_start(1).ok_or("恢复会话应可开始")?;
+    let job = match start {
+        RecoveryStart::Prepare(job) => job,
+        other => return Err(format!("期望准备阶段，实际 {other:?}").into()),
+    };
+    let prepared = job.run();
+    let job = match document.recovery_prepared(prepared, 1) {
+        Some(RecoveryStart::Publish(job)) => job,
+        other => return Err(format!("期望发布阶段，实际 {other:?}").into()),
+    };
+    let settlement = job.run();
+    assert_eq!(
+        document.recovery_settled(settlement, 1),
+        Some(RECOVERY_FAILED_KEY)
+    );
+    drop(held);
+
+    assert_eq!(complete_generations(&store)?, first);
+    Ok(())
+}
+
+#[test]
+fn recovery_session_does_not_publish_cancelled_preparation() -> Result<(), Box<dyn Error>> {
+    let temp = TempRecoveryDir::new()?;
+    let store = open_store(&temp)?;
+    let path = temp.path.join("cancelled.md");
+    let mut session = open_recovery_session(
+        &store,
+        Arc::new(FakeResources::new([])),
+        &path,
+        b"abc\n",
+        true,
+    )?;
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    open_recovery_block(document)?;
+    recovery_type(document, 0, "a")?;
+    let start = document.recovery_start(0).ok_or("恢复会话应可开始")?;
+    let job = match start {
+        RecoveryStart::Prepare(job) => job,
+        other => return Err(format!("期望准备阶段，实际 {other:?}").into()),
+    };
+    document.cancel_recovery();
+    let prepared = job.run();
+    assert!(matches!(&prepared, PreparedRecovery::Cancelled { .. }));
+    match document.recovery_prepared(prepared, 0) {
+        Some(RecoveryStart::Settled { feedback }) => assert_eq!(feedback, None),
+        other => return Err(format!("期望取消结算，实际 {other:?}").into()),
+    }
+    assert!(complete_generations(&store)?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn recovery_close_job_retires_and_is_idempotent() -> Result<(), Box<dyn Error>> {
+    let temp = TempRecoveryDir::new()?;
+    let store = open_store(&temp)?;
+    let path = temp.path.join("closing.md");
+    let mut session = open_recovery_session(
+        &store,
+        Arc::new(FakeResources::new([])),
+        &path,
+        b"abc\n",
+        true,
+    )?;
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    open_recovery_block(document)?;
+    recovery_type(document, 0, "a")?;
+    assert_eq!(run_recovery(document, 0)?, None);
+
+    let job = document.take_recovery_close().ok_or("应返回关闭退役任务")?;
+    match job.run() {
+        RetireOutcome::Retired { .. } => {}
+        other => return Err(format!("期望退役，实际 {other:?}").into()),
+    }
+    let scan = store.scan().map_err(|error| format!("{error:?}"))?;
+    assert!(scan.lineages.is_empty(), "退役后谱系应隐藏");
+    assert!(document.take_recovery_close().is_none(), "重复取走应为空");
+    Ok(())
+}
+
+#[test]
+fn recovery_readonly_document_never_attaches() -> Result<(), Box<dyn Error>> {
+    let temp = TempRecoveryDir::new()?;
+    let store = open_store(&temp)?;
+    let path = temp.path.join("readonly.md");
+    let mut session = open_recovery_session(
+        &store,
+        Arc::new(FakeResources::new([])),
+        &path,
+        b"abc\n",
+        false,
+    )?;
+    {
+        let document = session.document_mut().ok_or("应存在只读文档")?;
+        assert!(document.recovery_start(0).is_none());
+        assert!(document.recovery_deadline().is_none());
+        assert!(document.recovery_poll(0).is_none());
+        assert!(document.take_recovery_close().is_none());
+    }
+    assert_eq!(
+        session.configure_recovery(Some(recovery_config(
+            &store,
+            Arc::new(FakeResources::new([]))
+        ))),
+        Err(RecoveryConfigError::DocumentOpen)
+    );
+    let scan = store.scan().map_err(|error| format!("{error:?}"))?;
+    assert!(scan.lineages.is_empty());
+    Ok(())
+}
+
+#[test]
+fn recovery_source_file_bytes_unchanged_after_publish_and_retire() -> Result<(), Box<dyn Error>> {
+    let temp = TempRecoveryDir::new()?;
+    let store = open_store(&temp)?;
+    let target = temp.path.join("notes.md");
+    fs::write(&target, b"# hi\n")?;
+    let before = fs::read(&target)?;
+    let mut session =
+        open_recovery_session_real(&store, Arc::new(FakeResources::new([])), &target)?;
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    open_recovery_block(document)?;
+    recovery_type(document, 0, "x")?;
+    assert_eq!(run_recovery(document, 0)?, None);
+    assert_eq!(fs::read(&target)?, before);
+
+    let job = document.take_recovery_close().ok_or("应返回关闭退役任务")?;
+    assert!(matches!(job.run(), RetireOutcome::Retired { .. }));
+    assert_eq!(fs::read(&target)?, before);
+    Ok(())
 }

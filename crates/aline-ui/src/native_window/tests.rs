@@ -888,6 +888,101 @@ fn save_job_and_completion_are_send() {
     assert_send::<super::WriteCompletion>();
 }
 
+#[test]
+fn window_without_recovery_configuration_never_arms_recovery() -> Result<(), Box<dyn Error>> {
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    let request = state.request_open()?;
+    let job = state
+        .accept_dialog(&request, Ok(Some(vec![PathBuf::from("fixture.md")])))
+        .ok_or("应生成打开工作")?;
+    let (next, prepared) = state.read_finished(job.read_with(&Files(b"x\n")), |_| Ok(()));
+    assert!(next.is_none());
+    assert_eq!(prepared, Some(()));
+    // 未配置恢复：无会话、无计时、无法开始，且无退役任务。
+    assert!(state.arm_recovery(0).is_none());
+    assert!(state.recovery_poll(0).is_none());
+    assert!(state.recovery_start(0).is_none());
+    // 取消在无会话文档时同样零副作用。
+    state.cancel_recovery();
+    assert!(state.take_retired_recoveries().is_empty());
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn window_close_cancels_recovery_and_queues_retire() -> Result<(), Box<dyn Error>> {
+    use std::fs;
+    use std::sync::Arc;
+
+    use crate::document::{RecoveryRoot, RecoveryStore, UnavailableResources};
+
+    let directory = WindowSaveDir::create("aline-window-recovery")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let root_path = directory.0.join("recovery");
+    fs::create_dir(&root_path)?;
+    let root = RecoveryRoot::open(&root_path).map_err(|error| format!("{error:?}"))?;
+    let store = RecoveryStore::open(root).map_err(|error| format!("{error:?}"))?;
+
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    state
+        .configure_recovery(Some(crate::document::RecoveryConfig {
+            store: store.clone(),
+            resources: Arc::new(UnavailableResources),
+        }))
+        .map_err(|error| format!("{error:?}"))?;
+    open_window_document(&mut state, &target, b"x\n")?;
+    // 打开成功即布防；下一次到期为注入时刻 + 10 秒。
+    assert_eq!(state.arm_recovery(0), Some(10_000));
+    open_window_block(&mut state, SelectionSpec::new(0, 0))?;
+    window_type(&mut state, 1, "a")?;
+
+    let job = match state.recovery_start(0) {
+        Some(super::RecoveryStart::Prepare(job)) => job,
+        other => return Err(format!("期望准备阶段，实际 {other:?}").into()),
+    };
+    let prepared = job.run();
+    let job = match state.recovery_prepared(prepared, 0) {
+        Some(super::RecoveryStart::Publish(job)) => job,
+        other => return Err(format!("期望发布阶段，实际 {other:?}").into()),
+    };
+    let settlement = job.run();
+    assert_eq!(state.recovery_settled(settlement, 0), None);
+
+    // 撤销后文档重新与保存基线等价，关闭才会获准。
+    state
+        .session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .undo()?;
+    assert!(state.close_window(), "关闭应获准");
+    let retired = state.take_retired_recoveries();
+    assert!(!retired.is_empty(), "关闭应排队退役");
+    for job in retired {
+        job.run();
+    }
+    // 退役成功后活动谱系应被隐藏；失败会保留谱系供下次扫描（W4-53）。
+    let scan = store.scan().map_err(|error| format!("{error:?}"))?;
+    assert!(scan.lineages.is_empty(), "关闭退役应隐藏活动谱系");
+    assert!(state.arm_recovery(0).is_none());
+    assert!(state.session().document().is_none());
+    Ok(())
+}
+
+#[test]
+fn window_recovery_feedback_is_silent_on_success_and_visible_on_failure() {
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    // 成功与正常跳过传 None：保持既有反馈不变。
+    state.apply_recovery_feedback(None);
+    assert!(state.feedback_key().is_none());
+    state.apply_recovery_feedback(Some("document.recovery_failed"));
+    assert_eq!(state.feedback_key(), Some("document.recovery_failed"));
+    // 后续静默结算不得清除已显示失败。
+    state.apply_recovery_feedback(None);
+    assert_eq!(state.feedback_key(), Some("document.recovery_failed"));
+}
+
 /// 以 "y\n" 替换目标并保留原 mtime；本文件私有，不能复用 persistence 测试实现。
 #[cfg(target_os = "macos")]
 fn rewrite_window_target_same_mtime(target: &Path) -> Result<(), Box<dyn Error>> {
@@ -1071,4 +1166,48 @@ fn conflict_exits_follow_view_state() {
     assert!(!exits.overwrite);
     assert!(exits.retry);
     assert!(exits.dismiss);
+}
+
+#[test]
+fn recovery_slot_reset_rearms_new_timer_and_rejects_old_completion() -> Result<(), Box<dyn Error>> {
+    let mut slot = super::recovery_slot::RecoverySlot::new();
+    assert!(slot.can_arm());
+    let old = slot.begin_timer().ok_or("旧计时槽应可占用")?;
+    assert!(!slot.can_arm(), "旧计时占用期间不得重新布防");
+    // 替换文档：旧任务槽整体作废，新文档重新布防。
+    slot.reset();
+    assert!(slot.can_arm());
+    let fresh = slot.begin_timer().ok_or("替换后应可重新布防")?;
+    assert!(!slot.finish_timer(old), "旧计时完成不得清除新任务");
+    assert!(!slot.can_arm(), "新计时仍在，槽不得被旧完成释放");
+    assert!(slot.finish_timer(fresh));
+    assert!(slot.can_arm());
+    Ok(())
+}
+
+#[test]
+fn recovery_slot_old_work_completion_does_not_clear_new_timer() -> Result<(), Box<dyn Error>> {
+    let mut slot = super::recovery_slot::RecoverySlot::new();
+    let old_work = slot.begin_work().ok_or("旧工作槽应可占用")?;
+    // 替换文档：旧工作代次失效，新文档开始计时。
+    slot.reset();
+    let fresh = slot.begin_timer().ok_or("替换后应可重新布防")?;
+    assert!(!slot.finish_work(old_work), "旧工作完成不得清除新计时槽");
+    assert!(!slot.can_arm(), "新计时仍在，槽不得被旧完成释放");
+    assert!(slot.finish_timer(fresh));
+    assert!(slot.can_arm());
+    Ok(())
+}
+
+#[test]
+fn recovery_slot_close_rejects_late_completions_and_stays_empty() -> Result<(), Box<dyn Error>> {
+    let mut slot = super::recovery_slot::RecoverySlot::new();
+    let timer = slot.begin_timer().ok_or("关闭前应有计时任务")?;
+    let work = slot.begin_work().ok_or("关闭前应有工作任务")?;
+    // 关闭窗口：槽整体作废，之后不再布防；任何迟到完成都被拒绝且不占用槽。
+    slot.reset();
+    assert!(!slot.finish_timer(timer), "关闭后迟到计时完成应被拒绝");
+    assert!(!slot.finish_work(work), "关闭后迟到工作完成应被拒绝");
+    assert!(slot.can_arm(), "关闭后槽应保持空闲");
+    Ok(())
 }

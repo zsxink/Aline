@@ -14,6 +14,7 @@ mod readonly_evidence;
 mod readonly_hit;
 mod readonly_layout;
 mod readonly_reader;
+mod recovery_slot;
 mod shell;
 mod tokens;
 
@@ -48,8 +49,10 @@ use gpui::{
 use crate::document::{
     AutosaveAction, DocumentStatistics, ExternalApplyResult, ExternalCheckCommand,
     ExternalCheckCompletion, ExternalCheckIntent, ExternalCheckJob, ExternalCheckRejection,
-    ExternalConflictView, ExternalDiskState, SaveCommand, SaveJob, SaveRejection, SaveResult,
-    StageTimer, StageTiming, WriteCompletion,
+    ExternalConflictView, ExternalDiskState, PreparedRecovery, RecoveryAction, RecoveryCloseJob,
+    RecoveryConfig, RecoveryConfigError, RecoveryPrepareJob, RecoveryPublishJob,
+    RecoverySettlement, RecoveryStart, SaveCommand, SaveJob, SaveRejection, SaveResult, StageTimer,
+    StageTiming, WriteCompletion,
 };
 use crate::fonts::{FontEnvironment, FontStatus};
 use crate::{
@@ -450,6 +453,79 @@ impl NativeOpenCoordinator {
         Ok(request)
     }
 
+    /// 配置下一次打开使用的恢复会话；仅转发，不复制状态。
+    /// 生产配置入口归 4.2；4.1b 仅由 crate 内测试驱动。
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(super) fn configure_recovery(
+        &mut self,
+        config: Option<RecoveryConfig>,
+    ) -> Result<(), RecoveryConfigError> {
+        self.session.configure_recovery(config)
+    }
+
+    /// 取走关闭/替换后待后台退役的恢复谱系；仅转发。
+    pub(super) fn take_retired_recoveries(&mut self) -> Vec<RecoveryCloseJob> {
+        self.session.take_retired_recoveries()
+    }
+
+    /// 布防恢复并返回下一次到期时刻；无文档或无会话返回 None。
+    pub(super) fn arm_recovery(&mut self, now: u64) -> Option<u64> {
+        let document = self.session.document_mut()?;
+        document.recovery_arm(now);
+        document.recovery_deadline()
+    }
+
+    /// 结算恢复计时；无文档返回 None。
+    pub(super) fn recovery_poll(&mut self, now: u64) -> Option<RecoveryAction> {
+        self.session
+            .document_mut()
+            .and_then(|document| document.recovery_poll(now))
+    }
+
+    /// 开始一次恢复准备；无文档或无会话返回 None。
+    pub(super) fn recovery_start(&mut self, now: u64) -> Option<RecoveryStart> {
+        self.session
+            .document_mut()
+            .and_then(|document| document.recovery_start(now))
+    }
+
+    /// 复验后台准备结果；无文档或无会话返回 None。
+    pub(super) fn recovery_prepared(
+        &mut self,
+        prepared: PreparedRecovery,
+        now: u64,
+    ) -> Option<RecoveryStart> {
+        self.session
+            .document_mut()
+            .and_then(|document| document.recovery_prepared(prepared, now))
+    }
+
+    /// 结算后台发布；外来标签返回 None。
+    pub(super) fn recovery_settled(
+        &mut self,
+        settlement: RecoverySettlement,
+        now: u64,
+    ) -> Option<&'static str> {
+        self.session
+            .document_mut()
+            .and_then(|document| document.recovery_settled(settlement, now))
+    }
+
+    /// 取消在途恢复并清除计时；无文档时零副作用。
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(super) fn cancel_recovery(&mut self) {
+        if let Some(document) = self.session.document_mut() {
+            document.cancel_recovery();
+        }
+    }
+
+    /// 成功与正常跳过保持静默；只有 Some 反馈键才写入通知区。
+    pub(super) fn apply_recovery_feedback(&mut self, feedback: Option<&'static str>) {
+        if let Some(key) = feedback {
+            self.feedback = Some(key);
+        }
+    }
+
     pub(super) fn accept_dialog(
         &mut self,
         request: &OpenRequestId,
@@ -760,6 +836,8 @@ impl NativeWindowCopy {
             "document.conflict_baseline",
             "document.conflict_local",
             "document.conflict_disk",
+            "document.recovery_failed",
+            "document.recovery_incomplete",
             "find.failed",
             "find.refused",
             "open_error.selection",
@@ -964,6 +1042,9 @@ struct NativeDocumentWindow {
     read_task: Option<Task<()>>,
     save_task: Option<Task<()>>,
     autosave_task: Option<Task<()>>,
+    /// 恢复计时槽代次；与 `recovery_task` 一一对应，迟到回调不得清除新任务。
+    recovery_slot: recovery_slot::RecoverySlot,
+    recovery_task: Option<Task<()>>,
     external_task: Option<Task<()>>,
     activation_subscription: Option<Subscription>,
     parse_task: Option<Task<()>>,
@@ -1020,6 +1101,8 @@ impl NativeDocumentWindow {
             read_task: None,
             save_task: None,
             autosave_task: None,
+            recovery_slot: recovery_slot::RecoverySlot::new(),
+            recovery_task: None,
             external_task: None,
             activation_subscription: None,
             parse_task: None,
@@ -1154,8 +1237,19 @@ impl NativeDocumentWindow {
                 });
                 let applied = prepared.is_some();
                 if applied {
-                    // 新文档接管窗口：旧文档的未完成输入与在途结果全部作废。
+                    // 新文档接管窗口：旧文档的未完成输入、恢复计时与在途结果全部作废。
                     this.clear_input_state();
+                    // 先作废旧恢复任务槽，再为新文档布防；旧计时迟到回调随后被拒绝。
+                    this.reset_recovery_tasks();
+                    this.arm_recovery(window, cx);
+                    // 替换前会话已取消旧恢复；退役任务在后台执行，失败保留谱系。
+                    for job in this.state.take_retired_recoveries() {
+                        cx.background_executor()
+                            .spawn(async move {
+                                job.run();
+                            })
+                            .detach();
+                    }
                 }
                 if let Some((reader, generation)) = prepared {
                     reader.schedule_height_hint(window, cx);
@@ -1362,6 +1456,152 @@ impl NativeDocumentWindow {
         cx.notify();
     }
 
+    /// 按当前到期时刻布防恢复；已有计时或工作时直接复用（提前唤醒会自行重算剩余时间）。
+    fn arm_recovery(&mut self, window: &Window, cx: &mut Context<Self>) {
+        if !self.recovery_slot.can_arm() {
+            return;
+        }
+        let now = self.now_millis();
+        let Some(deadline) = self.state.arm_recovery(now) else {
+            return;
+        };
+        let remaining = deadline.saturating_sub(now);
+        self.spawn_recovery_timer(remaining, window, cx);
+    }
+
+    /// 替换文档或关闭窗口：作废旧恢复任务槽，迟到完成因代次不匹配被拒绝。
+    fn reset_recovery_tasks(&mut self) {
+        self.recovery_slot.reset();
+        self.recovery_task = None;
+    }
+
+    /// 调度一次恢复“叫醒”任务；所有时间判定仍在会话的纯状态机里。
+    fn spawn_recovery_timer(&mut self, delay_millis: u64, window: &Window, cx: &mut Context<Self>) {
+        let Some(task_id) = self.recovery_slot.begin_timer() else {
+            return;
+        };
+        self.recovery_task = Some(cx.spawn_in(window, async move |weak, cx| {
+            cx.background_executor()
+                .timer(std::time::Duration::from_millis(delay_millis))
+                .await;
+            let _ = weak.update_in(cx, |this, window, cx| {
+                // 槽已被替换或关闭：迟到唤醒不得清除新任务或结算新文档。
+                if !this.recovery_slot.finish_timer(task_id) {
+                    return;
+                }
+                this.recovery_task = None;
+                this.recovery_tick(window, cx);
+            });
+        }));
+    }
+
+    /// 一次恢复到期结算：可能开始准备、重新布防或什么都不做。
+    fn recovery_tick(&mut self, window: &Window, cx: &mut Context<Self>) {
+        let now = self.now_millis();
+        match self.state.recovery_poll(now) {
+            Some(RecoveryAction::Fire) => match self.state.recovery_start(now) {
+                Some(RecoveryStart::Prepare(job)) => self.start_recovery_prepare(job, window, cx),
+                Some(RecoveryStart::Settled { feedback }) => {
+                    self.state.apply_recovery_feedback(feedback);
+                    self.arm_recovery(window, cx);
+                }
+                Some(RecoveryStart::Retire(job)) => {
+                    self.spawn_recovery_retire(job, cx);
+                }
+                Some(RecoveryStart::Publish(_)) | None => {}
+            },
+            Some(RecoveryAction::NotDue { remaining_millis }) => {
+                self.spawn_recovery_timer(remaining_millis, window, cx);
+            }
+            Some(RecoveryAction::Idle) | None => {}
+        }
+    }
+
+    /// 后台完成整段物化；回到窗口复验版本后再决定发布。
+    fn start_recovery_prepare(
+        &mut self,
+        job: RecoveryPrepareJob,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(task_id) = self.recovery_slot.begin_work() else {
+            return;
+        };
+        let work = cx.background_executor().spawn(async move { job.run() });
+        self.recovery_task = Some(cx.spawn_in(window, async move |weak, cx| {
+            let prepared = work.await;
+            let _ = weak.update_in(cx, |this, window, cx| {
+                // 槽已被替换或关闭：迟到准备不得清除新任务；已分配的谱系在此退役。
+                if !this.recovery_slot.finish_work(task_id) {
+                    if let Some(job) = prepared.into_close_job() {
+                        this.spawn_recovery_retire(job, cx);
+                    }
+                    return;
+                }
+                this.recovery_task = None;
+                let now = this.now_millis();
+                match this.state.recovery_prepared(prepared, now) {
+                    Some(RecoveryStart::Publish(job)) => {
+                        this.start_recovery_publish(job, window, cx);
+                    }
+                    Some(RecoveryStart::Settled { feedback }) => {
+                        this.state.apply_recovery_feedback(feedback);
+                        this.arm_recovery(window, cx);
+                    }
+                    Some(RecoveryStart::Retire(job)) => {
+                        this.spawn_recovery_retire(job, cx);
+                        this.arm_recovery(window, cx);
+                    }
+                    // 准备任务不会再产出准备任务；出现时按新任务继续。
+                    Some(RecoveryStart::Prepare(job)) => {
+                        this.start_recovery_prepare(job, window, cx);
+                    }
+                    None => {}
+                }
+                this.update_menu(cx);
+                cx.notify();
+            });
+        }));
+    }
+
+    /// 后台发布一代恢复记录；回到窗口结算反馈并重新布防。
+    fn start_recovery_publish(
+        &mut self,
+        job: RecoveryPublishJob,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(task_id) = self.recovery_slot.begin_work() else {
+            return;
+        };
+        let work = cx.background_executor().spawn(async move { job.run() });
+        self.recovery_task = Some(cx.spawn_in(window, async move |weak, cx| {
+            let settlement = work.await;
+            let _ = weak.update_in(cx, |this, window, cx| {
+                // 槽已被替换或关闭：迟到发布结算不得清除新任务。
+                if !this.recovery_slot.finish_work(task_id) {
+                    return;
+                }
+                this.recovery_task = None;
+                let now = this.now_millis();
+                let feedback = this.state.recovery_settled(settlement, now);
+                this.state.apply_recovery_feedback(feedback);
+                this.arm_recovery(window, cx);
+                this.update_menu(cx);
+                cx.notify();
+            });
+        }));
+    }
+
+    /// 在后台退役已归属旧会话或迟到准备的恢复谱系（W4-53）。
+    fn spawn_recovery_retire(&mut self, job: RecoveryCloseJob, cx: &mut Context<Self>) {
+        cx.background_executor()
+            .spawn(async move {
+                job.run();
+            })
+            .detach();
+    }
+
     /// 后台执行真实写盘；完成后回到窗口结算并显示本地化反馈。
     fn start_save(&mut self, job: SaveJob, window: &Window, cx: &mut Context<Self>) {
         let work = cx.background_executor().spawn(async move { job.run() });
@@ -1422,10 +1662,20 @@ impl NativeDocumentWindow {
                 })
                 .detach();
         }
-        // 关闭成功：取消待办自动保存计时，丢弃正文帧与排队输入；在途结果按文档身份被拒绝。
+        // 关闭成功：取消待办自动保存与恢复计时，丢弃正文帧与排队输入；在途结果按文档身份被拒绝。
         self.autosave_task = None;
+        self.reset_recovery_tasks();
         if let Some(document) = self.state.session.document_mut() {
             document.cancel_autosave();
+            document.cancel_recovery();
+        }
+        // 关闭路径已取消会话；退役任务在后台执行，失败保留谱系（W4-53）。
+        for job in self.state.take_retired_recoveries() {
+            cx.background_executor()
+                .spawn(async move {
+                    job.run();
+                })
+                .detach();
         }
         self.clear_input_state();
         true

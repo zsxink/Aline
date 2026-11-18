@@ -19,11 +19,16 @@ use super::persistence::{
     SaveError, SaveJob, SaveRejection, SaveRequest, SaveRequestError, SaveResult, SaveStatus,
     WriteCompletion, WriteOutcome, WriteSettlement, WriteStop, clamped_selection, preview,
 };
+use super::recovery::{
+    PreparedRecovery, RecoveryAcceptOutcome, RecoveryAction, RecoveryBegin, RecoveryBeginOutcome,
+    RecoveryCloseJob, RecoveryConfig, RecoveryConfigError, RecoveryPath, RecoverySession,
+    RecoverySettlement, RecoveryStart,
+};
 use super::{
     DocCore, DocError, DocLimits, EditorMode, InputIdentity, ModeSwitchOutcome, PublicationOutcome,
     WaitHandle, WaitStatus,
 };
-use aline_buffer::{ReloadOutcome, SrcSelection};
+use aline_buffer::{ReloadOutcome, SrcSelection, TextSnapshot};
 
 mod autosave;
 mod read;
@@ -181,6 +186,8 @@ pub struct ReadonlyDocument {
     reload_mark: Option<usize>,
     /// 1 秒防抖自动保存计时；时间由宿主注入。
     autosave: AutosaveScheduler,
+    /// 独立 10 秒恢复会话；只在可编辑文档挂接，与自动保存互不共享状态。
+    recovery: Option<RecoverySession>,
 }
 impl ReadonlyDocument {
     /// 返回用户选择的文件路径，供标题等显式 UI 使用。
@@ -537,6 +544,161 @@ impl ReadonlyDocument {
         }
         self.autosave.clear(); // Fire 一次性消费到期时刻，失败后不自动重试
         AutosaveAction::Fire
+    }
+
+    /// 仅在可编辑文档上挂接恢复会话；只读文档永不挂接。
+    pub(crate) fn attach_recovery(&mut self, config: RecoveryConfig) {
+        if self.editable {
+            self.recovery = Some(RecoverySession::new(config));
+        }
+    }
+
+    /// 仅当会话存在且空闲时布防；不读时钟。
+    pub(crate) fn recovery_arm(&mut self, now: u64) {
+        if let Some(recovery) = self.recovery.as_mut() {
+            recovery.arm(now);
+        }
+    }
+
+    /// 返回下一次恢复准备到期时刻；None 表示没有待办。
+    pub(crate) fn recovery_deadline(&self) -> Option<u64> {
+        self.recovery.as_ref().and_then(RecoverySession::deadline)
+    }
+
+    /// 结算恢复计时；无会话返回 None，宿主不布防。
+    pub(crate) fn recovery_poll(&mut self, now: u64) -> Option<RecoveryAction> {
+        self.recovery.as_mut().map(|recovery| recovery.poll(now))
+    }
+
+    /// 开始一次恢复准备；快照失败时就地记录失败反馈。
+    pub(crate) fn recovery_start(&mut self, now: u64) -> Option<RecoveryStart> {
+        let snapshot = match self.current_snapshot() {
+            Ok(snapshot) => snapshot,
+            Err(_) => {
+                let feedback = self
+                    .recovery
+                    .as_mut()
+                    .map(|recovery| recovery.settle_failure(now));
+                return Some(RecoveryStart::Settled { feedback });
+            }
+        };
+        // 只有可编辑且目标为绝对路径时才记录宿主路径与路径代次。
+        let has_persistence = self.persistence.is_some() && self.path.is_absolute();
+        let path = if has_persistence {
+            RecoveryPath::from_os_path(&self.path)
+        } else {
+            RecoveryPath::Unlinked
+        };
+        let path_generation = if has_persistence {
+            self.persistence
+                .as_ref()
+                .map_or(0, |coordinator| coordinator.path_generation().value())
+        } else {
+            0
+        };
+        let captured_composition = self.core.composition().is_some();
+        let logical = self.saved_logical_snapshot().cloned();
+        let storage = self.baseline.clone();
+        let document_id = self.core.document_id().clone();
+        let text_budget = self.limits.text();
+        let recovery = self.recovery.as_mut()?;
+        match recovery.begin(
+            RecoveryBegin {
+                document_id,
+                snapshot,
+                captured_composition,
+                path,
+                path_generation,
+                logical,
+                storage,
+                text_budget,
+            },
+            now,
+        )? {
+            RecoveryBeginOutcome::Prepare(job) => Some(RecoveryStart::Prepare(job)),
+            RecoveryBeginOutcome::Settled(settlement) => {
+                let fallback = settlement.feedback;
+                let feedback = recovery.settle(settlement, now).or(fallback);
+                // 结算路径可能已在会话内清空尝试；这里保证下次仍会布防。
+                recovery.arm(now);
+                Some(RecoveryStart::Settled { feedback })
+            }
+        }
+    }
+
+    /// 复验后台准备结果；版本变化时静默丢弃，发布前再交给后台。
+    pub(crate) fn recovery_prepared(
+        &mut self,
+        prepared: PreparedRecovery,
+        now: u64,
+    ) -> Option<RecoveryStart> {
+        if self.recovery.is_none() {
+            // 会话已被关闭/替换取走：迟到准备若已分配谱系，交给宿主后台退役。
+            return prepared.into_close_job().map(RecoveryStart::Retire);
+        }
+        let snapshot = match self.current_snapshot() {
+            Ok(snapshot) => snapshot,
+            Err(_) => {
+                let feedback = self
+                    .recovery
+                    .as_mut()
+                    .map(|recovery| recovery.settle_failure(now));
+                return Some(RecoveryStart::Settled { feedback });
+            }
+        };
+        let path_generation = self
+            .persistence
+            .as_ref()
+            .map_or(0, |coordinator| coordinator.path_generation().value());
+        let recovery = self.recovery.as_mut()?;
+        match recovery.accept_prepared(prepared, &snapshot, path_generation, now) {
+            RecoveryAcceptOutcome::Stale => None,
+            RecoveryAcceptOutcome::Retire(job) => Some(RecoveryStart::Retire(job)),
+            RecoveryAcceptOutcome::Publish(job) => Some(RecoveryStart::Publish(job)),
+            RecoveryAcceptOutcome::Settled(settlement) => {
+                let fallback = settlement.feedback;
+                let feedback = recovery.settle(settlement, now).or(fallback);
+                recovery.arm(now);
+                Some(RecoveryStart::Settled { feedback })
+            }
+        }
+    }
+
+    /// 结算后台发布；外来文档或标签不匹配时零副作用。
+    pub(crate) fn recovery_settled(
+        &mut self,
+        settlement: RecoverySettlement,
+        now: u64,
+    ) -> Option<&'static str> {
+        if &settlement.tag.document_id != self.core.document_id() {
+            return None;
+        }
+        self.recovery.as_mut()?.settle(settlement, now)
+    }
+
+    /// 取消在途恢复任务并清除计时；阶段由结算或关闭收尾。
+    pub(crate) fn cancel_recovery(&mut self) {
+        if let Some(recovery) = self.recovery.as_mut() {
+            recovery.cancel();
+        }
+    }
+
+    /// 取走关闭退役任务；先取消在途任务，无会话或无谱系时返回 None。
+    pub(crate) fn take_recovery_close(&mut self) -> Option<RecoveryCloseJob> {
+        self.recovery.take()?.into_close_job()
+    }
+
+    /// 返回最近一次保存采纳的逻辑视图；恢复准备据此判断保存点等价。
+    pub(crate) fn saved_logical_snapshot(&self) -> Option<&TextSnapshot> {
+        self.persistence
+            .as_ref()
+            .and_then(PersistenceCoordinator::saved_logical)
+    }
+
+    /// 仅用于无持久化目标测试：移除保存协调器，不改路径与基线。
+    #[cfg(test)]
+    pub(crate) fn detach_persistence_for_test(&mut self) {
+        self.persistence = None;
     }
 
     /// 在 Undo/Redo 成功（版本发生变化）后由宿主调用。
@@ -1029,6 +1191,10 @@ pub struct ReadonlySession {
     pending: Option<PendingOpen>,
     document: Option<ReadonlyDocument>,
     alive: bool,
+    /// 下一次打开可编辑文档时注入的恢复配置；打开期间不可更改。
+    recovery: Option<RecoveryConfig>,
+    /// 关闭/替换后待后台退役的恢复谱系；由宿主取走执行。
+    retired_recoveries: Vec<RecoveryCloseJob>,
 }
 impl ReadonlySession {
     /// 建立无文档状态，不创建编辑块、任务或文件句柄。
@@ -1040,6 +1206,8 @@ impl ReadonlySession {
             pending: None,
             document: None,
             alive: true,
+            recovery: None,
+            retired_recoveries: Vec::new(),
         }
     }
     /// 返回当前完整 Ready 文档；加载候选不会覆盖它。
@@ -1143,6 +1311,25 @@ impl ReadonlySession {
         }
     }
 
+    /// 配置下一次打开使用的恢复会话；文档打开期间拒绝更改。
+    /// 生产配置入口归 4.2；4.1b 仅由 crate 内测试驱动。
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn configure_recovery(
+        &mut self,
+        config: Option<RecoveryConfig>,
+    ) -> Result<(), RecoveryConfigError> {
+        if self.document.is_some() {
+            return Err(RecoveryConfigError::DocumentOpen);
+        }
+        self.recovery = config;
+        Ok(())
+    }
+
+    /// 取走关闭/替换后待退役的恢复谱系；宿主在后台执行。
+    pub(crate) fn take_retired_recoveries(&mut self) -> Vec<RecoveryCloseJob> {
+        std::mem::take(&mut self.retired_recoveries)
+    }
+
     /// 复验请求后准备宿主所需的派生状态。准备失败时结算请求并保留当前文档。
     pub(crate) fn accept_open_with<T, E>(
         &mut self,
@@ -1166,6 +1353,15 @@ impl ReadonlySession {
                 {
                     return Ok((OpenDisposition::RejectedUnresolvedDocument, None));
                 }
+                // 替换前先取消旧文档在途恢复并排队退役，再挂接新文档。
+                if let Some(old) = self.document.as_mut()
+                    && let Some(job) = old.take_recovery_close()
+                {
+                    self.retired_recoveries.push(job);
+                }
+                if let Some(config) = self.recovery.clone() {
+                    document.attach_recovery(config);
+                }
                 let prepared = prepare(&mut document)?;
                 self.document = Some(document);
                 Ok((OpenDisposition::Applied, Some(prepared)))
@@ -1185,7 +1381,12 @@ impl ReadonlySession {
             if !document.can_discard_for_replacement() {
                 return Err(CloseDisposition::Refused);
             }
-            Some(before_close(document))
+            let value = before_close(document);
+            // 关闭获准后先取消在途恢复并排队退役，再释放文档。
+            if let Some(job) = document.take_recovery_close() {
+                self.retired_recoveries.push(job);
+            }
+            Some(value)
         } else {
             None
         };
