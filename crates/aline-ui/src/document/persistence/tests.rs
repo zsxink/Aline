@@ -1,8 +1,14 @@
-use super::publication::{SaveRequest, SaveRequestError};
 use super::*;
 use crate::document::{DocCore, DocError, DocLimits, PublicationOutcome, WaitStatus};
 use aline_buffer::{HistoryBudget, LineIndexBudget, SelectionSpec};
 use aline_source::DiskVersion;
+
+// 以下导入只被 macOS 真实文件会话测试使用；条件导入避免其他平台测试构建
+// 出现未使用导入并在 `-D warnings` 下失败。
+#[cfg(target_os = "macos")]
+use crate::document::{CloseDisposition, OpenDisposition, ReadonlyOpenLimits, ReadonlySession};
+#[cfg(target_os = "macos")]
+use aline_markdown::{ParseBudget, ParseConfig};
 
 const TEXT: TextBudget = TextBudget::new(4096);
 const STORAGE: StorageBudget = StorageBudget::new(4096);
@@ -519,6 +525,28 @@ fn persistence_state_source_failure_retains_original_file_error() -> TestResult 
 struct TempSaveDir(PathBuf);
 
 #[cfg(target_os = "macos")]
+impl TempSaveDir {
+    /// 在系统临时目录下独占创建本测试使用的目录；Drop 时递归清理。
+    fn create(prefix: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+        for attempt in 0..100u32 {
+            let candidate = fixture_path(&format!(
+                "{prefix}-{}-{nonce:x}-{attempt}",
+                std::process::id()
+            ));
+            match std::fs::create_dir(&candidate) {
+                Ok(()) => return Ok(Self(candidate)),
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => return Err(error.into()),
+            }
+        }
+        Err("无法创建保存测试目录".into())
+    }
+}
+
+#[cfg(target_os = "macos")]
 impl Drop for TempSaveDir {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.0);
@@ -540,25 +568,7 @@ fn macos_save_fixture() -> Result<
     ),
     Box<dyn std::error::Error>,
 > {
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
-    let mut created = None;
-    for attempt in 0..100u32 {
-        let candidate = fixture_path(&format!(
-            "aline-save-{}-{nonce:x}-{attempt}",
-            std::process::id()
-        ));
-        match std::fs::create_dir(&candidate) {
-            Ok(()) => {
-                created = Some(candidate);
-                break;
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
-            Err(error) => return Err(error.into()),
-        }
-    }
-    let owned = TempSaveDir(created.ok_or("无法创建保存测试目录")?);
+    let owned = TempSaveDir::create("aline-save")?;
     let target = owned.0.join("notes.md");
     std::fs::write(&target, b"x\n")?;
     let (mut doc, mut state) = fixture(b"x\n")?;
@@ -665,5 +675,427 @@ fn persistence_state_refuses_reobserved_same_length_changed_content() -> TestRes
     assert_eq!(state.status(), SaveStatus::Conflict);
     assert_eq!(fs::read(&target)?, b"y\n");
     assert_eq!(doc.current_snapshot(TEXT)?.full_text(TEXT)?, "xa\n");
+    Ok(())
+}
+
+/// 打开真实绝对路径上的可编辑会话；目标必须已存在。
+#[cfg(target_os = "macos")]
+fn editable_absolute_session(path: &Path) -> Result<ReadonlySession, Box<dyn std::error::Error>> {
+    let limits = ReadonlyOpenLimits::new(
+        StorageBudget::new(4096),
+        DocLimits::new(
+            TextBudget::new(4096),
+            LineIndexBudget::new(128),
+            HistoryBudget::new(16, 4096),
+        ),
+        ParseConfig::m0(),
+        ParseBudget::m0(),
+    )
+    .with_editing();
+    let mut session = ReadonlySession::new(limits);
+    let request = session.request_open()?;
+    let job = session
+        .accept_selection(&request, Some(vec![path.to_path_buf()]))?
+        .ok_or("应生成打开工作")?;
+    assert!(
+        matches!(session.accept_open(job.run()), OpenDisposition::Applied),
+        "真实文件打开应发布可编辑文档"
+    );
+    Ok(session)
+}
+
+/// 保存入口错误只用于测试诊断；测试结果统一装箱为动态错误。
+#[cfg(target_os = "macos")]
+fn save_request_error(error: SaveRequestError) -> Box<dyn std::error::Error> {
+    format!("{error:?}").into()
+}
+
+/// 在全文范围打开旧式输入块；无窗口可编辑打开不会自动打开块。
+/// 测试需要跨末尾换行继续输入，因此不使用限定在段落视觉范围内的块。
+#[cfg(target_os = "macos")]
+fn open_editing_block(session: &mut ReadonlySession) -> Result<(), Box<dyn std::error::Error>> {
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    let len = document.baseline().source().len();
+    document
+        .edit_core()?
+        .open_block(0..len, SelectionSpec::new(0, 0))?;
+    Ok(())
+}
+
+/// 请求一次显式保存并返回排队操作号；组合等待不属于这些会话用例。
+#[cfg(target_os = "macos")]
+fn queue_save(session: &mut ReadonlySession) -> Result<OperationId, Box<dyn std::error::Error>> {
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    match document
+        .request_persistence_save()
+        .map_err(save_request_error)?
+    {
+        SaveRequest::Queued(operation) => Ok(operation),
+        SaveRequest::Waiting(_) => Err("无组合输入时应直接排队".into()),
+    }
+}
+
+/// 取走已排队保存，同步执行真实后台工作并交回会话结算。
+#[cfg(target_os = "macos")]
+fn run_save(
+    session: &mut ReadonlySession,
+    staging: PathBuf,
+) -> Result<WriteSettlement, Box<dyn std::error::Error>> {
+    let completion = session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .start_save_job(staging)
+        .map_err(save_request_error)?
+        .run();
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .settle_save(completion)
+        .map_err(save_request_error)
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn persistence_session_save_publishes_receipt_and_adopts_baseline() -> TestResult {
+    use std::fs;
+
+    let directory = TempSaveDir::create("aline-session-publish")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut session = editable_absolute_session(&target)?;
+    open_editing_block(&mut session)?;
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .type_text(1, "a", 0)?;
+
+    let (text, version, selection, undo_depth, history_nodes, buffer_text) = {
+        let document = session.document_mut().ok_or("应存在可编辑文档")?;
+        let snapshot = document.current_snapshot()?;
+        (
+            snapshot.full_text(TEXT)?,
+            snapshot.version(),
+            snapshot.selection().clone(),
+            document.core().undo_depth(),
+            document.core().history_node_count(),
+            document.core().buffer_text()?,
+        )
+    };
+    assert_eq!(text, "xa\n", "输入后的快照应包含草稿");
+
+    let operation = queue_save(&mut session)?;
+    let staging = directory.0.join("stage.md");
+    let settlement = run_save(&mut session, staging.clone())?;
+
+    assert!(settlement.adopted, "真实发布回执应被采纳");
+    assert!(
+        matches!(
+            &settlement.outcome,
+            WriteOutcome::Published {
+                synchronized: true,
+                ..
+            }
+        ),
+        "目录同步成功的发布必须标记 synchronized，实际为 {:?}",
+        settlement.outcome
+    );
+    assert_eq!(settlement.operation, operation, "结算项应属于本次排队操作");
+    assert_eq!(settlement.path, target, "结算路径应等于实际目标路径");
+    assert_eq!(fs::read(&target)?, b"xa\n", "真实替换后磁盘应包含新内容");
+    assert!(!staging.exists(), "成功发布后 staging 应被 source 清理");
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    assert_eq!(
+        document.baseline().source(),
+        "xa\n",
+        "成功回执应替换文档磁盘基线"
+    );
+    let snapshot = document.current_snapshot()?;
+    assert_eq!(snapshot.full_text(TEXT)?, text, "保存不应改变当前全文");
+    assert_eq!(snapshot.version(), version, "保存不应推进工作版本");
+    assert_eq!(snapshot.selection(), &selection, "保存不应改变选区");
+    assert_eq!(
+        document.core().undo_depth(),
+        undo_depth,
+        "保存不应改变撤销深度"
+    );
+    assert_eq!(
+        document.core().history_node_count(),
+        history_nodes,
+        "保存不应改变历史节点数"
+    );
+    assert_eq!(
+        document.core().buffer_text()?,
+        buffer_text,
+        "保存不应改变已提交文本"
+    );
+    assert_eq!(
+        document.persistence_status(),
+        Some(SaveStatus::Idle),
+        "发布成功后协调器应回到空闲"
+    );
+    assert_eq!(
+        session.close_document(),
+        CloseDisposition::Closed,
+        "保存成功后应允许关闭"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn persistence_session_save_in_flight_refuses_close_until_settled() -> TestResult {
+    use std::fs;
+
+    let directory = TempSaveDir::create("aline-session-inflight")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut session = editable_absolute_session(&target)?;
+    open_editing_block(&mut session)?;
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .type_text(1, "a", 0)?;
+
+    let operation = queue_save(&mut session)?;
+    let job = session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .start_save_job(directory.0.join("stage.md"))
+        .map_err(save_request_error)?;
+    assert_eq!(
+        session.close_document(),
+        CloseDisposition::Refused,
+        "在途保存必须拒绝关闭"
+    );
+    assert!(session.document().is_some(), "拒绝关闭必须保留文档");
+    let text = session
+        .document_mut()
+        .ok_or("拒绝关闭后应保留文档")?
+        .current_snapshot()?
+        .full_text(TEXT)?;
+    assert_eq!(text, "xa\n", "拒绝关闭不得改变内存文本");
+
+    let settlement = session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .settle_save(job.run())
+        .map_err(save_request_error)?;
+    assert!(settlement.adopted, "后台真实发布应被采纳");
+    assert_eq!(settlement.operation, operation, "结算项应属于在途操作");
+    assert_eq!(
+        session.close_document(),
+        CloseDisposition::Closed,
+        "结算成功后应允许关闭"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn persistence_session_continues_editing_after_published_save() -> TestResult {
+    use std::fs;
+
+    let directory = TempSaveDir::create("aline-session-continue")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut session = editable_absolute_session(&target)?;
+    open_editing_block(&mut session)?;
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .type_text(1, "a", 0)?;
+
+    let first_operation = queue_save(&mut session)?;
+    let first = run_save(&mut session, directory.0.join("stage.md"))?;
+    assert_eq!(first.operation, first_operation, "首次结算项应匹配排队操作");
+    assert!(first.adopted, "首次真实发布应被采纳");
+    let first_version = match &first.outcome {
+        WriteOutcome::Published { storage, .. } => storage.storage().version(),
+        other => return Err(format!("首次保存应成功发布，实际为 {other:?}").into()),
+    };
+    assert_eq!(fs::read(&target)?, b"xa\n", "首次保存应写入新内容");
+    {
+        let document = session.document_mut().ok_or("应存在可编辑文档")?;
+        assert_eq!(
+            document.baseline().source(),
+            "xa\n",
+            "首次保存应更新文档磁盘基线"
+        );
+    }
+
+    // 首次保存不改写内存草稿，逻辑文本仍为 "xa\n"；在换行前偏移 2 输入
+    // 得到 "xab\n"（brief 的偏移 3 位于换行之后，会得到 "xa\nb"）。
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .type_text(2, "b", 1)?;
+    assert_eq!(
+        session.close_document(),
+        CloseDisposition::Refused,
+        "相对实际保存基线仍有修改时必须拒绝关闭"
+    );
+    assert!(session.document().is_some(), "拒绝关闭必须保留文档");
+
+    let second_operation = queue_save(&mut session)?;
+    let second = run_save(&mut session, directory.0.join("stage2.md"))?;
+    assert_eq!(
+        second.operation, second_operation,
+        "第二次结算项应匹配排队操作"
+    );
+    assert!(second.adopted, "第二次真实发布应被采纳");
+    let second_version = match &second.outcome {
+        WriteOutcome::Published { storage, .. } => storage.storage().version(),
+        other => return Err(format!("第二次保存应成功发布，实际为 {other:?}").into()),
+    };
+    assert!(
+        second_version > first_version,
+        "第二次发布的磁盘代次必须严格大于第一次"
+    );
+    assert_eq!(fs::read(&target)?, b"xab\n", "第二次保存应写入新内容");
+    assert_eq!(
+        session
+            .document()
+            .ok_or("应存在可编辑文档")?
+            .persistence_status(),
+        Some(SaveStatus::Idle),
+        "第二次发布成功后协调器应回到空闲"
+    );
+    assert_eq!(
+        session.close_document(),
+        CloseDisposition::Closed,
+        "第二次保存成功后应允许关闭"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn persistence_session_external_change_conflict_preserves_memory_and_disk() -> TestResult {
+    use std::fs;
+
+    let directory = TempSaveDir::create("aline-session-conflict")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut session = editable_absolute_session(&target)?;
+    open_editing_block(&mut session)?;
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .type_text(1, "a", 0)?;
+    rewrite_same_size_and_mtime(&target)?;
+
+    let operation = queue_save(&mut session)?;
+    let staging = directory.0.join("stage-conflict.md");
+    let settlement = run_save(&mut session, staging.clone())?;
+    assert_eq!(settlement.operation, operation, "冲突结算项应匹配排队操作");
+    assert!(settlement.adopted, "冲突完成项仍须结算以记录状态");
+    assert_eq!(
+        session
+            .document()
+            .ok_or("应存在可编辑文档")?
+            .persistence_status(),
+        Some(SaveStatus::Conflict),
+        "外部内容变化必须结算为冲突"
+    );
+    assert_eq!(
+        settlement.published_target(),
+        None,
+        "冲突不得报告已发布目标"
+    );
+    assert_eq!(fs::read(&target)?, b"y\n", "外部内容不得被覆盖");
+    assert!(!staging.exists(), "观察/复核冲突前不得创建 staging");
+    let text = session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .current_snapshot()?
+        .full_text(TEXT)?;
+    assert_eq!(text, "xa\n", "冲突结算必须保留内存文本");
+    assert_eq!(
+        session.close_document(),
+        CloseDisposition::Refused,
+        "未结算冲突必须拒绝关闭"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn persistence_session_missing_target_settles_conflict_without_recreating_file() -> TestResult {
+    use std::fs;
+
+    let directory = TempSaveDir::create("aline-session-missing")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut session = editable_absolute_session(&target)?;
+    open_editing_block(&mut session)?;
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .type_text(1, "a", 0)?;
+    let buffer_text = session
+        .document()
+        .ok_or("应存在可编辑文档")?
+        .core()
+        .buffer_text()?;
+    fs::remove_file(&target)?;
+
+    let operation = queue_save(&mut session)?;
+    let settlement = run_save(&mut session, directory.0.join("stage-missing.md"))?;
+    assert_eq!(settlement.operation, operation, "冲突结算项应匹配排队操作");
+    assert!(settlement.adopted, "目标缺失冲突仍须结算并记录状态");
+    assert!(
+        matches!(
+            &settlement.outcome,
+            WriteOutcome::NotPublished(WriteStop::File(error))
+                if matches!(
+                    error.kind(),
+                    AtomicFailureKind::Conflict {
+                        target_exists: false
+                    }
+                )
+        ),
+        "目标删除必须按 source 的缺失冲突事实交回，实际为 {:?}",
+        settlement.outcome
+    );
+    assert_eq!(
+        session
+            .document()
+            .ok_or("应存在可编辑文档")?
+            .persistence_status(),
+        Some(SaveStatus::Conflict),
+        "目标不存在沿用 source 分类结算为冲突，而不是保存失败"
+    );
+    assert_eq!(
+        settlement.published_target(),
+        None,
+        "目标缺失不得报告已发布目标"
+    );
+    let text = session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .current_snapshot()?
+        .full_text(TEXT)?;
+    assert_eq!(text, "xa\n", "失败结算必须保留内存全文");
+    assert_eq!(
+        session
+            .document()
+            .ok_or("应存在可编辑文档")?
+            .core()
+            .buffer_text()?,
+        buffer_text,
+        "失败结算不得改变已提交文本"
+    );
+    assert_eq!(
+        session.close_document(),
+        CloseDisposition::Refused,
+        "未结算失败必须拒绝关闭"
+    );
+    assert!(!target.exists(), "失败保存不得重建或截断原路径");
     Ok(())
 }

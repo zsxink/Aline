@@ -8,6 +8,8 @@ use aline_buffer::SelectionSpec;
 use aline_markdown::parse_with_cancel;
 use aline_source::{DiskVersion, StorageSnapshot, decode};
 
+use crate::document::persistence::PersistenceCoordinator;
+
 use super::{
     DocCore, OpenError, OpenTimings, ReadonlyDocument, ReadonlyOpenCompletion, ReadonlyOpenJob,
     StageTimer,
@@ -216,6 +218,21 @@ impl ReadonlyOpenJob {
             parse_mapping,
             ..OpenTimings::default()
         };
+        // 只有可编辑且目标为绝对路径时才建立可写关联；文件对话框返回绝对路径，
+        // 非绝对路径只可能来自注入读取器/测试，此时没有可写目标可关联。
+        // 只读文档不持有保存协调器；此失败分支正常不可达，映射为无效路径输入。
+        let persistence = if self.limits.editable && self.path.is_absolute() {
+            Some(
+                PersistenceCoordinator::new(
+                    core.document_id().clone(),
+                    self.path.clone(),
+                    baseline.clone(),
+                )
+                .map_err(|_| OpenError::Io(std::io::ErrorKind::InvalidInput))?,
+            )
+        } else {
+            None
+        };
         Ok((
             ReadonlyDocument {
                 path: self.path.clone(),
@@ -226,6 +243,8 @@ impl ReadonlyOpenJob {
                 pending_parse: None,
                 editable: self.limits.editable,
                 limits: self.limits.document,
+                persistence,
+                storage_budget: self.limits.storage,
             },
             timings,
         ))

@@ -1,6 +1,11 @@
 //! 单文档保存队列与结算。会话拥有本状态，向后台交付冻结快照及目标基线，
-//! 再接收实际写盘回执。后台比较可借用文本片段。这里不读取文件、改变历史
-//! 或管理恢复资源，冻结快照强持有其已有的资源引用。
+//! 再接收实际写盘回执。后台比较可借用文本片段。本模块主体不读取文件、
+//! 不改变历史；实际磁盘阶段在同目录 `execute` 子模块按固定顺序执行。
+//! 冻结快照强持有其已有的资源引用，本模块不管理恢复资源。
+
+// 3.2–3.4 的保存/自动保存/冲突 UI 接线前，保存入口只有 crate 内测试调用；
+// 该豁免只覆盖本模块，待 UI 接线后删除。
+#![cfg_attr(not(test), allow(dead_code))]
 
 use std::{
     error::Error,
@@ -17,7 +22,11 @@ use aline_source::{
 
 use super::{CurrentSnapshot, DocumentId};
 
+mod execute;
 mod publication;
+
+pub(super) use execute::SaveJob;
+pub(super) use publication::{SaveRequest, SaveRequestError};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) struct OperationId(u64);

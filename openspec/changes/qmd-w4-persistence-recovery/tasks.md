@@ -23,8 +23,8 @@
 
 关联保存状态、外改/可撤销重载 requirements，R-3/5/6/15、S-7/12～14。
 
-- [ ] 3.1 先写冻结快照/路径代次/旧回执/继续输入/取消/关闭的无头时序测试，再实现单文档唯一保存协调器与内容等价 dirty。验收拟新增 `cargo test -p aline-ui --test persistence_state`，比较文本、草稿、选区、revision、历史与实际基线，旧失败不覆盖新成功；同步架构 §7.3 接线边界。
-  - `document/persistence.rs` 已注册为 Cargo 测试模块；工作区测试中现有状态用例覆盖路径竞争、等价 Undo/Redo、旧回执、取消/关闭等待和源观察，另有 ED-01 等待协议的隔离测试通过。仍无生产会话消费者、真实替换成功回执及目标路径/资源持久化接线，故不勾选 3.1。
+- [x] 3.1 先写冻结快照/路径代次/旧回执/继续输入/取消/关闭的无头时序测试，再实现单文档唯一保存协调器与内容等价 dirty。验收拟新增 `cargo test -p aline-ui --test persistence_state`，比较文本、草稿、选区、revision、历史与实际基线，旧失败不覆盖新成功；同步架构 §7.3 接线边界。
+  - 2026-11-18 完成（主 Agent 自复核）：单文档协调器已绑定到可编辑文档会话（`ReadonlyDocument` 唯一持有，打开时关联 `DocumentId`、绝对目标路径与解码基线），`SaveJob` 跑通无头真实保存链路（观察 → 复核 → 编码 → 同目录 staging 受检替换 → 回执结算），成功回执更新文档磁盘基线；关闭/替换 guard 对可编辑文档改问协调器 `CloseStatus`；架构 §7.3 已注明接线边界。测试按 Ruling W4-2 落在 `document/persistence/tests.rs`（crate 内 `cfg(test)`，未新增 `--test persistence_state`），新增 5 个 macOS 会话级用例；`cargo test -p aline-ui` 411 passed / 0 failed / 2 ignored。目标缺失按 Ruling W4-7 保留 `Conflict { target_exists: false }` 事实供 3.3 区分删除/不可读。证据：`logs/validation/qmd-w4/persistence-session-20261118-210947/`。
 - [ ] 3.2 接显式保存/另存为到同一队列与 ED-01 可取消等待；先用 W5 协议 fake 验证，自然平台结束的真实消费依赖 W5。验收拟新增 `cargo test -p aline-ui --test persistence_publication`：等待更新/取消/自然确认/自然取消、目标改变、成功后新输入仍脏；双语 catalog 同键同插值，中文 UI 反馈不抢焦点。
 - [ ] 3.3 实现聚焦/写前内容版本检查、冲突四出口和删除/不可读保内存；自动/显式重载走可撤销历史边界。验收拟新增 `cargo test -p aline-ui --test persistence_reload`，同 size/mtime、覆盖确认后再变、Undo 保新磁盘基线/暂停自动保存、Redo 回基线及拒绝零副作用；回填引擎/架构重载实际边界。
 - [ ] 3.4 实现独立 1 秒防抖自动保存和组合期延后、冲突/重载撤销暂停；未命名不选路径。验收拟新增 `cargo test -p aline-ui --test persistence_autosave` 使用虚拟时钟覆盖 999/1000ms、重复事件、组合延后、关闭取消和恢复策略；真实计时记录不替代虚拟边界。

@@ -9,8 +9,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use aline_markdown::{CancelToken, ParseBudget, ParseConfig, Parsed};
-use aline_source::{SourceBaseline, StorageBudget};
+use aline_source::{IoBudget, SourceBaseline, StorageBudget};
 
+use super::persistence::{
+    CloseStatus, PersistenceCoordinator, SaveError, SaveJob, SaveRequest, SaveRequestError,
+    WriteCompletion, WriteOutcome, WriteSettlement,
+};
 use super::{
     DocCore, DocError, DocLimits, EditorMode, InputIdentity, ModeSwitchOutcome, WaitStatus,
 };
@@ -155,13 +159,17 @@ pub struct ReadonlyDocument {
     pending_parse: Option<refresh::PendingParse>,
     editable: bool,
     limits: DocLimits,
+    /// 可编辑且目标为绝对路径时持有唯一保存协调器；只读或无绝对目标时为 None。
+    persistence: Option<PersistenceCoordinator>,
+    /// 保存编码与 I/O 预算，来自打开时注入的存储预算。
+    storage_budget: StorageBudget,
 }
 impl ReadonlyDocument {
     /// 返回用户选择的文件路径，供标题等显式 UI 使用。
     pub fn path(&self) -> &Path {
         &self.path
     }
-    /// 返回原 bytes/BOM/行尾与冻结解码源码的只读存储基线。
+    /// 返回当前磁盘基线：打开时为原 bytes/BOM/行尾，成功保存后替换为实际写出快照。
     pub fn baseline(&self) -> &SourceBaseline {
         &self.baseline
     }
@@ -188,6 +196,89 @@ impl ReadonlyDocument {
     /// 冻结当前文档输入身份，供布局与派生结果受检消费。
     pub fn input_identity(&mut self) -> Result<InputIdentity, DocError> {
         self.core.current_input_identity()
+    }
+
+    /// 请求一次显式保存：组合期进入 ED-01 可取消等待，否则冻结当前快照排队。
+    #[cfg_attr(
+        not(test),
+        allow(dead_code) // 保存菜单与 ED-01 等待界面在 W4 3.2 接线前只有 crate 内测试调用。
+    )]
+    pub(in crate::document) fn request_persistence_save(
+        &mut self,
+    ) -> Result<SaveRequest, SaveRequestError> {
+        if !self.editable {
+            return Err(SaveRequestError::Input(DocError::ReadOnly));
+        }
+        let coordinator = self
+            .persistence
+            .as_mut()
+            .ok_or(SaveRequestError::Queue(SaveError::InvalidPath))?;
+        coordinator.request_save(&mut self.core, self.limits.text())
+    }
+
+    /// 取走已排队的保存，生成可离开 UI 线程执行的后台工作；
+    /// staging 必须与目标同目录且不存在。
+    #[cfg_attr(
+        not(test),
+        allow(dead_code) // 保存执行排程在 W4 3.2 接线前只有 crate 内测试调用。
+    )]
+    pub(in crate::document) fn start_save_job(
+        &mut self,
+        staging: PathBuf,
+    ) -> Result<SaveJob, SaveRequestError> {
+        if !self.editable {
+            return Err(SaveRequestError::Input(DocError::ReadOnly));
+        }
+        let coordinator = self
+            .persistence
+            .as_mut()
+            .ok_or(SaveRequestError::Queue(SaveError::InvalidPath))?;
+        let frozen = coordinator.start()?;
+        Ok(SaveJob::new(
+            frozen,
+            self.limits.text(),
+            self.storage_budget,
+            IoBudget::new(self.storage_budget.max_bytes()),
+            staging,
+        ))
+    }
+
+    /// 结算一次真实写盘完成项；采纳成功回执时同时替换文档的磁盘基线。
+    #[cfg_attr(
+        not(test),
+        allow(dead_code) // 回执结算在 W4 3.2 接线前只有 crate 内测试调用。
+    )]
+    pub(in crate::document) fn settle_save(
+        &mut self,
+        completion: WriteCompletion,
+    ) -> Result<WriteSettlement, SaveRequestError> {
+        // 与另外两个保存入口保持一致：只读文档在排查误接线时先报只读，
+        // 而不是落到无协调器的 InvalidPath。
+        if !self.editable {
+            return Err(SaveRequestError::Input(DocError::ReadOnly));
+        }
+        let coordinator = self
+            .persistence
+            .as_mut()
+            .ok_or(SaveRequestError::Queue(SaveError::InvalidPath))?;
+        let settlement = coordinator.reconcile(completion);
+        if settlement.adopted
+            && let WriteOutcome::Published { storage, .. } = &settlement.outcome
+        {
+            // 成功发布即按实际写出字节建立磁盘基线；即使目录同步未确认
+            //（synchronized=false）也与协调器保存基线保持一致，关闭 guard
+            // 仍按 PublishedUncertain 要求用户处理。PublishedBaselineFailed 不替换。
+            self.baseline = storage.clone();
+        }
+        Ok(settlement)
+    }
+
+    /// 仅供 crate 内测试读取保存协调器状态；不扩大生产 API。
+    #[cfg(test)]
+    pub(super) fn persistence_status(&self) -> Option<super::persistence::SaveStatus> {
+        self.persistence
+            .as_ref()
+            .map(PersistenceCoordinator::status)
     }
 
     /// 判断已采用解析是否仍属于当前源码和解析配置。
@@ -322,9 +413,16 @@ impl ReadonlyDocument {
         let Ok(snapshot) = self.current_snapshot() else {
             return false;
         };
-        snapshot
-            .full_text(self.limits.text())
-            .is_ok_and(|text| text == self.baseline.source())
+        match &self.persistence {
+            // 可编辑文档的关闭/替换一律以协调器的最新状态为准：在途保存、
+            // 未结算失败/冲突/不确定发布或相对保存基线有修改都须先由用户处理。
+            Some(coordinator) => coordinator.close_status(&snapshot) == CloseStatus::Ready,
+            // 没有绝对目标路径的可编辑文档只可能来自注入读取器或测试，
+            // 此时没有可写目标关联，退回原有的打开基线全文比较。
+            None => snapshot
+                .full_text(self.limits.text())
+                .is_ok_and(|text| text == self.baseline.source()),
+        }
     }
 }
 
