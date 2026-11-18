@@ -332,7 +332,8 @@ impl NativeOpenCoordinator {
 
     /// 平台自然结束；返回 Some(job) 时窗口负责后台执行。反馈已设置。
     ///
-    /// 真实平台结束回调属于 W5；当前只有 crate 测试直接调用。
+    /// 生产路径由 `settle_after_input` 调用 `finish_save_wait_intent`；本入口
+    /// 仍只由 crate 测试直接调用，故保留测试外 dead-code 豁免。
     #[cfg_attr(not(test), allow(dead_code))]
     pub(super) fn finish_save_wait(
         &mut self,
@@ -367,7 +368,13 @@ impl NativeOpenCoordinator {
         };
         if let Some(command) = association {
             return match command {
-                AssociationCommand::Run(job) => Some(SaveIntent::Migrate(job)),
+                // 关联等待已结束并转入迁移复制：与 Save 分支一致进入运行态，
+                // 使复制阶段 `cancel_save_wait` 走 `association_active` 语义。
+                AssociationCommand::Run(job) => {
+                    self.save_host = SaveHost::Running { automatic: false };
+                    self.feedback = None;
+                    Some(SaveIntent::Migrate(job))
+                }
                 AssociationCommand::Save(command) => self.apply_save_command(command),
                 AssociationCommand::Cancelled => {
                     self.save_host = SaveHost::Idle;

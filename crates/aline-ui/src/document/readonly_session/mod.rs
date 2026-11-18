@@ -535,7 +535,6 @@ impl ReadonlyDocument {
     }
 
     /// 关联等待是否仍属于当前状态；迟到句柄不得结算新关联。
-    #[allow(dead_code)]
     pub(crate) fn association_wait_matches(&self, handle: WaitHandle) -> bool {
         self.association.as_ref().is_some_and(|state| {
             state.phase == AssociationPhase::Waiting && state.wait == Some(handle)
@@ -543,7 +542,6 @@ impl ReadonlyDocument {
     }
 
     /// 平台自然结束关联等待：确认后进入复制阶段，取消则清理状态。
-    #[allow(dead_code)]
     pub(crate) fn finish_association_wait(
         &mut self,
         handle: WaitHandle,
@@ -1679,8 +1677,8 @@ impl ReadonlyDocument {
 
     /// 平台自然结束后按当时快照继续保存；返回可执行工作或拒绝。
     ///
-    /// 真实平台结束回调属于 W5；在此之前只有 crate 测试的协议 fake 调用。
-    #[cfg_attr(not(test), allow(dead_code))]
+    /// 生产路径由窗口 `settle_after_input` 在组合自然结束后调用；crate 测试
+    /// 直接覆盖该协议入口。
     pub(crate) fn finish_save_wait_command(
         &mut self,
         handle: WaitHandle,

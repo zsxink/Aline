@@ -40,9 +40,12 @@ use gpui::{
 
 use crate::document::native_input_coordinates::{BoundInputCoordinates, NativeInputCoordinates};
 use crate::document::{NativeInputJob, PreparedNativeInput};
-use crate::{CurrentSnapshot, DocError, DocumentId, EditorMode, InputIdentity, ReadonlyDocument};
+use crate::{
+    CurrentSnapshot, DocError, DocumentId, EditorMode, InputIdentity, PublicationOutcome,
+    ReadonlyDocument,
+};
 
-use super::{NativeDocumentWindow, PreparedLayout, edit_error_key, tokens};
+use super::{NativeDocumentWindow, PreparedLayout, SaveIntent, edit_error_key, tokens};
 
 const MAX_INPUT_BYTES: usize = 64 * 1024;
 const MAPPING: MappingBudget = MappingBudget::new(MAX_INPUT_BYTES, MAX_INPUT_BYTES + 1);
@@ -297,7 +300,13 @@ impl InputView {
                 }
                 let range = match self.delete_range(identity, current, *forward, *count) {
                     Ok(Some(range)) => range,
-                    Ok(None) => return InputStep::Applied { changed: false },
+                    // 组合活动时删除已拒绝；到达边界不会改变组合状态。
+                    Ok(None) => {
+                        return InputStep::Applied {
+                            changed: false,
+                            composition: None,
+                        };
+                    }
                     Err(error) => return InputStep::Rejected(error),
                 };
                 let before = document.core().version();
@@ -306,9 +315,10 @@ impl InputView {
                     .and_then(|core| core.prepare_native_delete(identity, &range, now_millis));
                 match prepared {
                     Ok(Some(job)) => InputStep::Prepared(job),
-                    // 局部草稿内删除已同步完成；版本差异反映真实变化。
+                    // 局部草稿内删除已同步完成；组合活动时删除已在上面拒绝，不会结束组合。
                     Ok(None) => InputStep::Applied {
                         changed: document.core().version() != before,
+                        composition: None,
                     },
                     Err(error) => InputStep::Rejected(error),
                 }
@@ -458,10 +468,16 @@ impl InputView {
         document: &mut ReadonlyDocument,
         now_millis: u64,
     ) -> InputStep {
+        let was_composing = document.core().composition().is_some();
         let before = document.core().version();
         match intent.apply(self, current, document, now_millis) {
             Ok(()) => InputStep::Applied {
                 changed: document.core().version() != before,
+                composition: composition_end(
+                    intent,
+                    was_composing,
+                    document.core().composition().is_some(),
+                ),
             },
             Err(error) => InputStep::Rejected(error),
         }
@@ -475,10 +491,16 @@ impl InputView {
         document: &mut ReadonlyDocument,
         now_millis: u64,
     ) -> InputStep {
+        let was_composing = document.core().composition().is_some();
         let before = document.core().version();
         match intent.apply(self, current, document, now_millis) {
             Ok(()) => InputStep::Recovered {
                 changed: document.core().version() != before,
+                composition: composition_end(
+                    intent,
+                    was_composing,
+                    document.core().composition().is_some(),
+                ),
             },
             Err(error) => InputStep::Rejected(error),
         }
@@ -510,6 +532,28 @@ fn starts_composition(document: &ReadonlyDocument, text: &str) -> bool {
         && document.core().open_block_draft().is_some()
 }
 
+/// 组合由本次输入结算结束时给出平台结束结果；未结束或结算前无组合返回 `None`。
+///
+/// 判定依据：空候选 `Mark` 在 `InputView::step` 中走 `composition_cancel`，属于
+/// 平台取消；其余结束（确认提交、IME 替换确认等）都按平台确认继续原保存意图。
+/// 只有「结算前组合活动且结算后结束」才产生结果，组合仍活动时窗口不得结算等待。
+fn composition_end(
+    intent: &InputIntent,
+    was_composing: bool,
+    is_composing: bool,
+) -> Option<PublicationOutcome> {
+    if !was_composing || is_composing {
+        return None;
+    }
+    Some(
+        if matches!(intent, InputIntent::Mark(_, text, _) if text.is_empty()) {
+            PublicationOutcome::PlatformCancelled
+        } else {
+            PublicationOutcome::PlatformConfirmed
+        },
+    )
+}
+
 /// 自持输入意图：跨越在途 job 排队时不得借用平台回调文本。
 #[derive(Clone)]
 enum InputIntent {
@@ -527,10 +571,14 @@ enum InputIntent {
 enum InputStep {
     Applied {
         changed: bool,
+        /// 本次同步结算是否结束了组合；窗口据此继续组合期保存等待。
+        composition: Option<PublicationOutcome>,
     },
     /// 准备结果与判定不一致时同步应用；窗口须报告内部错误反馈。
     Recovered {
         changed: bool,
+        /// 同步退化同样可能结束组合；窗口据此继续组合期保存等待。
+        composition: Option<PublicationOutcome>,
     },
     Prepared(NativeInputJob),
     Sealed(NativeInputJob),
@@ -1121,12 +1169,18 @@ impl NativeDocumentWindow {
             )
         };
         match step {
-            InputStep::Applied { changed } => {
-                self.settle_after_input(Some(frame), changed, window, cx);
+            InputStep::Applied {
+                changed,
+                composition,
+            } => {
+                self.settle_after_input(Some(frame), changed, composition, window, cx);
                 InputExecution::Applied
             }
-            InputStep::Recovered { changed } => {
-                self.settle_after_input(Some(frame), changed, window, cx);
+            InputStep::Recovered {
+                changed,
+                composition,
+            } => {
+                self.settle_after_input(Some(frame), changed, composition, window, cx);
                 self.state.feedback = Some("document.input_applied_after_failure");
                 cx.notify();
                 InputExecution::Applied
@@ -1230,34 +1284,45 @@ impl NativeDocumentWindow {
             Err(error) => Err(error),
         };
         match settled {
-            Ok(changed) => {
+            Ok((changed, was_composing, is_composing)) => {
+                let composition =
+                    composition_end(&active.input().intent, was_composing, is_composing);
                 if active.is_seal() {
                     // 触发意图尚未应用：放回队首，在新版本上重放。
                     self.input_scheduler.requeue_front(active.into_input());
                 }
                 let frame = self.active_input_frame();
-                self.settle_after_input(frame.as_ref(), changed, window, cx);
+                self.settle_after_input(frame.as_ref(), changed, composition, window, cx);
                 self.drain_inputs(window, cx);
             }
             Err(error) => self.retry_or_fallback(active, error, window, cx),
         }
     }
 
-    /// 在最新文档状态上发布后台结果；返回版本是否变化。
-    fn publish_native(&mut self, prepared: PreparedNativeInput) -> Result<bool, DocError> {
+    /// 在最新文档状态上发布后台结果；返回版本是否变化及发布前后的组合状态。
+    fn publish_native(
+        &mut self,
+        prepared: PreparedNativeInput,
+    ) -> Result<(bool, bool, bool), DocError> {
         let Some(document) = self.state.session.document_mut() else {
             return Err(DocError::ClosedTarget);
         };
         let before = document.core().version();
+        let was_composing = document.core().composition().is_some();
         document.edit_core()?.publish_native_input(prepared)?;
-        Ok(document.core().version() != before)
+        Ok((
+            document.core().version() != before,
+            was_composing,
+            document.core().composition().is_some(),
+        ))
     }
 
-    /// 发布或同步应用后的统一收尾：刷新、重绑、组合帧与通知。
+    /// 发布或同步应用后的统一收尾：刷新、重绑、组合帧、保存等待与通知。
     fn settle_after_input(
         &mut self,
         frame: Option<&InputFrame>,
         changed: bool,
+        composition: Option<PublicationOutcome>,
         window: &Window,
         cx: &mut Context<Self>,
     ) {
@@ -1281,6 +1346,25 @@ impl NativeDocumentWindow {
         // 也必须靠本次结算恢复 1 秒计时。
         self.note_document_activity(window, cx);
         self.refresh_composing_input_frame(frame);
+        // 组合自然结束后立即以该结束结果结算组合期保存等待并继续原保存意图。
+        // 组合仍活动时 `composition` 必为 None，这里不会误结算。
+        if let Some(outcome) = composition
+            && self.state.save_waiting()
+        {
+            match self
+                .state
+                .finish_save_wait_intent(outcome, self.input_millis())
+            {
+                Some(SaveIntent::Save(job)) => self.start_save(job, window, cx),
+                Some(SaveIntent::Migrate(job)) => self.start_association(job, window, cx),
+                Some(SaveIntent::ChooseTarget(_)) => {
+                    // 等待必有目标；选择器不可达，按内部失败反馈且不改菜单。
+                    self.state.feedback = Some("document.save_failed");
+                }
+                // 等待已由协调器按拒绝/取消路径结算，保留其反馈。
+                None => {}
+            }
+        }
         cx.notify();
     }
 

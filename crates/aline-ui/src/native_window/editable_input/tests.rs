@@ -500,7 +500,7 @@ fn typing_inside_the_window_does_not_parse_and_the_boundary_only_freezes_a_job()
             doc,
             10,
         ),
-        InputStep::Applied { changed: true }
+        InputStep::Applied { changed: true, .. }
     ));
     assert_eq!(parse_call_count(), baseline, "组内普通输入不得解析");
 
@@ -554,7 +554,7 @@ fn draft_local_backspace_completes_without_a_background_job() -> TestResult {
         2,
     );
     assert!(
-        matches!(step, InputStep::Applied { changed: true }),
+        matches!(step, InputStep::Applied { changed: true, .. }),
         "组内删除应同步完成"
     );
     assert_eq!(parse_call_count(), baseline, "组内删除不得解析");
@@ -1061,7 +1061,7 @@ fn explicit_undo_during_in_flight_seal_rebinds_and_replays_input_in_order() -> T
         )
     };
     assert!(
-        matches!(applied, InputStep::Applied { changed: true }),
+        matches!(applied, InputStep::Applied { changed: true, .. }),
         "命令之后触发键必须重新应用"
     );
     assert_eq!(
@@ -1083,7 +1083,7 @@ fn explicit_undo_during_in_flight_seal_rebinds_and_replays_input_in_order() -> T
         view.step(&queued.intent, &identity, &current, doc, queued.now_millis)
     };
     assert!(
-        matches!(applied, InputStep::Applied { changed: true }),
+        matches!(applied, InputStep::Applied { changed: true, .. }),
         "命令前已排队的按键必须按序应用"
     );
     assert_eq!(scheduler.pending_len(), 0, "等待队列必须消费完毕");
@@ -1155,4 +1155,36 @@ fn mode_switch_during_in_flight_seal_cannot_rebind_and_clears_the_frame() -> Tes
     assert_eq!(doc.core().history_node_count(), 1);
     assert_eq!(doc.core().open_block_draft(), None);
     Ok(())
+}
+
+#[test]
+fn composition_end_classifies_platform_outcome() {
+    let empty_mark = InputIntent::Mark(None, String::new(), None);
+    let filled_mark = InputIntent::Mark(None, "候".to_owned(), None);
+    let confirmation = InputIntent::Replace(None, "候".to_owned());
+    assert_eq!(
+        composition_end(&empty_mark, true, false),
+        Some(PublicationOutcome::PlatformCancelled),
+        "空候选 Mark 走 composition_cancel，应判定为平台取消"
+    );
+    assert_eq!(
+        composition_end(&filled_mark, true, false),
+        Some(PublicationOutcome::PlatformConfirmed),
+        "非空 Mark 结束组合应判定为平台确认"
+    );
+    assert_eq!(
+        composition_end(&confirmation, true, false),
+        Some(PublicationOutcome::PlatformConfirmed),
+        "IME 替换确认应判定为平台确认"
+    );
+    assert_eq!(
+        composition_end(&filled_mark, true, true),
+        None,
+        "组合仍活动时不得产生结束结果"
+    );
+    assert_eq!(
+        composition_end(&filled_mark, false, false),
+        None,
+        "结算前无组合时不得产生结束结果"
+    );
 }

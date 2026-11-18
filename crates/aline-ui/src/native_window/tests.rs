@@ -809,6 +809,197 @@ fn window_natural_platform_finish_saves_latest_snapshot() -> Result<(), Box<dyn 
     Ok(())
 }
 
+/// 生产接线 `settle_after_input` 经 `finish_save_wait_intent` 结算等待；
+/// 这里固定该入口在组合自然结束后继续保存最新快照。
+#[cfg(target_os = "macos")]
+#[test]
+fn window_composition_end_intent_settles_wait_and_saves_latest_snapshot()
+-> Result<(), Box<dyn Error>> {
+    use std::fs;
+
+    let cases: [(crate::PublicationOutcome, &[u8]); 2] = [
+        (
+            crate::PublicationOutcome::PlatformConfirmed,
+            "候y\n".as_bytes(),
+        ),
+        (crate::PublicationOutcome::PlatformCancelled, b"x\n"),
+    ];
+    for (outcome, expected) in cases {
+        let directory = WindowSaveDir::create("aline-window-intent")?;
+        let target = directory.0.join("notes.md");
+        fs::write(&target, b"x\n")?;
+        let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+        open_window_document(&mut state, &target, b"x\n")?;
+        // 组合插入使用当前选区；选中首个字符后确认才能得到 `候y\n`。
+        open_window_block(&mut state, SelectionSpec::new(0, 1))?;
+        {
+            let core = state
+                .session
+                .document_mut()
+                .ok_or("应存在可编辑文档")?
+                .edit_core()?;
+            core.composition_start("候", 0)?;
+            core.composition_update("候y", 1)?;
+        }
+        assert!(state.request_save().is_none(), "组合期保存应转入等待");
+        assert!(state.save_waiting());
+        {
+            let core = state
+                .session
+                .document_mut()
+                .ok_or("应存在可编辑文档")?
+                .edit_core()?;
+            match outcome {
+                crate::PublicationOutcome::PlatformConfirmed => {
+                    core.composition_commit(2)?;
+                }
+                crate::PublicationOutcome::PlatformCancelled => {
+                    core.composition_cancel(2)?;
+                }
+            }
+        }
+        let Some(super::SaveIntent::Save(job)) = state.finish_save_wait_intent(outcome, 3) else {
+            return Err("组合自然结束后等待必须继续为保存意图".into());
+        };
+        assert!(!state.save_waiting(), "结算后等待必须退出");
+        assert_eq!(state.feedback_key(), None, "进入写盘应清除等待反馈");
+        let completion = job.run();
+        assert_eq!(
+            state.settle_save(completion).feedback,
+            Some("document.save_saved")
+        );
+        assert_eq!(fs::read(&target)?, expected);
+        assert!(
+            state.finish_save_wait_intent(outcome, 4).is_none(),
+            "等待句柄不得复用"
+        );
+    }
+    Ok(())
+}
+
+/// 组合仍活动时生产由 `settle_after_input` 的 `composition_end` 守卫；
+/// 直接调用协调器入口必须固定为拒绝路径，不得把等待误当成功或写盘。
+#[cfg(target_os = "macos")]
+#[test]
+fn window_finish_save_wait_intent_while_composing_is_rejected_not_saved()
+-> Result<(), Box<dyn Error>> {
+    use std::fs;
+
+    let directory = WindowSaveDir::create("aline-window-composing-reject")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    open_window_document(&mut state, &target, b"x\n")?;
+    open_window_block(&mut state, SelectionSpec::new(0, 1))?;
+    state
+        .session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .composition_start("候", 0)?;
+    assert!(state.request_save().is_none(), "组合期保存应转入等待");
+    assert!(state.save_waiting());
+
+    assert!(
+        state
+            .finish_save_wait_intent(crate::PublicationOutcome::PlatformConfirmed, 3)
+            .is_none(),
+        "组合仍活动时不得返回保存意图"
+    );
+    assert!(!state.save_waiting(), "拒绝后协调器必须退出等待");
+    assert_eq!(state.feedback_key(), Some("document.save_failed"));
+    assert_eq!(fs::read(&target)?, b"x\n", "组合活动时不得写盘");
+    let document = state.session.document_mut().ok_or("应存在可编辑文档")?;
+    assert!(document.core().composition().is_some(), "拒绝不得结束组合");
+    Ok(())
+}
+
+/// 组合期首次另存为建立关联等待；组合自然结束后必须转入迁移运行态，
+/// 复制阶段取消仍按既有 `association_active` 语义生效且等待不得二次结算。
+#[cfg(target_os = "macos")]
+#[test]
+fn window_composition_end_migrates_association_and_cancel_stays_available()
+-> Result<(), Box<dyn Error>> {
+    let mut state = super::NativeOpenCoordinator::new(coordinator_limits(true));
+    open_synthetic_recovered(&mut state, "x\n")?;
+    {
+        let document = state.session.document_mut().ok_or("应存在可编辑文档")?;
+        let len = document.baseline().source().len();
+        document
+            .edit_core()?
+            .open_block(0..len, SelectionSpec::new(0, 1))?;
+        document.edit_core()?.composition_start("候", 0)?;
+    }
+    let target =
+        std::env::temp_dir().join(format!("aline-association-wait-{}.md", std::process::id()));
+    assert!(
+        state
+            .accept_save_target(WriteKind::SaveAs, Ok(Some(target)), 1)
+            .is_none(),
+        "组合期首次另存为应转入关联等待"
+    );
+    assert!(state.save_waiting());
+    assert_eq!(state.feedback_key(), Some("document.save_waiting"));
+    state
+        .session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .composition_commit(2)?;
+
+    let Some(super::SaveIntent::Migrate(job)) =
+        state.finish_save_wait_intent(crate::PublicationOutcome::PlatformConfirmed, 3)
+    else {
+        return Err("组合自然结束后关联等待应继续为迁移意图".into());
+    };
+    assert!(!state.save_waiting(), "迁移复制阶段不得仍处于等待");
+    assert!(
+        matches!(
+            state.save_host,
+            super::SaveHost::Running { automatic: false }
+        ),
+        "迁移复制阶段必须进入运行态"
+    );
+    assert_eq!(state.feedback_key(), None, "进入迁移应清除等待反馈");
+    assert!(state.save_cancel_enabled(), "迁移复制阶段取消菜单应可用");
+    assert!(state.save_busy());
+
+    // 已结算的等待不得被第二次组合结束重复结算。
+    assert!(
+        state
+            .finish_save_wait_intent(crate::PublicationOutcome::PlatformConfirmed, 4)
+            .is_none(),
+        "已结算的关联等待不得再次返回意图"
+    );
+    assert!(
+        matches!(
+            state.save_host,
+            super::SaveHost::Running { automatic: false }
+        ),
+        "重复结算不得改变运行态"
+    );
+    assert_eq!(state.feedback_key(), None);
+
+    // 迁移复制阶段取消仍走既有 association_active 分支。
+    assert!(state.cancel_save_wait());
+    assert_eq!(state.feedback_key(), Some("document.save_cancelled"));
+    assert!(matches!(state.save_host, super::SaveHost::Idle));
+    assert!(!state.save_cancel_enabled());
+    assert!(!state.save_busy());
+    {
+        let document = state.session.document().ok_or("应存在恢复文档")?;
+        assert!(!document.association_active(), "取消后关联必须结束");
+        assert_eq!(document.path(), Path::new("recovered.md"));
+    }
+
+    // 迟到的迁移完成不得覆盖取消反馈或改路径。
+    let late = job.run();
+    assert!(state.association_finished(late, 5).is_none());
+    assert_eq!(state.feedback_key(), Some("document.save_cancelled"));
+    assert!(matches!(state.save_host, super::SaveHost::Idle));
+    Ok(())
+}
+
 #[cfg(target_os = "macos")]
 #[test]
 fn window_save_request_while_running_is_rejected_and_queue_recovers() -> Result<(), Box<dyn Error>>
