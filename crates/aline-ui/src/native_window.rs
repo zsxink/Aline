@@ -84,21 +84,28 @@ gpui::actions!(m1_debug, [ReportLayout]);
 /// M1 不随包分发字体；V-04 取得授权夹具后再在此登记（字族, 静态 TTF/OTF 字节）。
 const BUNDLED_FONTS: &[(&str, &[u8])] = &[];
 
-/// M1 实验预算沿用现有 16 MiB 解析输入上限；不是发布限额。
+/// M2 实验预算沿用现有 16 MiB 解析输入上限；不是发布限额。
 const MAX_DOCUMENT_BYTES: usize = 16 * 1024 * 1024;
 
-/// M1 原生阅读窗口预算；可编辑打开与历史预算仍由 M2 接线单独启用。
+/// M2 实验预算：可编辑会话的历史节点上限；不是发布限额。
+const MAX_HISTORY_NODES: usize = 4096;
+
+/// M2 实验预算：可编辑会话的历史补丁字节上限；不是发布限额。
+const MAX_HISTORY_PATCH_BYTES: usize = 1 << 20;
+
+/// 原生窗口预算：M2 起生产打开即可编辑；历史预算为实验值。
 pub(super) fn open_limits() -> ReadonlyOpenLimits {
     ReadonlyOpenLimits::new(
         StorageBudget::new(MAX_DOCUMENT_BYTES),
         DocLimits::new(
             TextBudget::new(MAX_DOCUMENT_BYTES),
             LineIndexBudget::new(1_000_000),
-            HistoryBudget::new(0, 0),
+            HistoryBudget::new(MAX_HISTORY_NODES, MAX_HISTORY_PATCH_BYTES),
         ),
         ParseConfig::m0(),
         ParseBudget::m0(),
     )
+    .with_editing()
 }
 
 /// 无 GPUI 的窗口协调规则；会话继续独占文档与请求资格。
@@ -361,6 +368,8 @@ impl NativeWindowCopy {
         for key in [
             "document.close_pending_changes",
             "document.edit_refused",
+            "document.input_dropped",
+            "document.input_applied_after_failure",
             "document.composition_pending",
             "document.refresh_failed",
             "find.failed",
@@ -546,6 +555,8 @@ struct NativeDocumentWindow {
     source_input_site: Option<editable_input::SourceInputSite>,
     input_frame: Option<editable_input::InputFrame>,
     composing_input_frame: Option<editable_input::InputFrame>,
+    input_task: Option<Task<()>>,
+    input_scheduler: editable_input::InputScheduler,
     next_reader_generation: u64,
     statistics: Option<(DocumentId, SharedString, SharedString)>,
     statistics_task: Option<(DocumentId, Task<()>)>,
@@ -596,6 +607,8 @@ impl NativeDocumentWindow {
             source_input_site: None,
             input_frame: None,
             composing_input_frame: None,
+            input_task: None,
+            input_scheduler: editable_input::InputScheduler::new(),
             next_reader_generation: 0,
             statistics: None,
             statistics_task: None,
@@ -707,6 +720,10 @@ impl NativeDocumentWindow {
                     result
                 });
                 let applied = prepared.is_some();
+                if applied {
+                    // 新文档接管窗口：旧文档的未完成输入与在途结果全部作废。
+                    this.clear_input_state();
+                }
                 if let Some((reader, generation)) = prepared {
                     reader.schedule_height_hint(window, cx);
                     this.reader = Some(reader);
@@ -784,6 +801,8 @@ impl NativeDocumentWindow {
                 })
                 .detach();
         }
+        // 关闭成功：丢弃正文帧与排队输入；在途结果按文档身份被拒绝。
+        self.clear_input_state();
         true
     }
 

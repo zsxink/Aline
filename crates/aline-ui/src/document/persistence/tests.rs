@@ -516,24 +516,51 @@ fn persistence_state_source_failure_retains_original_file_error() -> TestResult 
 }
 
 #[cfg(target_os = "macos")]
-#[test]
-fn persistence_state_refuses_reobserved_same_length_changed_content() -> TestResult {
-    use std::fs::{self, FileTimes, OpenOptions};
+struct TempSaveDir(PathBuf);
+
+#[cfg(target_os = "macos")]
+impl Drop for TempSaveDir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+/// 真实磁盘保存夹具：关联 `x\n` 基线并排队一次输入 `a`。
+///
+/// 五元组各字段都是测试直接使用的独立句柄；拆成结构体不会减少调用方代码。
+#[cfg(target_os = "macos")]
+#[allow(clippy::type_complexity)]
+fn macos_save_fixture() -> Result<
+    (
+        TempSaveDir,
+        PathBuf,
+        DocCore,
+        PersistenceCoordinator,
+        FrozenWrite,
+    ),
+    Box<dyn std::error::Error>,
+> {
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    struct Fixture(PathBuf);
-    impl Drop for Fixture {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
+    let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+    let mut created = None;
+    for attempt in 0..100u32 {
+        let candidate = fixture_path(&format!(
+            "aline-save-{}-{nonce:x}-{attempt}",
+            std::process::id()
+        ));
+        match std::fs::create_dir(&candidate) {
+            Ok(()) => {
+                created = Some(candidate);
+                break;
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error.into()),
         }
     }
-
-    let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
-    let dir = fixture_path(&format!("aline-save-{}-{nonce:x}", std::process::id()));
-    fs::create_dir(&dir)?;
-    let owned = Fixture(dir);
+    let owned = TempSaveDir(created.ok_or("无法创建保存测试目录")?);
     let target = owned.0.join("notes.md");
-    fs::write(&target, b"x\n")?;
+    std::fs::write(&target, b"x\n")?;
     let (mut doc, mut state) = fixture(b"x\n")?;
     let initial = doc.current_snapshot(TEXT)?;
     state
@@ -547,7 +574,30 @@ fn persistence_state_refuses_reobserved_same_length_changed_content() -> TestRes
     doc.type_text(1, "a", 0)?;
     queue(&mut state, &mut doc)?;
     let work = start(&mut state)?;
+    Ok((owned, target, doc, state, work))
+}
 
+/// 以不同内容替换目标，同时保持字节长度和 mtime 不变。
+#[cfg(target_os = "macos")]
+fn rewrite_same_size_and_mtime(target: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
+    use std::fs::{self, FileTimes, OpenOptions};
+
+    let before = fs::metadata(target)?.modified()?;
+    fs::write(target, b"y\n")?;
+    OpenOptions::new()
+        .write(true)
+        .open(target)?
+        .set_times(FileTimes::new().set_modified(before))?;
+    assert_eq!(fs::metadata(target)?.modified()?, before);
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn persistence_state_reconciles_publish_conflict_as_conflict() -> TestResult {
+    use std::fs;
+
+    let (owned, target, mut doc, mut state, work) = macos_save_fixture()?;
     let observe = || {
         ExistingTarget::observe(
             &target,
@@ -562,36 +612,45 @@ fn persistence_state_refuses_reobserved_same_length_changed_content() -> TestRes
     let encoded = work
         .encode(TEXT, STORAGE)
         .map_err(|error| format!("{error:?}"))?;
-    let prepare = aline_source::prepare_checked_replace(
+    // macOS 平台受检替换已按 §44 准入实现，staging 创建不再失败关闭；
+    // 同尺寸、同时间戳的外部改写必须在发布前的重新观测中按内容比对拒绝。
+    let prepared = aline_source::prepare_checked_replace(
         encoded.bytes(),
         &observe()?,
         &staging,
         aline_source::IoBudget::new(4096),
         work.cancellation(),
-    );
-    let rejected = prepare.err().ok_or("平台应拒绝未取证的 staging 创建")?;
+    )
+    .map_err(|error| format!("{error:?}"))?;
+    rewrite_same_size_and_mtime(&target)?;
+    let rejected = prepared
+        .publish(work.cancellation())
+        .err()
+        .ok_or("发布前重新观测必须拒绝同尺寸同时间戳的外改")?;
     assert!(matches!(
         rejected.kind(),
-        AtomicFailureKind::ReplacementMetadataUnverified
+        AtomicFailureKind::Conflict {
+            target_exists: true
+        }
     ));
-    assert!(rejected.staging_path().is_none());
+    assert_eq!(rejected.staging_path(), Some(staging.as_path()));
     let receipt = state.reconcile(work.finish_replacement(&encoded, Err(rejected)));
     assert!(receipt.adopted);
     assert_eq!(receipt.published_target(), None);
-    assert_eq!(state.status(), SaveStatus::Failed);
+    assert_eq!(state.status(), SaveStatus::Conflict);
     assert!(state.is_dirty(&doc.current_snapshot(TEXT)?));
-    assert_eq!(fs::read(&target)?, b"x\n");
-    assert!(!staging.try_exists()?);
+    assert_eq!(fs::read(&target)?, b"y\n");
+    assert!(staging.try_exists()?);
+    Ok(())
+}
 
-    queue(&mut state, &mut doc)?;
-    let work = start(&mut state)?;
-    let before = fs::metadata(&target)?.modified()?;
-    fs::write(&target, b"y\n")?;
-    OpenOptions::new()
-        .write(true)
-        .open(&target)?
-        .set_times(FileTimes::new().set_modified(before))?;
-    assert_eq!(fs::metadata(&target)?.modified()?, before);
+#[cfg(target_os = "macos")]
+#[test]
+fn persistence_state_refuses_reobserved_same_length_changed_content() -> TestResult {
+    use std::fs;
+
+    let (_owned, target, mut doc, mut state, work) = macos_save_fixture()?;
+    rewrite_same_size_and_mtime(&target)?;
     let error = work
         .check_observation(&ExistingTarget::observe(
             &target,

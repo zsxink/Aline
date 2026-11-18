@@ -279,6 +279,20 @@ mod tests {
             .ok_or_else(|| "missing read job".into())
     }
 
+    /// 构造只读会话预算；生产 `open_limits()` 自 M2 起可编辑，只读路径需显式固定。
+    fn read_only_limits() -> ReadonlyOpenLimits {
+        ReadonlyOpenLimits::new(
+            StorageBudget::new(4096),
+            DocLimits::new(
+                TextBudget::new(4096),
+                LineIndexBudget::new(128),
+                HistoryBudget::new(0, 0),
+            ),
+            ParseConfig::m0(),
+            ParseBudget::m0(),
+        )
+    }
+
     fn open(bytes: &'static [u8], editable: bool) -> Result<NativeOpenCoordinator, Box<dyn Error>> {
         let limits = if editable {
             ReadonlyOpenLimits::new(
@@ -293,7 +307,7 @@ mod tests {
             )
             .with_editing()
         } else {
-            open_limits()
+            read_only_limits()
         };
         let mut state = NativeOpenCoordinator::new(limits);
         let job = open_job(&mut state)?;

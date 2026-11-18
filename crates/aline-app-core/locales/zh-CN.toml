@@ -75,6 +75,8 @@ pending = "统计中…"
 [document]
 close_pending_changes = "当前文档有未结算的编辑，暂不能关闭或替换。"
 edit_refused = "当前编辑操作无法应用，文档内容和剪贴板未改变。"
+input_dropped = "部分输入未能应用，请检查文档内容。"
+input_applied_after_failure = "本次输入已应用，请检查文档内容是否完整。"
 composition_pending = "输入法组合尚未结束，请先完成或取消输入。"
 refresh_failed = "无法更新文档视图；上一次完整视图仍保留。"
 

@@ -19,6 +19,14 @@ mod statistics;
 
 pub use composition::CompositionView;
 pub use doc_core::{CommitOutcome, DocCore, DocError, DocLimits};
+
+/// 原生窗口后台输入任务；仅 macOS 窗口适配消费。
+#[cfg(target_os = "macos")]
+pub(crate) use doc_core::{NativeInputJob, PreparedNativeInput};
+
+/// 结构化解析计数；仅 macOS 无头输入测试消费。
+#[cfg(all(test, target_os = "macos"))]
+pub(crate) use doc_core::parse_call_count;
 pub use identity::{
     DerivedRequestId, DocumentId, DraftGeneration, IdentityError, InputIdentity,
     ParseConfigGeneration, WorkingVersion,

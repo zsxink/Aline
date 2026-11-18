@@ -1,8 +1,36 @@
-//! 正文输入适配持有局部只读投影和布局。输入文本、组合、选区和历史仍归 DocCore。
+//! 正文输入适配持有局部只读投影和布局；输入文本、组合、选区和历史仍归 DocCore。
+//!
+//! 所有者：DocCore 拥有文本、组合候选、选区与历史；窗口协调器
+//! `NativeDocumentWindow` 拥有 `InputScheduler` 的在途/等待队列、后台任务与
+//! `composing_input_frame`；`InputView` 只持有可重建的局部投影和布局。
+//!
+//! 生命周期：按键先在主线程经 `InputView::step` 做同步决策——组内输入与选区移动
+//! 直接应用，独立删除、组合确认、900ms 边界封口与 Escape 只冻结 `NativeInputJob`；
+//! job 在后台 `run`，结果回主线程由 `finish_input_job` 复验发布；封口成功后触发键
+//! 放回队首，再由 `drain_inputs` 依次消费。
+//!
+//! 副作用与反馈：准备段只读，后台只读，同步应用与发布只改 DocCore 的既定状态。
+//! 发布失败先在同一最新状态重试一次；封口再失败时按 D2b.5 允许一次同步退化，成功
+//! 反馈 `document.input_applied_after_failure`，失败反馈 `document.input_dropped`；
+//! 独立 job 再失败清空队列并反馈 `document.input_dropped`。文档已关闭或替换时按
+//! D3.6 只丢弃在途与等待输入、不设 feedback（文档已不存在，反馈无处呈现）。
+//!
+//! 菜单/快捷键显式命令（撤销、重做、剪切、粘贴、全选、模式切换）不经过
+//! `InputScheduler`；若在途 job 因此过期，重试与同步退化前会按最新文档状态重建
+//! 输入帧，命令前已排队的输入仍按序应用。帧无法重建且文档仍可编辑时，按键与
+//! IME 输入反馈 `document.input_dropped`；文档已关闭或只读时不反馈。
+//! Escape 成功后清空排队输入并反馈 `document.input_dropped`。
+//!
+//! `prepare_seal` 返回 Err 时直接拒绝（`InputStep::Rejected`）：该错误来自主线程
+//! 冻结的前置条件（身份/可写/组合/范围），在同步调用内是确定性的；重试或 D2b.5
+//! 同步退化会在同一状态上得到同一错误，不会多保下一个按键。代价是该按键被拒绝并
+//! 显示编辑拒绝反馈（组合类错误显示组合待定），不会静默丢失。D2b.5 的「重试一次→
+//! 同步退化」只适用于后台 job 结果失败与准备段 `Ok(None)` 的内部不一致（`recover`），
+//! 不覆盖这一分支。
 
-use std::{cell::RefCell, ops::Range, rc::Rc};
+use std::{cell::RefCell, collections::VecDeque, ops::Range, rc::Rc};
 
-use aline_buffer::{BufferError, SrcRange, SrcSelection};
+use aline_buffer::{BufferError, SrcOffset, SrcRange, SrcSelection};
 use aline_markdown::{MappingBudget, ProjectionId};
 use gpui::{
     AnyElement, App, Bounds, ClipboardItem, Context, FocusHandle, InputHandler, MouseButton,
@@ -11,7 +39,8 @@ use gpui::{
 };
 
 use crate::document::native_input_coordinates::{BoundInputCoordinates, NativeInputCoordinates};
-use crate::{CurrentSnapshot, DocError, EditorMode, InputIdentity, ReadonlyDocument};
+use crate::document::{NativeInputJob, PreparedNativeInput};
+use crate::{CurrentSnapshot, DocError, DocumentId, EditorMode, InputIdentity, ReadonlyDocument};
 
 use super::{NativeDocumentWindow, PreparedLayout, edit_error_key, tokens};
 
@@ -234,21 +263,293 @@ impl InputView {
         }
         Ok(())
     }
+
+    /// 主线程的一次输入决策：只做 prepare 或既有同步路径，不解析。
+    fn step(
+        &self,
+        intent: &InputIntent,
+        identity: &InputIdentity,
+        current: &CurrentSnapshot,
+        document: &mut ReadonlyDocument,
+        now_millis: u64,
+    ) -> InputStep {
+        if self
+            .active(identity, current, document.core().mode())
+            .is_none()
+        {
+            return InputStep::Inactive;
+        }
+        match intent {
+            // Escape 由窗口关闭路径处理，不经过视图投影。
+            InputIntent::Escape => InputStep::Rejected(DocError::NoOpenBlock),
+            InputIntent::LineBreak => {
+                if document.core().composition().is_some() {
+                    return InputStep::Rejected(DocError::CompositionActive);
+                }
+                if let Err(error) = self.replacement(current, document, None, 1) {
+                    return InputStep::Rejected(error);
+                }
+                self.step_text(identity, current, document, "\n", now_millis)
+            }
+            InputIntent::Delete { forward, count } => {
+                if document.core().composition().is_some() {
+                    return InputStep::Rejected(DocError::CompositionActive);
+                }
+                let range = match self.delete_range(identity, current, *forward, *count) {
+                    Ok(Some(range)) => range,
+                    Ok(None) => return InputStep::Applied { changed: false },
+                    Err(error) => return InputStep::Rejected(error),
+                };
+                let before = document.core().version();
+                let prepared = document
+                    .edit_core()
+                    .and_then(|core| core.prepare_native_delete(identity, &range, now_millis));
+                match prepared {
+                    Ok(Some(job)) => InputStep::Prepared(job),
+                    // 局部草稿内删除已同步完成；版本差异反映真实变化。
+                    Ok(None) => InputStep::Applied {
+                        changed: document.core().version() != before,
+                    },
+                    Err(error) => InputStep::Rejected(error),
+                }
+            }
+            InputIntent::Move { .. } | InputIntent::Select(_) => {
+                self.apply_checked(intent, current, document, now_millis)
+            }
+            InputIntent::Paste(text) => {
+                if let Err(error) = self.replacement(current, document, None, text.len()) {
+                    return InputStep::Rejected(error);
+                }
+                self.apply_checked(intent, current, document, now_millis)
+            }
+            InputIntent::Replace(range, text) => {
+                if let Err(error) = self.replacement(current, document, range.clone(), text.len()) {
+                    return InputStep::Rejected(error);
+                }
+                if document.core().composition().is_some() {
+                    // 组合确认统一走后台冻结；发布段不重做候选拼接。
+                    let prepared = document.edit_core().and_then(|core| {
+                        core.prepare_native_confirmation(identity, Some(text), now_millis)
+                    });
+                    return match prepared {
+                        Ok(job) => InputStep::Prepared(job),
+                        Err(error) => InputStep::Rejected(error),
+                    };
+                }
+                if text.is_empty() {
+                    self.apply_checked(intent, current, document, now_millis)
+                } else {
+                    self.step_text(identity, current, document, text, now_millis)
+                }
+            }
+            InputIntent::Mark(range, text, _) => {
+                if let Err(error) = self.replacement(current, document, range.clone(), text.len()) {
+                    return InputStep::Rejected(error);
+                }
+                if starts_composition(document, text) {
+                    match self.prepare_seal(identity, current, document, now_millis) {
+                        Ok(Some(job)) => InputStep::Sealed(job),
+                        Ok(None) => self.recover(intent, current, document, now_millis),
+                        // 冻结前置条件失败即拒绝：同步重试或退化会得到同一错误。
+                        Err(error) => InputStep::Rejected(error),
+                    }
+                } else {
+                    self.apply_checked(intent, current, document, now_millis)
+                }
+            }
+        }
+    }
+
+    /// 普通文本输入：900ms 边界由核心判定，只有需要封口时才冻结后台 job。
+    fn step_text(
+        &self,
+        identity: &InputIdentity,
+        current: &CurrentSnapshot,
+        document: &mut ReadonlyDocument,
+        text: &str,
+        now_millis: u64,
+    ) -> InputStep {
+        let required = match document
+            .edit_core()
+            .and_then(|core| core.native_typing_commit_required(identity, text, now_millis))
+        {
+            Ok(required) => required,
+            Err(error) => return InputStep::Rejected(error),
+        };
+        if !required {
+            let intent = InputIntent::Replace(None, text.to_owned());
+            return self.apply_checked(&intent, current, document, now_millis);
+        }
+        match self.prepare_seal(identity, current, document, now_millis) {
+            Ok(Some(job)) => InputStep::Sealed(job),
+            // 准备段判定需封口却拿不到 job：内部不一致，按 D2b.4 同步应用并反馈。
+            Ok(None) => self.recover(
+                &InputIntent::Replace(None, text.to_owned()),
+                current,
+                document,
+                now_millis,
+            ),
+            // 冻结前置条件失败即拒绝：同步重试或退化会得到同一错误。
+            Err(error) => InputStep::Rejected(error),
+        }
+    }
+
+    /// 冻结「封口旧输入组」，并携带按键时刻的选区作为下一目标。
+    fn prepare_seal(
+        &self,
+        identity: &InputIdentity,
+        current: &CurrentSnapshot,
+        document: &mut ReadonlyDocument,
+        now_millis: u64,
+    ) -> Result<Option<NativeInputJob>, DocError> {
+        let target = current.selection().range();
+        document
+            .edit_core()?
+            .prepare_native_typing_commit(identity, now_millis, Some(&target))
+    }
+
+    /// 计算一次删除覆盖的连续源码范围；到达边界时返回 `None`。
+    fn delete_range(
+        &self,
+        identity: &InputIdentity,
+        current: &CurrentSnapshot,
+        forward: bool,
+        count: usize,
+    ) -> Result<Option<SrcRange>, DocError> {
+        let bound = self.bound(identity).ok_or(DocError::StaleResult)?;
+        let units = bound
+            .utf16_from_source_selection(current.selection())
+            .map_err(|_| DocError::OutsideOpenBlock)?;
+        let checked = bound
+            .editable_selection(&units)
+            .ok()
+            .flatten()
+            .ok_or(DocError::OutsideOpenBlock)?;
+        let (anchor, head) = (checked.anchor().clone(), checked.head().clone());
+        let (start, end) = if anchor.byte_offset() <= head.byte_offset() {
+            (anchor, head)
+        } else {
+            (head, anchor)
+        };
+        let has_selection = start.byte_offset() != end.byte_offset();
+        // 有选区时首步删除选区本身，其余步按方向外扩；无选区时全部外扩。
+        let steps = count.max(1).saturating_sub(usize::from(has_selection));
+        let (from, edge_forward) = if forward {
+            (end.clone(), true)
+        } else {
+            (start.clone(), false)
+        };
+        let (edge, moved) = step_graphemes(&bound, from, edge_forward, steps);
+        if !has_selection && moved == 0 {
+            return Ok(None);
+        }
+        let selected = if forward {
+            SrcSelection::new(start, edge)
+        } else {
+            SrcSelection::new(edge, end)
+        }?;
+        Ok(Some(selected.range()))
+    }
+
+    fn apply_checked(
+        &self,
+        intent: &InputIntent,
+        current: &CurrentSnapshot,
+        document: &mut ReadonlyDocument,
+        now_millis: u64,
+    ) -> InputStep {
+        let before = document.core().version();
+        match intent.apply(self, current, document, now_millis) {
+            Ok(()) => InputStep::Applied {
+                changed: document.core().version() != before,
+            },
+            Err(error) => InputStep::Rejected(error),
+        }
+    }
+
+    /// 准备结果与判定不一致时的同步退化路径；调用方须报告反馈。
+    fn recover(
+        &self,
+        intent: &InputIntent,
+        current: &CurrentSnapshot,
+        document: &mut ReadonlyDocument,
+        now_millis: u64,
+    ) -> InputStep {
+        let before = document.core().version();
+        match intent.apply(self, current, document, now_millis) {
+            Ok(()) => InputStep::Recovered {
+                changed: document.core().version() != before,
+            },
+            Err(error) => InputStep::Rejected(error),
+        }
+    }
 }
 
-enum InputIntent<'a> {
+/// 从 `edge` 沿方向前进最多 `steps` 个字素；返回终点与实际步数。
+fn step_graphemes(
+    bound: &BoundInputCoordinates<'_>,
+    mut edge: SrcOffset,
+    forward: bool,
+    steps: usize,
+) -> (SrcOffset, usize) {
+    let mut moved = 0usize;
+    while moved < steps {
+        let Some(next) = bound.adjacent_grapheme(&edge, forward) else {
+            break;
+        };
+        edge = next;
+        moved += 1;
+    }
+    (edge, moved)
+}
+
+/// 非空 Mark 在无组合且有普通输入组时会开启组合；窗口先封口旧组。
+fn starts_composition(document: &ReadonlyDocument, text: &str) -> bool {
+    !text.is_empty()
+        && document.core().composition().is_none()
+        && document.core().open_block_draft().is_some()
+}
+
+/// 自持输入意图：跨越在途 job 排队时不得借用平台回调文本。
+#[derive(Clone)]
+enum InputIntent {
     LineBreak,
-    Delete { forward: bool },
+    Delete { forward: bool, count: usize },
     Move { forward: bool, extend: bool },
-    Replace(Option<Range<usize>>, &'a str),
-    Mark(Option<Range<usize>>, &'a str, Option<Range<usize>>),
+    Replace(Option<Range<usize>>, String),
+    Mark(Option<Range<usize>>, String, Option<Range<usize>>),
     Select(Range<usize>),
-    Paste(&'a str),
+    Paste(String),
+    Escape,
 }
 
-impl InputIntent<'_> {
+/// 一次输入决策的结果；只有 Prepared/Sealed 需要后台 job。
+enum InputStep {
+    Applied {
+        changed: bool,
+    },
+    /// 准备结果与判定不一致时同步应用；窗口须报告内部错误反馈。
+    Recovered {
+        changed: bool,
+    },
+    Prepared(NativeInputJob),
+    Sealed(NativeInputJob),
+    Rejected(DocError),
+    Inactive,
+}
+
+/// 一次调度的执行状态；Started 表示输入已交给后台 job。
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum InputExecution {
+    Applied,
+    Started,
+    Rejected,
+    Inactive,
+}
+
+impl InputIntent {
     fn apply(
-        self,
+        &self,
         view: &InputView,
         current: &CurrentSnapshot,
         document: &mut ReadonlyDocument,
@@ -288,27 +589,12 @@ impl InputIntent<'_> {
                     .edit_core()?
                     .type_selection(identity, "\n", now_millis)
             }
-            Self::Delete { forward } => {
+            Self::Delete { forward, count } => {
                 if composing {
                     return Err(DocError::CompositionActive);
                 }
-                let selection = current.selection();
-                let bound = view.bound(identity).ok_or(DocError::StaleResult)?;
-                let units = bound
-                    .utf16_from_source_selection(selection)
-                    .map_err(|_| DocError::OutsideOpenBlock)?;
-                let checked = bound
-                    .editable_selection(&units)
-                    .ok()
-                    .flatten()
-                    .ok_or(DocError::OutsideOpenBlock)?;
-                let range = if checked.range().is_empty() {
-                    let Some(adjacent) = bound.adjacent_grapheme(selection.head(), forward) else {
-                        return Ok(());
-                    };
-                    SrcSelection::new(selection.head().clone(), adjacent)?.range()
-                } else {
-                    checked.range()
+                let Some(range) = view.delete_range(identity, current, *forward, *count)? else {
+                    return Ok(());
                 };
                 document
                     .edit_core()?
@@ -321,26 +607,26 @@ impl InputIntent<'_> {
                 }
                 let selection = current.selection();
                 let bound = view.bound(identity).ok_or(DocError::StaleResult)?;
-                let head = if !extend && !selection.range().is_empty() {
-                    if forward == selection.is_reversed() {
+                let head = if !*extend && !selection.range().is_empty() {
+                    if *forward == selection.is_reversed() {
                         selection.anchor().clone()
                     } else {
                         selection.head().clone()
                     }
                 } else {
-                    let Some(head) = bound.adjacent_grapheme(selection.head(), forward) else {
+                    let Some(head) = bound.adjacent_grapheme(selection.head(), *forward) else {
                         return Ok(());
                     };
                     head
                 };
-                let anchor = if extend { selection.anchor() } else { &head };
+                let anchor = if *extend { selection.anchor() } else { &head };
                 let selected = SrcSelection::new(anchor.clone(), head)?;
                 document.edit_core()?.select(identity, &selected)
             }
             Self::Select(range) => {
                 let bound = view.bound(identity).ok_or(DocError::StaleResult)?;
                 let range = bound
-                    .utf16_range(range)
+                    .utf16_range(range.clone())
                     .map_err(|_| DocError::OutsideOpenBlock)?;
                 let selection = bound
                     .editable_selection(&range)
@@ -357,7 +643,7 @@ impl InputIntent<'_> {
                     .map(|_| ())
             }
             Self::Replace(range, text) => {
-                view.replacement(current, document, range, text.len())?;
+                view.replacement(current, document, range.clone(), text.len())?;
                 let core = document.edit_core()?;
                 if composing {
                     core.commit_native_candidate(identity, text, now_millis)
@@ -370,9 +656,9 @@ impl InputIntent<'_> {
                 }
             }
             Self::Mark(range, text, selection) => {
-                view.replacement(current, document, range, text.len())?;
+                view.replacement(current, document, range.clone(), text.len())?;
                 if text.is_empty() {
-                    if selection.is_some_and(|range| range != (0..0)) {
+                    if selection.clone().is_some_and(|range| range != (0..0)) {
                         return Err(DocError::OutsideOpenBlock);
                     }
                     if composing {
@@ -387,6 +673,7 @@ impl InputIntent<'_> {
                     }));
                 }
                 let selected = selection
+                    .clone()
                     .map(|range| {
                         BoundInputCoordinates::candidate_selection(text, range, MAX_INPUT_BYTES)
                             .ok_or(DocError::OutsideOpenBlock)
@@ -396,7 +683,210 @@ impl InputIntent<'_> {
                     .edit_core()?
                     .update_native_candidate(identity, text, selected, now_millis)
             }
+            // Escape 由窗口关闭路径处理，不经过视图投影。
+            Self::Escape => Err(DocError::NoOpenBlock),
         }
+    }
+}
+
+/// 单条自持输入意图及其按键时刻。
+#[derive(Clone)]
+pub(super) struct ScheduledInput {
+    intent: InputIntent,
+    now_millis: u64,
+    retried: bool,
+}
+
+impl ScheduledInput {
+    fn new(intent: InputIntent, now_millis: u64) -> Self {
+        Self {
+            intent,
+            now_millis,
+            retried: false,
+        }
+    }
+}
+
+/// 立即执行，或已在等待队列中（含合并）。
+pub(super) enum InputSubmission {
+    Now(ScheduledInput),
+    Queued,
+}
+
+/// 同一个在途输入 job 的类别。
+enum ActiveInput {
+    /// job 自身提交该意图；发布后不重放。
+    Direct(ScheduledInput),
+    /// 封口 job；发布成功后把触发意图放回队首重放。
+    Seal(ScheduledInput),
+}
+
+impl ActiveInput {
+    fn input(&self) -> &ScheduledInput {
+        match self {
+            Self::Direct(input) | Self::Seal(input) => input,
+        }
+    }
+
+    fn into_input(self) -> ScheduledInput {
+        match self {
+            Self::Direct(input) | Self::Seal(input) => input,
+        }
+    }
+
+    fn is_seal(&self) -> bool {
+        matches!(self, Self::Seal(_))
+    }
+
+    /// 标记该输入已重试过；后续失败不得再次重试。
+    fn mark_retried(&mut self) {
+        match self {
+            Self::Direct(input) | Self::Seal(input) => input.retried = true,
+        }
+    }
+}
+
+/// 后台失败后的恢复动作；由纯判定给出，窗口薄壳只负责执行。
+enum Recovery {
+    /// 在同一最新状态上重试一次；判定时已标记为已重试。
+    Retry,
+    /// 同步退化：先应用触发意图，再按序应用等待队列。
+    SyncFallback,
+    /// 放弃活动输入并清空等待队列。
+    Clear,
+}
+
+/// 薄壳观察到的失败场景；把窗口状态映射为纯输入，判定本身不依赖 GPUI。
+#[derive(Clone, Copy)]
+enum InputFailure {
+    /// 文档仍在，后台 job 或重试失败。
+    OpenDocument,
+    /// 文档已关闭或替换；结果只丢弃。
+    DocumentGone,
+}
+
+/// 不依赖 GPUI 的输入调度：至多一个在途 job，其余有序等待。
+///
+/// 顺序、连续同向删除合并与封口重放都在这里完成；窗口层只做 spawn/update_in 薄壳。
+/// 无头测试可直接驱动本类型，不需要窗口或平台输入栈。
+pub(super) struct InputScheduler {
+    document: Option<DocumentId>,
+    active: Option<ActiveInput>,
+    pending: VecDeque<ScheduledInput>,
+}
+
+impl InputScheduler {
+    pub(super) fn new() -> Self {
+        Self {
+            document: None,
+            active: None,
+            pending: VecDeque::new(),
+        }
+    }
+
+    /// 先登记文档身份；关闭或替换后到达的输入不得进入新文档队列。
+    pub(super) fn submit(
+        &mut self,
+        document: &DocumentId,
+        input: ScheduledInput,
+    ) -> InputSubmission {
+        if self.document.as_ref() != Some(document) {
+            self.document = Some(document.clone());
+            self.active = None;
+            self.pending.clear();
+        }
+        if self.active.is_none() && self.pending.is_empty() {
+            return InputSubmission::Now(input);
+        }
+        self.enqueue(input);
+        InputSubmission::Queued
+    }
+
+    fn enqueue(&mut self, input: ScheduledInput) {
+        let merged = match self.pending.back_mut() {
+            Some(back) => match (&mut back.intent, &input.intent) {
+                (
+                    InputIntent::Delete {
+                        forward: back_forward,
+                        count: back_count,
+                    },
+                    InputIntent::Delete { forward, count },
+                ) if *back_forward == *forward => {
+                    *back_count = back_count.saturating_add(*count);
+                    back.now_millis = input.now_millis;
+                    true
+                }
+                _ => false,
+            },
+            None => false,
+        };
+        if !merged {
+            self.pending.push_back(input);
+        }
+    }
+
+    pub(super) fn start_direct(&mut self, input: ScheduledInput) {
+        self.active = Some(ActiveInput::Direct(input));
+    }
+
+    pub(super) fn start_seal(&mut self, input: ScheduledInput) {
+        self.active = Some(ActiveInput::Seal(input));
+    }
+
+    fn take_active(&mut self) -> Option<ActiveInput> {
+        self.active.take()
+    }
+
+    /// 失败后的纯恢复判定：先重试一次；再失败时封口退化、其余清空。
+    ///
+    /// `Retry` 会先把活动输入标记为已重试，薄壳按意图重新执行即可；
+    /// `Clear` 会清空等待队列，薄壳只负责反馈；`SyncFallback` 保留队列供同步应用。
+    fn on_failure(&mut self, active: &mut ActiveInput, scene: InputFailure) -> Recovery {
+        if matches!(scene, InputFailure::DocumentGone) {
+            self.pending.clear();
+            return Recovery::Clear;
+        }
+        if !active.input().retried {
+            active.mark_retried();
+            return Recovery::Retry;
+        }
+        match active {
+            ActiveInput::Seal(_) => Recovery::SyncFallback,
+            ActiveInput::Direct(_) => {
+                self.pending.clear();
+                Recovery::Clear
+            }
+        }
+    }
+
+    pub(super) fn take_pending(&mut self) -> Option<ScheduledInput> {
+        self.pending.pop_front()
+    }
+
+    pub(super) fn requeue_front(&mut self, input: ScheduledInput) {
+        self.pending.push_front(input);
+    }
+
+    pub(super) fn clear(&mut self) {
+        self.active = None;
+        self.pending.clear();
+    }
+
+    pub(super) fn is_active(&self) -> bool {
+        self.active.is_some()
+    }
+
+    pub(super) fn has_pending(&self) -> bool {
+        !self.pending.is_empty()
+    }
+
+    pub(super) fn document(&self) -> Option<&DocumentId> {
+        self.document.as_ref()
+    }
+
+    #[cfg(test)]
+    pub(super) fn pending_len(&self) -> usize {
+        self.pending.len()
     }
 }
 
@@ -411,11 +901,69 @@ struct InputGeometry {
 #[derive(Clone)]
 pub(super) struct InputFrame(Rc<RefCell<Option<InputView>>>);
 
+impl InputFrame {
+    /// 在最新快照上重建帧内局部投影；没有可重建站点或站点失效时清空该帧。
+    ///
+    /// 显式命令不经过调度：在途 job 因命令过期后，重试与同步退化取帧前都依赖
+    /// 本方法把旧投影换到当前身份与选区，而不是直接判为不可消费。
+    fn rebind(&self, document: &mut ReadonlyDocument) -> bool {
+        let Ok(mut active) = self.0.try_borrow_mut() else {
+            return false;
+        };
+        let view = active.take().and_then(|previous| {
+            let site = previous.site.rebound(document)?;
+            InputView::new(document, site)
+        });
+        *active = view;
+        active.is_some()
+    }
+
+    /// 清空帧内视图；之后只能由重新渲染或显式重建恢复。
+    fn clear(&self) {
+        if let Ok(mut active) = self.0.try_borrow_mut() {
+            *active = None;
+        }
+    }
+
+    /// 当前 Source 绑定；供列表延迟重建与输入行命中复用。
+    fn source_site(&self) -> Option<SourceInputSite> {
+        let active = self.0.try_borrow().ok()?;
+        let view = active.as_ref()?;
+        (view.site.mode == EditorMode::Source).then(|| SourceInputSite {
+            identity: view.identity.clone(),
+            site: view.site.clone(),
+        })
+    }
+
+    /// 帧内视图是否仍能消费当前文档状态；显式命令推进版本或移动选区后为 false。
+    fn accepts(&self, document: &mut ReadonlyDocument) -> bool {
+        let Ok(active) = self.0.try_borrow() else {
+            return false;
+        };
+        let Some(view) = active.as_ref() else {
+            return false;
+        };
+        let Some((identity, current)) = InputView::current(document) else {
+            return false;
+        };
+        view.active(&identity, &current, document.core().mode())
+            .is_some()
+    }
+}
+
 struct DocumentInput {
     host: WeakEntity<NativeDocumentWindow>,
     focus: FocusHandle,
     view: InputFrame,
     geometry: Option<InputGeometry>,
+}
+
+/// 组合活动时保留离屏输入帧；否则释放，避免组合预览与输入绑定滞留。
+fn composing_frame(frame: Option<&InputFrame>, composing: bool) -> Option<InputFrame> {
+    match frame {
+        Some(frame) => composing.then(|| frame.clone()),
+        None => None,
+    }
 }
 
 impl DocumentInput {
@@ -446,7 +994,7 @@ impl DocumentInput {
             .flatten()
     }
 
-    fn apply(&mut self, intent: InputIntent<'_>, window: &Window, cx: &mut App) {
+    fn apply(&mut self, intent: InputIntent, window: &Window, cx: &mut App) {
         if self.focus.is_focused(window) {
             let _ = self.host.update(cx, |host, cx| {
                 host.apply_native_input(&self.view, intent, window, cx);
@@ -473,8 +1021,14 @@ impl NativeDocumentWindow {
         }
         let intent = match event.keystroke.key.as_str() {
             "enter" => InputIntent::LineBreak,
-            "backspace" => InputIntent::Delete { forward: false },
-            "delete" => InputIntent::Delete { forward: true },
+            "backspace" => InputIntent::Delete {
+                forward: false,
+                count: 1,
+            },
+            "delete" => InputIntent::Delete {
+                forward: true,
+                count: 1,
+            },
             "left" => InputIntent::Move {
                 forward: false,
                 extend: modifiers.shift,
@@ -492,68 +1046,499 @@ impl NativeDocumentWindow {
         }
     }
 
+    /// 提交一次输入意图：空闲时立即执行，在途时入队（连续同向删除合并）。
+    ///
+    /// 显式命令可能先推进版本或移动选区而使帧失效；先按最新状态重建再提交。
+    /// 无法重建时不再静默忽略：文档仍在且可编辑时反馈 `document.input_dropped`，
+    /// 文档已关闭或只读时按 D3.6 不反馈。
     fn apply_native_input(
         &mut self,
         frame: &InputFrame,
-        intent: InputIntent<'_>,
+        intent: InputIntent,
         window: &Window,
         cx: &mut Context<Self>,
     ) -> bool {
-        let Ok(mut active) = frame.0.try_borrow_mut() else {
+        if !self.frame_accepts(frame) && !self.rebind_frame(frame) {
+            if self
+                .state
+                .session
+                .document()
+                .is_some_and(ReadonlyDocument::is_editable)
+            {
+                self.state.feedback = Some("document.input_dropped");
+                cx.notify();
+            }
             return false;
-        };
-        let Some(view) = active.as_ref() else {
-            return false;
-        };
+        }
         let Some(document) = self.state.session.document_mut() else {
             return false;
         };
-        let Some((identity, current)) = InputView::current(document) else {
-            return false;
-        };
-        if view
-            .active(&identity, &current, document.core().mode())
-            .is_none()
-        {
-            return false;
+        let document = document.core().document_id().clone();
+        let input = ScheduledInput::new(intent, self.input_millis());
+        match self.input_scheduler.submit(&document, input) {
+            InputSubmission::Queued => true,
+            InputSubmission::Now(input) => !matches!(
+                self.execute_step(frame, input, window, cx),
+                InputExecution::Inactive
+            ),
         }
-        let millis = u64::try_from(self.started.elapsed().as_millis()).unwrap_or(u64::MAX);
-        match intent.apply(view, &current, document, millis) {
-            Ok(()) => {
-                let changed = current.version() != document.core().version();
-                let rebound = changed.then(|| view.site.rebound(document)).flatten();
-                let has_draft = document.core().open_block_draft().is_some();
-                self.state.feedback = None;
-                if changed {
-                    self.refresh_find(cx);
-                    // 待定组可跨原行展开。输入仍用原虚拟行的绑定，封口再采纳新列表。
-                    if !has_draft {
-                        self.refresh_after_edit(window, cx);
-                    }
-                    *active = self
-                        .state
-                        .session
-                        .document_mut()
-                        .and_then(|doc| rebound.and_then(|site| InputView::new(doc, site)));
-                    self.source_input_site = active
-                        .as_ref()
-                        .filter(|view| view.site.mode == EditorMode::Source)
-                        .map(|view| SourceInputSite {
-                            identity: view.identity.clone(),
-                            site: view.site.clone(),
-                        });
-                }
+    }
+
+    /// 主线程执行一次已登记输入；准备、同步应用或启动后台 job。
+    fn execute_step(
+        &mut self,
+        frame: &InputFrame,
+        input: ScheduledInput,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> InputExecution {
+        if matches!(&input.intent, InputIntent::Escape) {
+            return self.execute_escape(input, window, cx);
+        }
+        let step = {
+            let Ok(active) = frame.0.try_borrow() else {
+                return InputExecution::Inactive;
+            };
+            let Some(view) = active.as_ref() else {
+                return InputExecution::Inactive;
+            };
+            let Some(document) = self.state.session.document_mut() else {
+                return InputExecution::Inactive;
+            };
+            let Some((identity, current)) = InputView::current(document) else {
+                return InputExecution::Inactive;
+            };
+            let mode = document.core().mode();
+            if view.active(&identity, &current, mode).is_none() {
+                return InputExecution::Inactive;
             }
-            Err(error) => self.state.feedback = Some(edit_error_key(error)),
+            view.step(
+                &input.intent,
+                &identity,
+                &current,
+                document,
+                input.now_millis,
+            )
+        };
+        match step {
+            InputStep::Applied { changed } => {
+                self.settle_after_input(Some(frame), changed, window, cx);
+                InputExecution::Applied
+            }
+            InputStep::Recovered { changed } => {
+                self.settle_after_input(Some(frame), changed, window, cx);
+                self.state.feedback = Some("document.input_applied_after_failure");
+                cx.notify();
+                InputExecution::Applied
+            }
+            InputStep::Prepared(job) => {
+                self.input_scheduler.start_direct(input);
+                self.start_input_job(job, window, cx);
+                InputExecution::Started
+            }
+            InputStep::Sealed(job) => {
+                self.input_scheduler.start_seal(input);
+                self.start_input_job(job, window, cx);
+                InputExecution::Started
+            }
+            InputStep::Rejected(error) => {
+                self.state.feedback = Some(edit_error_key(error));
+                cx.notify();
+                InputExecution::Rejected
+            }
+            InputStep::Inactive => InputExecution::Inactive,
         }
-        self.composing_input_frame = self
+    }
+
+    /// Escape 冻结「提交待定组 → 关闭块」后转后台；发布段不再解析。
+    fn execute_escape(
+        &mut self,
+        input: ScheduledInput,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> InputExecution {
+        let prepared = {
+            let Some(document) = self.state.session.document_mut() else {
+                self.input_scheduler.clear();
+                return InputExecution::Inactive;
+            };
+            match document.input_identity() {
+                Ok(identity) => document
+                    .edit_core()
+                    .and_then(|core| core.prepare_native_close(&identity, input.now_millis)),
+                Err(error) => Err(error),
+            }
+        };
+        match prepared {
+            Ok(job) => {
+                self.input_scheduler.start_direct(input);
+                self.start_input_job(job, window, cx);
+                InputExecution::Started
+            }
+            Err(error) => {
+                self.state.feedback = Some(edit_error_key(error));
+                cx.notify();
+                InputExecution::Rejected
+            }
+        }
+    }
+
+    /// 把冻结好的输入 job 交给后台执行器；结果回到主线程发布。
+    fn start_input_job(&mut self, job: NativeInputJob, window: &Window, cx: &mut Context<Self>) {
+        let work = cx.background_executor().spawn(async move { job.run() });
+        self.input_task = Some(cx.spawn_in(window, async move |weak, cx| {
+            let result = work.await;
+            let _ = weak.update_in(cx, |this, window, cx| {
+                this.input_task = None;
+                this.finish_input_job(result, window, cx);
+            });
+        }));
+    }
+
+    /// 后台结果发布：独立输入就地结束，封口则重放触发意图并继续排水。
+    fn finish_input_job(
+        &mut self,
+        result: Result<PreparedNativeInput, DocError>,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(active) = self.input_scheduler.take_active() else {
+            return;
+        };
+        let document = self
             .state
             .session
             .document()
-            .is_some_and(|doc| doc.core().composition().is_some())
-            .then(|| frame.clone());
+            .map(|document| document.core().document_id().clone());
+        if document.as_ref() != self.input_scheduler.document() {
+            // 文档已关闭或替换；旧结果不得进入新文档。
+            self.input_scheduler.clear();
+            return;
+        }
+        if matches!(active.input().intent, InputIntent::Escape) {
+            match result {
+                Ok(prepared) => match self.publish_native(prepared) {
+                    Ok(_) => self.finish_escape(window, cx),
+                    Err(error) => self.retry_or_fallback(active, error, window, cx),
+                },
+                Err(error) => self.retry_or_fallback(active, error, window, cx),
+            }
+            return;
+        }
+        let settled = match result {
+            Ok(prepared) => self.publish_native(prepared),
+            Err(error) => Err(error),
+        };
+        match settled {
+            Ok(changed) => {
+                if active.is_seal() {
+                    // 触发意图尚未应用：放回队首，在新版本上重放。
+                    self.input_scheduler.requeue_front(active.into_input());
+                }
+                let frame = self.active_input_frame();
+                self.settle_after_input(frame.as_ref(), changed, window, cx);
+                self.drain_inputs(window, cx);
+            }
+            Err(error) => self.retry_or_fallback(active, error, window, cx),
+        }
+    }
+
+    /// 在最新文档状态上发布后台结果；返回版本是否变化。
+    fn publish_native(&mut self, prepared: PreparedNativeInput) -> Result<bool, DocError> {
+        let Some(document) = self.state.session.document_mut() else {
+            return Err(DocError::ClosedTarget);
+        };
+        let before = document.core().version();
+        document.edit_core()?.publish_native_input(prepared)?;
+        Ok(document.core().version() != before)
+    }
+
+    /// 发布或同步应用后的统一收尾：刷新、重绑、组合帧与通知。
+    fn settle_after_input(
+        &mut self,
+        frame: Option<&InputFrame>,
+        changed: bool,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.state.feedback = None;
+        if changed {
+            self.refresh_find(cx);
+            // 待定组可跨原行展开。输入仍用原虚拟行的绑定，封口再采纳新列表。
+            let has_draft = self
+                .state
+                .session
+                .document()
+                .is_some_and(|document| document.core().open_block_draft().is_some());
+            if !has_draft {
+                self.refresh_after_edit(window, cx);
+            }
+            if let Some(frame) = frame {
+                self.rebind_frame(frame);
+            }
+        }
+        self.refresh_composing_input_frame(frame);
         cx.notify();
-        true
+    }
+
+    /// 按当前组合状态同步离屏输入帧；组合结束即释放，避免预览滞留。
+    fn refresh_composing_input_frame(&mut self, frame: Option<&InputFrame>) {
+        let composing = self
+            .state
+            .session
+            .document()
+            .is_some_and(|document| document.core().composition().is_some());
+        self.composing_input_frame = composing_frame(frame, composing);
+    }
+
+    /// 在最新快照上重建局部投影；失败时清空该帧（视图已失效）。
+    fn rebind_frame(&mut self, frame: &InputFrame) -> bool {
+        let rebound = match self.state.session.document_mut() {
+            Some(document) => frame.rebind(document),
+            None => {
+                frame.clear();
+                false
+            }
+        };
+        self.source_input_site = frame.source_site();
+        rebound
+    }
+
+    /// 帧内视图是否仍能消费当前文档状态；显式命令推进版本或移动选区后为 false。
+    fn frame_accepts(&mut self, frame: &InputFrame) -> bool {
+        self.state
+            .session
+            .document_mut()
+            .is_some_and(|document| frame.accepts(document))
+    }
+
+    /// 当前可消费输入的帧；已有帧失效时先按最新状态重建，Source 列表延迟重建时从最近绑定恢复。
+    fn active_input_frame(&mut self) -> Option<InputFrame> {
+        if let Some(frame) = self.input_frame.clone() {
+            // 显式命令可能已推进版本或移动选区；恢复前先重建，避免旧帧被判 Inactive。
+            if self.frame_accepts(&frame) || self.rebind_frame(&frame) {
+                return Some(frame);
+            }
+            return None;
+        }
+        let site = self.source_input_site.as_ref()?.site.clone();
+        let document = self.state.session.document_mut()?;
+        let view = InputView::new(document, site)?;
+        let frame = InputFrame(Rc::new(RefCell::new(Some(view))));
+        self.input_frame = Some(frame.clone());
+        Some(frame)
+    }
+
+    /// 依次消费等待队列；遇到新的后台 job 即停，由发布收尾继续。
+    fn drain_inputs(&mut self, window: &Window, cx: &mut Context<Self>) {
+        loop {
+            if self.input_scheduler.is_active() {
+                return;
+            }
+            let Some(input) = self.input_scheduler.take_pending() else {
+                return;
+            };
+            let Some(frame) = self.active_input_frame() else {
+                self.input_scheduler.clear();
+                self.state.feedback = Some("document.input_dropped");
+                cx.notify();
+                return;
+            };
+            match self.execute_step(&frame, input, window, cx) {
+                InputExecution::Applied | InputExecution::Rejected => {}
+                InputExecution::Started => return,
+                InputExecution::Inactive => {
+                    self.input_scheduler.clear();
+                    self.state.feedback = Some("document.input_dropped");
+                    cx.notify();
+                    return;
+                }
+            }
+        }
+    }
+
+    /// 失败后执行纯判定给出的恢复动作；重试仅一次，绝不静默丢输入。
+    ///
+    /// 显式命令不经过调度，可能在 job 在途时推进版本或移动选区；重试取帧时
+    /// `active_input_frame` 会先按最新文档状态重建失效帧，使触发键与排队输入仍能按序应用。
+    fn retry_or_fallback(
+        &mut self,
+        mut active: ActiveInput,
+        error: DocError,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) {
+        let scene = if self.state.session.document().is_none() {
+            InputFailure::DocumentGone
+        } else {
+            InputFailure::OpenDocument
+        };
+        let mut retried_now = false;
+        loop {
+            let had_pending = self.input_scheduler.has_pending();
+            match self.input_scheduler.on_failure(&mut active, scene) {
+                Recovery::Retry => {
+                    retried_now = true;
+                    let escape = matches!(active.input().intent, InputIntent::Escape);
+                    let retried = active.input().clone();
+                    let started = if escape {
+                        matches!(
+                            self.execute_escape(retried, window, cx),
+                            InputExecution::Started
+                        )
+                    } else {
+                        match self.active_input_frame() {
+                            Some(frame) => match self.execute_step(&frame, retried, window, cx) {
+                                InputExecution::Started => true,
+                                InputExecution::Applied => {
+                                    self.drain_inputs(window, cx);
+                                    true
+                                }
+                                InputExecution::Rejected | InputExecution::Inactive => false,
+                            },
+                            None => false,
+                        }
+                    };
+                    if started {
+                        return;
+                    }
+                }
+                Recovery::SyncFallback => {
+                    // D2b.5：仅此拒绝路径允许一次同步应用，保证触发键不丢。
+                    let applied = self.replay_pending_sync(active.into_input(), window, cx);
+                    if !applied {
+                        self.input_scheduler.clear();
+                    }
+                    self.state.feedback = Some(if applied {
+                        "document.input_applied_after_failure"
+                    } else {
+                        "document.input_dropped"
+                    });
+                    cx.notify();
+                    return;
+                }
+                Recovery::Clear => {
+                    if matches!(scene, InputFailure::DocumentGone) {
+                        return;
+                    }
+                    let escape = matches!(active.input().intent, InputIntent::Escape);
+                    if escape && !retried_now {
+                        // 入口即已重试的关闭意图再次失败：报告本次失败。
+                        self.state.feedback = Some(edit_error_key(error));
+                    } else if had_pending || !escape {
+                        self.state.feedback = Some("document.input_dropped");
+                    }
+                    cx.notify();
+                    return;
+                }
+            }
+        }
+    }
+
+    /// 同步退化：先应用封口触发键，再按序应用队列；任一失败即停止并报告。
+    ///
+    /// 取帧同样经过 `active_input_frame` 的重建，避免显式命令作废投影后整队被判失效。
+    fn replay_pending_sync(
+        &mut self,
+        first: ScheduledInput,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let Some(frame) = self.active_input_frame() else {
+            self.composing_input_frame = None;
+            return false;
+        };
+        let mut next = Some(first);
+        let applied = 'replay: loop {
+            let input = match next.take() {
+                Some(input) => input,
+                None => match self.input_scheduler.take_pending() {
+                    Some(input) => input,
+                    None => break 'replay true,
+                },
+            };
+            let changed = {
+                let Ok(active) = frame.0.try_borrow() else {
+                    break 'replay false;
+                };
+                let Some(view) = active.as_ref() else {
+                    break 'replay false;
+                };
+                let Some(document) = self.state.session.document_mut() else {
+                    break 'replay false;
+                };
+                let Some((identity, current)) = InputView::current(document) else {
+                    break 'replay false;
+                };
+                if view
+                    .active(&identity, &current, document.core().mode())
+                    .is_none()
+                {
+                    break 'replay false;
+                }
+                let before = document.core().version();
+                if input
+                    .intent
+                    .apply(view, &current, document, input.now_millis)
+                    .is_err()
+                {
+                    break 'replay false;
+                }
+                document.core().version() != before
+            };
+            if changed {
+                self.refresh_find(cx);
+                let has_draft = self
+                    .state
+                    .session
+                    .document()
+                    .is_some_and(|document| document.core().open_block_draft().is_some());
+                if !has_draft {
+                    self.refresh_after_edit(window, cx);
+                }
+                if !self.rebind_frame(&frame) {
+                    break 'replay !self.input_scheduler.has_pending();
+                }
+            }
+        };
+        // 同步退化可能开始或结束组合；刷新离屏帧，避免组合预览滞留或缺失。
+        self.refresh_composing_input_frame(Some(&frame));
+        applied
+    }
+
+    /// Escape 发布后的收尾：关闭块会移除正文帧，必要时刷新列表。
+    fn finish_escape(&mut self, window: &Window, cx: &mut Context<Self>) {
+        let refresh = self
+            .state
+            .session
+            .document()
+            .is_some_and(|document| !document.is_parse_current());
+        self.input_frame = None;
+        self.source_input_site = None;
+        self.composing_input_frame = None;
+        self.state.feedback = None;
+        if refresh {
+            self.refresh_find(cx);
+            self.refresh_after_edit(window, cx);
+        }
+        if self.input_scheduler.has_pending() {
+            self.input_scheduler.clear();
+            self.state.feedback = Some("document.input_dropped");
+        }
+        cx.notify();
+    }
+
+    /// 关闭或替换文档时清除全部未完成输入；在途结果由文档身份校验拦截。
+    pub(super) fn clear_input_state(&mut self) {
+        self.input_scheduler.clear();
+        self.input_task = None;
+        self.input_frame = None;
+        self.source_input_site = None;
+        self.composing_input_frame = None;
+    }
+
+    fn input_millis(&self) -> u64 {
+        u64::try_from(self.started.elapsed().as_millis()).unwrap_or(u64::MAX)
     }
 
     pub(super) fn escape_document_input(
@@ -568,27 +1553,22 @@ impl NativeDocumentWindow {
             .state
             .session
             .document_mut()
-            .filter(|doc| doc.is_editable() && doc.core().has_open_block())
+            .filter(|document| document.is_editable() && document.core().has_open_block())
         else {
             return false;
         };
-        let millis = u64::try_from(self.started.elapsed().as_millis()).unwrap_or(u64::MAX);
-        match document.edit_core().and_then(|core| core.escape(millis)) {
-            Ok(()) => {
-                let refresh = !document.is_parse_current();
-                self.input_frame = None;
-                self.source_input_site = None;
-                self.composing_input_frame = None;
-                self.state.feedback = None;
-                if refresh {
-                    self.refresh_find(cx);
-                    self.refresh_after_edit(window, cx);
-                }
+        let document = document.core().document_id().clone();
+        let input = ScheduledInput::new(InputIntent::Escape, self.input_millis());
+        match self.input_scheduler.submit(&document, input) {
+            InputSubmission::Queued => {
+                cx.notify();
+                true
             }
-            Err(error) => self.state.feedback = Some(edit_error_key(error)),
+            InputSubmission::Now(input) => {
+                let _ = self.execute_escape(input, window, cx);
+                true
+            }
         }
-        cx.notify();
-        true
     }
 
     pub(super) fn move_window_focus(
@@ -701,7 +1681,7 @@ impl InputHandler for DocumentInput {
         window: &mut Window,
         cx: &mut App,
     ) {
-        self.apply(InputIntent::Replace(range, text), window, cx);
+        self.apply(InputIntent::Replace(range, text.to_owned()), window, cx);
     }
 
     fn replace_and_mark_text_in_range(
@@ -712,7 +1692,11 @@ impl InputHandler for DocumentInput {
         window: &mut Window,
         cx: &mut App,
     ) {
-        self.apply(InputIntent::Mark(range, text, selection), window, cx);
+        self.apply(
+            InputIntent::Mark(range, text.to_owned(), selection),
+            window,
+            cx,
+        );
     }
 
     fn unmark_text(&mut self, _: &mut Window, _: &mut App) {
@@ -721,7 +1705,7 @@ impl InputHandler for DocumentInput {
 
     fn paste(&mut self, item: ClipboardItem, window: &mut Window, cx: &mut App) {
         if let Some(text) = item.text() {
-            self.apply(InputIntent::Paste(&text), window, cx);
+            self.apply(InputIntent::Paste(text), window, cx);
         }
     }
 

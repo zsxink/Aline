@@ -22,6 +22,19 @@ use aline_edit::{
 use aline_markdown::{Block, ParseBudget, ParseConfig, Parsed, parse};
 use std::ops::Range;
 
+// 仅测试编译的解析调用计数，用于证明发布段不再解析。
+// 使用线程局部量，避免并行测试互相干扰；生产构建不包含该状态。
+#[cfg(test)]
+thread_local! {
+    static PARSE_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// 返回当前线程累计的 `parse_for_edit` 调用次数。
+#[cfg(test)]
+pub(crate) fn parse_call_count() -> usize {
+    PARSE_CALLS.with(std::cell::Cell::get)
+}
+
 impl From<BufferError> for DocError {
     fn from(error: BufferError) -> Self {
         Self::Buffer(error)
@@ -629,6 +642,8 @@ fn query_context(context: EditContext, generation: Option<u64>) -> EditContext {
 }
 
 fn parse_for_edit(snapshot: &TextSnapshot, budget: EditBudget) -> Result<Parsed, DocError> {
+    #[cfg(test)]
+    PARSE_CALLS.with(|calls| calls.set(calls.get().saturating_add(1)));
     parse(snapshot, ParseConfig::m0(), budget.parse()).map_err(|cause| {
         DocError::Edit(EditRefusal::RereadFailed {
             reason: RereadFailure::Parse,

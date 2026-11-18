@@ -1085,8 +1085,33 @@ impl DocCore {
         Ok(())
     }
 
+    /// 提交待定普通输入组并封口，但保持块打开；无草稿时为无变化。
+    ///
+    /// 走 `prepare → run → publish` 协议：准备冻结组与快照，发布段不解析。
+    /// 身份构造可能为草稿视图建立快照缓存；拒绝时恢复调用前缓存，保持零副作用。
     fn commit_typing_group(&mut self, now_millis: u64) -> Result<CommitOutcome, DocError> {
-        self.commit_typing_group_for(now_millis, None)
+        let block = self.open.as_ref().ok_or(DocError::NoOpenBlock)?;
+        if block.typing().is_none() {
+            return Ok(CommitOutcome::Unchanged);
+        }
+        let cache = self.snapshot_cache.clone();
+        let result = self
+            .current_input_identity()
+            .and_then(|identity| self.prepare_native_typing_commit(&identity, now_millis, None))
+            .and_then(|job| {
+                // 入口已确认存在待定组；同一主线程调用内准备段不会把它换成
+                // 「无组」以外的错误。`None` 只表示无事可封口，语义等同无变化，
+                // 不用误导性的 `NoOpenBlock` 表示。
+                let Some(job) = job else {
+                    return Ok(CommitOutcome::Unchanged);
+                };
+                job.run()
+                    .and_then(|prepared| self.publish_native_input(prepared))
+            });
+        if result.is_err() {
+            self.snapshot_cache = cache;
+        }
+        result
     }
 
     fn commit_typing_group_for(
@@ -1152,22 +1177,18 @@ impl DocCore {
         if self.is_composition_active() {
             return Err(DocError::CompositionActive);
         }
-        // 关闭是结果采纳资格的边界；预检必须在任何待定组提交之前完成。
-        let next_request = self.derived_request.next().map_err(DocError::Identity)?;
-        self.commit_typing_group(now_millis)?;
-        if self
-            .typing_redo
-            .as_ref()
-            .is_some_and(|redo| redo.target == InputTarget::Legacy)
-        {
-            // M0 无头入口把待定重做的生命周期限定在调用者手动打开的块内。
-            self.typing_redo = None;
+        // 身份构造可能为草稿视图建立快照缓存；拒绝时恢复调用前缓存，保持零副作用。
+        let cache = self.snapshot_cache.clone();
+        let result = self
+            .current_input_identity()
+            .and_then(|identity| self.prepare_native_close(&identity, now_millis))
+            .and_then(|job| job.run())
+            .and_then(|prepared| self.publish_native_input(prepared))
+            .map(|_| ());
+        if result.is_err() {
+            self.snapshot_cache = cache;
         }
-        self.derived_request = next_request;
-        self.open = None;
-        self.wait = None;
-        self.snapshot_cache = None;
-        Ok(())
+        result
     }
 
     fn start_composition(
@@ -1473,10 +1494,18 @@ fn selection_of(selection: &aline_buffer::SrcSelection) -> SelectionSpec {
 
 mod checked_commit;
 mod editing;
-#[cfg(target_os = "macos")]
+// 本模块是平台无关的 DocCore 输入协议；仅其中原生窗口适配器按 macOS 编译。
 mod native_input;
 mod protocols;
 mod readonly;
+
+/// 原生窗口后台输入任务；仅 crate 内窗口适配消费。
+#[cfg(target_os = "macos")]
+pub(crate) use native_input::{NativeInputJob, PreparedNativeInput};
+
+/// 结构化解析计数；仅测试用于证明主线程输入路径不解析。
+#[cfg(all(test, target_os = "macos"))]
+pub(crate) use checked_commit::parse_call_count;
 
 #[cfg(test)]
 mod checked_commit_tests;

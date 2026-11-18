@@ -1,21 +1,42 @@
-//! 原生输入的受检意图、后台候选和主线程发布。
+//! 原生输入的受检意图、后台只读准备和所有者线程发布。
 //!
-//! DocCore 唯一拥有当前输入。准备任务只冻结源码快照与意图，供原生窗口调度；
-//! 发布复验当前文档、输入状态和实时历史。此模块不持有窗口、执行器或文件句柄。
+//! 所有者：DocCore 唯一拥有当前输入草稿、选区、输入组与历史；窗口协调器拥有
+//! 后台任务与等待队列；本模块不持有窗口、执行器或文件句柄。
+//!
+//! 生命周期：`prepare_*` 在所有者线程冻结普通输入组、源码快照、预算与身份，
+//! 返回可移交后台的 `NativeInputJob`；`NativeInputJob::run` 在后台只读解析并
+//! 规划候选；`publish_native_input` 回到所有者线程复验身份、站点与实时历史后
+//! 原子发布。封口（`commit_typing_group`）与离开块（`close_block`）共用同一协议，
+//! 发布段不解析、不物化候选、不重建行索引。
+//!
+//! 副作用边界：准备段只冻结并可能建立草稿快照缓存（拒绝时调用方恢复），后台段
+//! 只读，发布段才写 Buffer/历史/块状态。发布段允许的失败点只有绑定复验
+//! （`InputBinding::validate`）、关闭收尾的派生请求推进与 `Buffer::publish_prepared`；
+//! 前两者纯检查且在任何状态变更之前，Buffer 发布由引擎保证原子性。
+//!
+//! 无 Buffer 补丁但需回写选区的结算会在发布段调用 `bind_selection` 与
+//! `Buffer::set_selection`：该分支 `patch.buffer` 为 `None`，`bind_selection` 用当前
+//! 快照完成全部偏移校验后没有任何 Buffer 变更，`set_selection` 只是对同一快照
+//! 重复同一校验（`aline-buffer` 的 `StringBuffer::set_selection` 先
+//! `validate_selection`），因此它不可能在绑定成功后失败，不构成额外失败点。
 
 use std::{mem, ops::Range};
 
-use super::checked_commit::{
-    InputPatch, InputTargetUpdate, PreparedInputPatch, StagedInput, plan_single_patch,
-};
+use super::checked_commit::{InputPatch, InputTargetUpdate, PreparedInputPatch};
+#[cfg(any(test, target_os = "macos"))]
+use super::checked_commit::{StagedInput, plan_single_patch};
 use super::{
-    CommitOutcome, DocCore, DocError, DraftSlot, EditorMode, InputIdentity, InputTarget, OpenBlock,
-    TypingGroup, WaitState, bind_selection, copy_bounded, overflow,
+    CommitOutcome, DerivedRequestId, DocCore, DocError, DraftSlot, EditorMode, InputIdentity,
+    InputTarget, OpenBlock, WaitState, bind_selection, copy_bounded,
 };
+#[cfg(any(test, target_os = "macos"))]
+use super::{TypingGroup, overflow};
 use aline_buffer::{
     ApplyOutcome, BufferEditBase, OperationSource, SelectionSpec, SnapshotId, SrcRange,
 };
-use aline_edit::{EditBudget, EditContext, EditMode};
+#[cfg(any(test, target_os = "macos"))]
+use aline_edit::EditContext;
+use aline_edit::{EditBudget, EditMode};
 
 /// UI 线程冻结的原生输入；背景任务只能计算候选。
 pub(crate) struct NativeInputJob {
@@ -27,31 +48,55 @@ pub(crate) struct NativeInputJob {
 
 enum FrozenInput {
     Single(InputPatch, InputSettlement),
+    /// 原生窗口删除适配器专用；无头协议不依赖该意图。
+    #[cfg(any(test, target_os = "macos"))]
     DeleteAfterTyping {
         group: TypingGroup,
         range: Range<usize>,
         now_millis: u64,
     },
+    /// 提交待定普通输入组并关闭块；无待定组时只做关闭收尾。
+    CloseBlock {
+        patch: Option<InputPatch>,
+        settlement: InputSettlement,
+    },
 }
 
 #[derive(Clone, Copy)]
 enum InputSettlement {
-    #[cfg(test)]
     Typing(SelectionSpec),
+    /// 组合确认结算；唯一构造点是原生窗口组合确认适配器（3.3b 接线）。
+    /// 非测试的非 macOS 构建不编译该适配器，因此显式允许该变体暂未被构造。
+    #[cfg_attr(not(any(test, target_os = "macos")), allow(dead_code))]
     Composition(SelectionSpec),
+    /// 原生窗口删除适配器专用；无头协议不依赖该结算。
+    #[cfg(any(test, target_os = "macos"))]
     Delete,
+    /// 关闭块；`Some` 仅在存在待定普通输入组时携带封口后的选区。
+    Close(Option<SelectionSpec>),
 }
 
 impl InputSettlement {
     fn closing_selection(self) -> Option<SelectionSpec> {
         match self {
-            #[cfg(test)]
-            Self::Typing(selection) => Some(selection),
-            Self::Composition(selection) => Some(selection),
+            Self::Typing(selection) | Self::Composition(selection) => Some(selection),
+            #[cfg(any(test, target_os = "macos"))]
             Self::Delete => None,
+            Self::Close(selection) => selection,
         }
     }
+
+    fn closes_block(self) -> bool {
+        matches!(self, Self::Close(_))
+    }
 }
+
+/// 编译期约束：后台执行器只能接收可跨线程移交的准备值。
+const _: fn() = || {
+    fn assert_send<T: Send>() {}
+    assert_send::<NativeInputJob>();
+    assert_send::<PreparedNativeInput>();
+};
 
 struct InputBinding {
     identity: InputIdentity,
@@ -122,6 +167,7 @@ impl NativeInputJob {
                 patch.prepare(self.base, mode, extent, self.budget)?,
                 settlement,
             ),
+            #[cfg(any(test, target_os = "macos"))]
             FrozenInput::DeleteAfterTyping {
                 group,
                 range,
@@ -146,6 +192,16 @@ impl NativeInputJob {
                     InputSettlement::Delete,
                 )
             }
+            FrozenInput::CloseBlock { patch, settlement } => {
+                let patch = match patch {
+                    Some(patch) => patch.prepare(self.base, mode, extent, self.budget)?,
+                    None => PreparedInputPatch {
+                        buffer: None,
+                        target: InputTargetUpdate::Preserve,
+                    },
+                };
+                (patch, settlement)
+            }
         };
         Ok(PreparedNativeInput {
             binding: self.binding,
@@ -166,8 +222,11 @@ impl DocCore {
     }
 
     /// 查询本次普通输入是否需先封口旧组。调用者必须先结算准备结果。
-    #[cfg(test)]
-    fn native_typing_commit_required(
+    ///
+    /// 原生窗口按键处理器在 900ms 边界处消费；平台适配仅在 macOS 编译，
+    /// 无头测试仍可直接驱动。准备段只读、有界、不解析。
+    #[cfg(any(test, target_os = "macos"))]
+    pub(crate) fn native_typing_commit_required(
         &mut self,
         identity: &InputIdentity,
         text: &str,
@@ -195,8 +254,10 @@ impl DocCore {
         Ok(current.slice(&selected, self.limits.text)? != text)
     }
 
-    #[cfg(test)]
-    fn prepare_native_typing_commit(
+    /// 冻结普通输入组的封口意图；准备段只读，发布由 `publish_native_input` 完成。
+    ///
+    /// `next_target` 供 3.3b 的原生输入回调保留；同步封口传 `None`。
+    pub(crate) fn prepare_native_typing_commit(
         &mut self,
         identity: &InputIdentity,
         now_millis: u64,
@@ -235,6 +296,40 @@ impl DocCore {
         )))
     }
 
+    /// 冻结「提交待定普通输入组 → 关闭块」的整体意图。
+    ///
+    /// 准备段预检派生请求可推进；发布段在任何状态变更前再次执行同一纯计数检查。
+    pub(crate) fn prepare_native_close(
+        &mut self,
+        identity: &InputIdentity,
+        now_millis: u64,
+    ) -> Result<NativeInputJob, DocError> {
+        self.ensure_ready()?;
+        self.accept_document_result(identity)?;
+        if self.is_composition_active() {
+            return Err(DocError::CompositionActive);
+        }
+        self.derived_request.next().map_err(DocError::Identity)?;
+        let block = self.open.as_ref().ok_or(DocError::NoOpenBlock)?;
+        let patch = block
+            .typing()
+            .map(|group| {
+                Ok::<_, DocError>(InputPatch {
+                    range: group.range.clone(),
+                    replacement: copy_bounded(&group.draft, self.limits.text)?,
+                    selections: (group.before_selection, block.selection),
+                    source: OperationSource::Typing,
+                    now_millis,
+                    next_target: None,
+                })
+            })
+            .transpose()?;
+        let settlement = InputSettlement::Close(patch.is_some().then_some(block.selection));
+        Ok(self.freeze_native_input(identity, FrozenInput::CloseBlock { patch, settlement }))
+    }
+
+    /// 原生窗口组合适配器；无头协议不依赖该入口。
+    #[cfg(any(test, target_os = "macos"))]
     pub(crate) fn update_native_candidate(
         &mut self,
         identity: &InputIdentity,
@@ -263,6 +358,8 @@ impl DocCore {
         result
     }
 
+    /// 原生窗口组合确认适配器；无头协议不依赖该入口。
+    #[cfg(any(test, target_os = "macos"))]
     pub(crate) fn prepare_native_confirmation(
         &mut self,
         identity: &InputIdentity,
@@ -302,6 +399,7 @@ impl DocCore {
     }
 
     /// 在局部草稿内删除，或冻结需后台准备的独立删除意图。
+    #[cfg(any(test, target_os = "macos"))]
     pub(crate) fn prepare_native_delete(
         &mut self,
         identity: &InputIdentity,
@@ -381,6 +479,12 @@ impl DocCore {
             settlement,
         } = prepared;
         binding.validate(self, settlement)?;
+        // 关闭收尾的请求推进是纯计数器检查，必须在任何状态变更之前完成。
+        let close_request = if settlement.closes_block() {
+            Some(self.derived_request.next().map_err(DocError::Identity)?)
+        } else {
+            None
+        };
         let revision = patch
             .buffer
             .as_ref()
@@ -423,15 +527,37 @@ impl DocCore {
                 self.sync_block_after_buffer_change();
             }
             self.snapshot_cache = None;
+            self.finish_native_close(close_request);
             return Ok(CommitOutcome::Committed { revision });
         }
         if let Some(selection) = closing_selection {
             self.finish_composition(None, selection);
         }
+        self.finish_native_close(close_request);
         Ok(CommitOutcome::Unchanged)
     }
 
-    /// 同步适配保留既有调用顺序。
+    /// 关闭块的收尾；与既有 `close_block` 的收尾语义逐项一致。
+    fn finish_native_close(&mut self, next_request: Option<DerivedRequestId>) {
+        let Some(next_request) = next_request else {
+            return;
+        };
+        if self
+            .typing_redo
+            .as_ref()
+            .is_some_and(|redo| redo.target == InputTarget::Legacy)
+        {
+            // M0 无头入口把待定重做的生命周期限定在调用者手动打开的块内。
+            self.typing_redo = None;
+        }
+        self.derived_request = next_request;
+        self.open = None;
+        self.wait = None;
+        self.snapshot_cache = None;
+    }
+
+    /// 同步适配保留既有调用顺序；仅原生窗口使用。
+    #[cfg(target_os = "macos")]
     pub(crate) fn delete_native_range(
         &mut self,
         identity: &InputIdentity,
@@ -444,6 +570,8 @@ impl DocCore {
         self.publish_native_input(job.run()?)
     }
 
+    /// 同步适配保留既有调用顺序；仅原生窗口使用。
+    #[cfg(target_os = "macos")]
     pub(crate) fn commit_native_candidate(
         &mut self,
         identity: &InputIdentity,
