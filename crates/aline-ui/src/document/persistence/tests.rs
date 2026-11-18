@@ -1,5 +1,7 @@
 use super::*;
-use crate::document::{DocCore, DocError, DocLimits, PublicationOutcome, WaitStatus};
+use crate::document::{
+    AutosaveAction, DocCore, DocError, DocLimits, PublicationOutcome, WaitStatus,
+};
 use aline_buffer::{HistoryBudget, LineIndexBudget, SelectionSpec};
 use aline_source::DiskVersion;
 
@@ -1881,4 +1883,392 @@ fn external_check_completion_is_send() {
 
     assert_send::<ExternalCheckJob>();
     assert_send::<ExternalCheckCompletion>();
+}
+
+/// 打开真实可编辑会话并制造一次本地修改；供自动保存计时用例复用。
+#[cfg(target_os = "macos")]
+fn dirty_editable_session(
+    prefix: &str,
+) -> Result<(TempSaveDir, PathBuf, ReadonlySession), Box<dyn std::error::Error>> {
+    use std::fs;
+
+    let directory = TempSaveDir::create(prefix)?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut session = editable_absolute_session(&target)?;
+    open_editing_block(&mut session)?;
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .type_text(1, "a", 0)?;
+    Ok((directory, target, session))
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn autosave_fires_exactly_at_one_second() -> TestResult {
+    let (_directory, _target, mut session) = dirty_editable_session("aline-autosave-boundary")?;
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    document.note_document_activity(0);
+    assert_eq!(
+        document.autosave_poll(999),
+        AutosaveAction::NotDue {
+            remaining_millis: 1
+        },
+        "999ms 时不应到期"
+    );
+    assert_eq!(
+        document.autosave_poll(1000),
+        AutosaveAction::Fire,
+        "1000ms 必须到期"
+    );
+    assert_eq!(
+        document.autosave_poll(1000),
+        AutosaveAction::Idle,
+        "Fire 必须一次性消费到期时刻"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn autosave_repeated_events_reset_the_deadline() -> TestResult {
+    let (_directory, _target, mut session) = dirty_editable_session("aline-autosave-reset")?;
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    document.note_document_activity(0);
+    document.note_document_activity(500);
+    assert_eq!(
+        document.autosave_poll(1000),
+        AutosaveAction::NotDue {
+            remaining_millis: 500
+        },
+        "重复活动应把到期时刻重置到 1500ms"
+    );
+    assert_eq!(
+        document.autosave_poll(1499),
+        AutosaveAction::NotDue {
+            remaining_millis: 1
+        }
+    );
+    assert_eq!(document.autosave_poll(1500), AutosaveAction::Fire);
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn autosave_defers_through_composition_and_rearms_after_it_ends() -> TestResult {
+    use std::fs;
+
+    let directory = TempSaveDir::create("aline-autosave-composition")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut session = editable_absolute_session(&target)?;
+    open_editing_block(&mut session)?;
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .composition_start("候", 0)?;
+
+    {
+        let document = session.document_mut().ok_or("应存在可编辑文档")?;
+        document.note_document_activity(0);
+        assert_eq!(
+            document.autosave_poll(1000),
+            AutosaveAction::DeferredComposition,
+            "组合活动期间不得自动保存"
+        );
+    }
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .composition_commit(1500)?;
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    document.note_document_activity(1500);
+    assert_eq!(
+        document.autosave_poll(2499),
+        AutosaveAction::NotDue {
+            remaining_millis: 1
+        },
+        "组合结束后的结算应从 1500ms 重新布防"
+    );
+    assert_eq!(document.autosave_poll(2500), AutosaveAction::Fire);
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn autosave_skips_clean_document() -> TestResult {
+    use std::fs;
+
+    let directory = TempSaveDir::create("aline-autosave-clean")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut session = editable_absolute_session(&target)?;
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    document.note_document_activity(0);
+    assert_eq!(
+        document.autosave_poll(1000),
+        AutosaveAction::NotDirty,
+        "干净文档不得触发自动保存"
+    );
+    assert_eq!(
+        document.autosave_deadline(),
+        None,
+        "NotDirty 后不应保留到期时刻"
+    );
+    Ok(())
+}
+
+#[test]
+fn autosave_never_selects_a_path_without_target() -> TestResult {
+    use std::io::{self, Cursor};
+
+    use crate::{
+        OpenDisposition, ReadonlyFileAccess, ReadonlyFileInput, ReadonlyOpenLimits, ReadonlySession,
+    };
+    use aline_markdown::{ParseBudget, ParseConfig};
+
+    struct RelativeFiles;
+    impl ReadonlyFileAccess for RelativeFiles {
+        type Reader = Cursor<&'static [u8]>;
+        fn open(&self, _: &Path) -> io::Result<ReadonlyFileInput<Self::Reader>> {
+            Ok(ReadonlyFileInput::new(Cursor::new(b"x\n"), 2, true))
+        }
+    }
+
+    let limits = ReadonlyOpenLimits::new(
+        STORAGE,
+        DocLimits::new(
+            TEXT,
+            LineIndexBudget::new(128),
+            HistoryBudget::new(16, 4096),
+        ),
+        ParseConfig::m0(),
+        ParseBudget::m0(),
+    )
+    .with_editing();
+    let relative = PathBuf::from(format!(
+        "aline-autosave-no-target-{}.md",
+        std::process::id()
+    ));
+    assert!(!relative.exists(), "测试前置：相对目标不应存在");
+    let mut session = ReadonlySession::new(limits);
+    let request = session.request_open()?;
+    let job = session
+        .accept_selection(&request, Some(vec![relative.clone()]))?
+        .ok_or("应生成打开工作")?;
+    assert!(matches!(
+        session.accept_open(job.read_with(&RelativeFiles)),
+        OpenDisposition::Applied
+    ));
+
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    assert!(document.is_editable(), "相对路径仍应以可编辑文档打开");
+    assert_eq!(
+        document.persistence_status(),
+        None,
+        "相对路径不得建立写目标"
+    );
+    document.note_document_activity(0);
+    assert_eq!(
+        document.autosave_poll(1000),
+        AutosaveAction::NoTarget,
+        "无持久化目标必须拒绝自动保存"
+    );
+    assert!(
+        matches!(
+            document.request_save_command(),
+            SaveCommand::Rejected(SaveRejection::NoTarget)
+        ),
+        "未命名文档不得创建保存请求"
+    );
+    assert_eq!(document.path(), relative.as_path());
+    assert!(!relative.exists(), "自动保存绝不选择路径");
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn autosave_pauses_for_external_conflict_and_resumes_after_load_disk() -> TestResult {
+    use std::fs;
+
+    let directory = TempSaveDir::create("aline-autosave-conflict")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut session = editable_absolute_session(&target)?;
+    open_editing_block(&mut session)?;
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .type_text(1, "a", 0)?;
+    rewrite_same_size_and_mtime(&target)?;
+    assert_eq!(
+        run_external_check(&mut session, ExternalCheckIntent::Focus, 10)?,
+        ExternalApplyResult::Presented(ExternalDiskState::Changed)
+    );
+    {
+        let document = session.document_mut().ok_or("应存在可编辑文档")?;
+        document.note_document_activity(0);
+        assert_eq!(
+            document.autosave_poll(1000),
+            AutosaveAction::Paused,
+            "外改冲突必须暂停自动保存"
+        );
+    }
+
+    assert_eq!(
+        run_external_check(&mut session, ExternalCheckIntent::Reload, 20)?,
+        ExternalApplyResult::Reloaded
+    );
+    {
+        let document = session.document_mut().ok_or("应存在可编辑文档")?;
+        assert_eq!(
+            document.autosave_poll(1000),
+            AutosaveAction::NotDirty,
+            "载入磁盘后已干净，到期结算应为 NotDirty"
+        );
+        assert_eq!(document.autosave_deadline(), None);
+    }
+    open_editing_block(&mut session)?;
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .type_text(1, "a", 2000)?;
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    document.note_document_activity(2000);
+    assert_eq!(
+        document.autosave_poll(3000),
+        AutosaveAction::Fire,
+        "暂停解除后的新输入应重新布防"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn autosave_pauses_after_reload_undo_until_redo_to_baseline() -> TestResult {
+    use std::fs;
+
+    let directory = TempSaveDir::create("aline-autosave-reload-undo")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut session = editable_absolute_session(&target)?;
+    rewrite_same_size_and_mtime(&target)?;
+    assert_eq!(
+        run_external_check(&mut session, ExternalCheckIntent::Focus, 10)?,
+        ExternalApplyResult::Reloaded,
+        "干净文档的外改应自动重载"
+    );
+
+    {
+        let document = session.document_mut().ok_or("应存在可编辑文档")?;
+        document.edit_core()?.undo()?;
+        assert!(document.note_history_move(), "撤销越过重载边界应进入暂停");
+        document.note_document_activity(0);
+        assert_eq!(
+            document.autosave_poll(1000),
+            AutosaveAction::Paused,
+            "重载撤销暂停期间不得自动保存"
+        );
+    }
+
+    {
+        let document = session.document_mut().ok_or("应存在可编辑文档")?;
+        document.edit_core()?.redo()?;
+        assert!(!document.note_history_move(), "重做回磁盘基线应解除暂停");
+        document.note_document_activity(2000);
+        assert_eq!(
+            document.autosave_poll(3000),
+            AutosaveAction::NotDirty,
+            "重做回基线后到期结算应为 NotDirty"
+        );
+    }
+    open_editing_block(&mut session)?;
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .type_text(1, "a", 4000)?;
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    document.note_document_activity(4000);
+    assert_eq!(document.autosave_poll(5000), AutosaveAction::Fire);
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn autosave_reports_busy_while_a_save_is_active() -> TestResult {
+    let (_directory, _target, mut session) = dirty_editable_session("aline-autosave-busy")?;
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    let SaveCommand::Run(job) = document.request_save_command() else {
+        return Err("脏文档的自动保存应生成后台工作".into());
+    };
+    document.note_document_activity(0);
+    assert_eq!(
+        document.autosave_poll(1000),
+        AutosaveAction::Busy,
+        "在途保存期间不得再次自动保存"
+    );
+    let completion = job.run();
+    assert_eq!(
+        session
+            .document_mut()
+            .ok_or("应存在可编辑文档")?
+            .settle_save_command(completion),
+        SaveResult::Saved,
+        "结算后应回到成功状态"
+    );
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    assert_eq!(document.persistence_status(), Some(SaveStatus::Idle));
+    assert_eq!(
+        document.autosave_poll(1000),
+        AutosaveAction::NotDirty,
+        "保存成功后保留的到期时刻应按干净文档消费"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn autosave_end_to_end_saves_once_after_debounce() -> TestResult {
+    use std::fs;
+
+    let (_directory, target, mut session) = dirty_editable_session("aline-autosave-e2e")?;
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    document.note_document_activity(0);
+    assert_eq!(document.autosave_poll(1000), AutosaveAction::Fire);
+    let SaveCommand::Run(job) = document.request_save_command() else {
+        return Err("到期后应生成后台工作".into());
+    };
+    let completion = job.run();
+    assert_eq!(
+        document.settle_save_command(completion),
+        SaveResult::Saved,
+        "自动保存应走同一协调器并成功发布"
+    );
+    assert_eq!(fs::read(&target)?, b"xa\n", "磁盘字节应更新");
+    assert_eq!(
+        document.autosave_poll(1000),
+        AutosaveAction::Idle,
+        "保存完成后没有新的待办计时"
+    );
+    assert!(!document.autosave_paused());
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn autosave_cancel_clears_pending_deadline() -> TestResult {
+    let (_directory, _target, mut session) = dirty_editable_session("aline-autosave-cancel")?;
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    document.note_document_activity(0);
+    document.cancel_autosave();
+    assert_eq!(document.autosave_deadline(), None);
+    assert_eq!(document.autosave_poll(1000), AutosaveAction::Idle);
+    Ok(())
 }

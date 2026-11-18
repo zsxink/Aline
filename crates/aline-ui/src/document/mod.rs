@@ -36,7 +36,7 @@ pub use publication::{
 };
 pub use snapshot::CurrentSnapshot;
 
-pub(crate) use readonly_session::{OpenTimings, StageTimer, StageTiming};
+pub(crate) use readonly_session::{AutosaveAction, OpenTimings, StageTimer, StageTiming};
 pub(crate) use statistics::DocumentStatistics;
 
 pub(crate) use persistence::{

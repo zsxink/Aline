@@ -241,6 +241,7 @@ impl NativeDocumentWindow {
                         this.state.feedback = None;
                         this.refresh_find(cx);
                         this.refresh_after_edit(window, cx);
+                        this.note_document_activity(window, cx);
                     }
                     Ok(CommitOutcome::Unchanged) => this.state.feedback = None,
                     Err(DocError::StaleResult | DocError::ClosedTarget) => return,

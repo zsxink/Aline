@@ -1277,6 +1277,9 @@ impl NativeDocumentWindow {
                 self.rebind_frame(frame);
             }
         }
+        // 每次输入结算都重新布防自动保存；组合结束/取消可能 changed == false，
+        // 也必须靠本次结算恢复 1 秒计时。
+        self.note_document_activity(window, cx);
         self.refresh_composing_input_frame(frame);
         cx.notify();
     }

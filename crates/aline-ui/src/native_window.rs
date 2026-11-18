@@ -46,10 +46,10 @@ use gpui::{
 };
 
 use crate::document::{
-    DocumentStatistics, ExternalApplyResult, ExternalCheckCommand, ExternalCheckCompletion,
-    ExternalCheckIntent, ExternalCheckJob, ExternalCheckRejection, ExternalConflictView,
-    ExternalDiskState, SaveCommand, SaveJob, SaveRejection, SaveResult, StageTimer, StageTiming,
-    WriteCompletion,
+    AutosaveAction, DocumentStatistics, ExternalApplyResult, ExternalCheckCommand,
+    ExternalCheckCompletion, ExternalCheckIntent, ExternalCheckJob, ExternalCheckRejection,
+    ExternalConflictView, ExternalDiskState, SaveCommand, SaveJob, SaveRejection, SaveResult,
+    StageTimer, StageTiming, WriteCompletion,
 };
 use crate::fonts::{FontEnvironment, FontStatus};
 use crate::{
@@ -128,7 +128,7 @@ enum SaveHost {
     /// 组合期内等待平台自然结束；句柄用于取消或结算。
     Waiting(WaitHandle),
     /// 已完成冻结并交给后台执行，等待结算回执。
-    Running,
+    Running { automatic: bool },
 }
 
 /// 无 GPUI 的窗口协调规则；会话继续独占文档与请求资格。
@@ -152,6 +152,16 @@ pub(super) struct ExternalHostOutcome {
     pub(super) feedback: Option<&'static str>,
     pub(super) refresh: bool,
     pub(super) start_save: bool,
+}
+
+/// 保存结算结果；反馈键已按手工/自动入口选定。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) struct SaveSettlement {
+    /// 自动保存成功静默；失败/冲突/不确定保留既有反馈键。
+    pub(super) feedback: Option<&'static str>,
+    /// 本次结算是否来自自动保存；宿主据此在结算后重查自动保存。
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(super) automatic: bool,
 }
 
 /// 冲突面板展示数据：状态、保存基线、当前编辑、磁盘文本（不可读时为 None）。
@@ -188,7 +198,10 @@ impl NativeOpenCoordinator {
 
     /// 请求保存；返回 Some(job) 时窗口负责后台执行。反馈已在内部设置。
     pub(super) fn request_save(&mut self) -> Option<SaveJob> {
-        if matches!(self.save_host, SaveHost::Running | SaveHost::Waiting(_)) {
+        if matches!(
+            self.save_host,
+            SaveHost::Running { .. } | SaveHost::Waiting(_)
+        ) {
             self.feedback = Some("document.save_busy");
             return None;
         }
@@ -198,7 +211,7 @@ impl NativeOpenCoordinator {
         };
         match document.request_save_command() {
             SaveCommand::Run(job) => {
-                self.save_host = SaveHost::Running;
+                self.save_host = SaveHost::Running { automatic: false };
                 // 成功进入执行即清除旧错误提示，避免过期反馈留在通知区。
                 self.feedback = None;
                 Some(job)
@@ -212,6 +225,28 @@ impl NativeOpenCoordinator {
                 self.feedback = Some(save_rejection_key(rejection));
                 None
             }
+        }
+    }
+
+    /// 自动保存请求；任何拒绝都不写反馈，不进入 ED-01 等待。
+    pub(super) fn request_autosave(&mut self) -> Option<SaveJob> {
+        if !matches!(self.save_host, SaveHost::Idle) {
+            return None;
+        }
+        let document = self.session.document_mut()?;
+        match document.request_save_command() {
+            SaveCommand::Run(job) => {
+                self.save_host = SaveHost::Running { automatic: true };
+                // 与手工保存一致：进入执行即清除旧错误提示。
+                self.feedback = None;
+                Some(job)
+            }
+            SaveCommand::Wait(handle) => {
+                // 组合已在 poll 前排除；理论不可达，撤掉等待避免协调器卡死。
+                let _ = document.cancel_save_wait(handle);
+                None
+            }
+            SaveCommand::Rejected(_) => None,
         }
     }
 
@@ -257,7 +292,7 @@ impl NativeOpenCoordinator {
         };
         match document.finish_save_wait_command(handle, outcome, now_millis) {
             SaveCommand::Run(job) => {
-                self.save_host = SaveHost::Running;
+                self.save_host = SaveHost::Running { automatic: false };
                 self.feedback = None;
                 Some(job)
             }
@@ -275,19 +310,35 @@ impl NativeOpenCoordinator {
         }
     }
 
-    /// 结算完成项；返回反馈键（Stale 返回 None）。Running 回到 Idle。
-    pub(super) fn settle_save(&mut self, completion: WriteCompletion) -> Option<&'static str> {
-        if matches!(self.save_host, SaveHost::Running) {
+    /// 保存结算结果；反馈键已按手工/自动入口选定。
+    pub(super) fn settle_save(&mut self, completion: WriteCompletion) -> SaveSettlement {
+        let automatic = matches!(self.save_host, SaveHost::Running { automatic: true });
+        if matches!(self.save_host, SaveHost::Running { .. }) {
             self.save_host = SaveHost::Idle;
         }
         // 文档已关闭时完成项只能是迟到结果，不产生新反馈。
-        let document = self.session.document_mut()?;
+        let Some(document) = self.session.document_mut() else {
+            return SaveSettlement {
+                feedback: None,
+                automatic,
+            };
+        };
         let result = document.settle_save_command(completion);
         if result == SaveResult::Conflict {
             // Ruling W4-31：保存冲突后补一次静默检查，刷新磁盘事实。
             self.pending_external_refresh = true;
         }
-        save_result_key(result)
+        let feedback = save_result_key(result);
+        // 自动保存成功静默；失败/冲突/不确定保留既有反馈键。
+        let feedback = if automatic && feedback == Some("document.save_saved") {
+            None
+        } else {
+            feedback
+        };
+        SaveSettlement {
+            feedback,
+            automatic,
+        }
     }
 
     /// 是否存在组合期保存等待（菜单取消项可用性）。
@@ -912,6 +963,7 @@ struct NativeDocumentWindow {
     dialog_return_focus: Option<FocusHandle>,
     read_task: Option<Task<()>>,
     save_task: Option<Task<()>>,
+    autosave_task: Option<Task<()>>,
     external_task: Option<Task<()>>,
     activation_subscription: Option<Subscription>,
     parse_task: Option<Task<()>>,
@@ -967,6 +1019,7 @@ impl NativeDocumentWindow {
             dialog_return_focus: None,
             read_task: None,
             save_task: None,
+            autosave_task: None,
             external_task: None,
             activation_subscription: None,
             parse_task: None,
@@ -1236,6 +1289,79 @@ impl NativeDocumentWindow {
         }));
     }
 
+    /// 返回窗口启动以来的单调毫秒；饱和转换避免长期运行溢出。
+    fn now_millis(&self) -> u64 {
+        u64::try_from(self.started.elapsed().as_millis()).unwrap_or(u64::MAX)
+    }
+
+    /// 记录一次内容活动并确保有且只有一个待办唤醒任务。
+    fn note_document_activity(&mut self, window: &Window, cx: &mut Context<Self>) {
+        let now = self.now_millis();
+        if let Some(document) = self.state.session.document_mut() {
+            document.note_document_activity(now);
+        } else {
+            return;
+        }
+        self.arm_autosave(window, cx);
+    }
+
+    /// 按当前到期时刻布防；已有任务时直接复用（提前唤醒会自行重算剩余时间）。
+    fn arm_autosave(&mut self, window: &Window, cx: &mut Context<Self>) {
+        if self.autosave_task.is_some() {
+            return;
+        }
+        let Some(deadline) = self
+            .state
+            .session()
+            .document()
+            .and_then(ReadonlyDocument::autosave_deadline)
+        else {
+            return;
+        };
+        let remaining = deadline.saturating_sub(self.now_millis());
+        self.spawn_autosave_timer(remaining, window, cx);
+    }
+
+    /// 调度一次“叫醒”任务；所有时间判定仍在会话的纯状态机里。
+    fn spawn_autosave_timer(&mut self, delay_millis: u64, window: &Window, cx: &mut Context<Self>) {
+        self.autosave_task = Some(cx.spawn_in(window, async move |weak, cx| {
+            cx.background_executor()
+                .timer(std::time::Duration::from_millis(delay_millis))
+                .await;
+            let _ = weak.update_in(cx, |this, window, cx| {
+                this.autosave_task = None;
+                this.autosave_tick(window, cx);
+            });
+        }));
+    }
+
+    /// 一次到期结算：可能发起一次自动保存、重新布防或什么都不做。
+    fn autosave_tick(&mut self, window: &Window, cx: &mut Context<Self>) {
+        let now = self.now_millis();
+        let action = match self.state.session.document_mut() {
+            Some(document) => document.autosave_poll(now),
+            None => return,
+        };
+        match action {
+            AutosaveAction::Fire => {
+                if let Some(job) = self.state.request_autosave() {
+                    self.start_save(job, window, cx);
+                }
+            }
+            AutosaveAction::NotDue { remaining_millis } => {
+                self.spawn_autosave_timer(remaining_millis, window, cx);
+            }
+            AutosaveAction::Idle
+            | AutosaveAction::DeferredComposition
+            | AutosaveAction::Paused
+            | AutosaveAction::NoTarget
+            | AutosaveAction::NotDirty
+            | AutosaveAction::Busy => {}
+        }
+        self.update_menu(cx);
+        cx.notify();
+    }
+
     /// 后台执行真实写盘；完成后回到窗口结算并显示本地化反馈。
     fn start_save(&mut self, job: SaveJob, window: &Window, cx: &mut Context<Self>) {
         let work = cx.background_executor().spawn(async move { job.run() });
@@ -1243,12 +1369,15 @@ impl NativeDocumentWindow {
             let completion = work.await;
             let _ = weak.update_in(cx, |this, window, cx| {
                 this.save_task = None;
-                if let Some(key) = this.state.settle_save(completion) {
+                let settlement = this.state.settle_save(completion);
+                if let Some(key) = settlement.feedback {
                     this.state.feedback = Some(key);
                 }
                 if this.state.take_external_refresh() {
                     this.check_external(ExternalCheckIntent::Focus, window, cx);
                 }
+                // 保存期间到期但被 Busy 挡下的自动保存，或保存期间的新输入，在结算后立即重查。
+                this.autosave_tick(window, cx);
                 this.update_menu(cx);
                 cx.notify();
             });
@@ -1293,7 +1422,11 @@ impl NativeDocumentWindow {
                 })
                 .detach();
         }
-        // 关闭成功：丢弃正文帧与排队输入；在途结果按文档身份被拒绝。
+        // 关闭成功：取消待办自动保存计时，丢弃正文帧与排队输入；在途结果按文档身份被拒绝。
+        self.autosave_task = None;
+        if let Some(document) = self.state.session.document_mut() {
+            document.cancel_autosave();
+        }
         self.clear_input_state();
         true
     }

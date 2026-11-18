@@ -640,7 +640,10 @@ fn window_save_publishes_and_reports_saved() -> Result<(), Box<dyn Error>> {
     let job = state.request_save().ok_or("首次保存应返回后台工作")?;
     assert_eq!(state.feedback_key(), None);
     let completion = job.run();
-    assert_eq!(state.settle_save(completion), Some("document.save_saved"));
+    assert_eq!(
+        state.settle_save(completion).feedback,
+        Some("document.save_saved")
+    );
     assert_eq!(fs::read(&target)?, b"xa\n");
     let entries = fs::read_dir(&directory.0)?.collect::<Result<Vec<_>, io::Error>>()?;
     assert_eq!(entries.len(), 1, "成功保存后目录不应残留 staging");
@@ -662,7 +665,10 @@ fn window_save_publishes_and_reports_saved() -> Result<(), Box<dyn Error>> {
     window_type(&mut state, 2, "b")?;
     let job = state.request_save().ok_or("成功保存后队列应可复用")?;
     let completion = job.run();
-    assert_eq!(state.settle_save(completion), Some("document.save_saved"));
+    assert_eq!(
+        state.settle_save(completion).feedback,
+        Some("document.save_saved")
+    );
     assert_eq!(fs::read(&target)?, b"xab\n");
     Ok(())
 }
@@ -769,7 +775,10 @@ fn window_natural_platform_finish_saves_latest_snapshot() -> Result<(), Box<dyn 
             .finish_save_wait(outcome, 3)
             .ok_or("平台自然结束应继续保存")?;
         let completion = job.run();
-        assert_eq!(state.settle_save(completion), Some("document.save_saved"));
+        assert_eq!(
+            state.settle_save(completion).feedback,
+            Some("document.save_saved")
+        );
         assert_eq!(fs::read(&target)?, expected);
         assert!(
             state.finish_save_wait(outcome, 4).is_none(),
@@ -797,13 +806,57 @@ fn window_save_request_while_running_is_rejected_and_queue_recovers() -> Result<
     assert!(state.request_save().is_none(), "保存进行中应拒绝再次请求");
     assert_eq!(state.feedback_key(), Some("document.save_busy"));
     let completion = job1.run();
-    assert_eq!(state.settle_save(completion), Some("document.save_saved"));
+    assert_eq!(
+        state.settle_save(completion).feedback,
+        Some("document.save_saved")
+    );
     assert_eq!(fs::read(&target)?, b"xa\n");
 
     let job2 = state.request_save().ok_or("结算后队列应可复用")?;
     let completion = job2.run();
-    assert_eq!(state.settle_save(completion), Some("document.save_saved"));
+    assert_eq!(
+        state.settle_save(completion).feedback,
+        Some("document.save_saved")
+    );
     assert_eq!(fs::read(&target)?, b"xa\n");
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn window_autosave_success_is_silent_but_manual_save_reports() -> Result<(), Box<dyn Error>> {
+    use std::fs;
+
+    let directory = WindowSaveDir::create("aline-window-autosave")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    open_window_document(&mut state, &target, b"x\n")?;
+    open_window_block(&mut state, SelectionSpec::new(0, 0))?;
+    window_type(&mut state, 1, "a")?;
+
+    let job = state.request_autosave().ok_or("自动保存应生成后台工作")?;
+    assert_eq!(state.feedback_key(), None, "自动保存进入执行时不得提示");
+    let completion = job.run();
+    assert_eq!(
+        state.settle_save(completion),
+        super::SaveSettlement {
+            feedback: None,
+            automatic: true,
+        },
+        "自动保存成功必须静默"
+    );
+    assert_eq!(fs::read(&target)?, b"xa\n", "自动保存应写入磁盘");
+
+    let job = state.request_save().ok_or("手工保存应生成后台工作")?;
+    assert_eq!(
+        state.settle_save(job.run()),
+        super::SaveSettlement {
+            feedback: Some("document.save_saved"),
+            automatic: false,
+        },
+        "手工保存成功仍须提示"
+    );
     Ok(())
 }
 
@@ -867,7 +920,7 @@ fn window_save_conflict_requests_and_presents_external_check() -> Result<(), Box
     let job = state.request_save().ok_or("首次保存应返回后台工作")?;
     let completion = job.run();
     assert_eq!(
-        state.settle_save(completion),
+        state.settle_save(completion).feedback,
         Some("document.save_conflict")
     );
     assert!(
@@ -963,7 +1016,10 @@ fn window_overwrite_ready_starts_save_and_publishes() -> Result<(), Box<dyn Erro
     rewrite_window_target_same_mtime(&target)?;
 
     let job = state.request_save().ok_or("首次保存应返回后台工作")?;
-    assert_eq!(state.settle_save(job.run()), Some("document.save_conflict"));
+    assert_eq!(
+        state.settle_save(job.run()).feedback,
+        Some("document.save_conflict")
+    );
     state.take_external_refresh();
     let job = state
         .request_external_check(super::ExternalCheckIntent::Focus)
@@ -977,7 +1033,10 @@ fn window_overwrite_ready_starts_save_and_publishes() -> Result<(), Box<dyn Erro
     assert!(outcome.start_save, "OverwriteReady 应触发既有保存");
     assert_eq!(outcome.feedback, None);
     let job = state.request_save().ok_or("覆盖后应允许保存")?;
-    assert_eq!(state.settle_save(job.run()), Some("document.save_saved"));
+    assert_eq!(
+        state.settle_save(job.run()).feedback,
+        Some("document.save_saved")
+    );
     assert_eq!(fs::read(&target)?, b"xa\n", "覆盖确认后应发布本地文本");
     Ok(())
 }

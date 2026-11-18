@@ -25,9 +25,12 @@ use super::{
 };
 use aline_buffer::{ReloadOutcome, SrcSelection};
 
+mod autosave;
 mod read;
 mod refresh;
 mod timing;
+pub(crate) use autosave::AutosaveAction;
+use autosave::AutosaveScheduler;
 pub use read::{ReadonlyFileAccess, ReadonlyFileInput};
 pub use refresh::{ParseRefreshCompletion, ParseRefreshDisposition, ParseRefreshJob};
 pub(crate) use timing::{StageTimer, StageTiming};
@@ -176,6 +179,8 @@ pub struct ReadonlyDocument {
     reload_pause: bool,
     /// 最近一次 Changed 重载后的 `undo_depth()`。
     reload_mark: Option<usize>,
+    /// 1 秒防抖自动保存计时；时间由宿主注入。
+    autosave: AutosaveScheduler,
 }
 impl ReadonlyDocument {
     /// 返回用户选择的文件路径，供标题等显式 UI 使用。
@@ -462,10 +467,76 @@ impl ReadonlyDocument {
         self.external = None;
     }
 
-    /// 3.4 的自动保存计时器消费此查询；3.3 生产代码不调用。
-    #[cfg_attr(not(test), allow(dead_code))] // Ruling W4-21：3.4 消费
+    /// 自动保存计时器消费此查询；外部冲突或重载撤销暂停时不自动写盘。
     pub(crate) fn autosave_paused(&self) -> bool {
         self.reload_pause || self.external_pause
+    }
+
+    /// 记录一次输入结算或内容变更。组合活动时只清除到期时刻；
+    /// 组合结束后的下一次结算会以该时刻重新布防 1 秒。
+    pub(crate) fn note_document_activity(&mut self, now_millis: u64) {
+        let composing = self.core.composition().is_some();
+        self.autosave.note_activity(now_millis, composing);
+    }
+
+    /// 返回下一次自动保存唤醒时刻；None 表示没有待办。
+    pub(crate) fn autosave_deadline(&self) -> Option<u64> {
+        self.autosave.deadline()
+    }
+
+    /// 关闭/替换时取消待办计时。
+    pub(crate) fn cancel_autosave(&mut self) {
+        self.autosave.clear();
+    }
+
+    /// 结算到期的自动保存；不执行保存，只返回动作。
+    pub(crate) fn autosave_poll(&mut self, now_millis: u64) -> AutosaveAction {
+        if !self.editable || self.persistence.is_none() {
+            return AutosaveAction::NoTarget;
+        }
+        if self.core.composition().is_some() {
+            return AutosaveAction::DeferredComposition;
+        }
+        if self.autosave_paused() {
+            return AutosaveAction::Paused;
+        }
+        let status = self
+            .persistence
+            .as_ref()
+            .map(PersistenceCoordinator::status);
+        match status {
+            // 冲突必须走用户出口；不确定发布必须等用户处理。
+            Some(SaveStatus::Conflict) => return AutosaveAction::Paused,
+            Some(
+                SaveStatus::Saving
+                | SaveStatus::WaitingForComposition
+                | SaveStatus::PublishedUncertain,
+            ) => return AutosaveAction::Busy,
+            Some(SaveStatus::Idle | SaveStatus::Failed) | None => {}
+        }
+        let Some(deadline) = self.autosave.deadline() else {
+            return AutosaveAction::Idle;
+        };
+        if now_millis < deadline {
+            return AutosaveAction::NotDue {
+                remaining_millis: deadline - now_millis,
+            };
+        }
+        let snapshot = match self.current_snapshot() {
+            Ok(snapshot) => snapshot,
+            // 快照失败不自动写盘；保留到期时刻，等待下一次结算/唤醒。
+            Err(_) => return AutosaveAction::Busy,
+        };
+        let dirty = self
+            .persistence
+            .as_ref()
+            .is_some_and(|coordinator| coordinator.is_dirty(&snapshot));
+        if !dirty {
+            self.autosave.clear();
+            return AutosaveAction::NotDirty;
+        }
+        self.autosave.clear(); // Fire 一次性消费到期时刻，失败后不自动重试
+        AutosaveAction::Fire
     }
 
     /// 在 Undo/Redo 成功（版本发生变化）后由宿主调用。

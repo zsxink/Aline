@@ -52,6 +52,7 @@ impl NativeDocumentWindow {
                 }
                 if effect.refresh {
                     self.refresh_after_edit(window, cx);
+                    self.note_document_activity(window, cx);
                 }
             }
             Err(DocError::ClosedTarget | DocError::ReadOnly) => return,
