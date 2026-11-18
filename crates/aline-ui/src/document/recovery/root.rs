@@ -4,10 +4,6 @@
 //!
 //! macOS 是唯一支持平台：其他平台的根打开与子项验证失败关闭，不写盘。
 
-// 4.1a 只提供根验证与身份类型；生产根接线（4.2）到来前部分访问器仅由
-// crate 内测试使用。该豁免只覆盖本模块。
-#![cfg_attr(not(test), allow(dead_code))]
-
 use std::fs;
 use std::io;
 use std::num::NonZeroU64;
@@ -20,12 +16,15 @@ use std::os::unix::fs::MetadataExt;
 
 use super::store::RecoveryDefect;
 
-/// 应用管理恢复目录的固定子目录名；生产根由 4.2 接线创建。
+/// 应用管理恢复目录的固定子目录名；`create_default_root` 生产装配使用。
 pub(crate) const RECOVERY_DIR: &str = "recovery";
 
-/// 由 HOME 推导默认恢复根；不访问磁盘。
+/// 由 HOME 推导默认恢复根；不访问磁盘。非 macOS 不创建生产根，
+/// 该推导仅在 macOS 装配与测试中使用。
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub(crate) fn default_recovery_root(home: &Path) -> PathBuf {
-    home.join("Library/Application Support/Aline/recovery")
+    home.join("Library/Application Support/Aline")
+        .join(RECOVERY_DIR)
 }
 
 /// 已复验的恢复根：绝对路径、普通目录、非符号链接，且 uid 与 HOME 一致。
@@ -36,7 +35,9 @@ pub(crate) struct RecoveryRoot {
 }
 
 impl RecoveryRoot {
-    /// 受检打开既有恢复根。根缺失时拒绝而不创建；生产根由 4.2 创建。
+    /// 受检打开既有恢复根。根缺失时拒绝而不创建；生产根由 `create_default_root` 装配。
+    /// 仅 crate 测试直接打开既有根。
+    #[cfg(test)]
     pub(crate) fn open(path: &Path) -> Result<Self, RootError> {
         #[cfg(target_os = "macos")]
         {
@@ -140,12 +141,19 @@ impl RecoveryRoot {
 #[derive(Debug)]
 pub(crate) enum RootError {
     UnsupportedPlatform,
+    /// 仅测试构造的家目录不可用分类。
+    #[allow(dead_code)]
     HomeUnavailable,
     InvalidPath,
     Missing,
     NotDirectory,
     Symlink,
-    ForeignOwner { expected: u32, actual: u32 },
+    /// uid 明细只由测试读取诊断。
+    #[allow(dead_code)]
+    ForeignOwner {
+        expected: u32,
+        actual: u32,
+    },
     Io(io::Error),
 }
 
@@ -191,7 +199,7 @@ pub(crate) fn create_default_root(home: &Path) -> Result<RecoveryRoot, RootError
         }
         let app = base.join("Aline");
         create_or_verify(&app, owner_uid)?;
-        let recovery = app.join(RECOVERY_DIR);
+        let recovery = default_recovery_root(home);
         create_or_verify(&recovery, owner_uid)?;
         RecoveryRoot::open_with_expected_uid_inner(&recovery, owner_uid)
     }

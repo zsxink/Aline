@@ -53,6 +53,8 @@ struct PendingOperation {
     document: RecoveryDocumentId,
     operation: u64,
     kind: PendingKind,
+    /// 受理时的恢复代次；用户开始打开/关闭/替换或窗口关闭后旧代完成作废。
+    epoch: u64,
 }
 
 /// 恢复面板的全部可测状态；同一时间只允许一个在途操作。
@@ -65,6 +67,8 @@ pub(super) struct RecoveryPanelState {
     confirming: Option<RecoveryDocumentId>,
     feedback: Option<&'static str>,
     next_operation: u64,
+    /// 恢复生命周期代次；用户开始打开/关闭/替换或窗口关闭时递增。
+    restore_epoch: u64,
 }
 
 impl RecoveryPanelState {
@@ -96,6 +100,18 @@ impl RecoveryPanelState {
         self.unrecoverable = count_unrecoverable(scan);
         self.confirming = None;
         true
+    }
+
+    /// 用户开始打开/关闭/替换文档或窗口关闭：在飞恢复立即失效。
+    /// 迟到完成随后被忽略，其临时材料由完成信封 Drop 清理；记录保持可恢复。
+    pub(super) fn invalidate_restore(&mut self) {
+        if self
+            .pending
+            .is_some_and(|pending| pending.kind == PendingKind::Restore)
+        {
+            self.pending = None;
+        }
+        self.restore_epoch = self.restore_epoch.wrapping_add(1);
     }
 
     /// 有可恢复条目或不可恢复计数时，面板在内容区显示。
@@ -149,6 +165,7 @@ impl RecoveryPanelState {
                     document,
                     operation,
                     kind: PendingKind::Restore,
+                    epoch: self.restore_epoch,
                 });
                 self.confirming = None;
                 self.feedback = None;
@@ -191,6 +208,7 @@ impl RecoveryPanelState {
             document,
             operation,
             kind: PendingKind::Discard,
+            epoch: self.restore_epoch,
         });
         self.feedback = None;
         RecoveryPanelStep::Discard(RecoveryDiscardJob::new(store.clone(), document, operation))
@@ -207,6 +225,7 @@ impl RecoveryPanelState {
         if pending.kind != PendingKind::Restore
             || pending.document != completion.document
             || pending.operation != completion.operation
+            || pending.epoch != self.restore_epoch
         {
             return RecoveryPanelStep::Ignore;
         }

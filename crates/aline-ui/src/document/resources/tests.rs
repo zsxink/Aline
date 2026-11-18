@@ -303,6 +303,10 @@ fn migration_skips_unreferenced_entries() -> Result<(), Box<dyn Error>> {
     )?)?;
     assert_eq!(migration.mappings.len(), 1);
     assert_eq!(migration.copied.len(), 1);
+    assert!(
+        temp.path().join("out/assets").is_dir(),
+        "成功迁移必须保留资产目录"
+    );
     assert!(!temp.path().join("out/assets/unused.png").exists());
     assert_eq!(
         fs::read(catalog.directory().join(&unused.file_name))?,
@@ -347,6 +351,10 @@ fn migration_relative_and_absolute_settings_choose_expected_reference() -> Resul
         WriteKind::Create,
     )?)?;
     assert_eq!(migration.mappings[0].to, "./assets/pic.png");
+    assert!(
+        temp.path().join("out/assets/pic.png").exists(),
+        "相对目录成功时应保留 assets/"
+    );
 
     let absolute = temp.path().join("abs-assets");
     let settings = ImageSettings {
@@ -394,7 +402,46 @@ fn migration_copy_failure_removes_created_assets_and_keeps_temp() -> Result<(), 
     )?;
     assert_eq!(completion.result.err(), Some(MigrationError::Io));
     assert!(!temp.path().join("out/assets/first.png").exists());
+    assert!(
+        !temp.path().join("out/assets").exists(),
+        "复制失败后本次新建的空资产目录必须删除"
+    );
     assert!(catalog.directory().join(&first.file_name).exists());
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn migration_resource_count_failure_removes_created_asset_directory() -> Result<(), Box<dyn Error>>
+{
+    let temp = TempDir::new("count-rollback")?;
+    let root = temp.temp_root()?;
+    let mut catalog = ok(ResourceCatalog::new(DocumentId::new(), &root, 29))?;
+    let entry = ok(catalog.stage("pic.png", b"png", 1024))?;
+    let file_name = entry.file_name.clone();
+    let text = format!("![x]({})", entry.locator);
+    // 配额检查在复制前失败：此时尚未建立 created 列表，仍须撤回空目录。
+    let entries = vec![entry; MAX_RESOURCE_COUNT + 1];
+    let target = temp.path().join("out/notes.md");
+    fs::create_dir_all(target.parent().ok_or("target parent")?)?;
+
+    let completion = run_migration(
+        &target,
+        &text,
+        entries,
+        catalog.directory(),
+        ImageSettings::default(),
+        WriteKind::Create,
+    )?;
+    assert_eq!(
+        completion.result.err(),
+        Some(MigrationError::TooManyResources)
+    );
+    assert!(
+        !temp.path().join("out/assets").exists(),
+        "配额失败后本次新建的空资产目录必须删除"
+    );
+    assert!(catalog.directory().join(file_name).exists());
     Ok(())
 }
 

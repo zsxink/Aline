@@ -165,15 +165,12 @@ fn run_create(
         Err(error) => return frozen.stop_before_write(error),
     };
     let Some(parent) = frozen.path().parent() else {
-        return completion(
-            frozen,
-            WriteOutcome::NotPublished(WriteStop::Create(FsError::InvalidPath)),
-        );
+        return completion(frozen, WriteOutcome::NotPublished(WriteStop::Create));
     };
     let staged = match create_staging(parent, ".aline-save", encoded.bytes().bytes()) {
         Ok(staged) => staged,
-        Err(error) => {
-            return completion(frozen, WriteOutcome::NotPublished(WriteStop::Create(error)));
+        Err(_) => {
+            return completion(frozen, WriteOutcome::NotPublished(WriteStop::Create));
         }
     };
     let identity = staged.identity();
@@ -191,7 +188,7 @@ fn run_create(
             } else if matches!(error, FsError::AlreadyExists) {
                 completion(frozen, WriteOutcome::NotPublished(WriteStop::Conflict))
             } else {
-                completion(frozen, WriteOutcome::NotPublished(WriteStop::Create(error)))
+                completion(frozen, WriteOutcome::NotPublished(WriteStop::Create))
             }
         }
     }

@@ -145,6 +145,8 @@ impl PersistenceCoordinator {
     }
 
     /// 关闭先撤销尚未冻结的保存资格，再通知后台工作停止。已发布结果仍需结算。
+    /// 生产关闭走会话退役；本入口仅 crate 测试调用。
+    #[cfg(test)]
     pub(in crate::document) fn begin_close(
         &mut self,
         core: &mut DocCore,

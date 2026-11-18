@@ -30,10 +30,10 @@ use super::coordinator::{
     PreparedRecovery, RECOVERY_FAILED_KEY, RECOVERY_INCOMPLETE_KEY, RecoverySkip, RecoveryStart,
 };
 use super::record::{
-    MAX_ACTIVE_LINEAGES, MAX_COMPLETE_GENERATIONS, MAX_GENERATION_RESOURCE_BYTES,
-    MAX_INCOMPLETE_RESERVATIONS, MAX_MANIFEST_BYTES, MAX_RESOURCE_BYTES, MAX_TEXT_BYTES,
-    NEXT_ID_BYTES, RECOVERY_INTERVAL_MILLIS, RESERVATION_BYTES, RETIRED_MANIFEST_BYTES,
-    ROOT_PAYLOAD_LIMIT, RecoveryRecord,
+    MAX_ACTIVE_LINEAGES, MAX_GENERATION_RESOURCE_BYTES, MAX_INCOMPLETE_RESERVATIONS,
+    MAX_MANIFEST_BYTES, MAX_RESOURCE_BYTES, MAX_TEXT_BYTES, NEXT_ID_BYTES,
+    RECOVERY_INTERVAL_MILLIS, RESERVATION_BYTES, RETIRED_MANIFEST_BYTES, ROOT_PAYLOAD_LIMIT,
+    RecoveryRecord,
 };
 use super::resource::{
     RecoveryConfig, RecoveryConfigError, RecoveryResourceError, RecoveryResourceSource,
@@ -42,8 +42,8 @@ use super::root::{RECOVERY_DIR, RecoveryRoot, RootError, default_recovery_root};
 use super::scan::{RecoveryGenerationStatus, RecoveryLineageDisposition};
 use super::store::{
     RecoveredPath, RecoveryBudget, RecoveryDefect, RecoveryDocumentId, RecoveryGenerationInput,
-    RecoveryLock, RecoveryPath, RecoveryPublishCause, RecoveryPublishOutcome, RecoveryReadError,
-    RecoveryResourceInput, RecoveryStore, RecoveryStoreError, RetireOutcome,
+    RecoveryLock, RecoveryOperation, RecoveryPath, RecoveryPublishCause, RecoveryPublishOutcome,
+    RecoveryReadError, RecoveryResourceInput, RecoveryStore, RecoveryStoreError, RetireOutcome,
 };
 
 struct TempRecoveryDir {
@@ -280,7 +280,6 @@ fn root_rejects_missing_relative_symlink_and_foreign_owner() -> Result<(), Box<d
 
 #[test]
 fn store_open_initializes_only_fixed_subdirs_and_syncs() -> Result<(), Box<dyn Error>> {
-    assert_eq!(MAX_COMPLETE_GENERATIONS, 2);
     assert_eq!(MAX_INCOMPLETE_RESERVATIONS, 32);
     assert_eq!(RECOVERY_INTERVAL_MILLIS, 10_000);
     assert_eq!(RETIRED_MANIFEST_BYTES, 48);
@@ -1430,9 +1429,13 @@ fn complete_generations(store: &RecoveryStore) -> Result<Vec<NonZeroU64>, Box<dy
 
 /// 测试资源源：按引用键返回给定分类，未知引用一律不可用。
 enum FakeResource {
+    /// 伪资源保留的未用分类，便于扩展读取失败路径。
+    #[allow(dead_code)]
     Bytes(Vec<u8>),
     Unavailable,
     Corrupt,
+    /// 伪资源保留的未用分类，配合 `Bytes` 覆盖超限分支。
+    #[allow(dead_code)]
     TooLarge,
 }
 
@@ -1949,5 +1952,152 @@ fn recovery_source_file_bytes_unchanged_after_publish_and_retire() -> Result<(),
     let job = document.take_recovery_close().ok_or("应返回关闭退役任务")?;
     assert!(matches!(job.run(), RetireOutcome::Retired { .. }));
     assert_eq!(fs::read(&target)?, before);
+    Ok(())
+}
+
+#[test]
+fn active_lineage_quota_rejects_at_exact_boundary() -> Result<(), Box<dyn Error>> {
+    let temp = TempRecoveryDir::new()?;
+    let store = open_store(&temp)?;
+    for _ in 0..MAX_ACTIVE_LINEAGES {
+        open_lineage(&store)?;
+    }
+    // 已达 256 条活动谱系；再开一条会变成 257，必须拒绝。
+    match store.open_lineage(100) {
+        Err(RecoveryStoreError::Budget(RecoveryBudget::ActiveLineages)) => {}
+        other => return Err(format!("期望 ActiveLineages 预算拒绝，实际 {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn incomplete_reservation_quota_rejects_at_exact_boundary() -> Result<(), Box<dyn Error>> {
+    let temp = TempRecoveryDir::new()?;
+    let store = open_store(&temp)?;
+    let document = open_lineage(&store)?;
+    // 31 个未结算 reservation：低于上限，发布仍应成功。
+    for generation in 2..(2 + MAX_INCOMPLETE_RESERVATIONS as u64 - 1) {
+        write_reservation(&store, document, generation, 0)?;
+    }
+    publish_ok(&store, document, sample_input("one"))?;
+    assert_eq!(
+        reservation_names(&store, document).len(),
+        MAX_INCOMPLETE_RESERVATIONS - 1
+    );
+    // 补到正好 32 个未结算 reservation，下一次发布必须拒绝。
+    let full = 2 + MAX_INCOMPLETE_RESERVATIONS as u64 - 1;
+    write_reservation(&store, document, full, 0)?;
+    // reservation 目录只读使半成品回收无法搬走文件，确保观察到配额拒绝
+    // 而不是回收后的成功路径。
+    let reservations = store.reservations();
+    let original = fs::metadata(&reservations)?.permissions();
+    let mut readonly = original.clone();
+    readonly.set_mode(0o500);
+    fs::set_permissions(&reservations, readonly)?;
+    let result = store.publish(document, sample_input("two"), &Cancellation::new());
+    fs::set_permissions(&reservations, original)?;
+    match result {
+        Err(RecoveryStoreError::Budget(RecoveryBudget::Reservations)) => {}
+        other => return Err(format!("期望 Reservations 预算拒绝，实际 {other:?}").into()),
+    }
+    assert_eq!(
+        reservation_names(&store, document).len(),
+        MAX_INCOMPLETE_RESERVATIONS,
+        "拒绝不得顺带删除既有 reservation"
+    );
+    Ok(())
+}
+
+#[test]
+fn already_retired_discard_finishes_residual_cleanup() -> Result<(), Box<dyn Error>> {
+    let temp = TempRecoveryDir::new()?;
+    let store = open_store(&temp)?;
+    let document = open_lineage(&store)?;
+    publish_ok(&store, document, sample_input("one"))?;
+    let first = store
+        .discard(document)
+        .map_err(|error| format!("{error:?}"))?;
+    assert!(matches!(first, RetireOutcome::Retired { .. }));
+
+    // 模拟 marker 已发布但清理中断：重建活动目录、代目录与 next-id。
+    let generation = NonZeroU64::new(1).ok_or("generation 必须非零")?;
+    fs::create_dir_all(store.generation_dir(document, generation))?;
+    fs::write(store.next_id(document), NextId::initial().encode())?;
+    let second = store
+        .discard(document)
+        .map_err(|error| format!("{error:?}"))?;
+    match second {
+        RetireOutcome::AlreadyRetired { through } => assert_eq!(through, 1),
+        other => return Err(format!("期望 AlreadyRetired，实际 {other:?}").into()),
+    }
+    assert!(!store.active_dir(document).exists(), "残留活动目录应被清理");
+    assert!(!store.generations(document).exists());
+
+    // 残留无法清理时不得假装 AlreadyRetired，而应返回 Deferred。
+    fs::create_dir_all(store.generations(document))?;
+    fs::write(store.generations(document).join("1"), b"not-a-directory")?;
+    let third = store
+        .discard(document)
+        .map_err(|error| format!("{error:?}"))?;
+    assert!(
+        matches!(third, RetireOutcome::Deferred { .. }),
+        "清理失败应返回 Deferred，实际 {third:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn publish_failure_discards_created_staging() -> Result<(), Box<dyn Error>> {
+    let temp = TempRecoveryDir::new()?;
+    let store = open_store(&temp)?;
+    let document = open_lineage(&store)?;
+    let directory = store.generations(document);
+    let target = directory.join("source.utf8");
+    fs::write(&target, b"existing")?;
+    let result = store.write_published_file(
+        &directory,
+        "source",
+        &target,
+        b"new",
+        RecoveryOperation::WriteGenerationFile,
+    );
+    assert!(result.is_err(), "目标已存在时发布必须失败");
+    let staged = fs::read_dir(&directory)?
+        .flatten()
+        .filter(|entry| entry.file_name().to_string_lossy().ends_with(".staging"))
+        .count();
+    assert_eq!(staged, 0, "发布失败不得残留 staging");
+    assert_eq!(fs::read(&target)?, b"existing", "既有目标不得被改动");
+    Ok(())
+}
+
+#[test]
+fn scan_rejects_symlinked_manifest() -> Result<(), Box<dyn Error>> {
+    use std::os::unix::fs::symlink;
+
+    let temp = TempRecoveryDir::new()?;
+    let store = open_store(&temp)?;
+    let document = open_lineage(&store)?;
+    let generation = publish_ok(&store, document, sample_input("one"))?;
+    let manifest = store.generation_dir(document, generation).join("manifest");
+    let real = store
+        .generation_dir(document, generation)
+        .join("manifest.real");
+    fs::rename(&manifest, &real)?;
+    symlink(&real, &manifest)?;
+    let scan = store.scan().map_err(|error| format!("{error:?}"))?;
+    let lineage = scan
+        .lineages
+        .iter()
+        .find(|lineage| lineage.document == document)
+        .ok_or("扫描应包含该谱系")?;
+    assert!(
+        lineage
+            .generations
+            .iter()
+            .any(|entry| entry.generation == generation
+                && entry.status == RecoveryGenerationStatus::Corrupt),
+        "符号链接 manifest 必须判为 Corrupt"
+    );
     Ok(())
 }

@@ -4,10 +4,10 @@
 //!
 //! 本模块不调度 10 秒恢复、不接生产根、不修改源文件；所有路径与身份都来自
 //! [`RecoveryRoot`]。仅 macOS 真实执行文件操作，其他平台在打开存储时失败关闭。
-
-// 4.1a 只提供存储机制；生产恢复协调器（4.1b）与 UI（4.2）到来前，多数入口
-// 仅由 crate 内测试使用。该豁免只覆盖本模块，接线后必须复核删除。
-#![cfg_attr(not(test), allow(dead_code))]
+//!
+//! 锁只约束遵守本协议的 Aline 进程；锁文件与目录身份均按路径打开，同 uid 的
+//! 其他进程可在核对与使用之间替换路径（已知 TOCTOU 边界）。本实现不提供跨
+//! 进程 CAS，也不做 fd 级目录身份绑定。
 
 use std::collections::HashSet;
 use std::fs;
@@ -54,6 +54,8 @@ pub(crate) struct RecoveryGenerationInput {
 pub(crate) enum RecoveryPath {
     Unlinked,
     Unix(Vec<u8>),
+    /// Windows 原始路径表示；macOS 构建不构造，仅保留 V1 对称与测试。
+    #[allow(dead_code)]
     WindowsUtf16Le(Vec<u8>),
 }
 
@@ -96,10 +98,14 @@ pub(crate) enum RecoveryPublishOutcome {
         generation: NonZeroU64,
         generation_bytes: u64,
     },
+    /// 分类载荷只由测试读取；生产只按变体结算。
+    #[allow(dead_code)]
     PublishedUncertain {
         generation: NonZeroU64,
         operation: RecoveryOperation,
     },
+    /// 分类载荷只由测试读取；生产只按变体结算。
+    #[allow(dead_code)]
     NotPublished {
         generation: NonZeroU64,
         cause: RecoveryPublishCause,
@@ -110,27 +116,47 @@ pub(crate) enum RecoveryPublishOutcome {
 #[derive(Debug)]
 pub(crate) enum RecoveryPublishCause {
     Cancelled,
+    /// 分类载荷只由测试读取。
+    #[allow(dead_code)]
     LockBusy(RecoveryLock),
+    /// 分类载荷只由测试读取。
+    #[allow(dead_code)]
     Budget(RecoveryBudget),
+    /// 分类载荷只由测试读取。
+    #[allow(dead_code)]
     Record(RecordError),
+    /// 分类载荷只由测试读取。
+    #[allow(dead_code)]
     UnknownFormat {
         path: PathBuf,
     },
+    /// 分类载荷只由测试读取。
+    #[allow(dead_code)]
     Io {
         operation: RecoveryOperation,
         source: io::Error,
     },
+    /// 分类载荷只由测试读取。
+    #[allow(dead_code)]
     Uncertain {
         operation: RecoveryOperation,
     },
+    /// 仅测试构造的分类变体。
+    #[allow(dead_code)]
     ManifestAbsent,
 }
 
 /// 一次退役尝试的结果；`Deferred` 保留谱系与 marker。
 #[derive(Debug)]
 pub(crate) enum RetireOutcome {
+    /// 结算载荷只由测试读取。
+    #[allow(dead_code)]
     Retired { generation: NonZeroU64 },
+    /// 结算载荷只由测试读取。
+    #[allow(dead_code)]
     AlreadyRetired { through: u64 },
+    /// 结算载荷只由测试读取。
+    #[allow(dead_code)]
     Deferred { cause: RecoveryPublishCause },
 }
 
@@ -140,12 +166,22 @@ pub(crate) struct RecoveredDocument {
     pub(crate) document: RecoveryDocumentId,
     pub(crate) generation: NonZeroU64,
     pub(crate) path_generation: u64,
+    /// 只由测试读取捕获态事实。
+    #[allow(dead_code)]
     pub(crate) captured_composition: bool,
     pub(crate) path: RecoveredPath,
+    /// 只由测试读取锚点。
+    #[allow(dead_code)]
     pub(crate) anchor_byte: usize,
+    /// 只由测试读取头位置。
+    #[allow(dead_code)]
     pub(crate) head_byte: usize,
     pub(crate) source: String,
+    /// 只由测试读取逻辑保存态。
+    #[allow(dead_code)]
     pub(crate) logical_saved: Option<String>,
+    /// 只由测试读取保存基线。
+    #[allow(dead_code)]
     pub(crate) baseline: Option<Vec<u8>>,
     pub(crate) resources: Vec<RecoveredResource>,
 }
@@ -155,6 +191,8 @@ pub(crate) struct RecoveredDocument {
 pub(crate) enum RecoveredPath {
     Unlinked,
     Unix(Vec<u8>),
+    /// Windows 原始路径表示；macOS 构建不构造，仅保留 V1 对称与测试。
+    #[allow(dead_code)]
     WindowsUtf16Le(Vec<u8>),
 }
 
@@ -176,8 +214,12 @@ pub(crate) enum RecoveryLock {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum RecoveryOperation {
     OpenRoot,
+    /// 仅测试构造的操作分类。
+    #[allow(dead_code)]
     OpenLineage,
     QuotaLock,
+    /// 仅测试构造的操作分类。
+    #[allow(dead_code)]
     OwnerLock,
     Meter,
     AllocateIdentity,
@@ -214,8 +256,14 @@ pub(crate) enum RecoveryBudget {
 pub(crate) enum RecoveryDefect {
     BadIdentityName,
     BadGenerationName,
+    /// 仅测试构造的协议缺陷。
+    #[allow(dead_code)]
     MissingIdentityDirectory,
+    /// 仅测试构造的协议缺陷。
+    #[allow(dead_code)]
     MissingOwnerLock,
+    /// 仅测试构造的协议缺陷。
+    #[allow(dead_code)]
     MissingActiveDirectory,
     MissingEntry,
     BadControl,
@@ -241,14 +289,22 @@ pub(crate) enum RecoveryDefect {
 /// 存储操作失败；`Uncertain` 表示副作用可能已发生。
 #[derive(Debug)]
 pub(crate) enum RecoveryStoreError {
+    /// 分类载荷只由测试读取。
+    #[allow(dead_code)]
     Disabled(RootError),
     InvalidInput,
+    /// 分类载荷只由测试读取。
+    #[allow(dead_code)]
     LockBusy {
         lock: RecoveryLock,
     },
+    /// 分类载荷只由测试读取。
+    #[allow(dead_code)]
     Retired {
         document: RecoveryDocumentId,
     },
+    /// 分类载荷只由测试读取。
+    #[allow(dead_code)]
     Protocol {
         document: RecoveryDocumentId,
         defect: RecoveryDefect,
@@ -269,27 +325,43 @@ pub(crate) enum RecoveryStoreError {
 /// 显式读取错误；`Corrupt`/`UnknownFormat` 不触发任何清理。
 #[derive(Debug)]
 pub(crate) enum RecoveryReadError {
+    /// 分类载荷只由测试读取。
+    #[allow(dead_code)]
     Disabled(RootError),
     InvalidInput,
+    /// 分类载荷只由测试读取。
+    #[allow(dead_code)]
     LockBusy {
         lock: RecoveryLock,
     },
+    /// 分类载荷只由测试读取。
+    #[allow(dead_code)]
     Retired {
         document: RecoveryDocumentId,
     },
+    /// 分类载荷只由测试读取。
+    #[allow(dead_code)]
     Protocol {
         document: RecoveryDocumentId,
         defect: RecoveryDefect,
     },
+    /// 分类载荷只由测试读取。
+    #[allow(dead_code)]
     Corrupt {
         generation: NonZeroU64,
         defect: RecordDefect,
     },
+    /// 分类载荷只由测试读取。
+    #[allow(dead_code)]
     UnknownFormat {
         generation: NonZeroU64,
         path: PathBuf,
     },
+    /// 分类载荷只由测试读取。
+    #[allow(dead_code)]
     Budget(RecoveryBudget),
+    /// 分类载荷只由测试读取。
+    #[allow(dead_code)]
     Io {
         operation: RecoveryOperation,
         source: io::Error,
@@ -359,7 +431,7 @@ impl RecoveryStore {
     ) -> Result<RecoveryDocumentId, RecoveryStoreError> {
         let _quota = self.lock_quota()?;
         let active = self.list_active_documents()?;
-        if active.len() > MAX_ACTIVE_LINEAGES {
+        if active.len() >= MAX_ACTIVE_LINEAGES {
             return Err(RecoveryStoreError::Budget(RecoveryBudget::ActiveLineages));
         }
         self.sync_quota_scope(None)?;
@@ -447,10 +519,10 @@ impl RecoveryStore {
 
         // 未结算 reservation 数量与配额准入。
         let mut reservations = self.list_reservations(document)?;
-        if reservations.len() > MAX_INCOMPLETE_RESERVATIONS {
+        if reservations.len() >= MAX_INCOMPLETE_RESERVATIONS {
             self.reclaim_half_products(document, &next)?;
             reservations = self.list_reservations(document)?;
-            if reservations.len() > MAX_INCOMPLETE_RESERVATIONS {
+            if reservations.len() >= MAX_INCOMPLETE_RESERVATIONS {
                 return Err(RecoveryStoreError::Budget(RecoveryBudget::Reservations));
             }
         }
@@ -460,6 +532,7 @@ impl RecoveryStore {
             .and_then(|current| current.checked_add(NEXT_ID_BYTES))
             .ok_or(RecoveryStoreError::Budget(RecoveryBudget::RootPayload))?;
         if admission > self.root_limit() {
+            // 容量回收是尽力而为：失败时下面的准入复查会失败并返回 RootPayload。
             self.reclaim_old_generations(document, parent, generation)
                 .ok();
             total = self.quota_total()?;
@@ -522,6 +595,8 @@ impl RecoveryStore {
                 }
             };
         if platform_fs::publish_staged_new(&staged, &reservation_path).is_err() {
+            // 发布失败不保留 staging 半成品。
+            discard_staging_quietly(staged);
             return Err(RecoveryStoreError::Uncertain {
                 operation: RecoveryOperation::WriteReservation,
             });
@@ -705,9 +780,17 @@ impl RecoveryStore {
         let quota = self.lock_quota()?;
         let owner = self.lock_owner(document)?;
         if let Some(through) = self.read_retired(document)? {
+            // 上次退役已发布 marker，但清理可能中断；这里续作 retire_cleanup。
+            // 只有清理确实完成才确认 AlreadyRetired，否则返回 Deferred 供下次重试。
+            let cleanup = self.retire_cleanup(document);
             drop(owner);
             drop(quota);
-            return Ok(RetireOutcome::AlreadyRetired { through });
+            return match cleanup {
+                Ok(()) => Ok(RetireOutcome::AlreadyRetired { through }),
+                Err(operation) => Ok(RetireOutcome::Deferred {
+                    cause: RecoveryPublishCause::Uncertain { operation },
+                }),
+            };
         }
         self.verify_lineage(document)?;
         let (mut next, next_identity) = self.read_next_id(document)?;
@@ -764,6 +847,8 @@ impl RecoveryStore {
             }
         };
         if platform_fs::publish_staged_new(&staged, &marker_path).is_err() {
+            // 发布失败不保留 staging 半成品。
+            discard_staging_quietly(staged);
             return Ok(RetireOutcome::Deferred {
                 cause: RecoveryPublishCause::Uncertain {
                     operation: RecoveryOperation::Retire,
@@ -1034,6 +1119,8 @@ impl RecoveryStore {
                 }
             })?;
         if platform_fs::publish_staged_new(&staged, &self.next_id(document)).is_err() {
+            // 发布失败不保留 staging 半成品。
+            discard_staging_quietly(staged);
             return Err(RecoveryStoreError::Uncertain {
                 operation: RecoveryOperation::AllocateIdentity,
             });
@@ -1610,6 +1697,8 @@ impl RecoveryStore {
             }
         })?;
         if platform_fs::publish_staged_new(&staged, target).is_err() {
+            // 发布失败不保留 staging 半成品。
+            discard_staging_quietly(staged);
             return Err(RecoveryPublishCause::Uncertain { operation });
         }
         discard_staging_quietly(staged);
@@ -1761,6 +1850,7 @@ impl RecoveryStore {
         keep_parent: Option<NonZeroU64>,
         keep_latest: NonZeroU64,
     ) -> Result<(), RecoveryStoreError> {
+        // 保留策略：只留下最新完整代与其父代（共两代）；其余完整代移入 trash。
         let trash = self.trash(document);
         let mut created_trash = false;
         for generation in self.list_generation_ids(document)? {
@@ -1900,6 +1990,7 @@ impl RecoveryStore {
         }
         self.meter_v1()
             .map_err(|_| RecoveryOperation::SettleReservation)?;
+        // 发布已成功，旧代回收是尽力而为；失败只留下可被下次扫描识别的残留。
         self.reclaim_old_generations(document, snapshot.parent_generation(), generation)
             .ok();
         drop(owner);
@@ -2171,6 +2262,12 @@ impl RecoveryStore {
         &self,
         document: RecoveryDocumentId,
     ) -> Result<(), RecoveryOperation> {
+        // 活动目录已不存在说明此前已完整清理；重复调用保持幂等。
+        match platform_fs::verify_ordinary_directory(&self.active_dir(document)) {
+            Ok(_) => {}
+            Err(FsError::NotFound) => return Ok(()),
+            Err(_) => return Err(RecoveryOperation::Retire),
+        }
         let trash = self.trash(document);
         if platform_fs::create_directory_exclusive(&trash).is_err()
             && platform_fs::verify_ordinary_directory(&trash).is_err()

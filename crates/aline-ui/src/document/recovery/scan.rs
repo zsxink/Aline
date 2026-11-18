@@ -9,7 +9,9 @@ use std::io;
 use std::num::NonZeroU64;
 use std::path::{Path, PathBuf};
 
-use super::record::{MAX_MANIFEST_BYTES, MAX_TEXT_BYTES, RecordDefect, RecoveryRecord};
+use super::record::{
+    MAX_MANIFEST_BYTES, MAX_RESOURCE_BYTES, MAX_TEXT_BYTES, RecordDefect, RecoveryRecord,
+};
 use super::root::RecoveryDocumentId;
 use super::store::{RecoveryDefect, RecoveryStore, RecoveryStoreError};
 
@@ -260,8 +262,14 @@ fn scan_lineage(store: &RecoveryStore, document: RecoveryDocumentId) -> Recovery
         && lineage.retired_through.is_none()
         && reservations_valid
         && lineage.disposition == RecoveryLineageDisposition::Active
+        && let Err(error) = store.reclaim_half_products(document, &next)
     {
-        store.reclaim_half_products(document, &next).ok();
+        // 回收失败不静默吞掉：记录诊断，扫描仍继续（不自动恢复）。
+        record_if_absent(
+            &mut lineage,
+            store.generations(document),
+            store_defect(&error),
+        );
     }
     let reservations = match read_reservations(store, document, &mut lineage) {
         Ok(reservations) => reservations,
@@ -379,19 +387,14 @@ fn read_reservations(
     };
     let mut valid = Vec::new();
     for (generation, path) in list {
-        let bytes = match fs::read(&path) {
+        let bytes = match read_bounded(&path, 4096) {
             Ok(bytes) => bytes,
-            Err(_) => {
+            Err(()) => {
                 lineage.disposition = RecoveryLineageDisposition::Blocked;
                 record_if_absent(lineage, path, RecoveryDefect::BadReservation);
                 return Err(());
             }
         };
-        if bytes.len() > 4096 {
-            lineage.disposition = RecoveryLineageDisposition::Blocked;
-            record_if_absent(lineage, path, RecoveryDefect::BadReservation);
-            return Err(());
-        }
         match super::control::Reservation::decode(&bytes) {
             Ok(reservation)
                 if reservation.document == document.get()
@@ -427,13 +430,10 @@ fn inspect_generation(
             payload_bytes,
         );
     }
-    let manifest = match fs::read(&manifest_path) {
+    let manifest = match read_bounded(&manifest_path, MAX_MANIFEST_BYTES) {
         Ok(manifest) => manifest,
-        Err(_) => return (RecoveryGenerationStatus::Corrupt, payload_bytes),
+        Err(()) => return (RecoveryGenerationStatus::Corrupt, payload_bytes),
     };
-    if manifest.len() > MAX_MANIFEST_BYTES {
-        return (RecoveryGenerationStatus::Corrupt, payload_bytes);
-    }
     let snapshot = match RecoveryRecord::decode(&manifest) {
         Ok(RecoveryRecord::Snapshot(snapshot)) => snapshot,
         Ok(RecoveryRecord::Retired(_)) => {
@@ -452,24 +452,24 @@ fn inspect_generation(
     if snapshot.document_id() != document.get() || snapshot.generation() != generation {
         return (RecoveryGenerationStatus::Corrupt, payload_bytes);
     }
-    match fs::read(generation_dir.join("source.utf8")) {
-        Ok(bytes) if bytes.len() <= MAX_TEXT_BYTES => {
+    match read_bounded(&generation_dir.join("source.utf8"), MAX_TEXT_BYTES) {
+        Ok(bytes) => {
             if snapshot.verify_source(&bytes).is_err() {
                 return (RecoveryGenerationStatus::Incomplete, payload_bytes);
             }
         }
-        _ => return (RecoveryGenerationStatus::Incomplete, payload_bytes),
+        Err(()) => return (RecoveryGenerationStatus::Incomplete, payload_bytes),
     }
     if let Some(descriptor) = snapshot.logical_saved() {
         let path = generation_dir.join("logical-saved.utf8");
-        match fs::read(&path) {
+        match read_bounded(&path, MAX_TEXT_BYTES) {
             Ok(bytes) if descriptor.verify_utf8(&bytes).is_ok() => {}
             _ => return (RecoveryGenerationStatus::Incomplete, payload_bytes),
         }
     }
     if let Some(descriptor) = snapshot.baseline() {
         let path = generation_dir.join("baseline.bytes");
-        match fs::read(&path) {
+        match read_bounded(&path, MAX_TEXT_BYTES) {
             Ok(bytes) if descriptor.verify(&bytes).is_ok() => {}
             _ => return (RecoveryGenerationStatus::Incomplete, payload_bytes),
         }
@@ -478,7 +478,7 @@ fn inspect_generation(
         let path = store
             .resource_dir(document, generation, resource.ordinal())
             .join("bytes");
-        match fs::read(&path) {
+        match read_bounded(&path, MAX_RESOURCE_BYTES) {
             Ok(bytes) if resource.bytes().verify(&bytes).is_ok() => {}
             _ => return (RecoveryGenerationStatus::Incomplete, payload_bytes),
         }
@@ -594,6 +594,24 @@ fn record_if_absent(lineage: &mut RecoveryLineageScan, path: PathBuf, defect: Re
         return;
     }
     lineage.defects.push(RecoveryScanDefect { path, defect });
+}
+
+/// 先按元数据限长再读取：拒绝符号链接与非常规文件，避免无上限读取。
+fn read_bounded(path: &Path, limit: usize) -> Result<Vec<u8>, ()> {
+    let metadata = fs::symlink_metadata(path).map_err(|_| ())?;
+    let file_type = metadata.file_type();
+    if file_type.is_symlink() || !file_type.is_file() {
+        return Err(());
+    }
+    let declared = usize::try_from(metadata.len()).map_err(|_| ())?;
+    if declared > limit {
+        return Err(());
+    }
+    let bytes = fs::read(path).map_err(|_| ())?;
+    if bytes.len() > limit {
+        return Err(());
+    }
+    Ok(bytes)
 }
 
 fn store_defect(error: &RecoveryStoreError) -> RecoveryDefect {

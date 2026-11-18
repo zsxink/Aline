@@ -143,7 +143,21 @@ impl NativeOpenCoordinator {
         let document = self.session.document_mut().ok_or(DocError::ClosedTarget)?;
         let budget = document.text_budget();
         let mut clipboard = None;
-        let (before, changed) = {
+        let (before, changed) = if matches!(action, EditAction::Undo | EditAction::Redo) {
+            // 撤销/重做走文档受检入口：Visual 下触及保护区间时零副作用拒绝。
+            let before = {
+                let core = document.edit_core()?;
+                if core.composition().is_some() {
+                    return Err(DocError::CompositionActive);
+                }
+                core.version()
+            };
+            match action {
+                EditAction::Undo => document.checked_undo()?,
+                _ => document.checked_redo()?,
+            }
+            (before, document.edit_core()?.version())
+        } else {
             let core = document.edit_core()?;
             if core.composition().is_some() {
                 return Err(DocError::CompositionActive);
@@ -169,8 +183,7 @@ impl NativeOpenCoordinator {
                     let identity = core.current_input_identity()?;
                     core.select_all(&identity)?;
                 }
-                EditAction::Undo => core.undo()?,
-                EditAction::Redo => core.redo()?,
+                EditAction::Undo | EditAction::Redo => {}
             }
             (before, core.version())
         };

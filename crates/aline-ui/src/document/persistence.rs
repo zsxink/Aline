@@ -3,13 +3,9 @@
 //! 不改变历史；实际磁盘阶段在同目录 `execute` 子模块按固定顺序执行。
 //! 冻结快照强持有其已有的资源引用，本模块不管理恢复资源。
 
-// `cancel` 已在 W4 3.2 有生产出口；剩余豁免是 `replace_association` 的生产出口
-// （属于 W4 4.2），以及 `WriteSettlement` 的 operation/snapshot/path 字段仍只有
-// crate 内测试读取。该豁免只覆盖本模块，对应 UI 接线后逐项复核删除。
-#![cfg_attr(not(test), allow(dead_code))]
-
+#[cfg(test)]
+use std::error::Error;
 use std::{
-    error::Error,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -114,6 +110,8 @@ impl PathGeneration {
 pub(super) enum SaveError {
     ForeignDocument,
     InvalidPath,
+    /// 仅关联测试覆盖的基线一致性拒绝。
+    #[cfg(test)]
     InconsistentBaseline,
     StaleAssociation,
     Busy,
@@ -126,8 +124,10 @@ pub(super) enum SaveError {
 pub(super) enum PrepareError {
     Cancelled,
     Conflict,
-    Text(BufferError),
-    Encoding(EncodeError),
+    /// 底层缓冲错误只由测试读取诊断。
+    Text(#[allow(dead_code)] BufferError),
+    /// 编码错误只由测试读取诊断。
+    Encoding(#[allow(dead_code)] EncodeError),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -414,11 +414,12 @@ impl FrozenWrite {
 pub(super) enum WriteStop {
     Cancelled,
     Conflict,
-    File(AtomicFailure),
-    /// 新建目标失败的底层原因；4.2a 只按分类转为 Failed，载荷留待后续诊断消费。
-    #[allow(dead_code)]
-    Create(aline_source::fs::FsError),
-    Preparation(PrepareError),
+    /// 底层失败载荷只由测试读取诊断；生产只按枚举分类。
+    File(#[allow(dead_code)] AtomicFailure),
+    /// 新建目标失败；4.2a 只按分类转为 Failed，底层原因不参与结算。
+    Create,
+    /// 失败分类只由测试读取诊断。
+    Preparation(#[allow(dead_code)] PrepareError),
 }
 
 #[derive(Debug)]
@@ -428,15 +429,25 @@ pub(super) enum WriteOutcome {
         storage: SourceBaseline,
         synchronized: bool,
     },
-    PublishedTargetUnverified(AtomicFailure),
-    PublishedReceiptMismatch(ReplacementReceipt),
+    /// 载荷只由测试读取目标路径；生产仅按分类结算。
+    PublishedTargetUnverified(#[allow(dead_code)] AtomicFailure),
+    /// 载荷只由测试读取目标路径；生产仅按分类结算。
+    PublishedReceiptMismatch(#[allow(dead_code)] ReplacementReceipt),
     PublishedBaselineFailed {
+        /// 只由测试读取发布回执。
+        #[allow(dead_code)]
         receipt: ReplacementReceipt,
+        /// 只由测试读取底层错误。
+        #[allow(dead_code)]
         error: BaselineError,
     },
     /// 新建目标已写出，但实际 bytes 无法建立保存基线。
     PublishedNewBaselineFailed {
+        /// 只由测试读取实际目标路径。
+        #[allow(dead_code)]
         path: PathBuf,
+        /// 只由测试读取底层错误。
+        #[allow(dead_code)]
         error: BaselineError,
     },
 }
@@ -448,7 +459,11 @@ pub(crate) struct WriteCompletion {
 
 /// 每个完成项连同实际冻结输入交给会话完成后续结算。拒绝采用不吞掉已发布事实。
 pub(super) struct WriteSettlement {
+    /// 只由测试校验结算归属。
+    #[allow(dead_code)]
     pub(super) operation: OperationId,
+    /// 只由测试校验冻结快照。
+    #[allow(dead_code)]
     pub(super) snapshot: CurrentSnapshot,
     pub(super) path: PathBuf,
     pub(super) adopted: bool,
@@ -459,7 +474,8 @@ pub(super) struct WriteSettlement {
 
 impl WriteSettlement {
     /// 发布后归属异常时，返回 source 记录的实际目标。
-    /// 未发布时没有可报告的发布目标。
+    /// 未发布时没有可报告的发布目标。仅 crate 测试读取。
+    #[cfg(test)]
     pub(super) fn published_target(&self) -> Option<&Path> {
         match &self.outcome {
             WriteOutcome::Published { .. } => Some(&self.path),
@@ -474,7 +490,8 @@ impl WriteSettlement {
         }
     }
 
-    /// 保留底层错误供诊断。状态与本地化反馈由宿主按枚举判断。
+    /// 保留底层错误供诊断。状态与本地化反馈由宿主按枚举判断。仅 crate 测试读取。
+    #[cfg(test)]
     pub(super) fn failure(&self) -> Option<&dyn Error> {
         match &self.outcome {
             WriteOutcome::NotPublished(WriteStop::File(error))
@@ -487,7 +504,7 @@ impl WriteSettlement {
             }
             WriteOutcome::PublishedBaselineFailed { error, .. }
             | WriteOutcome::PublishedNewBaselineFailed { error, .. } => Some(error),
-            WriteOutcome::NotPublished(WriteStop::Create(_))
+            WriteOutcome::NotPublished(WriteStop::Create)
             | WriteOutcome::NotPublished(WriteStop::Cancelled)
             | WriteOutcome::NotPublished(WriteStop::Conflict) => None,
             WriteOutcome::NotPublished(WriteStop::Preparation(PrepareError::Cancelled))
@@ -739,21 +756,10 @@ impl PersistenceCoordinator {
                 AtomicFailureKind::Conflict { .. } => SaveStatus::Conflict,
                 _ => SaveStatus::Failed,
             },
-            WriteOutcome::NotPublished(WriteStop::Create(_))
+            WriteOutcome::NotPublished(WriteStop::Create)
             | WriteOutcome::NotPublished(WriteStop::Preparation(_)) => SaveStatus::Failed,
         };
         true
-    }
-
-    /// 仅在 Create/SaveAs 成功后调用；不要求当前文本等于写入基线。
-    #[allow(dead_code)]
-    pub(super) fn associate_new_target(
-        &mut self,
-        kind: WriteKind,
-        path: PathBuf,
-        baseline: SourceBaseline,
-    ) -> Result<(), SaveError> {
-        self.associate_new_target_inner(kind, path, baseline)
     }
 
     fn associate_new_target_inner(
@@ -871,7 +877,8 @@ impl PersistenceCoordinator {
     }
 
     /// 显式建立已完成的路径关联。调用者须先在 DocCore 统一提交重载/引用修改，
-    /// 并提供同一读盘结果的文本和存储基线。
+    /// 并提供同一读盘结果的文本和存储基线。生产接线前仅 crate 测试调用。
+    #[cfg(test)]
     pub(super) fn replace_association(
         &mut self,
         expected: PathGeneration,
@@ -918,6 +925,8 @@ impl PersistenceCoordinator {
     }
 
     /// 请求关闭会停止待执行项和通知在途项取消。实际回执仍会完整结算。
+    /// 只由测试专用的 `begin_close` 调用。
+    #[cfg(test)]
     fn stop_for_close(&mut self) {
         self.closing = true;
         self.queued = None;
@@ -926,6 +935,7 @@ impl PersistenceCoordinator {
         }
     }
 
+    #[cfg(test)]
     pub(super) fn cancel_close(&mut self) {
         self.closing = false;
     }

@@ -229,6 +229,52 @@ fn source_typing_and_ime_allow_protected_and_hidden_source() -> TestResult {
 }
 
 #[test]
+fn cross_mode_pending_redo_uses_current_visual_permissions() -> TestResult {
+    let mut doc = DocCore::new("---\nt: x\n---\n\nbody", SelectionSpec::new(7, 7), limits())?;
+    doc.switch_mode(EditorMode::Source, 0)?;
+    doc.type_text(7, "Y", 1)?;
+    doc.undo()?;
+    assert_eq!(doc.buffer_text()?, "---\nt: x\n---\n\nbody");
+    doc.switch_mode(EditorMode::Visual, 2)?;
+
+    let before = state(&doc);
+    let result = doc.redo();
+    assert!(
+        matches!(
+            result,
+            Err(DocError::Edit(EditRefusal::ProtectedRange {
+                kind: ProtectionKind::FrontMatter,
+                ..
+            }))
+        ),
+        "Source 权限被误用于 Visual：{result:?}"
+    );
+    assert_eq!(state(&doc), before);
+
+    doc.switch_mode(EditorMode::Source, 3)?;
+    doc.redo()?;
+    // 同模式重做恢复待定草稿；提交后才写回正文，语义与普通重做一致。
+    doc.commit_open_block(4)?;
+    assert_eq!(doc.buffer_text()?, "---\nt: Yx\n---\n\nbody");
+    Ok(())
+}
+
+#[test]
+fn cross_mode_pending_redo_of_body_edit_succeeds_in_visual() -> TestResult {
+    let mut doc = DocCore::new("body", SelectionSpec::new(0, 0), limits())?;
+    doc.switch_mode(EditorMode::Source, 0)?;
+    doc.type_text(0, "X", 1)?;
+    doc.undo()?;
+    assert_eq!(doc.buffer_text()?, "body");
+    doc.switch_mode(EditorMode::Visual, 2)?;
+
+    doc.redo()?;
+    assert_eq!(doc.buffer_text()?, "Xbody");
+    assert_eq!(doc.mode(), EditorMode::Visual);
+    Ok(())
+}
+
+#[test]
 fn visual_typing_and_ime_use_exact_mapped_visible_insertion() -> TestResult {
     for ime in [false, true] {
         let source = "**hi**";

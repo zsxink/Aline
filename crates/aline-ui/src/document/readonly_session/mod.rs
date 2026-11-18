@@ -35,12 +35,13 @@ use aline_edit::{
 use aline_markdown::parse_with_cancel;
 use aline_source::Cancellation;
 
+#[cfg(test)]
+use super::ImageSettingsError;
 use super::persistence::WriteKind;
 use super::recovery::MAX_RESOURCE_COUNT;
 use super::{
-    ImageSettings, ImageSettingsError, MigrationCompletion, MigrationError, ResourceCatalog,
-    ResourceCleanupJob, ResourceError, ResourceMapping, ResourceMigrationJob, TempRoot,
-    locator_spans,
+    ImageSettings, MigrationCompletion, MigrationError, ResourceCatalog, ResourceCleanupJob,
+    ResourceError, ResourceMapping, ResourceMigrationJob, TempRoot, locator_spans,
 };
 mod autosave;
 mod read;
@@ -50,6 +51,8 @@ mod timing;
 pub(crate) use autosave::AutosaveAction;
 use autosave::AutosaveScheduler;
 pub use read::{ReadonlyFileAccess, ReadonlyFileInput};
+#[cfg(test)]
+pub(crate) use recovered::RecoveredOpenError;
 use recovered::RecoveredOrigin;
 pub use refresh::{ParseRefreshCompletion, ParseRefreshDisposition, ParseRefreshJob};
 pub(crate) use timing::{StageTimer, StageTiming};
@@ -317,6 +320,55 @@ impl ReadonlyDocument {
             return Err(DocError::ReadOnly);
         }
         Ok(&mut self.core)
+    }
+
+    /// 受检撤销：Visual 下若下一次撤销触及 MD-11 保护区间，零副作用拒绝。
+    ///
+    /// 拒绝不推进版本、选区、草稿、历史或解析；用户可切到 Source 后重试。
+    pub(crate) fn checked_undo(&mut self) -> Result<(), DocError> {
+        if !self.editable {
+            return Err(DocError::ReadOnly);
+        }
+        if self.core.mode() == EditorMode::Visual
+            && let Some(refusal) = self.protected_intersection(self.core.undo_target_ranges())
+        {
+            return Err(DocError::Edit(refusal));
+        }
+        self.core.undo()
+    }
+
+    /// 受检重做：Visual 下若下一次重做触及 MD-11 保护区间，零副作用拒绝。
+    ///
+    /// 拒绝不推进版本、选区、草稿、历史或解析；用户可切到 Source 后重试。
+    pub(crate) fn checked_redo(&mut self) -> Result<(), DocError> {
+        if !self.editable {
+            return Err(DocError::ReadOnly);
+        }
+        if self.core.mode() == EditorMode::Visual
+            && let Some(refusal) = self.protected_intersection(self.core.redo_target_ranges())
+        {
+            return Err(DocError::Edit(refusal));
+        }
+        self.core.redo()
+    }
+
+    /// 返回目标范围与当前解析保护区间的首个交集；闭区间相交与输入检查一致。
+    fn protected_intersection(
+        &self,
+        ranges: Option<Vec<std::ops::Range<usize>>>,
+    ) -> Option<aline_edit::EditRefusal> {
+        for range in ranges? {
+            for protected in self.parsed.protected_ranges() {
+                let protected_range = protected.range().byte_range();
+                if range.start <= protected_range.end && protected_range.start <= range.end {
+                    return Some(aline_edit::EditRefusal::ProtectedRange {
+                        kind: protected.kind(),
+                        range: protected_range,
+                    });
+                }
+            }
+        }
+        None
     }
     /// 返回该打开请求是否采用可编辑访问策略。
     pub const fn is_editable(&self) -> bool {
@@ -699,8 +751,21 @@ impl ReadonlyDocument {
         Ok((job, operation))
     }
 
+    /// 失败后保留同一目标/类型与本次引用映射，供 `retry_association` 直接重试。
+    ///
+    /// 仅在关联仍存在时记录，避免覆盖此前保留的待重试目标；回滚语义不变：
+    /// 只撤回本次新建资产，文档字节、目标与用户模式均不改动。
+    fn retain_pending_migration(&mut self, mappings: Vec<ResourceMapping>) {
+        if let Some(state) = self.association.as_ref() {
+            self.pending_migration = Some(PendingMigration {
+                target: state.target.clone(),
+                kind: state.kind,
+                mappings,
+            });
+        }
+    }
+
     /// 按固定顺序复核迁移完成项：过期/取消/新引用/编辑拒绝/入队写盘。
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn association_prepared(
         &mut self,
         completion: MigrationCompletion,
@@ -721,6 +786,10 @@ impl ReadonlyDocument {
         let migration = match completion.result {
             Ok(migration) => migration,
             Err(error) => {
+                if error == MigrationError::StaleResourceSet {
+                    // 资源集已变化：保留同一目标，重试时按当前目录重新迁移。
+                    self.retain_pending_migration(Vec::new());
+                }
                 self.association = None;
                 return AssociationStep::Settled(if error == MigrationError::StaleResourceSet {
                     AssociationOutcome::NeedsRetry
@@ -732,6 +801,8 @@ impl ReadonlyDocument {
         let identity = match self.input_identity() {
             Ok(identity) => identity,
             Err(_) => {
+                migration.rollback_assets();
+                self.retain_pending_migration(migration.mappings.clone());
                 self.association = None;
                 return AssociationStep::Settled(AssociationOutcome::NeedsRetry);
             }
@@ -739,6 +810,8 @@ impl ReadonlyDocument {
         let snapshot = match self.current_snapshot() {
             Ok(snapshot) => snapshot,
             Err(_) => {
+                migration.rollback_assets();
+                self.retain_pending_migration(migration.mappings.clone());
                 self.association = None;
                 return AssociationStep::Settled(AssociationOutcome::NeedsRetry);
             }
@@ -746,6 +819,8 @@ impl ReadonlyDocument {
         let source = match snapshot.full_text(self.limits.text()) {
             Ok(source) => source,
             Err(_) => {
+                migration.rollback_assets();
+                self.retain_pending_migration(migration.mappings.clone());
                 self.association = None;
                 return AssociationStep::Settled(AssociationOutcome::NeedsRetry);
             }
@@ -758,6 +833,8 @@ impl ReadonlyDocument {
             })
         });
         if new_locator {
+            migration.rollback_assets();
+            self.retain_pending_migration(migration.mappings.clone());
             self.association = None;
             return AssociationStep::Settled(AssociationOutcome::NeedsRetry);
         }
@@ -787,6 +864,8 @@ impl ReadonlyDocument {
                             &parsed_local
                         }
                         Err(_) => {
+                            migration.rollback_assets();
+                            self.retain_pending_migration(migration.mappings.clone());
                             self.association = None;
                             return AssociationStep::Settled(AssociationOutcome::NeedsRetry);
                         }
@@ -803,10 +882,9 @@ impl ReadonlyDocument {
                 self.parse_budget,
             );
             let command = EditCommand::replace(edits);
-            let context = EditContext::new(match self.core.mode() {
-                EditorMode::Visual => EditMode::Visual,
-                EditorMode::Source => EditMode::Source,
-            });
+            // 引用重写是系统迁移，不是用户 Visual 编辑；固定 Source 上下文，
+            // 不改变用户视图，也不把 Visual 权限用于受保护位置。
+            let context = EditContext::new(EditMode::Source);
             match plan_change(
                 snapshot.text(),
                 parsed,
@@ -818,15 +896,19 @@ impl ReadonlyDocument {
                 Ok(PlanOutcome::Changed(plan)) => {
                     if self
                         .core
-                        .apply_change(&identity, parsed, &plan, now_millis)
+                        .apply_migration_change(&identity, parsed, &plan, now_millis)
                         .is_err()
                     {
+                        migration.rollback_assets();
+                        self.retain_pending_migration(migration.mappings.clone());
                         self.association = None;
                         return AssociationStep::Settled(AssociationOutcome::NeedsRetry);
                     }
                 }
                 Ok(PlanOutcome::Unchanged(_)) => {}
                 Err(_) => {
+                    migration.rollback_assets();
+                    self.retain_pending_migration(migration.mappings.clone());
                     self.association = None;
                     return AssociationStep::Settled(AssociationOutcome::NeedsRetry);
                 }
@@ -1848,7 +1930,7 @@ fn settlement_result(outcome: &WriteOutcome) -> SaveResult {
             _ => SaveResult::Failed,
         },
         WriteOutcome::NotPublished(WriteStop::Preparation(_)) => SaveResult::Failed,
-        WriteOutcome::NotPublished(WriteStop::Create(_)) => SaveResult::Failed,
+        WriteOutcome::NotPublished(WriteStop::Create) => SaveResult::Failed,
         WriteOutcome::Published {
             synchronized: true, ..
         } => SaveResult::Saved,
@@ -1957,8 +2039,8 @@ impl ReadonlySession {
         }
     }
 
-    /// 配置下一次打开使用的图片资产目录；文档打开期间拒绝更改。
-    #[cfg_attr(not(test), allow(dead_code))]
+    /// 测试专用：注入下一次打开使用的图片目录设置；文档打开期间拒绝更改。
+    #[cfg(test)]
     pub(crate) fn configure_image_settings(
         &mut self,
         settings: ImageSettings,
@@ -2088,8 +2170,7 @@ impl ReadonlySession {
     }
 
     /// 配置下一次打开使用的恢复会话；文档打开期间拒绝更改。
-    /// 生产配置入口归 4.2；4.1b 仅由 crate 内测试驱动。
-    #[cfg_attr(not(test), allow(dead_code))]
+    /// 生产由窗口启动装配调用；打开期间拒绝，测试覆盖拒绝分支。
     pub(crate) fn configure_recovery(
         &mut self,
         config: Option<RecoveryConfig>,
@@ -2225,11 +2306,10 @@ mod tests {
     use std::path::{Path, PathBuf};
 
     use super::*;
+    use crate::document::WorkingVersion;
     #[cfg(target_os = "macos")]
     use crate::document::resources::CleanupOutcome;
-    #[cfg(target_os = "macos")]
-    use aline_buffer::SelectionSpec;
-    use aline_buffer::{HistoryBudget, LineIndexBudget, TextBudget};
+    use aline_buffer::{HistoryBudget, LineIndexBudget, SelectionSpec, TextBudget};
     #[cfg(target_os = "macos")]
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -2270,6 +2350,111 @@ mod tests {
             OpenDisposition::Applied
         ));
         Ok(session)
+    }
+
+    /// 受检历史操作前后用于零副作用断言的完整可观测状态。
+    type CheckedState = (
+        String,
+        WorkingVersion,
+        SelectionSpec,
+        usize,
+        usize,
+        EditorMode,
+        bool,
+    );
+
+    fn checked_state(document: &ReadonlyDocument) -> Result<CheckedState, DocError> {
+        Ok((
+            document.core().buffer_text()?,
+            document.core().version(),
+            document.core().current_selection(),
+            document.core().undo_depth(),
+            document.core().redo_depth(),
+            document.core().mode(),
+            document.core().has_open_block(),
+        ))
+    }
+
+    #[test]
+    fn visual_undo_of_source_protected_edit_is_refused_without_side_effects()
+    -> Result<(), Box<dyn Error>> {
+        let mut session = editable_session(b"---\nt: x\n---\n\nbody")?;
+        let document = session.document_mut().ok_or("document")?;
+        assert_eq!(
+            document.switch_mode(EditorMode::Source)?,
+            ModeSwitchOutcome::Ready
+        );
+        document.core.open_block(0..18, SelectionSpec::new(7, 7))?;
+        document.core.type_text(7, "Y", 1)?;
+        document.core.commit_open_block(2)?;
+        assert_eq!(document.core.buffer_text()?, "---\nt: Yx\n---\n\nbody");
+        assert_eq!(
+            document.switch_mode(EditorMode::Visual)?,
+            ModeSwitchOutcome::Ready
+        );
+
+        let before = checked_state(document)?;
+        let result = document.checked_undo();
+        assert!(matches!(
+            result,
+            Err(DocError::Edit(aline_edit::EditRefusal::ProtectedRange {
+                kind: aline_markdown::ProtectionKind::FrontMatter,
+                ..
+            }))
+        ));
+        assert_eq!(checked_state(document)?, before);
+
+        // 切回 Source 后同一撤销可以完成。
+        document.switch_mode(EditorMode::Source)?;
+        document.checked_undo()?;
+        assert_eq!(document.core().buffer_text()?, "---\nt: x\n---\n\nbody");
+        Ok(())
+    }
+
+    #[test]
+    fn visual_redo_of_source_protected_edit_is_refused_without_side_effects()
+    -> Result<(), Box<dyn Error>> {
+        let mut session = editable_session(b"---\nt: x\n---\n\nbody")?;
+        let document = session.document_mut().ok_or("document")?;
+        document.switch_mode(EditorMode::Source)?;
+        document.core.open_block(0..18, SelectionSpec::new(7, 7))?;
+        document.core.type_text(7, "Y", 1)?;
+        document.core.commit_open_block(2)?;
+        document.checked_undo()?;
+        assert_eq!(document.core().buffer_text()?, "---\nt: x\n---\n\nbody");
+        document.switch_mode(EditorMode::Visual)?;
+
+        let before = checked_state(document)?;
+        let result = document.checked_redo();
+        assert!(matches!(
+            result,
+            Err(DocError::Edit(aline_edit::EditRefusal::ProtectedRange {
+                kind: aline_markdown::ProtectionKind::FrontMatter,
+                ..
+            }))
+        ));
+        assert_eq!(checked_state(document)?, before);
+
+        document.switch_mode(EditorMode::Source)?;
+        document.checked_redo()?;
+        assert_eq!(document.core().buffer_text()?, "---\nt: Yx\n---\n\nbody");
+        Ok(())
+    }
+
+    #[test]
+    fn visual_undo_and_redo_of_body_edit_still_succeed() -> Result<(), Box<dyn Error>> {
+        let mut session = editable_session(b"hello body")?;
+        let document = session.document_mut().ok_or("document")?;
+        document.core.open_block(0..10, SelectionSpec::new(0, 0))?;
+        document.core.type_text(0, "X", 1)?;
+        document.core.commit_open_block(2)?;
+        assert_eq!(document.core().buffer_text()?, "Xhello body");
+
+        document.checked_undo()?;
+        assert_eq!(document.core().buffer_text()?, "hello body");
+        document.checked_redo()?;
+        assert_eq!(document.core().buffer_text()?, "Xhello body");
+        Ok(())
     }
 
     #[test]

@@ -21,9 +21,9 @@ use crate::document::{
 };
 #[cfg(target_os = "macos")]
 use crate::document::{
-    RecoveryConfig, RecoveryDiscardCompletion, RecoveryGenerationInput, RecoveryPublishOutcome,
-    RecoveryResourceInput, RecoveryRestoreCompletion, RecoveryRestoreError, RecoveryRoot,
-    RecoveryStore, ResourceError, RetireOutcome, TempRoot, UnavailableResources,
+    RecoveredOpenError, RecoveryConfig, RecoveryDiscardCompletion, RecoveryGenerationInput,
+    RecoveryPublishOutcome, RecoveryResourceInput, RecoveryRestoreCompletion, RecoveryRestoreError,
+    RecoveryRoot, RecoveryStore, ResourceError, RetireOutcome, TempRoot, UnavailableResources,
 };
 #[cfg(target_os = "macos")]
 use aline_source::Cancellation;
@@ -861,10 +861,7 @@ fn window_autosave_success_is_silent_but_manual_save_reports() -> Result<(), Box
     let completion = job.run();
     assert_eq!(
         state.settle_save(completion),
-        super::SaveSettlement {
-            feedback: None,
-            automatic: true,
-        },
+        super::SaveSettlement { feedback: None },
         "自动保存成功必须静默"
     );
     assert_eq!(fs::read(&target)?, b"xa\n", "自动保存应写入磁盘");
@@ -873,8 +870,7 @@ fn window_autosave_success_is_silent_but_manual_save_reports() -> Result<(), Box
     assert_eq!(
         state.settle_save(job.run()),
         super::SaveSettlement {
-            feedback: Some("document.save_saved"),
-            automatic: false,
+            feedback: Some("document.save_saved")
         },
         "手工保存成功仍须提示"
     );
@@ -1276,7 +1272,7 @@ fn synthetic_restored(
 ) -> Result<RestoredRecovery, Box<dyn Error>> {
     Ok(RestoredRecovery {
         recovered: synthetic_recovered(source, generation, path)?,
-        temp_document: None,
+        temp_resources: None,
     })
 }
 
@@ -1878,6 +1874,33 @@ fn startup_creates_recovery_dirs_and_scans_once() -> Result<(), Box<dyn Error>> 
 
 #[cfg(target_os = "macos")]
 #[test]
+fn startup_scan_failure_allows_retry_without_auto_rescan() -> Result<(), Box<dyn Error>> {
+    use std::fs;
+
+    let directory = WindowSaveDir::create("aline-window-scan-retry")?;
+    let home = directory.0.join("home");
+    fs::create_dir_all(home.join("Library/Application Support"))?;
+    let runtime = production_recovery_with(Some(&home), true);
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    state
+        .install_recovery_runtime(runtime)
+        .ok_or("启用后应安装存储")?;
+
+    assert_eq!(state.begin_startup_scan(), Some(1));
+    assert!(
+        !state.startup_scan_finished(1, Err(crate::document::RecoveryStoreError::InvalidInput))
+    );
+    assert_eq!(state.feedback_key(), Some("document.recovery_scan_failed"));
+    assert_eq!(state.begin_startup_scan(), Some(1), "失败后应允许再次开始");
+    assert!(
+        state.begin_startup_scan().is_none(),
+        "同一轮仍只能启动一次，不自动循环重扫"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
 fn startup_without_home_disables_recovery_and_keeps_editing_available() -> Result<(), Box<dyn Error>>
 {
     use std::fs;
@@ -2065,6 +2088,188 @@ fn recovery_panel_restore_reads_latest_complete_generation() -> Result<(), Box<d
     );
     assert_eq!(panel.feedback_key(), Some("document.recovery_restored"));
     assert!(!panel.is_busy());
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn starting_open_invalidates_in_flight_restore_and_cleans_materialized_resources()
+-> Result<(), Box<dyn Error>> {
+    let fixture = RecoveryFixture::new("aline-panel-invalidate-open")?;
+    let document = fixture.lineage()?;
+    let root = fixture.temp_root()?;
+    let locator = "aline-temp:0000000000000005/0000000000000001.png".to_owned();
+    fixture.publish(
+        document,
+        "img\n",
+        vec![RecoveryResourceInput {
+            reference: locator,
+            bytes: b"img".to_vec(),
+        }],
+    )?;
+    let scan = ok(fixture.store.scan())?;
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    assert!(state.panel.install_scan(1, &scan));
+    let job = match state.panel.request(
+        RecoveryPanelAction::Restore { document },
+        &fixture.store,
+        Some(root.clone()),
+    ) {
+        RecoveryPanelStep::Read(job) => job,
+        _ => return Err("恢复请求应生成读取任务".into()),
+    };
+
+    // 用户开始打开（随后关闭）：在飞恢复作废，迟到完成不得接管文档。
+    let _request = state.request_open()?;
+    assert!(!state.panel.is_busy(), "开始打开必须作废在途恢复");
+    assert!(state.close_document_with(|_| ()).is_ok());
+
+    let completion = job.run();
+    assert!(completion.result.is_ok(), "后台任务仍会完成并物化材料");
+    assert_eq!(
+        regular_file_count(root.path())?,
+        1,
+        "完成信封持有材料时文件应存在"
+    );
+    assert!(matches!(
+        state.panel.restore_finished(completion),
+        RecoveryPanelStep::Ignore
+    ));
+    assert!(state.session().document().is_none(), "迟到完成不得重开文档");
+    assert_eq!(state.panel.entries().len(), 1);
+    assert_eq!(
+        state.panel.entries()[0].status,
+        RecoveryPanelEntryStatus::Available
+    );
+    assert_eq!(regular_file_count(root.path())?, 0, "未采纳材料必须清理");
+    assert!(
+        std::fs::read_dir(root.path())?.next().is_none(),
+        "未采纳材料必须删除按文档创建的子目录"
+    );
+    let scan = ok(fixture.store.scan())?;
+    assert_eq!(
+        scan.recoverable_lineages()
+            .iter()
+            .filter(|lineage| lineage.document == document)
+            .count(),
+        1,
+        "失效不得删除记录"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn in_flight_read_makes_recovered_open_busy_and_cleans_materialized_resources()
+-> Result<(), Box<dyn Error>> {
+    use std::fs;
+
+    let fixture = RecoveryFixture::new("aline-panel-busy")?;
+    let document = fixture.lineage()?;
+    let root = fixture.temp_root()?;
+    let locator = "aline-temp:0000000000000005/0000000000000001.png".to_owned();
+    fixture.publish(
+        document,
+        "img\n",
+        vec![RecoveryResourceInput {
+            reference: locator,
+            bytes: b"img".to_vec(),
+        }],
+    )?;
+    let scan = ok(fixture.store.scan())?;
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    assert!(state.panel.install_scan(1, &scan));
+    let job = match state.panel.request(
+        RecoveryPanelAction::Restore { document },
+        &fixture.store,
+        Some(root.clone()),
+    ) {
+        RecoveryPanelStep::Read(job) => job,
+        _ => return Err("恢复请求应生成读取任务".into()),
+    };
+
+    // 读取在飞：选择已受理但尚未完成。
+    let target = fixture.path().join("busy.md");
+    fs::write(&target, b"x\n")?;
+    let request = state.request_open()?;
+    assert!(
+        state
+            .accept_dialog(&request, Ok(Some(vec![target])))
+            .is_some()
+    );
+    assert!(state.session().is_loading());
+
+    let completion = job.run();
+    let restored = match completion.result {
+        Ok(restored) => restored,
+        Err(error) => return Err(format!("恢复应成功物化：{error:?}").into()),
+    };
+    assert_eq!(regular_file_count(root.path())?, 1);
+    let result = state
+        .session_mut()
+        .open_recovered_with(restored, |_| Ok::<(), ()>(()));
+    assert!(matches!(result, Err(RecoveredOpenError::Busy)));
+    assert!(state.session().document().is_none());
+    assert_eq!(
+        regular_file_count(root.path())?,
+        0,
+        "Busy 拒绝必须清理未采纳材料"
+    );
+    assert!(
+        fs::read_dir(root.path())?.next().is_none(),
+        "Busy 拒绝必须删除按文档创建的子目录"
+    );
+    let scan = ok(fixture.store.scan())?;
+    assert_eq!(
+        scan.recoverable_lineages()
+            .iter()
+            .filter(|lineage| lineage.document == document)
+            .count(),
+        1,
+        "失败不得删除记录"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn adopted_recovered_resources_survive_restore() -> Result<(), Box<dyn Error>> {
+    let fixture = RecoveryFixture::new("aline-panel-adopt")?;
+    let document = fixture.lineage()?;
+    let root = fixture.temp_root()?;
+    let locator = "aline-temp:0000000000000005/0000000000000001.png".to_owned();
+    fixture.publish(
+        document,
+        "img\n",
+        vec![RecoveryResourceInput {
+            reference: locator,
+            bytes: b"img".to_vec(),
+        }],
+    )?;
+    let scan = ok(fixture.store.scan())?;
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    assert!(state.panel.install_scan(1, &scan));
+    let job = match state.panel.request(
+        RecoveryPanelAction::Restore { document },
+        &fixture.store,
+        Some(root.clone()),
+    ) {
+        RecoveryPanelStep::Read(job) => job,
+        _ => return Err("恢复请求应生成读取任务".into()),
+    };
+
+    let restored = match state.panel.restore_finished(job.run()) {
+        RecoveryPanelStep::Recovered(restored) => restored,
+        _ => return Err("恢复完成应返回已恢复文档".into()),
+    };
+    state.session_mut().configure_temp_root(Some(root.clone()));
+    let (open, _) = state
+        .session_mut()
+        .open_recovered_with(restored, |_| Ok::<(), ()>(()))
+        .map_err(|error| format!("恢复文档应采纳：{error:?}"))?;
+    assert_eq!(open.resources, 1);
+    assert!(state.session().document().is_some());
+    assert_eq!(regular_file_count(root.path())?, 1, "采纳后材料必须保留");
     Ok(())
 }
 

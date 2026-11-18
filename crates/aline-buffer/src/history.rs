@@ -465,6 +465,22 @@ impl History {
         })
     }
 
+    /// 下一次撤销将触及的源码范围并集；逆补丁使用 after 坐标。
+    ///
+    /// 只读查询，不移动光标、不改文本或选区；没有可撤销节点时返回 `None`。
+    pub(crate) fn undo_target_ranges(&self) -> Option<Vec<Range<usize>>> {
+        let node = self.nodes.get(self.cursor.checked_sub(1)?)?;
+        Some(collect_patch_ranges(&node.steps, true))
+    }
+
+    /// 下一次重做将触及的源码范围并集；正补丁使用 before 坐标。
+    ///
+    /// 只读查询，不移动光标、不改文本或选区；没有可重做节点时返回 `None`。
+    pub(crate) fn redo_target_ranges(&self) -> Option<Vec<Range<usize>>> {
+        let node = self.nodes.get(self.cursor)?;
+        Some(collect_patch_ranges(&node.steps, false))
+    }
+
     pub(crate) fn commit_undo(&mut self) {
         if self.cursor > 0 {
             if let Some(node) = self.nodes.get_mut(self.cursor) {
@@ -567,6 +583,20 @@ impl History {
     pub(crate) fn can_redo(&self) -> bool {
         self.cursor < self.nodes.len()
     }
+}
+
+/// 汇总节点内各步补丁区间；撤销取逆补丁，重做取正补丁。
+fn collect_patch_ranges(steps: &[Arc<HistoryStep>], inverse: bool) -> Vec<Range<usize>> {
+    let mut ranges = Vec::new();
+    for step in steps {
+        let patches = if inverse {
+            step.inverse_patches()
+        } else {
+            step.forward_patches()
+        };
+        ranges.extend(patches.iter().map(|(range, _)| range.clone()));
+    }
+    ranges
 }
 
 fn sealed_node(step: Arc<HistoryStep>, now_millis: u64) -> Result<HistoryNode, BufferError> {

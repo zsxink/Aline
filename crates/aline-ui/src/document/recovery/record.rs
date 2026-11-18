@@ -2,10 +2,6 @@
 //! 输入为已限长读取的清单字节及同代文件字节。借用原始路径和资源键，不持有文件、
 //! 历史、路径授权或发布事实。目录身份、磁盘同步与恢复采纳由存储层负责。
 
-// 4.1a 只提供记录层与存储层；生产接线（4.1b/4.2）到来前，编码器与访问器
-// 仅由 crate 内测试使用。该豁免只覆盖本模块，接线后必须复核删除。
-#![cfg_attr(not(test), allow(dead_code))]
-
 use std::num::NonZeroU64;
 
 const MIB: usize = 1024 * 1024;
@@ -17,13 +13,14 @@ pub(crate) const MAX_RESOURCE_COUNT: usize = 256;
 pub(crate) const MAX_REFERENCE_BYTES: usize = 4096;
 pub(crate) const MAX_RESOURCE_BYTES: usize = 64 * MIB;
 pub(crate) const MAX_GENERATION_RESOURCE_BYTES: usize = 256 * MIB;
-pub(crate) const MAX_COMPLETE_GENERATIONS: usize = 2;
 pub(crate) const MAX_INCOMPLETE_RESERVATIONS: usize = 32;
 pub(crate) const MAX_ACTIVE_LINEAGES: usize = 256;
 pub(crate) const ROOT_PAYLOAD_LIMIT: u64 = 1024 * MIB as u64;
 pub(crate) const LINEAGE_RESERVE_BYTES: u64 = 80;
 pub(crate) const NEXT_ID_BYTES: u64 = 32;
 pub(crate) const RESERVATION_BYTES: u64 = 40;
+/// V1 退役清单固定字节数；仅测试断言使用。
+#[cfg(test)]
 pub(crate) const RETIRED_MANIFEST_BYTES: u64 = 48;
 pub(crate) const RECOVERY_INTERVAL_MILLIS: u64 = 10_000;
 const MANIFEST_MAGIC: &[u8; 8] = b"ALINEREC";
@@ -255,10 +252,6 @@ impl<'a> SnapshotRecord<'a> {
         self.selection
     }
 
-    pub(crate) const fn source(&self) -> FileDescriptor {
-        self.source
-    }
-
     pub(crate) const fn logical_saved(&self) -> Option<FileDescriptor> {
         self.logical_saved
     }
@@ -277,6 +270,8 @@ impl RetiredRecord {
         self.id.document
     }
 
+    /// 仅测试读取退役代。
+    #[cfg(test)]
     pub(crate) const fn generation(&self) -> NonZeroU64 {
         self.id.generation
     }
@@ -286,29 +281,13 @@ impl RetiredRecord {
     }
 }
 
-impl<'a> RecordedPath<'a> {
-    /// 路径种类：0 无路径、1 原始 Unix bytes、2 Windows UTF-16LE。
-    pub(crate) const fn kind(&self) -> u8 {
-        match self {
-            Self::Unlinked => 0,
-            Self::Unix(_) => 1,
-            Self::WindowsUtf16Le(_) => 2,
-        }
-    }
-
-    pub(crate) const fn bytes(&self) -> &'a [u8] {
-        match self {
-            Self::Unlinked => &[],
-            Self::Unix(bytes) | Self::WindowsUtf16Le(bytes) => bytes,
-        }
-    }
-}
-
 impl RecordedSelection {
+    /// 选区锚点字节偏移。
     pub(crate) const fn anchor_byte(self) -> usize {
         self.anchor_byte
     }
 
+    /// 选区头部字节偏移。
     pub(crate) const fn head_byte(self) -> usize {
         self.head_byte
     }
@@ -373,10 +352,6 @@ impl FileDescriptor {
 
     pub(crate) const fn len_bytes(self) -> usize {
         self.len_bytes
-    }
-
-    pub(crate) const fn crc32(self) -> u32 {
-        self.crc32
     }
 
     fn decode(body: &mut Wire<'_>, limit: usize) -> Result<Self, RecordError> {

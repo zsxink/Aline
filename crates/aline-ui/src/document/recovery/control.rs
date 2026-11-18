@@ -2,10 +2,6 @@
 //! 编解码。两条记录都带固定 magic、version/flags 与 CRC-32/ISO-HDLC；所有
 //! 整数小端。本模块不读文件、不加锁，身份与同步由存储层负责。
 
-// 4.1a 的控制记录只被存储层使用；生产接线（4.1b/4.2）到来前，编码器与
-// 部分访问器仅由 crate 内测试使用。该豁免只覆盖本模块。
-#![cfg_attr(not(test), allow(dead_code))]
-
 use std::num::NonZeroU64;
 
 use super::record::crc32;

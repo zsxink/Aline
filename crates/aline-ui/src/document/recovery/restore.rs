@@ -7,7 +7,9 @@ use super::store::{
     RecoveredDocument, RecoveryDocumentId, RecoveryReadError, RecoveryStore, RecoveryStoreError,
     RetireOutcome,
 };
-use crate::document::resources::{ResourceError, TempDocumentId, TempRoot, materialize_recovered};
+use crate::document::resources::{
+    MaterializedRecovery, ResourceError, TempRoot, materialize_recovered_owned,
+};
 
 /// 一条恢复记录的后台读取任务输入；`operation` 由面板分配并回传比对。
 #[derive(Clone, Debug)]
@@ -64,14 +66,14 @@ impl RecoveryRestoreJob {
         let temp_document = self.materialize(&recovered)?;
         Ok(RestoredRecovery {
             recovered,
-            temp_document,
+            temp_resources: temp_document,
         })
     }
 
     fn materialize(
         &self,
         recovered: &RecoveredDocument,
-    ) -> Result<Option<TempDocumentId>, RecoveryRestoreError> {
+    ) -> Result<Option<MaterializedRecovery>, RecoveryRestoreError> {
         if recovered.resources.is_empty() {
             return Ok(None);
         }
@@ -80,9 +82,9 @@ impl RecoveryRestoreJob {
                 ResourceError::UnsupportedPlatform,
             ));
         };
-        let temp_document = materialize_recovered(root, &recovered.resources)
+        let temp_resources = materialize_recovered_owned(root, &recovered.resources)
             .map_err(RecoveryRestoreError::Resources)?;
-        Ok(Some(temp_document))
+        Ok(Some(temp_resources))
     }
 }
 
@@ -94,11 +96,11 @@ pub(crate) struct RecoveryRestoreCompletion {
     pub(crate) result: Result<RestoredRecovery, RecoveryRestoreError>,
 }
 
-/// 成功恢复出的内存文档与已写回的临时资源身份；资源为空时无临时身份。
+/// 成功恢复出的内存文档与已写回的临时资源句柄；未采纳时 Drop 会清理材料。
 #[derive(Debug)]
 pub(crate) struct RestoredRecovery {
     pub(crate) recovered: RecoveredDocument,
-    pub(crate) temp_document: Option<TempDocumentId>,
+    pub(crate) temp_resources: Option<MaterializedRecovery>,
 }
 
 /// 恢复失败分类：记录读取失败或资源写回失败。
@@ -130,11 +132,6 @@ impl RecoveryDiscardJob {
     #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) const fn operation(&self) -> u64 {
         self.operation
-    }
-
-    #[cfg_attr(not(test), allow(dead_code))]
-    pub(crate) const fn document(&self) -> RecoveryDocumentId {
-        self.document
     }
 
     /// 后台执行逐文档退役；不删除临时根或原文件。

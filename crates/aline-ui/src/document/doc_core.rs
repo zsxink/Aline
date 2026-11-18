@@ -334,6 +334,28 @@ impl DocCore {
         self.buffer.history_node_count()
     }
 
+    /// 返回下一次撤销将触及的源码范围；待定输入组按草稿范围计算。
+    ///
+    /// 只读查询，不推进版本、选区、草稿或历史。
+    pub fn undo_target_ranges(&self) -> Option<Vec<Range<usize>>> {
+        if let Some(group) = self.open.as_ref().and_then(OpenBlock::typing) {
+            return Some(vec![group.range.clone()]);
+        }
+        self.buffer.undo_target_ranges()
+    }
+
+    /// 返回下一次重做将触及的源码范围；仅当待定组重做生效时按草稿范围计算。
+    ///
+    /// 只读查询，不推进版本、选区、草稿或历史。
+    pub fn redo_target_ranges(&self) -> Option<Vec<Range<usize>>> {
+        if !self.buffer.can_redo()
+            && let Some(redo) = self.typing_redo.as_ref()
+        {
+            return Some(vec![redo.group.range.clone()]);
+        }
+        self.buffer.redo_target_ranges()
+    }
+
     /// 在指定源码范围上打开块；块已打开时拒绝。
     ///
     /// 打开只记录基线与选区，不改变版本或历史。

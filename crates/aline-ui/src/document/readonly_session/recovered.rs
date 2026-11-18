@@ -80,7 +80,7 @@ impl ReadonlyDocument {
     ) -> Result<Self, RecoveredOpenError> {
         let RestoredRecovery {
             recovered,
-            temp_document,
+            temp_resources,
         } = restored;
         if recovered.source.len() > limits.document.text().max_bytes() {
             return Err(RecoveredOpenError::BudgetExceeded);
@@ -111,8 +111,8 @@ impl ReadonlyDocument {
         core.accept_document_result(&identity)
             .map_err(RecoveredOpenError::Document)?;
         let path = display_path(&recovered.path);
-        let resources = match (temp_document, recovered.resources.is_empty()) {
-            (Some(temp_document), false) => {
+        let resources = match (temp_resources, recovered.resources.is_empty()) {
+            (Some(materialized), false) => {
                 let Some(root) = temp_root.as_ref() else {
                     return Err(RecoveredOpenError::Resources(
                         ResourceError::UnsupportedPlatform,
@@ -123,15 +123,16 @@ impl ReadonlyDocument {
                     .iter()
                     .map(|resource| resource.reference.clone())
                     .collect();
-                Some(
-                    ResourceCatalog::restore(
-                        core.document_id().clone(),
-                        root,
-                        temp_document,
-                        &locators,
-                    )
-                    .map_err(RecoveredOpenError::Resources)?,
+                let catalog = ResourceCatalog::restore(
+                    core.document_id().clone(),
+                    root,
+                    materialized.temp_document(),
+                    &locators,
                 )
+                .map_err(RecoveredOpenError::Resources)?;
+                // 目录归属建立成功后才采纳物化材料；此前任何失败由 Drop 清理。
+                materialized.adopt();
+                Some(catalog)
             }
             _ => None,
         };
@@ -345,7 +346,7 @@ mod tests {
     fn restored(source: &str, path: RecoveredPath) -> Result<RestoredRecovery, Box<dyn Error>> {
         Ok(RestoredRecovery {
             recovered: recovered_document(source, 1, path, Vec::new())?,
-            temp_document: None,
+            temp_resources: None,
         })
     }
 
@@ -657,7 +658,7 @@ mod tests {
             Ok(restored) => restored,
             Err(error) => return Err(format!("恢复应成功: {error:?}").into()),
         };
-        assert!(restored.temp_document.is_some());
+        assert!(restored.temp_resources.is_some());
         let document = ok(ReadonlyDocument::from_recovered(
             restored,
             limits(),
@@ -694,14 +695,19 @@ mod tests {
             }],
         )?;
         let root = fixture.temp_root()?;
-        let FirstRun { restored } = run_restore(
+        let FirstRun { mut restored } = run_restore(
             &fixture.store,
             document_id,
             generation,
             Some(root.clone()),
             21,
         )?;
-        let temp_document = restored.temp_document.ok_or("首次恢复应有临时身份")?;
+        // 采纳首次恢复的材料，模拟已建立目录归属，避免 Drop 清理干扰冲突用例。
+        let temp_document = restored
+            .temp_resources
+            .take()
+            .ok_or("首次恢复应有临时身份")?
+            .adopt();
         let destination = root
             .path()
             .join(temp_document.directory_name())
@@ -786,7 +792,7 @@ mod tests {
         let before = ok(fixture.store.scan())?;
         let restored = RestoredRecovery {
             recovered: ok(fixture.store.recover(document_id, generation))?,
-            temp_document: None,
+            temp_resources: None,
         };
         let mut session = ReadonlySession::new(limits());
         session
@@ -794,7 +800,7 @@ mod tests {
             .map_err(|error| format!("{error:?}"))?;
         let second = session.open_recovered(RestoredRecovery {
             recovered: ok(fixture.store.recover(document_id, generation))?,
-            temp_document: None,
+            temp_resources: None,
         });
         assert!(matches!(second, Err(RecoveredOpenError::DocumentOpen)));
         assert_eq!(
@@ -811,7 +817,7 @@ mod tests {
         let _request = pending.request_open()?;
         let third = pending.open_recovered(RestoredRecovery {
             recovered: ok(fixture.store.recover(document_id, generation))?,
-            temp_document: None,
+            temp_resources: None,
         });
         assert!(matches!(third, Err(RecoveredOpenError::Busy)));
         assert!(pending.document().is_none());
@@ -834,7 +840,7 @@ mod tests {
         session
             .open_recovered(RestoredRecovery {
                 recovered: ok(fixture.store.recover(document_id, generation))?,
-                temp_document: None,
+                temp_resources: None,
             })
             .map_err(|error| format!("{error:?}"))?;
         assert_eq!(

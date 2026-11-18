@@ -731,8 +731,10 @@ fn pending_redo_follows_older_buffer_redo() -> Result<(), Box<dyn std::error::Er
     Ok(())
 }
 
+/// 跨模式重做按当前 Visual 权限判断：受隐藏源码影响的编辑被拒且零副作用，
+/// 切回 Source 后同一重做成功（W4-65 裁决：不使用 redo.mode 的 Source 权限）。
 #[test]
-fn pending_redo_crosses_modes_with_original_source_permissions()
+fn pending_redo_crosses_modes_with_current_visual_permissions()
 -> Result<(), Box<dyn std::error::Error>> {
     let mut doc = source_editable(limits())?;
     let identity = doc.current_input_identity()?;
@@ -749,16 +751,30 @@ fn pending_redo_crosses_modes_with_original_source_permissions()
     let identity = doc.current_input_identity()?;
     doc.select(&identity, &selection)?;
 
-    doc.redo()?;
+    common::assert_rejected_without_change(
+        &mut doc,
+        |doc| doc.redo(),
+        |error| {
+            matches!(
+                error,
+                DocError::Edit(aline_edit::EditRefusal::RereadFailed { .. })
+            )
+        },
+    )?;
     assert_eq!(doc.mode(), EditorMode::Visual);
-    assert_closed(&doc);
-    assert_buffer(&doc, "a*中*b")?;
-    assert_eq!(doc.current_selection(), after);
-    assert_history(&doc, 1, 0, 1);
-    doc.undo()?;
     assert_buffer(&doc, "ab")?;
-    assert_eq!(doc.current_selection(), collapsed(1));
-    assert_history(&doc, 0, 1, 1);
+    assert_eq!(doc.current_selection(), collapsed(2));
+    assert_history(&doc, 0, 0, 0);
+
+    doc.switch_mode(EditorMode::Source, 3)?;
+    doc.redo()?;
+    assert_eq!(doc.mode(), EditorMode::Source);
+    // 同模式重做恢复待定组草稿：全文体现草稿，已提交 buffer 不变。
+    assert_buffer(&doc, "ab")?;
+    assert_snapshot(&mut doc, "a*中*b")?;
+    assert_eq!(doc.current_selection(), after);
+    assert_history(&doc, 0, 0, 0);
+    assert_eq!(doc.open_block_draft(), Some("*中*"));
     Ok(())
 }
 

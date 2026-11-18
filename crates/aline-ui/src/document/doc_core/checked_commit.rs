@@ -41,6 +41,14 @@ impl From<BufferError> for DocError {
     }
 }
 
+/// 提交时的视图覆盖：`target_mode` 表达目标视图（如跨模式重做），
+/// `edit_mode` 强制固定权限上下文（首次保存迁移按 Source 规划）。
+#[derive(Clone, Copy, Default)]
+struct BoundContext {
+    target_mode: Option<EditorMode>,
+    edit_mode: Option<EditMode>,
+}
+
 impl DocCore {
     pub(super) fn publish_typing_redo_in_current_mode(
         &mut self,
@@ -51,7 +59,8 @@ impl DocCore {
         let selection = bind_selection(snapshot, redo.group.before_selection)?;
         let budget = self.edit_budget();
         let parsed = parse_for_edit(snapshot, budget)?;
-        let edit_mode = match redo.mode {
+        // 权限按当前视图判定；重做不得把记录时的 Source 权限用于当前 Visual。
+        let edit_mode = match self.mode {
             EditorMode::Visual => EditMode::Visual,
             EditorMode::Source => EditMode::Source,
         };
@@ -155,7 +164,38 @@ impl DocCore {
         plan: &ChangePlan,
         now_millis: u64,
     ) -> Result<CommitOutcome, DocError> {
-        self.apply_bound_change(identity, parsed, plan, None, None, now_millis)
+        self.apply_bound_change(
+            identity,
+            parsed,
+            plan,
+            None,
+            BoundContext::default(),
+            now_millis,
+        )
+    }
+
+    /// 以固定 Source 权限上下文应用系统迁移命令；不切换用户当前视图。
+    ///
+    /// 用于首次保存/另存为的引用重写：重写是系统迁移而非用户 Visual 编辑，
+    /// 因此按 Source 权限规划与应用，但成功后仍保持用户模式。
+    pub(crate) fn apply_migration_change(
+        &mut self,
+        identity: &InputIdentity,
+        parsed: &Parsed,
+        plan: &ChangePlan,
+        now_millis: u64,
+    ) -> Result<CommitOutcome, DocError> {
+        self.apply_bound_change(
+            identity,
+            parsed,
+            plan,
+            None,
+            BoundContext {
+                edit_mode: Some(EditMode::Source),
+                ..BoundContext::default()
+            },
+            now_millis,
+        )
     }
 
     /// 执行已规划的查找替换命令。
@@ -178,7 +218,7 @@ impl DocCore {
             parsed,
             plan,
             Some(query_generation),
-            None,
+            BoundContext::default(),
             now_millis,
         )
     }
@@ -200,7 +240,10 @@ impl DocCore {
             parsed,
             plan,
             Some(query_generation),
-            Some(EditorMode::Source),
+            BoundContext {
+                target_mode: Some(EditorMode::Source),
+                ..BoundContext::default()
+            },
             now_millis,
         )
     }
@@ -211,23 +254,33 @@ impl DocCore {
         parsed: &Parsed,
         plan: &ChangePlan,
         query_generation: Option<u64>,
-        target_mode: Option<EditorMode>,
+        binding: BoundContext,
         now_millis: u64,
     ) -> Result<CommitOutcome, DocError> {
+        let BoundContext {
+            target_mode,
+            edit_mode: context_mode,
+        } = binding;
         self.ensure_writable()?;
         if self.open.is_some() {
             self.ensure_ready()?;
         }
         let current_context = self.command_context();
-        let context = target_mode.map_or(current_context, |mode| {
-            let edit_mode = match mode {
-                EditorMode::Visual => EditMode::Visual,
-                EditorMode::Source => EditMode::Source,
-            };
-            EditContext::new(edit_mode)
+        let context = match (context_mode, target_mode) {
+            (Some(edit_mode), _) => EditContext::new(edit_mode)
                 .with_pending_input(current_context.has_pending_input())
-                .with_composition_active(current_context.has_composition())
-        });
+                .with_composition_active(current_context.has_composition()),
+            (None, Some(mode)) => {
+                let edit_mode = match mode {
+                    EditorMode::Visual => EditMode::Visual,
+                    EditorMode::Source => EditMode::Source,
+                };
+                EditContext::new(edit_mode)
+                    .with_pending_input(current_context.has_pending_input())
+                    .with_composition_active(current_context.has_composition())
+            }
+            (None, None) => current_context,
+        };
         if context.has_composition() {
             return Err(DocError::CompositionActive);
         }

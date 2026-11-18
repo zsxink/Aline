@@ -3,9 +3,6 @@
 //! 4.1 生产默认实现为 [`UnavailableResources`]：任何强引用都取不到字节，
 //! 协调器因此报告“资源不完整”而不发布恢复副本。真实资源保全归 4.2。
 
-// 生产默认实现与失败分类要等 4.2 接生产恢复根后才被构造。
-#![cfg_attr(not(test), allow(dead_code))]
-
 use std::sync::Arc;
 
 use super::store::RecoveryStore;
@@ -15,7 +12,8 @@ use super::store::RecoveryStore;
 pub(crate) enum RecoveryResourceError {
     /// 引用当前不可解析或不可读。
     Unavailable,
-    /// 资源内容损坏或未通过受检解码。
+    /// 资源内容损坏或未通过受检解码；仅测试伪资源构造。
+    #[allow(dead_code)]
     Corrupt,
     /// 资源超过单次读取预算。
     TooLarge,

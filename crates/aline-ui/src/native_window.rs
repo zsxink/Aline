@@ -178,9 +178,6 @@ pub(super) struct ExternalHostOutcome {
 pub(super) struct SaveSettlement {
     /// 自动保存成功静默；失败/冲突/不确定保留既有反馈键。
     pub(super) feedback: Option<&'static str>,
-    /// 本次结算是否来自自动保存；宿主据此在结算后重查自动保存。
-    #[cfg_attr(not(test), allow(dead_code))]
-    pub(super) automatic: bool,
 }
 
 /// 保存入口派生给窗口的下一步；目标对话框与迁移任务都由窗口装配。
@@ -422,10 +419,7 @@ impl NativeOpenCoordinator {
         }
         // 文档已关闭时完成项只能是迟到结果，不产生新反馈。
         let Some(document) = self.session.document_mut() else {
-            return SaveSettlement {
-                feedback: None,
-                automatic,
-            };
+            return SaveSettlement { feedback: None };
         };
         let result = document.settle_save_command(completion);
         if result == SaveResult::Conflict {
@@ -439,10 +433,7 @@ impl NativeOpenCoordinator {
         } else {
             feedback
         };
-        SaveSettlement {
-            feedback,
-            automatic,
-        }
+        SaveSettlement { feedback }
     }
 
     /// 是否存在组合期保存等待（菜单取消项可用性）。
@@ -526,7 +517,8 @@ impl NativeOpenCoordinator {
         Some(store)
     }
 
-    /// 启动扫描只允许开始一次；返回本次扫描代次。
+    /// 启动扫描每轮只允许开始一次；失败后由 [`Self::startup_scan_finished`]
+    /// 重置代次，允许再次开始。返回本轮扫描代次。
     pub(super) fn begin_startup_scan(&mut self) -> Option<u64> {
         if self.startup_scan_generation != 0 || self.recovery_store.is_none() {
             return None;
@@ -553,6 +545,9 @@ impl NativeOpenCoordinator {
                 installed
             }
             Err(_) => {
+                // 失败后重置代次，允许后续入口再次 begin_startup_scan；
+                // 不在此自动循环重扫。
+                self.startup_scan_generation = 0;
                 self.feedback = Some("document.recovery_scan_failed");
                 false
             }
@@ -823,6 +818,8 @@ impl NativeOpenCoordinator {
     }
 
     pub(super) fn request_open(&mut self) -> Result<OpenRequestId, OpenError> {
+        // 用户开始打开/替换文档：在飞恢复立即失效，迟到完成不得接管新文档。
+        self.panel.invalidate_restore();
         let request = self.session.request_open()?;
         self.queued = None;
         self.feedback = None;
@@ -831,7 +828,7 @@ impl NativeOpenCoordinator {
     }
 
     /// 配置下一次打开使用的恢复会话；仅转发，不复制状态。
-    /// 生产配置入口归 4.2；4.1b 仅由 crate 内测试驱动。
+    /// 生产启动装配直接调用 session；本转发入口当前仅由 crate 内测试驱动。
     #[cfg_attr(not(test), allow(dead_code))]
     pub(super) fn configure_recovery(
         &mut self,
@@ -991,6 +988,9 @@ impl NativeOpenCoordinator {
         &mut self,
         before_close: impl FnOnce(&ReadonlyDocument) -> T,
     ) -> Result<Option<T>, ()> {
+        // 用户开始关闭/替换或窗口关闭：在飞恢复立即失效；即使关闭随后被拒绝，
+        // 迟到完成也不得重开文档。
+        self.panel.invalidate_restore();
         match self.session.close_document_with(before_close) {
             Ok(value) => {
                 self.queued = None;
@@ -2043,6 +2043,7 @@ impl NativeDocumentWindow {
                     self.state.apply_recovery_feedback(feedback);
                     self.arm_recovery(window, cx);
                 }
+                // 防御分支：正常开始只返回 Prepare/Settled；若有已分配谱系仍须退役。
                 Some(RecoveryStart::Retire(job)) => {
                     self.spawn_recovery_retire(job, cx);
                 }
@@ -2086,11 +2087,12 @@ impl NativeDocumentWindow {
                         this.state.apply_recovery_feedback(feedback);
                         this.arm_recovery(window, cx);
                     }
+                    // 防御分支：正常准备完成不会直接退役；测试可构造该路径。
                     Some(RecoveryStart::Retire(job)) => {
                         this.spawn_recovery_retire(job, cx);
                         this.arm_recovery(window, cx);
                     }
-                    // 准备任务不会再产出准备任务；出现时按新任务继续。
+                    // 防御分支：准备任务不会再产出准备任务；出现时按新任务继续。
                     Some(RecoveryStart::Prepare(job)) => {
                         this.start_recovery_prepare(job, window, cx);
                     }

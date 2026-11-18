@@ -5,9 +5,6 @@
 //! 再由后台退役任务清理谱系（W4-53）。本模块不读时钟、不解析路径、不触碰
 //! 源文件；所有时间由宿主注入。
 
-// 4.1b 只接会话与任务；部分分类与访问器仅由 crate 内测试或 4.2 UI 消费。
-#![cfg_attr(not(test), allow(dead_code))]
-
 use std::collections::HashSet;
 use std::fmt;
 use std::num::NonZeroU64;
@@ -91,8 +88,6 @@ pub(crate) enum RecoverySkip {
     Unchanged,
     /// 准备期间版本、快照或路径代次已改变。
     VersionChanged,
-    /// 会话忙碌或不可布防。
-    Busy,
     /// 存储已停用；会话置为 blocked。
     Disabled,
     /// 准备或发布被取消。
@@ -148,7 +143,11 @@ pub(crate) struct RecoverySettlement {
 pub(crate) struct PublishedRecovery {
     pub(crate) version: WorkingVersion,
     pub(crate) snapshot_id: SnapshotId,
+    /// 只由测试读取发布代事实。
+    #[allow(dead_code)]
     pub(crate) generation: NonZeroU64,
+    /// 只由测试读取发布字节数。
+    #[allow(dead_code)]
     pub(crate) generation_bytes: u64,
 }
 
@@ -183,24 +182,6 @@ impl RecoverySession {
     /// 只读清理上下文：克隆存储与当前谱系身份；未分配谱系时为 `None`。
     pub(crate) fn cleanup_context(&self) -> Option<(RecoveryStore, RecoveryDocumentId)> {
         self.document.map(|document| (self.store.clone(), document))
-    }
-
-    /// 读取指定谱系全部保留代的资源引用；只读，异常由调用方 fail closed。
-    pub(crate) fn referenced_resources(
-        &self,
-        document: RecoveryDocumentId,
-    ) -> Result<std::collections::BTreeSet<String>, RecoveryStoreError> {
-        self.store.referenced_resources(document)
-    }
-
-    /// 返回本次会话身份；迟到任务据此判断归属。
-    pub(crate) fn id(&self) -> &RecoverySessionId {
-        &self.id
-    }
-
-    /// 返回会话是否空闲；只有空闲才允许布防。
-    pub(crate) fn is_idle(&self) -> bool {
-        self.phase == RecoveryPhase::Idle
     }
 
     /// 返回下一次到期时刻；None 表示没有待办计时。
@@ -511,6 +492,8 @@ pub(crate) enum PreparedRecovery {
     },
     Incomplete {
         tag: RecoveryJobTag,
+        /// 诊断引用只由测试构造，生产不读取。
+        #[allow(dead_code)]
         reference: String,
     },
     Failed {

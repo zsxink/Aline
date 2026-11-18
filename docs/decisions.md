@@ -1443,7 +1443,9 @@ V-07/V-09 的补齐或已知限制收口。本裁决只判 `docs/v1-architecture
   staging 清理拒绝外来替换两条回归。
 - **未覆盖边界（不阻塞准入）。** 不是跨进程 CAS：最终字节比较之后的写入不可
   检测，回读拉长「已交换但可能回滚」的可见窗口且无取消检查；staging 身份核对
-  与 `unlinkat` 非原子；`openat` 之后失败的 `created=true` 分支无失败注入
+  与 `unlinkat` 非原子；锁文件与身份核验只覆盖同 uid 本地路径，同 uid 进程可在
+  核对后替换目录项（已知 TOCTOU 边界），本实现不声称跨进程 CAS；`openat` 之后
+  失败的 `created=true` 分支无失败注入
   测试；ERANGE/`fchown`/`fgetxattr`/`fsetxattr`/`com.apple.*`/超大 xattr
   未覆盖；测试依赖 `staff` 组与系统工具；守卫的 `unsafe` 扫描是 token 级，
   宏展开内的 `unsafe` 不可见，强制边界依赖 rustc。

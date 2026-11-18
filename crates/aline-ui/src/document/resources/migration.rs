@@ -96,6 +96,21 @@ pub(crate) struct ResourceMigration {
     pub(crate) target: PathBuf,
     pub(crate) mappings: Vec<ResourceMapping>,
     pub(crate) copied: Vec<PathBuf>,
+    /// 本次迁移新建的资产及创建时身份；供重写失败时按身份撤回。
+    created: Vec<(PathBuf, FileIdentity)>,
+    /// 资产目录；回滚后同步目录项。
+    asset_dir: PathBuf,
+    /// 资产目录是否由本次迁移创建；仅此类空目录可在回滚时删除。
+    created_asset_dir: bool,
+}
+
+impl ResourceMigration {
+    /// 撤回本次迁移新建且身份未变化的资产；已存在或非本次创建的不动。
+    ///
+    /// 清理失败只保留残留，不向调用方伪造成功。
+    pub(crate) fn rollback_assets(&self) {
+        rollback_assets(&self.asset_dir, &self.created, self.created_asset_dir);
+    }
 }
 
 /// 迁移失败分类；任何失败都不报告成功，已发布资产按身份撤回。
@@ -205,26 +220,33 @@ impl ResourceMigrationJob {
             ImageDirectory::Relative(dir) => parent.join(dir),
             ImageDirectory::Absolute(dir) => dir.clone(),
         };
-        ensure_asset_directory(&target_dir)?;
-        let source = self
-            .snapshot
-            .full_text(self.text_budget)
-            .map_err(|_| MigrationError::Io)?;
+        let created_asset_dir = ensure_asset_directory(&target_dir)?;
+        let source = match self.snapshot.full_text(self.text_budget) {
+            Ok(source) => source,
+            Err(_) => {
+                rollback_assets(&target_dir, &[], created_asset_dir);
+                return Err(MigrationError::Io);
+            }
+        };
         let referenced: Vec<&TempResource> = self
             .entries
             .iter()
             .filter(|entry| source.contains(&entry.locator))
             .collect();
         let discovered = if self.kind == WriteKind::SaveAs {
-            let document_dir = self
-                .current_dir
-                .as_deref()
-                .ok_or(MigrationError::InvalidTarget)?;
+            let document_dir = match self.current_dir.as_deref() {
+                Some(directory) => directory,
+                None => {
+                    rollback_assets(&target_dir, &[], created_asset_dir);
+                    return Err(MigrationError::InvalidTarget);
+                }
+            };
             discover_relative_assets(&source, document_dir, &self.settings)
         } else {
             Vec::new()
         };
         if referenced.len().saturating_add(discovered.len()) > MAX_RESOURCE_COUNT {
+            rollback_assets(&target_dir, &[], created_asset_dir);
             return Err(MigrationError::TooManyResources);
         }
         let mut created: Vec<(PathBuf, FileIdentity)> = Vec::new();
@@ -232,18 +254,21 @@ impl ResourceMigrationJob {
             match self.copy_all(&target_dir, &referenced, &discovered, &mut created) {
                 Ok(result) => result,
                 Err(error) => {
-                    rollback_assets(&target_dir, &created);
+                    rollback_assets(&target_dir, &created, created_asset_dir);
                     return Err(error);
                 }
             };
         if platform_fs::sync_directory(&target_dir).is_err() {
-            rollback_assets(&target_dir, &created);
+            rollback_assets(&target_dir, &created, created_asset_dir);
             return Err(MigrationError::Io);
         }
         Ok(ResourceMigration {
             target: self.target.clone(),
             mappings,
             copied,
+            created,
+            asset_dir: target_dir,
+            created_asset_dir,
         })
     }
 
@@ -427,8 +452,8 @@ fn longest_match(rest: &str, mappings: &[ResourceMapping]) -> Option<usize> {
     best
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
-fn ensure_asset_directory(path: &Path) -> Result<(), MigrationError> {
+/// 确保资产目录可用；返回本次是否新建该目录，供失败回滚只删本次创建的空目录。
+fn ensure_asset_directory(path: &Path) -> Result<bool, MigrationError> {
     // 目录创建同样是可观察的文件系统副作用；非 macOS 在入口处直接失败关闭。
     if !cfg!(target_os = "macos") {
         return Err(MigrationError::UnsupportedPlatform);
@@ -438,10 +463,11 @@ fn ensure_asset_directory(path: &Path) -> Result<(), MigrationError> {
             if metadata.file_type().is_symlink() || !metadata.is_dir() {
                 return Err(MigrationError::InvalidTarget);
             }
-            Ok(())
+            Ok(false)
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            fs::create_dir_all(path).map_err(|_| MigrationError::InvalidTarget)
+            fs::create_dir_all(path).map_err(|_| MigrationError::InvalidTarget)?;
+            Ok(true)
         }
         Err(_) => Err(MigrationError::InvalidTarget),
     }
@@ -565,12 +591,18 @@ fn write_asset(
     Ok(())
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
-fn rollback_assets(directory: &Path, created: &[(PathBuf, FileIdentity)]) {
+fn rollback_assets(directory: &Path, created: &[(PathBuf, FileIdentity)], remove_empty_dir: bool) {
     for (path, identity) in created {
         if platform_fs::file_identity(path).is_ok_and(|current| current == *identity) {
             let _ = fs::remove_file(path);
         }
+    }
+    // 仅本次新建且已空的目录可删除；既有或非空目录保持原状，失败只留残留。
+    if remove_empty_dir && fs::remove_dir(directory).is_ok() {
+        if let Some(parent) = directory.parent() {
+            let _ = platform_fs::sync_directory(parent);
+        }
+        return;
     }
     let _ = platform_fs::sync_directory(directory);
 }

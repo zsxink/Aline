@@ -541,6 +541,20 @@ impl StringBuffer {
         self.history.cursor()
     }
 
+    /// 返回下一次撤销将触及的源码范围并集；没有可撤销节点时为 `None`。
+    ///
+    /// 只读查询，不改文本、选区、代次或历史光标。多步节点取逆补丁范围并集。
+    pub fn undo_target_ranges(&self) -> Option<Vec<Range<usize>>> {
+        self.history.undo_target_ranges()
+    }
+
+    /// 返回下一次重做将触及的源码范围并集；没有可重做节点时为 `None`。
+    ///
+    /// 只读查询，不改文本、选区、代次或历史光标。多步节点取正补丁范围并集。
+    pub fn redo_target_ranges(&self) -> Option<Vec<Range<usize>>> {
+        self.history.redo_target_ranges()
+    }
+
     /// 判断当前是否有可撤销节点。
     pub fn can_undo(&self) -> bool {
         self.history.can_undo()

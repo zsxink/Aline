@@ -14,7 +14,10 @@ use crate::document::readonly_session::{
 #[cfg(target_os = "macos")]
 use crate::document::resources::{ImageDirectory, ImageSettings, MigrationCompletion, TempRoot};
 #[cfg(target_os = "macos")]
-use crate::document::{CloseDisposition, OpenDisposition, ReadonlyOpenLimits, ReadonlySession};
+use crate::document::{
+    CloseDisposition, EditorMode, OpenDisposition, ReadonlyOpenLimits, ReadonlySession,
+    SaveTargetCommand,
+};
 #[cfg(target_os = "macos")]
 use aline_markdown::{ParseBudget, ParseConfig};
 
@@ -2316,6 +2319,15 @@ impl ReadonlyFileAccess for BytesFiles {
 fn untitled_editable_session(
     root: Option<TempRoot>,
 ) -> Result<ReadonlySession, Box<dyn std::error::Error>> {
+    untitled_editable_session_with(b"x\n", root)
+}
+
+/// 与 `untitled_editable_session` 相同，但使用调用方给定的初始 bytes。
+#[cfg(target_os = "macos")]
+fn untitled_editable_session_with(
+    source: &[u8],
+    root: Option<TempRoot>,
+) -> Result<ReadonlySession, Box<dyn std::error::Error>> {
     let limits = ReadonlyOpenLimits::new(
         StorageBudget::new(4096),
         DocLimits::new(
@@ -2335,7 +2347,7 @@ fn untitled_editable_session(
         .ok_or("应生成打开工作")?;
     assert!(
         matches!(
-            session.accept_open(job.read_with(&BytesFiles(b"x\n".to_vec()))),
+            session.accept_open(job.read_with(&BytesFiles(source.to_vec()))),
             OpenDisposition::Applied
         ),
         "未命名可编辑文档应发布"
@@ -2681,6 +2693,191 @@ fn first_save_undoes_reference_rewrite_without_deleting_temp() -> TestResult {
     assert!(
         current_text(&mut session)?.contains("./assets/pic.png"),
         "Redo 应回到新引用"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn visual_first_save_with_two_images_rewrites_in_source_context() -> TestResult {
+    let directory = TempSaveDir::create("aline-assoc-visual-multi")?;
+    let home = directory.0.join("home");
+    let root = temp_resource_root(&home)?;
+    let target = directory.0.join("out/notes.md");
+    std::fs::create_dir_all(target.parent().ok_or("target parent")?)?;
+    let mut session = untitled_editable_session_with(b"body\n", Some(root))?;
+    let first = stage_image(&mut session, "first.png", b"first")?;
+    append_text(&mut session, &first)?;
+    let second = stage_image(&mut session, "second.png", b"second")?;
+    append_text(&mut session, &second)?;
+    assert_eq!(
+        session.document().ok_or("应存在可编辑文档")?.core().mode(),
+        EditorMode::Visual,
+        "默认视图应为 Visual"
+    );
+
+    let completion = association_copy(&mut session, WriteKind::Create, &target)?;
+    let job = association_write_job(&mut session, completion)?;
+    let settlement = run_association_write(&mut session, job)?;
+    assert!(settlement.adopted);
+    let document = session.document().ok_or("应存在可编辑文档")?;
+    assert_eq!(
+        document.core().mode(),
+        EditorMode::Visual,
+        "系统迁移不得改变用户视图"
+    );
+    let written = std::fs::read_to_string(&target)?;
+    assert!(written.contains("./assets/first.png"));
+    assert!(written.contains("./assets/second.png"));
+    assert!(!written.contains(&first));
+    assert!(!written.contains(&second));
+    let out = target.parent().ok_or("target parent")?;
+    assert!(out.join("assets/first.png").exists());
+    assert!(out.join("assets/second.png").exists());
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn visual_first_save_rewrites_front_matter_image_reference() -> TestResult {
+    let directory = TempSaveDir::create("aline-assoc-visual-front")?;
+    let home = directory.0.join("home");
+    let root = temp_resource_root(&home)?;
+    let target = directory.0.join("out/notes.md");
+    std::fs::create_dir_all(target.parent().ok_or("target parent")?)?;
+    let mut session = untitled_editable_session_with(b"---\nt: x\n---\n\nbody\n", Some(root))?;
+    let locator = stage_image(&mut session, "front.png", b"front")?;
+    {
+        let document = session.document_mut().ok_or("应存在可编辑文档")?;
+        document.switch_mode(EditorMode::Source)?;
+        let len = document.current_snapshot()?.full_text(TEXT)?.len();
+        let core = document.edit_core()?;
+        core.open_block(0..len, SelectionSpec::new(7, 7))?;
+        core.type_text(7, &locator, 1)?;
+        core.leave_block(2)?;
+        document.switch_mode(EditorMode::Visual)?;
+    }
+
+    let completion = association_copy(&mut session, WriteKind::Create, &target)?;
+    let job = association_write_job(&mut session, completion)?;
+    let settlement = run_association_write(&mut session, job)?;
+    assert!(settlement.adopted);
+    let written = std::fs::read_to_string(&target)?;
+    assert!(written.contains("./assets/front.png"));
+    assert!(!written.contains(&locator));
+    assert!(
+        target
+            .parent()
+            .ok_or("target parent")?
+            .join("assets/front.png")
+            .exists(),
+        "成功迁移必须保留资产目录与文件"
+    );
+    assert_eq!(
+        session.document().ok_or("应存在可编辑文档")?.core().mode(),
+        EditorMode::Visual
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn association_rewrite_apply_failure_rolls_back_new_assets_and_allows_retry() -> TestResult {
+    let directory = TempSaveDir::create("aline-assoc-rollback")?;
+    let home = directory.0.join("home");
+    let root = temp_resource_root(&home)?;
+    let target = directory.0.join("out/notes.md");
+    let out = target.parent().ok_or("target parent")?;
+    std::fs::create_dir_all(out)?;
+    let mut session = untitled_editable_session_with(b"body\n", Some(root))?;
+    let locator = stage_image(&mut session, "pic.png", b"png")?;
+    append_text(&mut session, &locator)?;
+    let text_before = session
+        .document()
+        .ok_or("应存在可编辑文档")?
+        .core()
+        .buffer_text()?;
+
+    let completion = association_copy(&mut session, WriteKind::Create, &target)?;
+    // 复制已成功；开启组合使应用阶段以 CompositionActive 拒绝。
+    {
+        let document = session.document_mut().ok_or("应存在可编辑文档")?;
+        let len = document.current_snapshot()?.full_text(TEXT)?.len();
+        let core = document.edit_core()?;
+        core.open_block(0..len, SelectionSpec::new(0, 0))?;
+        core.composition_start("中", 2)?;
+    }
+    match session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .association_prepared(completion, 3)
+    {
+        AssociationStep::Settled(AssociationOutcome::NeedsRetry) => {}
+        _ => return Err("应用失败应结算为 NeedsRetry".into()),
+    }
+    assert!(
+        !out.join("assets/pic.png").exists(),
+        "失败后本次新建资产必须撤回"
+    );
+    assert!(
+        !out.join("assets").exists(),
+        "失败后本次新建的空资产目录也必须删除"
+    );
+    assert_eq!(
+        session.document().ok_or("应存在可编辑文档")?.core().mode(),
+        EditorMode::Visual,
+        "迁移失败不得改变用户视图"
+    );
+    assert_eq!(
+        session
+            .document()
+            .ok_or("应存在可编辑文档")?
+            .core()
+            .buffer_text()?,
+        text_before,
+        "失败后文档 bytes 不得改变"
+    );
+    assert!(
+        matches!(
+            session
+                .document_mut()
+                .ok_or("应存在可编辑文档")?
+                .request_save_or_target(),
+            SaveTargetCommand::RetryAssociation
+        ),
+        "失败后保存必须直接重试同一目标，不得重新选择"
+    );
+    {
+        let core = session
+            .document_mut()
+            .ok_or("应存在可编辑文档")?
+            .edit_core()?;
+        core.composition_cancel(4)?;
+        core.leave_block(5)?;
+    }
+
+    // 同一目标重试：走 `retry_association` 重新迁移并成功写盘，不再重新选路径。
+    let retry = session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .retry_association()
+        .map_err(|rejection| format!("重试被拒: {rejection:?}"))?;
+    let job = match retry {
+        AssociationStep::Run(job) => job,
+        _ => return Err("引用仍含 locator 时应重新迁移".into()),
+    };
+    let completion = job.run();
+    let job = association_write_job(&mut session, completion)?;
+    let settlement = run_association_write(&mut session, job)?;
+    assert!(settlement.adopted);
+    let written = std::fs::read_to_string(&target)?;
+    assert!(written.contains("./assets/pic.png"));
+    assert!(!written.contains(&locator));
+    assert!(out.join("assets/pic.png").exists());
+    assert_eq!(
+        session.document().ok_or("应存在可编辑文档")?.core().mode(),
+        EditorMode::Visual,
+        "重试成功后用户视图仍为 Visual"
     );
     Ok(())
 }

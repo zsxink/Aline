@@ -272,18 +272,29 @@ pub fn create_staging(directory: &Path, prefix: &str, bytes: &[u8]) -> Result<St
                 .open(&candidate)
             {
                 Ok(mut file) => {
-                    file.write_all(bytes)
-                        .map_err(|error| map_io(FsOperation::CreateStaging, &error))?;
-                    file.sync_all()
-                        .map_err(|error| map_io(FsOperation::CreateStaging, &error))?;
-                    let metadata = file
-                        .metadata()
-                        .map_err(|error| map_io(FsOperation::Metadata, &error))?;
-                    return Ok(StagedFile {
-                        path: candidate,
-                        identity: identity_of(&metadata),
-                        len_bytes: bytes.len() as u64,
-                    });
+                    // 写入/同步/取元数据任一失败时尽力删除本次创建的 staging，
+                    // 不给后续发布留下无主半成品。
+                    let staged = (|| -> Result<StagedFile, FsError> {
+                        file.write_all(bytes)
+                            .map_err(|error| map_io(FsOperation::CreateStaging, &error))?;
+                        file.sync_all()
+                            .map_err(|error| map_io(FsOperation::CreateStaging, &error))?;
+                        let metadata = file
+                            .metadata()
+                            .map_err(|error| map_io(FsOperation::Metadata, &error))?;
+                        Ok(StagedFile {
+                            path: candidate.clone(),
+                            identity: identity_of(&metadata),
+                            len_bytes: bytes.len() as u64,
+                        })
+                    })();
+                    match staged {
+                        Ok(staged) => return Ok(staged),
+                        Err(error) => {
+                            let _ = fs::remove_file(&candidate);
+                            return Err(error);
+                        }
+                    }
                 }
                 Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
                 Err(error) => return Err(map_io(FsOperation::CreateStaging, &error)),

@@ -187,11 +187,6 @@ impl ResourceCatalog {
         &self.entries
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn get(&self, locator: &str) -> Option<&TempResource> {
-        self.entries.iter().find(|entry| entry.locator == locator)
-    }
-
     pub(crate) fn remove(&mut self, id: TempResourceId) -> Option<TempResource> {
         let index = self.entries.iter().position(|entry| entry.id == id)?;
         Some(self.entries.remove(index))
@@ -213,14 +208,8 @@ impl ResourceCatalog {
         self.temp_document
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn is_empty(&self) -> bool {
-        self.entries.is_empty()
-    }
-
     /// 恢复专用：后台任务已把内嵌资源按原 locator 写回临时根，本方法只复验
     /// 目录与文件并建立条目，不写盘、不改动既有文件内容。
-    #[allow(dead_code)]
     pub(crate) fn restore(
         document: DocumentId,
         root: &TempRoot,
@@ -280,6 +269,78 @@ impl ResourceCatalog {
     }
 }
 
+/// 恢复物化结果与未采纳时的清理句柄；成功采纳后由 [`Self::adopt`] 转移所有权。
+#[derive(Debug)]
+pub(crate) struct MaterializedRecovery {
+    temp_document: TempDocumentId,
+    root: PathBuf,
+    directory: PathBuf,
+    created_files: Vec<(PathBuf, platform_fs::FileIdentity)>,
+    created_directory: bool,
+    adopted: bool,
+}
+
+impl MaterializedRecovery {
+    /// 返回物化的临时文档身份。
+    pub(crate) const fn temp_document(&self) -> TempDocumentId {
+        self.temp_document
+    }
+
+    /// 采纳本次物化结果；此后 Drop 不再清理材料。
+    pub(crate) fn adopt(mut self) -> TempDocumentId {
+        self.adopted = true;
+        self.temp_document
+    }
+
+    /// 删除本次新建且身份未变化的文件；目录仅在本次创建时尝试删除。
+    ///
+    /// 已存在或非本次创建的材料保持不动；清理失败返回错误供调用方记录。
+    pub(crate) fn cleanup(&mut self) -> Result<(), ResourceError> {
+        #[cfg(target_os = "macos")]
+        {
+            for (path, identity) in &self.created_files {
+                if platform_fs::file_identity(path).is_ok_and(|current| current == *identity) {
+                    fs::remove_file(path).map_err(|_| ResourceError::Io)?;
+                }
+            }
+            platform_fs::sync_directory(&self.directory).map_err(map_fs)?;
+            if self.created_directory {
+                match fs::remove_dir(&self.directory) {
+                    Ok(()) => {
+                        let _ = platform_fs::sync_directory(&self.root);
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(_) => return Err(ResourceError::Io),
+                }
+            }
+            self.created_files.clear();
+            Ok(())
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = (
+                &self.root,
+                &self.directory,
+                &self.created_files,
+                self.created_directory,
+            );
+            Err(ResourceError::UnsupportedPlatform)
+        }
+    }
+}
+
+impl Drop for MaterializedRecovery {
+    fn drop(&mut self) {
+        if self.adopted {
+            return;
+        }
+        if let Err(error) = self.cleanup() {
+            // 清理失败只记录；不得 panic，也不得影响窗口关闭路径。
+            eprintln!("w4-recovery-temp-cleanup failed: {error:?}");
+        }
+    }
+}
+
 /// 恢复专用：把恢复记录内嵌的资源按原 locator 写回临时根。所有引用必须指向
 /// 同一临时文档；目录与文件都是 create-only，既有同名字节相同才复用。
 #[cfg_attr(not(test), allow(dead_code))]
@@ -287,6 +348,15 @@ pub(crate) fn materialize_recovered(
     root: &TempRoot,
     resources: &[RecoveredResource],
 ) -> Result<TempDocumentId, ResourceError> {
+    materialize_recovered_owned(root, resources).map(MaterializedRecovery::adopt)
+}
+
+/// 与 [`materialize_recovered`] 相同，但返回可清理句柄；未采纳时由 Drop 兜底清理。
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) fn materialize_recovered_owned(
+    root: &TempRoot,
+    resources: &[RecoveredResource],
+) -> Result<MaterializedRecovery, ResourceError> {
     #[cfg(target_os = "macos")]
     {
         if resources.is_empty() || resources.len() > MAX_RESOURCE_COUNT {
@@ -313,11 +383,15 @@ pub(crate) fn materialize_recovered(
         let document = document.ok_or(ResourceError::WrongDocument)?;
         let temp_document = TempDocumentId::from_raw(document);
         let directory = root.path().join(temp_document.directory_name());
+        let mut created_directory = false;
         if directory.try_exists().map_err(|_| ResourceError::Io)? {
             verify_document_directory(&directory, root.owner_uid())?;
         } else {
             match platform_fs::create_directory_exclusive(&directory) {
-                Ok(_) => platform_fs::sync_directory(root.path()).map_err(map_fs)?,
+                Ok(_) => {
+                    created_directory = true;
+                    platform_fs::sync_directory(root.path()).map_err(map_fs)?;
+                }
                 Err(FsError::AlreadyExists) => {}
                 Err(error) => return Err(map_fs(error)),
             }
@@ -386,7 +460,14 @@ pub(crate) fn materialize_recovered(
             }
         }
         platform_fs::sync_directory(&directory).map_err(map_fs)?;
-        Ok(temp_document)
+        Ok(MaterializedRecovery {
+            temp_document,
+            root: root.path().to_path_buf(),
+            directory,
+            created_files: created,
+            created_directory,
+            adopted: false,
+        })
     }
     #[cfg(not(target_os = "macos"))]
     {

@@ -36,6 +36,9 @@ pub use publication::{
 };
 pub use snapshot::CurrentSnapshot;
 
+/// 恢复打开失败分类仅由 crate 内测试断言 Busy/DocumentOpen；生产路径只取失败。
+#[cfg(test)]
+pub(crate) use readonly_session::RecoveredOpenError;
 pub(crate) use readonly_session::{AutosaveAction, OpenTimings, StageTimer, StageTiming};
 pub(crate) use statistics::DocumentStatistics;
 
@@ -66,6 +69,9 @@ pub(crate) use persistence::{
 pub(crate) use readonly_session::{
     AssociationCommand, AssociationOutcome, AssociationStep, SaveTargetCommand,
 };
+/// 图片目录设置的失败分类只由只读会话测试入口使用。
+#[cfg(test)]
+pub(crate) use resources::ImageSettingsError;
 /// 4.2b 窗口与恢复接线将消费的资源面；接线前仅由 crate 内测试命名。
 #[allow(unused_imports)]
 pub(crate) use resources::{
@@ -75,9 +81,8 @@ pub(crate) use resources::{
 };
 /// 4.2a 会话已消费的资源面；从这里导入避免会话与资源模块直接耦合。
 pub(crate) use resources::{
-    ImageSettings, ImageSettingsError, MigrationCompletion, MigrationError, ResourceCatalog,
-    ResourceCleanupJob, ResourceError, ResourceMapping, ResourceMigrationJob, TempRoot,
-    locator_spans,
+    ImageSettings, MigrationCompletion, MigrationError, ResourceCatalog, ResourceCleanupJob,
+    ResourceError, ResourceMapping, ResourceMigrationJob, TempRoot, locator_spans,
 };
 
 pub use mode::{EditorMode, ModeSwitchOutcome};

@@ -13,10 +13,12 @@ pub(crate) const TEMPORARY_DIR: &str = "temporary";
 #[cfg_attr(not(test), allow(dead_code))]
 const MAX_ALLOCATION_ATTEMPTS: u32 = 8;
 
-/// 由 HOME 推导默认临时根；不访问磁盘。
-#[allow(dead_code)]
+/// 由 HOME 推导默认临时根；不访问磁盘。非 macOS 不创建临时根，
+/// 该推导仅在 macOS 装配与测试中使用。
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub(crate) fn default_temp_root(home: &Path) -> PathBuf {
-    home.join("Library/Application Support/Aline/temporary")
+    home.join("Library/Application Support/Aline")
+        .join(TEMPORARY_DIR)
 }
 
 /// 临时文档目录身份；只由分配结果或恢复材料解析得到。
@@ -95,7 +97,7 @@ impl TempRoot {
             }
             let app = base.join("Aline");
             create_or_verify(&app, owner_uid)?;
-            let temporary = app.join(TEMPORARY_DIR);
+            let temporary = default_temp_root(home);
             create_or_verify(&temporary, owner_uid)?;
             Ok(Self {
                 path: temporary,

@@ -153,6 +153,7 @@ impl DocCore {
 
     /// 恢复保护独立读取当前输入（含组合候选），不发起显式发布等待。
     /// 只读阶段返回 ReadOnly，普通阅读仍可使用 current_snapshot。
+    /// 生产恢复走协调器快照；本方法仅由集成测试使用（测试专用 API）。
     pub fn recovery_snapshot(&mut self, budget: TextBudget) -> Result<CurrentSnapshot, DocError> {
         self.ensure_writable()?;
         self.current_snapshot(budget)
