@@ -457,6 +457,46 @@ mod tests {
     }
 
     #[test]
+    fn visual_click_on_same_or_other_block_waits_for_platform_composition()
+    -> Result<(), Box<dyn Error>> {
+        // 这是 `open_visual_at` 的文档层 API 契约测试，不证明窗口点击路径可达：
+        // 窗口在组合期不刷新解析，因此也不会挂载行级命中回调。此处显式
+        // `refresh` 只为构造可调用 `open_visual_at` 的文档状态。
+        let mut session = open("abc\n\nxyz", ParseBudget::m0())?;
+        let doc = session.document_mut().ok_or("missing document")?;
+        open_first_block(doc)?;
+        doc.core.composition_start("候", 1)?;
+        refresh(&mut session)?;
+        let doc = session.document_mut().ok_or("missing document")?;
+        let before = retarget_state(doc)?;
+
+        // 同块点击在 `open_visual_at` 内走 `core.select`；跨块走 `retarget_visual`。
+        // 两条路径都必须在组合活动时拒绝，且不推进版本、选区、草稿、候选或历史。
+        let same = caret(doc, 1)?;
+        assert!(matches!(
+            doc.open_visual_at(&before.identity, &same),
+            Err(DocError::CompositionActive)
+        ));
+        assert_eq!(retarget_state(doc)?, before);
+        assert_eq!(
+            doc.core.composition().ok_or("composition")?.candidate(),
+            "候"
+        );
+
+        let other = caret(doc, 8)?;
+        assert!(matches!(
+            doc.open_visual_at(&before.identity, &other),
+            Err(DocError::CompositionActive)
+        ));
+        assert_eq!(retarget_state(doc)?, before);
+        assert_eq!(
+            doc.core.composition().ok_or("composition")?.candidate(),
+            "候"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn refresh_keeps_last_view_after_hard_parse_error_and_stale_edit() -> Result<(), Box<dyn Error>>
     {
         let mut session = open("ab", ParseBudget::m0().with_max_source_bytes(4))?;

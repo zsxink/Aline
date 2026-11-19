@@ -47,7 +47,7 @@ use aline_buffer::{HistoryBudget, LineIndexBudget, TextBudget};
 use aline_markdown::{DiagnosticKind, ParseBudget, ParseConfig, Parsed};
 use aline_source::StorageBudget;
 use gpui::{
-    App, Bounds, Context, Entity, FocusHandle, Image, KeyBinding, Menu, MenuItem,
+    App, Bounds, Context, Entity, FocusHandle, Image, KeyBinding, Menu, MenuItem, MouseButton,
     PathPromptOptions, Role, SharedString, Subscription, Task, Window, WindowBounds, WindowOptions,
     div, prelude::*, px, rgb, rgba, size,
 };
@@ -2586,6 +2586,9 @@ impl NativeDocumentWindow {
         let Some(document) = self.state.session.document_mut() else {
             return div().into_any_element();
         };
+        // 组合活动时解析身份必然失效，行级 `HitTarget` 创建失败，reader 不会挂
+        // 命中回调；因此反馈必须在本层行容器上给出。
+        let composing = document.core().composition().is_some();
         if document.is_editable()
             && let Some(range) = reader.input_row(document, row)
             && let Some(site) =
@@ -2594,6 +2597,7 @@ impl NativeDocumentWindow {
                 editable_input::render(document, site, self.focus.clone(), cx)
         {
             self.input_frame = Some(frame);
+            // 输入行由编辑框自行处理组合与点击，不套阅读行守卫。
             return reader.wrap_input_row(row, input);
         }
         let failure = self
@@ -2602,22 +2606,42 @@ impl NativeDocumentWindow {
             .get("reading.layout_budget")
             .cloned()
             .unwrap_or_default();
-        let weak = cx.entity().downgrade();
-        let navigate = cx.entity().downgrade();
-        reader.render_row(
-            document,
-            row,
-            failure,
-            &self.copy.content,
-            move |target, candidate, prepared, _, cx| {
-                let _ = weak.update(cx, |this, cx| {
-                    this.accept_reading_hit(target, candidate, prepared, cx)
-                });
-            },
-            move |target, _, cx| {
-                let _ = navigate.update(cx, |this, cx| this.navigate_to_source(target, cx));
-            },
-        )
+        // 普通行、虚拟列表行与源码行统一经 `render_row` 产出；闭包只持有弱实体，
+        // 不借用 `self.reader` / `document` / `self.copy`。
+        let element = {
+            let weak = cx.entity().downgrade();
+            let navigate = cx.entity().downgrade();
+            reader.render_row(
+                document,
+                row,
+                failure,
+                &self.copy.content,
+                move |target, candidate, prepared, _, cx| {
+                    let _ = weak.update(cx, |this, cx| {
+                        this.accept_reading_hit(target, candidate, prepared, cx)
+                    });
+                },
+                move |target, _, cx| {
+                    let _ = navigate.update(cx, |this, cx| this.navigate_to_source(target, cx));
+                },
+            )
+        };
+        if composing {
+            // 组合期间行容器兜底：只给既有组合待定反馈，不记录 hit、不滚动、
+            // 不改选区、不结束组合，避免跨块点击无声无息。
+            let dismiss = cx.entity().downgrade();
+            return div()
+                .w_full()
+                .on_mouse_down(MouseButton::Left, move |_, _, cx| {
+                    let _ = dismiss.update(cx, |this, cx| {
+                        this.state.feedback = Some("document.composition_pending");
+                        cx.notify();
+                    });
+                })
+                .child(element)
+                .into_any_element();
+        }
+        element
     }
 
     /// 目录与脚注跳转：先写入只读导航锚点，再把目标行滚到顶部。
@@ -2673,6 +2697,14 @@ impl NativeDocumentWindow {
         let Some(document) = self.state.session.document_mut() else {
             return;
         };
+        // 设计决定 3：组合活动时先等平台自然结束。组合态主要由行容器守卫；
+        // 此处兜底旧帧竞态（组合开始后、下一次重绘前，旧元素仍持有命中回调）。
+        // 只给反馈，不记录 hit、不滚动、不改选区、不结束组合。
+        if document.core().composition().is_some() {
+            self.state.feedback = Some("document.composition_pending");
+            cx.notify();
+            return;
+        }
         let expected_edge = candidate
             .as_ref()
             .ok()
@@ -2705,6 +2737,8 @@ impl NativeDocumentWindow {
                     })();
                     if let Ok(selection) = mapped
                         && let Ok(identity) = document.input_identity()
+                        // 进入本分支时前面的组合守卫已确认无组合，同步执行期间
+                        // 组合状态不会变化，因此这里不会返回 `CompositionActive`。
                         && document.open_visual_at(&identity, &selection).is_ok()
                     {
                         cx.notify();

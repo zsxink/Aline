@@ -179,6 +179,30 @@ fn native_confirmation_preserves_cancelled_publication_request_and_commits_input
 }
 
 #[test]
+fn late_native_candidate_and_confirmation_after_cancel_are_stale_without_side_effects() -> TestResult
+{
+    let mut doc = document("ab", SelectionSpec::new(1, 1))?;
+    let identity = doc.current_input_identity()?;
+    doc.update_native_candidate(&identity, "候", None, 1)?;
+    doc.composition_cancel(2)?;
+    let cancelled = state(&doc)?;
+    assert!(doc.composition().is_none());
+
+    // 取消后迟到的平台更新/确认携带旧身份，必须拒绝且不复活旧候选。
+    assert!(matches!(
+        doc.update_native_candidate(&identity, "迟到", None, 3),
+        Err(DocError::StaleResult)
+    ));
+    assert_eq!(state(&doc)?, cancelled);
+    assert!(matches!(
+        doc.prepare_native_confirmation(&identity, Some("迟到"), 4),
+        Err(DocError::StaleResult)
+    ));
+    assert_eq!(state(&doc)?, cancelled);
+    Ok(())
+}
+
+#[test]
 fn native_preparation_refuses_other_document_or_changed_selection() -> TestResult {
     let start = SelectionSpec::new(0, 1);
     let mut doc = document("ab", start)?;
