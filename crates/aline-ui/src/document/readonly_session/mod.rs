@@ -445,8 +445,22 @@ impl ReadonlyDocument {
         Ok(entry.reference)
     }
 
+    /// 首次保存是否必须先选择目标：可编辑、无关联、无待迁移且未挂接持久化。
+    ///
+    /// 只读查询，不推进版本、选区、草稿或历史；调用方仅在 macOS 的
+    /// `native_window` 编译（窗口据此在组合期拒绝打开原生目标选择器）。
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    pub(crate) fn save_target_required(&self) -> bool {
+        self.editable
+            && self.association.is_none()
+            && self.pending_migration.is_none()
+            && self.persistence.is_none()
+    }
+
     /// 首次保存/另存为入口：迁移意图优先重试；已有目标直接保存；无目标要求选择。
-    #[allow(dead_code)]
+    ///
+    /// 调用方仅在 macOS 的 `native_window` 编译。
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     pub(crate) fn request_save_or_target(&mut self) -> SaveTargetCommand {
         if self.association.is_some() {
             return SaveTargetCommand::Save(SaveCommand::Rejected(SaveRejection::Busy));
@@ -466,7 +480,9 @@ impl ReadonlyDocument {
     }
 
     /// 另存为总是先请宿主选择目标；选定后交给 `begin_association_save`。
-    #[allow(dead_code)]
+    ///
+    /// 调用方仅在 macOS 的 `native_window` 编译。
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     pub(crate) fn request_save_as_target(&mut self) -> SaveTargetCommand {
         if self.association.is_some() {
             return SaveTargetCommand::Save(SaveCommand::Rejected(SaveRejection::Busy));

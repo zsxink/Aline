@@ -792,9 +792,9 @@ fn window_natural_platform_finish_saves_latest_snapshot() -> Result<(), Box<dyn 
                 }
             }
         }
-        let job = state
-            .finish_save_wait(outcome, 3)
-            .ok_or("平台自然结束应继续保存")?;
+        let Some(super::SaveIntent::Save(job)) = state.finish_save_wait_intent(outcome, 3) else {
+            return Err("平台自然结束应继续保存".into());
+        };
         let completion = job.run();
         assert_eq!(
             state.settle_save(completion).feedback,
@@ -802,7 +802,7 @@ fn window_natural_platform_finish_saves_latest_snapshot() -> Result<(), Box<dyn 
         );
         assert_eq!(fs::read(&target)?, expected);
         assert!(
-            state.finish_save_wait(outcome, 4).is_none(),
+            state.finish_save_wait_intent(outcome, 4).is_none(),
             "等待句柄不得复用"
         );
     }
@@ -1707,6 +1707,116 @@ fn untitled_save_action_requests_target_instead_of_no_target() -> Result<(), Box
     ));
     assert!(state.feedback_key().is_none());
     assert!(matches!(state.save_host, super::SaveHost::Idle));
+    Ok(())
+}
+
+#[test]
+fn non_composing_save_entries_keep_their_target_selection() -> Result<(), Box<dyn Error>> {
+    let mut state = super::NativeOpenCoordinator::new(coordinator_limits(true));
+    open_synthetic_recovered(&mut state, "x\n")?;
+    assert!(matches!(
+        state.request_save_intent(),
+        Some(super::SaveIntent::ChooseTarget(WriteKind::Create))
+    ));
+    assert!(state.feedback_key().is_none());
+    assert!(matches!(state.save_host, super::SaveHost::Idle));
+    assert!(matches!(
+        state.request_save_as_intent(),
+        Some(super::SaveIntent::ChooseTarget(WriteKind::SaveAs))
+    ));
+    assert!(state.feedback_key().is_none());
+    assert!(matches!(state.save_host, super::SaveHost::Idle));
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn composing_untitled_save_intent_rejects_target_selection_without_side_effects()
+-> Result<(), Box<dyn Error>> {
+    let mut state = super::NativeOpenCoordinator::new(coordinator_limits(true));
+    open_synthetic_recovered(&mut state, "x\n")?;
+    {
+        let document = state.session.document_mut().ok_or("应存在可编辑文档")?;
+        let len = document.baseline().source().len();
+        let core = document.edit_core()?;
+        core.open_block(0..len, SelectionSpec::new(0, 0))?;
+        core.composition_start("候", 0)?;
+    }
+
+    assert!(state.save_as_enabled(), "组合期菜单保持可用，点击后给反馈");
+    assert!(
+        state.request_save_intent().is_none(),
+        "无目标首次保存在组合期不得打开选择器"
+    );
+    assert_eq!(state.feedback_key(), Some("document.composition_pending"));
+    assert!(
+        matches!(state.save_host, super::SaveHost::Idle),
+        "拒绝不得建立等待句柄"
+    );
+    assert!(!state.save_waiting());
+    let document = state.session.document().ok_or("应存在文档")?;
+    assert!(document.core().composition().is_some(), "拒绝不得结束组合");
+    assert!(
+        !document.association_active(),
+        "拒绝不得产生关联或迁移副作用"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn composing_save_as_intent_rejects_target_selection_without_side_effects()
+-> Result<(), Box<dyn Error>> {
+    let mut state = super::NativeOpenCoordinator::new(coordinator_limits(true));
+    open_synthetic_recovered(&mut state, "x\n")?;
+    {
+        let document = state.session.document_mut().ok_or("应存在可编辑文档")?;
+        let len = document.baseline().source().len();
+        let core = document.edit_core()?;
+        core.open_block(0..len, SelectionSpec::new(0, 0))?;
+        core.composition_start("候", 0)?;
+    }
+
+    assert!(state.save_as_enabled(), "组合期另存为菜单仍可用");
+    assert!(
+        state.request_save_as_intent().is_none(),
+        "组合期另存为不得打开原生选择器"
+    );
+    assert_eq!(state.feedback_key(), Some("document.composition_pending"));
+    assert!(matches!(state.save_host, super::SaveHost::Idle));
+    assert!(!state.save_waiting());
+    let document = state.session.document().ok_or("应存在文档")?;
+    assert!(document.core().composition().is_some());
+    assert!(!document.association_active());
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn composing_save_intent_with_target_still_waits_for_natural_end() -> Result<(), Box<dyn Error>> {
+    use std::fs;
+
+    let directory = WindowSaveDir::create("aline-composing-save-target")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    open_window_document(&mut state, &target, b"x\n")?;
+    open_window_block(&mut state, SelectionSpec::new(0, 1))?;
+    state
+        .session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .composition_start("候", 0)?;
+
+    assert!(
+        state.request_save_intent().is_none(),
+        "已有目标的保存在组合期仍转入等待"
+    );
+    assert!(matches!(state.save_host, super::SaveHost::Waiting(_)));
+    assert!(state.save_waiting());
+    assert_eq!(state.feedback_key(), Some("document.save_waiting"));
+    assert_eq!(fs::read(&target)?, b"x\n", "等待不得提前写盘");
     Ok(())
 }
 

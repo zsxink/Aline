@@ -197,6 +197,64 @@ fn marked_cancel_restores_selection_and_failed_confirmation_keeps_mark() -> Test
 }
 
 #[test]
+fn input_recovery_rejects_stale_platform_coordinates_and_rebinds_commands() {
+    // 携带平台 UTF-16 坐标的意图：旧帧不可消费时必须拒收，不能换投影解释。
+    let platform = [
+        InputIntent::Replace(None, "x".to_owned()),
+        InputIntent::Replace(Some(0..1), "x".to_owned()),
+        InputIntent::Mark(None, "n".to_owned(), None),
+        InputIntent::Mark(Some(0..1), "n".to_owned(), Some(1..1)),
+        InputIntent::Select(0..1),
+    ];
+    for intent in &platform {
+        assert_eq!(
+            input_recovery(true, intent),
+            InputRecovery::Proceed,
+            "可消费帧上的平台意图应直接提交"
+        );
+        assert_eq!(
+            input_recovery(false, intent),
+            InputRecovery::Reject,
+            "过期帧上的平台坐标意图必须静默拒收"
+        );
+    }
+    // 只携带语义的命令：过期后按最新状态重建，排队输入继续按序应用。
+    let commands = [
+        InputIntent::LineBreak,
+        InputIntent::Delete {
+            forward: true,
+            count: 1,
+        },
+        InputIntent::Delete {
+            forward: false,
+            count: 2,
+        },
+        InputIntent::Move {
+            forward: true,
+            extend: false,
+        },
+        InputIntent::Move {
+            forward: false,
+            extend: true,
+        },
+        InputIntent::Paste("p".to_owned()),
+        InputIntent::Escape,
+    ];
+    for intent in &commands {
+        assert_eq!(
+            input_recovery(true, intent),
+            InputRecovery::Proceed,
+            "可消费帧上的命令应直接提交"
+        );
+        assert_eq!(
+            input_recovery(false, intent),
+            InputRecovery::Rebind,
+            "过期帧上的命令应重建后继续"
+        );
+    }
+}
+
+#[test]
 fn same_version_source_retarget_invalidates_queries_and_writes_for_old_row() -> TestResult {
     let mut state = session("ab\ncd", HistoryBudget::new(8, 4096), EditorMode::Source)?;
     let doc = state.document_mut().ok_or("没有文档")?;
@@ -423,6 +481,97 @@ fn line_break_and_following_input_share_the_source_site_until_commit() -> TestRe
     doc.edit_core()?.escape(2)?;
     assert_eq!(doc.core().buffer_text()?, "a\n中b\ncd");
     assert_eq!(doc.core().history_node_count(), 1);
+    Ok(())
+}
+
+#[test]
+fn source_rebound_relocates_to_the_same_line_after_an_earlier_length_change() -> TestResult {
+    let mut state = session("a\nb\nc", HistoryBudget::new(8, 4096), EditorMode::Source)?;
+    let doc = state.document_mut().ok_or("没有文档")?;
+    // 在 c 行首打开块，并把该行绑定为输入站点。
+    let len = doc.current_snapshot()?.len_bytes();
+    doc.edit_core()?
+        .open_block(0..len, SelectionSpec::new(4, 4))?;
+    let current = doc.current_snapshot()?;
+    let row = current.text().src_range(4..5)?;
+    let site = InputSite::for_row(doc, row, None).ok_or("没有当前输入行")?;
+    let initial = InputView::new(doc, site).ok_or("没有正文输入投影")?;
+
+    // 显式编辑：在 c 行之前插入一个字符并提交，长度 +1、行数不变。
+    doc.edit_core()?.type_text(0, "x", 0)?;
+    assert!(matches!(
+        doc.edit_core()?.commit_open_block(1)?,
+        CommitOutcome::Committed { .. }
+    ));
+    assert_eq!(doc.current_snapshot()?.full_text(TEXT)?, "xa\nb\nc");
+    // 光标随内容平移到新 c 行首（5），再重建输入站点。
+    let identity = doc.input_identity()?;
+    let head = doc.current_snapshot()?.text().src_offset(5)?;
+    doc.edit_core()?
+        .select(&identity, &SrcSelection::new(head.clone(), head)?)?;
+
+    let rebound = initial.site.rebound(doc).ok_or("应能重建到同一逻辑行")?;
+    assert_eq!(rebound.source, 5..6, "重建必须指向 c 行而不是旧偏移");
+    let resumed = InputView::new(doc, rebound).ok_or("没有重建后的投影")?;
+    apply(doc, &resumed, InputIntent::Replace(None, "X".to_owned()))?;
+    assert_eq!(
+        doc.current_snapshot()?.full_text(TEXT)?,
+        "xa\nb\nXc",
+        "排队按键必须写入同一逻辑行"
+    );
+    Ok(())
+}
+
+#[test]
+fn source_rebound_refuses_a_line_merged_into_the_previous_one() -> TestResult {
+    let mut state = session("a\nb\nc", HistoryBudget::new(8, 4096), EditorMode::Source)?;
+    let doc = state.document_mut().ok_or("没有文档")?;
+    let len = doc.current_snapshot()?.len_bytes();
+    doc.edit_core()?
+        .open_block(0..len, SelectionSpec::new(4, 4))?;
+    let current = doc.current_snapshot()?;
+    let row = current.text().src_range(4..5)?;
+    let site = InputSite::for_row(doc, row, None).ok_or("没有当前输入行")?;
+    let initial = InputView::new(doc, site).ok_or("没有正文输入投影")?;
+
+    // 显式编辑：删除 b 与 c 之间的换行，c 行被并入 b 行，光标留在合并点。
+    let identity = doc.input_identity()?;
+    let anchor = current.text().src_offset(3)?;
+    let head = current.text().src_offset(4)?;
+    doc.edit_core()?
+        .select(&identity, &SrcSelection::new(anchor, head)?)?;
+    doc.edit_core()?.replace_selection(&identity, "", 1)?;
+    assert_eq!(doc.current_snapshot()?.full_text(TEXT)?, "a\nbc");
+
+    assert!(
+        initial.site.rebound(doc).is_none(),
+        "原输入行已被并入更早的行，无法证明时不得把排队输入写到新偏移"
+    );
+    Ok(())
+}
+
+#[test]
+fn source_rebound_refuses_a_selection_outside_the_logical_line() -> TestResult {
+    let mut state = session("a\nb\nc", HistoryBudget::new(8, 4096), EditorMode::Source)?;
+    let doc = state.document_mut().ok_or("没有文档")?;
+    let len = doc.current_snapshot()?.len_bytes();
+    doc.edit_core()?
+        .open_block(0..len, SelectionSpec::new(4, 4))?;
+    let current = doc.current_snapshot()?;
+    let row = current.text().src_range(4..5)?;
+    let site = InputSite::for_row(doc, row, None).ok_or("没有当前输入行")?;
+    let initial = InputView::new(doc, site).ok_or("没有正文输入投影")?;
+
+    // 边界仍成立，但选区跨出该行；单一逻辑行不能被证明为输入站点。
+    let identity = doc.input_identity()?;
+    let anchor = current.text().src_offset(1)?;
+    let head = current.text().src_offset(4)?;
+    doc.edit_core()?
+        .select(&identity, &SrcSelection::new(anchor, head)?)?;
+    assert!(
+        initial.site.rebound(doc).is_none(),
+        "选区跨行时不得把该行继续当作输入站点"
+    );
     Ok(())
 }
 

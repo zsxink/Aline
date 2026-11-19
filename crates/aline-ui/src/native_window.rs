@@ -330,22 +330,6 @@ impl NativeOpenCoordinator {
         }
     }
 
-    /// 平台自然结束；返回 Some(job) 时窗口负责后台执行。反馈已设置。
-    ///
-    /// 生产路径由 `settle_after_input` 调用 `finish_save_wait_intent`；本入口
-    /// 仍只由 crate 测试直接调用，故保留测试外 dead-code 豁免。
-    #[cfg_attr(not(test), allow(dead_code))]
-    pub(super) fn finish_save_wait(
-        &mut self,
-        outcome: PublicationOutcome,
-        now_millis: u64,
-    ) -> Option<SaveJob> {
-        match self.finish_save_wait_intent(outcome, now_millis) {
-            Some(SaveIntent::Save(job)) => Some(job),
-            Some(SaveIntent::Migrate(_)) | Some(SaveIntent::ChooseTarget(_)) | None => None,
-        }
-    }
-
     /// 平台自然结束后按意图返回；关联等待可转入迁移任务。
     pub(super) fn finish_save_wait_intent(
         &mut self,
@@ -562,6 +546,10 @@ impl NativeOpenCoordinator {
     }
 
     /// 手工保存入口：无目标时请求选择器，待重试迁移优先重试。
+    ///
+    /// 组合未结束时，无目标的首次保存会进入目标选择；原生面板可能夺取焦点并
+    /// 打断组合。按设计决定 3 保留上下文并拒绝目标动作：只设反馈，不建等待句柄、
+    /// 不开对话框，也不产生文档副作用。已有目标的保存仍走等待路径。
     pub(super) fn request_save_intent(&mut self) -> Option<SaveIntent> {
         if !matches!(self.save_host, SaveHost::Idle) {
             self.feedback = Some("document.save_busy");
@@ -571,11 +559,18 @@ impl NativeOpenCoordinator {
             self.feedback = Some("document.save_unavailable");
             return None;
         };
+        if document.core().composition().is_some() && document.save_target_required() {
+            self.feedback = Some("document.composition_pending");
+            return None;
+        }
         let command = document.request_save_or_target();
         self.apply_save_target_command(command)
     }
 
     /// 另存为入口：总是先请求新目标。
+    ///
+    /// 组合未结束时直接拒绝：另存为必然打开原生目标选择器，理由同
+    /// `request_save_intent`；`save_as_enabled` 保持菜单可用，点击后给反馈。
     pub(super) fn request_save_as_intent(&mut self) -> Option<SaveIntent> {
         if !matches!(self.save_host, SaveHost::Idle) {
             self.feedback = Some("document.save_busy");
@@ -585,6 +580,10 @@ impl NativeOpenCoordinator {
             self.feedback = Some("document.save_unavailable");
             return None;
         };
+        if document.core().composition().is_some() {
+            self.feedback = Some("document.composition_pending");
+            return None;
+        }
         let command = document.request_save_as_target();
         self.apply_save_target_command(command)
     }

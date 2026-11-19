@@ -30,7 +30,7 @@
 
 use std::{cell::RefCell, collections::VecDeque, ops::Range, rc::Rc};
 
-use aline_buffer::{BufferError, SrcOffset, SrcRange, SrcSelection};
+use aline_buffer::{BufferError, SrcOffset, SrcRange, SrcSelection, TextBudget};
 use aline_markdown::{MappingBudget, ProjectionId};
 use gpui::{
     AnyElement, App, Bounds, ClipboardItem, Context, FocusHandle, InputHandler, MouseButton,
@@ -112,28 +112,141 @@ impl InputSite {
         })
     }
 
+    /// 按最新快照重建输入站点；无法证明同一逻辑行时返回 None 并由调用方清空帧。
+    ///
+    /// Source 分支不再只按长度差平移：普通按键先按长度差沿用原行（只做 O(1) 字节
+    /// 校验），候选不成立（显式命令改动当前行之前的文本、换行、行被合并等）时，
+    /// 才扫描选区所在逻辑行。该扫描不建全文行索引，最坏只遍历快照一遍，仍在命令
+    /// 之后的重建路径内，不进入普通按键路径。
     fn rebound(&self, document: &mut ReadonlyDocument) -> Option<Self> {
         if !document.is_editable() || document.core().mode() != self.mode {
             return None;
         }
         let current = document.current_snapshot().ok()?;
         let source = match self.mode {
-            EditorMode::Visual => document
-                .core()
-                .visual_block_range(&current)
-                .ok()??
-                .byte_range(),
+            EditorMode::Visual => {
+                let source = document
+                    .core()
+                    .visual_block_range(&current)
+                    .ok()??
+                    .byte_range();
+                (self.source.start == source.start).then_some(source)?
+            }
             EditorMode::Source => {
-                resized(self.source.clone(), self.document_len, current.len_bytes())?
+                let candidate =
+                    resized(self.source.clone(), self.document_len, current.len_bytes())?;
+                if valid_source_line(document, &current, &candidate) {
+                    candidate
+                } else {
+                    let line = source_line(&current)?;
+                    // 选区所在行起点前移说明原输入行已被并入更早的行；
+                    // 无法证明仍是同一逻辑行时不得把排队输入写到新偏移。
+                    if line.start < self.source.start
+                        || !valid_source_line(document, &current, &line)
+                    {
+                        return None;
+                    }
+                    line
+                }
             }
         };
-        (self.source.start == source.start).then_some(Self {
+        let selection = current.selection().range().byte_range();
+        if selection.start < source.start || selection.end > source.end {
+            return None;
+        }
+        Some(Self {
             mode: self.mode,
             source,
             document_len: current.len_bytes(),
             reader_row: self.reader_row.clone(),
         })
     }
+}
+
+/// 校验区间是否为当前快照中的完整逻辑行：起点在文件开头或紧邻 `\n`，
+/// 终点在文件末尾或紧邻 `\n`/`\r`，且区间在快照内、UTF-8 边界合法。
+///
+/// 额外拒绝在 CRLF 的 `\r` 与 `\n` 之间截断，避免把行尾符算作行内容。
+fn valid_source_line(
+    document: &ReadonlyDocument,
+    current: &CurrentSnapshot,
+    range: &Range<usize>,
+) -> bool {
+    let len = current.len_bytes();
+    if range.start > range.end || range.end > len {
+        return false;
+    }
+    let text = current.text();
+    // 受检范围同时覆盖越界与半字符端点。
+    if text.src_range(range.clone()).is_err() {
+        return false;
+    }
+    let budget = document.text_budget();
+    if range.start > 0 && text_byte(text, range.start - 1, budget) != Some(b'\n') {
+        return false;
+    }
+    if range.end < len {
+        match text_byte(text, range.end, budget) {
+            Some(b'\n') => {
+                // 行内容不得包含 CRLF 的 `\r`。
+                if range.end > range.start && text_byte(text, range.end - 1, budget) == Some(b'\r')
+                {
+                    return false;
+                }
+            }
+            // 单独的回车不是行分隔符，只有 CRLF 的 `\r` 才能作为行内容终点。
+            Some(b'\r') => {
+                if text_byte(text, range.end + 1, budget) != Some(b'\n') {
+                    return false;
+                }
+            }
+            _ => return false,
+        }
+    }
+    true
+}
+
+/// 读取快照中的一个字节；越界、半字符或预算不足时返回 None。
+fn text_byte(text: &aline_buffer::TextSnapshot, index: usize, budget: TextBudget) -> Option<u8> {
+    let range = text.src_range(index..index.checked_add(1)?).ok()?;
+    text.slice(&range, budget).ok()?.as_bytes().first().copied()
+}
+
+/// 扫描选区所在逻辑行；行起止只在本行内判定，不依赖全文行索引。
+///
+/// 换行字节归属其所在行（与 `LineIndex` 语义一致）：起点取选区前最后一个 `\n`
+/// 之后，终点取选区处或之后的第一个 `\n` 之前，并排除 CRLF 的 `\r`。
+fn source_line(current: &CurrentSnapshot) -> Option<Range<usize>> {
+    let len = current.len_bytes();
+    let head = current.selection().head().byte_offset();
+    if head > len {
+        return None;
+    }
+    let text = current.text();
+    let mut start = 0usize;
+    let mut end = len;
+    let mut seen = 0usize;
+    let mut previous: Option<u8> = None;
+    let mut found = false;
+    for chunk in text.iter_chunks().ok()? {
+        for (index, byte) in chunk.bytes().enumerate() {
+            let at = seen.checked_add(index)?;
+            if byte == b'\n' {
+                if at < head {
+                    start = at.checked_add(1)?;
+                } else if !found {
+                    end = at;
+                    found = true;
+                    if previous == Some(b'\r') {
+                        end = end.checked_sub(1)?;
+                    }
+                }
+            }
+            previous = Some(byte);
+        }
+        seen = seen.checked_add(chunk.len())?;
+    }
+    (start <= end).then_some(start..end)
 }
 
 pub(super) struct SourceInputSite {
@@ -565,6 +678,38 @@ enum InputIntent {
     Select(Range<usize>),
     Paste(String),
     Escape,
+}
+
+/// 帧不可消费时对一次输入的处置。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum InputRecovery {
+    /// 帧仍可消费，直接提交。
+    Proceed,
+    /// 显式命令类意图：按最新状态重建帧后继续按序应用。
+    Rebind,
+    /// 携带平台坐标的意图：不得换投影解释，静默拒收并保留上下文。
+    Reject,
+}
+
+/// 判定一次输入在当前帧是否可继续，供窗口入口与三分类矩阵测试共用。
+///
+/// 平台 UTF-16 范围只对其注册的帧有效；命令推进工作版本后，同一数值在新投影上
+/// 指向不同文本，重建后解释旧坐标会写到错误位置，因此必须拒收而不是重绑。
+/// 只携带语义（按键、删除、移动、粘贴）的意图与平台坐标无关，可在重建后按序应用。
+fn input_recovery(accepted: bool, intent: &InputIntent) -> InputRecovery {
+    if accepted {
+        return InputRecovery::Proceed;
+    }
+    match intent {
+        InputIntent::Replace(..) | InputIntent::Mark(..) | InputIntent::Select(..) => {
+            InputRecovery::Reject
+        }
+        InputIntent::LineBreak
+        | InputIntent::Delete { .. }
+        | InputIntent::Move { .. }
+        | InputIntent::Paste(_)
+        | InputIntent::Escape => InputRecovery::Rebind,
+    }
 }
 
 /// 一次输入决策的结果；只有 Prepared/Sealed 需要后台 job。
@@ -1096,9 +1241,11 @@ impl NativeDocumentWindow {
 
     /// 提交一次输入意图：空闲时立即执行，在途时入队（连续同向删除合并）。
     ///
-    /// 显式命令可能先推进版本或移动选区而使帧失效；先按最新状态重建再提交。
-    /// 无法重建时不再静默忽略：文档仍在且可编辑时反馈 `document.input_dropped`，
-    /// 文档已关闭或只读时按 D3.6 不反馈。
+    /// 显式命令可能先推进版本或移动选区而使帧失效；命令类意图先按最新状态重建
+    /// 再提交，携带平台坐标的意图（Replace/Mark/Select）则按过期回调静默拒收：
+    /// 不重建、不提交、不设反馈，保留现有上下文，避免旧坐标按新投影解释。
+    /// 命令类意图无法重建时不再静默忽略：文档仍在且可编辑时反馈
+    /// `document.input_dropped`，文档已关闭或只读时按 D3.6 不反馈。
     fn apply_native_input(
         &mut self,
         frame: &InputFrame,
@@ -1106,17 +1253,24 @@ impl NativeDocumentWindow {
         window: &Window,
         cx: &mut Context<Self>,
     ) -> bool {
-        if !self.frame_accepts(frame) && !self.rebind_frame(frame) {
-            if self
-                .state
-                .session
-                .document()
-                .is_some_and(ReadonlyDocument::is_editable)
-            {
-                self.state.feedback = Some("document.input_dropped");
-                cx.notify();
+        match input_recovery(self.frame_accepts(frame), &intent) {
+            InputRecovery::Proceed => {}
+            // 平台坐标只对其注册帧有效；命令推进版本后必须拒收。
+            InputRecovery::Reject => return false,
+            InputRecovery::Rebind => {
+                if !self.rebind_frame(frame) {
+                    if self
+                        .state
+                        .session
+                        .document()
+                        .is_some_and(ReadonlyDocument::is_editable)
+                    {
+                        self.state.feedback = Some("document.input_dropped");
+                        cx.notify();
+                    }
+                    return false;
+                }
             }
-            return false;
         }
         let Some(document) = self.state.session.document_mut() else {
             return false;
@@ -1756,6 +1910,11 @@ impl InputHandler for DocumentInput {
                 .slice(&source, doc.text_budget())
                 .ok()?
                 .into_owned();
+            // vendored GPUI 把该回填写入 `NSTextInputClient` 的
+            // `attributedSubstring(forProposedRange:actualRange:)` 的 `actualRange`
+            // （`vendor/gpui-pre-0.3.9/src/platform.rs:2255-2268` 的注释）；返回
+            // 实际范围即请求范围是契约允许的实现。真实 IME 对「请求与返回不一致」
+            // 的行为未取证，故不回填其他范围，也不据此声称已覆盖平台契约。
             *adjusted = Some(range);
             Some(text)
         })
