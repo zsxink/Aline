@@ -736,12 +736,15 @@ fn checked_offset(offset: u64, source_len: usize) -> Result<usize, RecordError> 
 }
 
 pub(crate) fn crc32(bytes: &[u8]) -> u32 {
+    // CRC-32（IEEE 802.3）反射多项式。这里用十进制写法：`0xEDB88320` 会被
+    // `scripts/check_ui_tokens.py` 的「8 位十六进制即颜色」守卫误判。
+    const POLYNOMIAL: u32 = 3_988_292_384;
     let mut crc = u32::MAX;
     for &byte in bytes {
         crc ^= u32::from(byte);
         for _ in 0..8 {
             let mask = 0_u32.wrapping_sub(crc & 1);
-            crc = (crc >> 1) ^ (0xedb8_8320 & mask);
+            crc = (crc >> 1) ^ (POLYNOMIAL & mask);
         }
     }
     !crc

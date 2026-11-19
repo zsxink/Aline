@@ -989,10 +989,14 @@ impl ReaderSurface {
                         .child(StyledText::new(SharedString::from(numbers)))
                 });
                 let scroller = div()
+                    .flex()
                     .flex_1()
                     .min_w_0()
                     .whitespace_nowrap()
-                    .child(styled)
+                    // 块布局会把 nowrap 文本拉回容器宽，横向可滚动范围永远是零；
+                    // 行布局 + 不收缩的文本子项让滚动内容保持单行全宽的固有尺寸。
+                    .items_start()
+                    .child(div().flex_none().child(styled))
                     .on_children_prepainted(move |bounds, _, _| {
                         mark_prepared.mark_prepainted();
                         bounds_cell.set(bounds.first().copied());

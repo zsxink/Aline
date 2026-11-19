@@ -1787,6 +1787,52 @@ impl ReadonlyDocument {
             && self.parsed_identity.parse_config_generation() == self.core.parse_config_generation()
     }
 
+    /// 仅供显式启用的原生取证采样：保存协调器类别标签，不扩大生产写入口。
+    pub(crate) fn evidence_save_status(&self) -> &'static str {
+        match self
+            .persistence
+            .as_ref()
+            .map(PersistenceCoordinator::status)
+        {
+            None => "none",
+            Some(SaveStatus::Idle) => "idle",
+            Some(SaveStatus::WaitingForComposition) => "waiting-for-composition",
+            Some(SaveStatus::Saving) => "saving",
+            Some(SaveStatus::Failed) => "failed",
+            Some(SaveStatus::Conflict) => "conflict",
+            Some(SaveStatus::PublishedUncertain) => "published-uncertain",
+        }
+    }
+
+    /// 仅供显式启用的原生取证采样：外部磁盘状态标签。
+    pub(crate) fn evidence_external_label(&self) -> &'static str {
+        match self.external.as_ref().map(|view| view.state) {
+            None => "none",
+            Some(ExternalDiskState::Changed) => "changed",
+            Some(ExternalDiskState::Missing) => "missing",
+            Some(ExternalDiskState::Unreadable) => "unreadable",
+            Some(ExternalDiskState::Unsupported) => "unsupported",
+            Some(ExternalDiskState::Unstable) => "unstable",
+        }
+    }
+
+    /// 仅供显式启用的原生取证采样：以当前一致快照判断是否偏离保存点。
+    pub(crate) fn evidence_dirty(&mut self) -> Option<bool> {
+        let snapshot = self.current_snapshot().ok()?;
+        self.persistence
+            .as_ref()
+            .map(|coordinator| coordinator.is_dirty(&snapshot))
+    }
+
+    /// 仅供显式启用的原生取证采样：关闭就绪判定标签；零副作用。
+    pub(crate) fn evidence_close_label(&mut self) -> &'static str {
+        match self.close_status() {
+            CloseStatus::Waiting => "waiting",
+            CloseStatus::NeedsDecision => "needs-decision",
+            CloseStatus::Ready => "ready",
+        }
+    }
+
     #[cfg(target_os = "macos")]
     pub(crate) fn parsed_identity(&self) -> &InputIdentity {
         &self.parsed_identity

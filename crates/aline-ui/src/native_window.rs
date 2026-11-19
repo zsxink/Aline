@@ -8,6 +8,7 @@ mod editable_input;
 mod find_panel;
 mod font_invalidate;
 mod geometry;
+mod m2_evidence;
 mod probe;
 mod readonly_content;
 mod readonly_evidence;
@@ -1537,6 +1538,8 @@ struct NativeDocumentWindow {
     fonts: FontEnvironment,
     probe: Option<probe::ProbeState>,
     evidence: Option<readonly_evidence::SharedEvidence>,
+    /// 显式启用的 M2 状态采样；只在 `ALINE_M2_EVIDENCE_DIR` 存在时创建。
+    m2_evidence: Option<m2_evidence::M2Evidence>,
     font_invalidation: Option<font_invalidate::FontInvalidation>,
 }
 
@@ -1597,6 +1600,7 @@ impl NativeDocumentWindow {
             fonts,
             probe: probe::ProbeState::from_env(),
             evidence: readonly_evidence::ReadonlyEvidence::from_env(),
+            m2_evidence: m2_evidence::M2Evidence::from_env(),
             font_invalidation: font_invalidate::FontInvalidation::from_env(),
         };
         if state.probe.is_some() {
@@ -1619,6 +1623,29 @@ impl NativeDocumentWindow {
                     "m1-probe event_loop_gap_ns={max_gap_ns} tick_ns={}",
                     probe::PROBE_TICK.as_nanos()
                 );
+            })
+            .detach();
+        }
+        // M2 取证只在显式请求时运行：周期采样真实文档状态，不触发任何文档动作。
+        if state.m2_evidence.is_some() {
+            cx.spawn_in(window, async move |weak, cx| {
+                loop {
+                    let keep = weak.update_in(cx, |this, _window, _cx| {
+                        let Some(evidence) = this.m2_evidence.as_mut() else {
+                            return false;
+                        };
+                        if let Some(document) = this.state.session_mut().document_mut() {
+                            evidence.sample(document);
+                        }
+                        true
+                    });
+                    if !matches!(keep, Ok(true)) {
+                        break;
+                    }
+                    cx.background_executor()
+                        .timer(m2_evidence::SAMPLE_TICK)
+                        .await;
+                }
             })
             .detach();
         }
@@ -2374,6 +2401,9 @@ impl NativeDocumentWindow {
                     true,
                 );
                 self.refresh_statistics(window, cx);
+                // 采纳恢复文档等同一次文档打开：焦点落在窗口根，保证按键
+                // 走窗口根的 key context，而不是悬空的恢复面板按钮。
+                self.focus.focus(window, cx);
             }
             Ok((_, None)) => {}
             Err(_) => {
@@ -2405,29 +2435,52 @@ impl NativeDocumentWindow {
 
     /// 关闭前捕获当前核心，关闭后在后台读磁盘并只创建证据文件。
     fn close_with_evidence(&mut self, cx: &mut App) -> bool {
+        // M2 取证在释放前最后采样一次：脏判定与关闭结论只在此时可算。
+        if let Some(evidence) = self.m2_evidence.as_mut()
+            && let Some(document) = self.state.session_mut().document_mut()
+        {
+            evidence.sample(document);
+        }
         let evidence = self.evidence.clone();
-        let packet = match self.state.close_document_with(|document| {
-            evidence
-                .as_ref()
-                .map(|evidence| evidence.borrow_mut().closing(document))
+        let m2_evidence = self.m2_evidence.as_mut();
+        let packets = match self.state.close_document_with(|document| {
+            (
+                evidence
+                    .as_ref()
+                    .map(|evidence| evidence.borrow_mut().closing(document)),
+                m2_evidence.map(|evidence| evidence.closing(document)),
+            )
         }) {
-            Ok(Some(Some(Ok(packet)))) => Some(packet),
-            Ok(Some(Some(Err(error)))) => {
-                eprintln!("m1-readonly-evidence close failed: {error}");
-                None
-            }
-            Ok(Some(None)) | Ok(None) => None,
+            Ok(Some(packets)) => Some(packets),
+            Ok(None) => None,
             Err(()) => return false,
         };
-        if let Some(packet) = packet {
-            let closed = self.state.session().document().is_none();
-            cx.background_executor()
-                .spawn(async move {
-                    if packet.write(closed).is_err() {
-                        eprintln!("m1-readonly-evidence write failed");
+        if let Some((m1_packet, m2_packet)) = packets {
+            self.m2_evidence = None;
+            if let Some(packet) = m1_packet {
+                match packet {
+                    Ok(packet) => {
+                        let closed = self.state.session().document().is_none();
+                        cx.background_executor()
+                            .spawn(async move {
+                                if packet.write(closed).is_err() {
+                                    eprintln!("m1-readonly-evidence write failed");
+                                }
+                            })
+                            .detach();
                     }
-                })
-                .detach();
+                    Err(error) => eprintln!("m1-readonly-evidence close failed: {error}"),
+                }
+            }
+            if let Some(packet) = m2_packet {
+                cx.background_executor()
+                    .spawn(async move {
+                        if packet.write().is_err() {
+                            eprintln!("m2-evidence write failed");
+                        }
+                    })
+                    .detach();
+            }
         }
         // 关闭成功：取消待办自动保存与恢复计时，丢弃正文帧与排队输入；在途结果按文档身份被拒绝。
         // 会话已在释放前取消自动保存/关联并构造退役与清理任务。
@@ -2631,6 +2684,10 @@ impl NativeDocumentWindow {
             let dismiss = cx.entity().downgrade();
             return div()
                 .w_full()
+                // 窗口根可聚焦：按下时它的自动焦点转移会把焦点从输入框
+                // 挪走，平台输入法随之结束组合。捕获阶段取消默认行为，
+                // 点击仍会冒泡给出组合待定反馈。
+                .capture_any_mouse_down(|_, window, _| window.prevent_default())
                 .on_mouse_down(MouseButton::Left, move |_, _, cx| {
                     let _ = dismiss.update(cx, |this, cx| {
                         this.state.feedback = Some("document.composition_pending");
@@ -2808,6 +2865,21 @@ impl NativeDocumentWindow {
                     .text_color(rgb(tokens::TEXT))
                     .hover(|style| style.bg(rgba(tokens::HOVER)))
             })
+            .capture_any_mouse_down(cx.listener(|this, _: &gpui::MouseDownEvent, window, _cx| {
+                // 组合期间点击模式按钮属于拒绝路径。按钮可聚焦，按下时
+                // GPUI 的自动焦点转移会移走输入框焦点，平台输入法随即
+                // 结束组合并丢掉 marked 草稿（继续输入会从零重新组合）。
+                // 捕获阶段取消默认焦点转移即可保留组合；点击照常冒泡到
+                // on_click，由 request_view 给出「组合待定」反馈。
+                let composing = this
+                    .state
+                    .session()
+                    .document()
+                    .is_some_and(|document| document.core().composition().is_some());
+                if composing {
+                    window.prevent_default();
+                }
+            }))
             .on_click(cx.listener(move |this, _, window, cx| this.request_view(mode, window, cx)))
             .on_key_down(
                 cx.listener(move |this, event: &gpui::KeyDownEvent, window, cx| {
@@ -2908,11 +2980,16 @@ impl NativeDocumentWindow {
                     .hover(|style| style.bg(rgba(tokens::HOVER)))
                     .on_click(cx.listener(move |this, _, window, cx| {
                         click(this, window, cx);
+                        // 按钮在按下时接管焦点；动作可能移除按钮本身（面板消失、
+                        // 条目退役），悬空的焦点会让后续按键落不到窗口根的
+                        // key context，必须把焦点还给窗口根。
+                        this.focus.focus(window, cx);
                     }))
                     .on_key_down(cx.listener(
                         move |this, event: &gpui::KeyDownEvent, window, cx| {
                             if event.keystroke.key == "enter" || event.keystroke.key == "space" {
                                 key(this, window, cx);
+                                this.focus.focus(window, cx);
                                 cx.stop_propagation();
                             }
                         },
