@@ -32,7 +32,8 @@
 
 - [ ] 4.1 执行真实 macOS 中文输入法矩阵：候选更新/替换/确认/取消、选中文字组合、菜单借焦点/点击其他块/切模式/失活、Undo/Redo、滚动折行/DPI 候选窗与保存等待取消。验收：输入法/系统/GPUI/显示身份、操作序列、真实截图/事件结果、内存源码与历史/草稿核查齐全；不记录敏感候选正文，模拟/离屏不代替真实证据；回填 V-01/07/08。
 - [ ] 4.2 依 V-01 顺序补 Windows/Linux、Intel Mac 与多屏/缩放实际证据；无法取得的列明确平台限制，不由 macOS 或 all-targets 推导通过。验收：每个任务场景有适用平台成功证据或明确未测阻塞，V-01/07/架构 §13 状态一致，正式三平台边界保留。
-- [ ] 4.3 安排输入状态/公共坐标/API 与生命周期独立审查，清理替代 handler/无消费者导出/fake 并 CodeGraph sync/status。验收：重要 finding 修复且主 Agent 复核，MD-11 所有已开放写入口/跨块/替换继续受保护；审查原文只留 `<evidence>/qmd-w5/review/`。
+- [x] 4.3 安排输入状态/公共坐标/API 与生命周期独立审查，清理替代 handler/无消费者导出/fake 并 CodeGraph sync/status。验收：重要 finding 修复且主 Agent 复核，MD-11 所有已开放写入口/跨块/替换继续受保护；审查原文只留 `<evidence>/qmd-w5/review/`。
+  - 2026-11-19 完成：独立审查 Critical 0 / Important 4 / Minor 3，原文在 `logs/validation/qmd-w5/review/review-4.3-20261119-083458/review.md`。I1 平台坐标意图在过期帧上静默拒收（不再重建后按新投影解释）、I2 Source rebind 校验逻辑行边界并在无法证明时清空帧、I3 组合期无目标保存/另存为反馈 `document.composition_pending` 且不开选择器、M1 删除测试专用 `finish_save_wait`、M2 dead-code 改平台条件、M3 仅补 `adjusted` 契约注释。修复经限定范围复审 APPROVE（0 Critical/Important），主 Agent 复跑 fmt/clippy/三守卫与 workspace 71 套件 989 passed / 0 failed / 2 ignored，`codegraph sync`/`status` 均 0。残留 Minor 两条（rebind 注释精度、行合并扫描分支缺直接测试）记入 ledger 裁决不阻塞；真实平台回调时序、窗口路径与非 macOS 构建仍未取证，不影响本项审查收口。
 - [ ] 4.4 执行 workspace fmt/Clippy/tests 与 engineering/lints/safety/public-api 守卫，新增守卫包含正例和最小违规反例并核实八成员 lint 继承。验收命令：`cargo fmt --all --check`、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo test --workspace` 全通过；原始输出经 evidence_paths 归一化，实际平台/feature 边界明确。
 - [ ] 4.5 回填引擎 §10/UI §6/13/架构 §5/13 的实际接线与 V-01/07/08 证据状态，执行 `openspec validate qmd-w5-native-ime-input --strict --no-interactive`、全量严格校验、`git diff --check` 和引用/绝对路径检查。验收：真实证据缺失仍未完成，M0 豁免不被倒填，不提交/推送/归档。
   - 2026-11-17 收尾记录在 `logs/validation/m2-editable-core/2026-11-17-wrap-up.md`。全 workspace 工程门禁通过不表示真实 IME、候选定位、三平台或 M2 阶段出口通过。
