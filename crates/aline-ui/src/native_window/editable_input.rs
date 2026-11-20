@@ -691,6 +691,18 @@ enum InputRecovery {
     Reject,
 }
 
+/// 输入结算是否清除现有反馈：只清输入类提示。
+///
+/// 保存失败、外部冲突、不确定发布与关闭/替换拒绝必须保留到用户处理，
+/// 否则紧随输入回调的结算会把刚出现的保存提示抹掉。
+fn input_feedback_cleared(key: &str) -> bool {
+    !matches!(
+        key,
+        "document.save_failed" | "document.save_conflict" | "document.save_uncertain"
+    ) && !key.starts_with("document.external_")
+        && !key.starts_with("document.close_")
+}
+
 /// 判定一次输入在当前帧是否可继续，供窗口入口与三分类矩阵测试共用。
 ///
 /// 平台 UTF-16 范围只对其注册的帧有效；命令推进工作版本后，同一数值在新投影上
@@ -1480,7 +1492,10 @@ impl NativeDocumentWindow {
         window: &Window,
         cx: &mut Context<Self>,
     ) {
-        self.state.feedback = None;
+        // 输入结算只清输入类反馈；保存/冲突/关闭提示保留到用户处理。
+        if self.state.feedback.is_some_and(input_feedback_cleared) {
+            self.state.feedback = None;
+        }
         if changed {
             self.refresh_find(cx);
             // 待定组可跨原行展开。输入仍用原虚拟行的绑定，封口再采纳新列表。

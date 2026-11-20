@@ -2053,6 +2053,89 @@ fn close_refusal_does_not_cancel_recovery_or_cleanup() -> Result<(), Box<dyn Err
     Ok(())
 }
 
+/// 组合活动时打开必须只给反馈：原生面板会夺取焦点并打断组合。
+#[cfg(target_os = "macos")]
+#[test]
+fn open_while_composing_reports_pending_without_starting_request() -> Result<(), Box<dyn Error>> {
+    use std::fs;
+
+    let directory = WindowSaveDir::create("aline-window-open-composing")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    open_window_document(&mut state, &target, b"x\n")?;
+    open_window_block(&mut state, SelectionSpec::new(0, 1))?;
+    state
+        .session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .edit_core()?
+        .composition_start("候", 0)?;
+    let before = window_save_view(&mut state)?;
+
+    assert!(
+        state.open_blocked_by_composition(),
+        "组合活动时必须拒绝打开"
+    );
+    assert_eq!(state.feedback_key(), Some("document.composition_pending"));
+    assert!(!state.take_focus_return(), "拒绝打开不得请求回焦");
+    assert_eq!(
+        window_save_view(&mut state)?,
+        before,
+        "拒绝打开不得改变文档"
+    );
+    let document = state.session.document_mut().ok_or("应存在可编辑文档")?;
+    assert!(
+        document.core().composition().is_some(),
+        "拒绝打开不得结束组合"
+    );
+
+    document.edit_core()?.composition_cancel(2)?;
+    assert!(!state.open_blocked_by_composition());
+    assert!(
+        state.request_open().is_ok(),
+        "组合结束后应能正常发起打开，不得残留 Selecting 请求"
+    );
+    Ok(())
+}
+
+/// 保存失败后关闭必须提示可重试/另存为，而不是笼统的「有未结算编辑」。
+#[cfg(target_os = "macos")]
+#[test]
+fn close_after_failed_save_reports_retry_guidance_and_keeps_document() -> Result<(), Box<dyn Error>>
+{
+    use std::fs;
+    use std::os::unix::fs::PermissionsExt;
+
+    let directory = WindowSaveDir::create("aline-window-close-save-failed")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    open_window_document(&mut state, &target, b"x\n")?;
+    open_window_block(&mut state, SelectionSpec::new(0, 0))?;
+    window_type(&mut state, 1, "a")?;
+
+    // 目录不可写时暂存文件创建失败，保存进入 Failed（不是冲突或组合等待）。
+    fs::set_permissions(&directory.0, fs::Permissions::from_mode(0o555))?;
+    let job = state.request_save().ok_or("首次保存应返回后台工作")?;
+    let completion = job.run();
+    let settlement = state.settle_save(completion);
+    fs::set_permissions(&directory.0, fs::Permissions::from_mode(0o755))?;
+    assert_eq!(settlement.feedback, Some("document.save_failed"));
+
+    assert!(
+        state.close_document_with(|_| ()).is_err(),
+        "保存失败后必须拒绝关闭"
+    );
+    assert_eq!(
+        state.feedback_key(),
+        Some("document.close_save_failed"),
+        "拒绝原因必须指向保存失败及其解除方式"
+    );
+    assert!(state.session().document().is_some(), "拒绝关闭必须保留文档");
+    Ok(())
+}
+
 #[cfg(target_os = "macos")]
 #[test]
 fn close_success_spawns_cleanup_only_after_retirement() -> Result<(), Box<dyn Error>> {

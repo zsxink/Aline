@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """M2 可编辑真实窗口取证驱动：打开→块编辑→直接文本插入/退格→中文 IME 组合
 （确认/取消）→撤销/重做→选区/复制/粘贴→代码块横向滚动→模式往返→查找→
-回到基线→关闭文档→关闭窗口。
+回到基线→关闭文档→关闭窗口。关闭后按采样表核对块内删除后块保持打开、后续
+按键进入待定输入（修复前同位置为 `open_block=false`）。
 
 只经 macOS 无障碍接口投递真实输入，不触碰应用内部状态；应用侧由
 `ALINE_M2_EVIDENCE_DIR` 显式启用的采样器记录真实回调造成的状态。驱动只负责
@@ -387,6 +388,60 @@ class WindowDriver:
                   allow_missing_window=True)
 
 
+def session_table(evidence):
+    """读应用侧采样表；末尾 `truncated=` 行是完整性标记，不是数据行。"""
+    path = Path(evidence) / "session.tsv"
+    if not path.is_file():
+        raise DriverError("缺少应用侧采样表 session.tsv")
+    lines = path.read_text(encoding="utf-8").splitlines()
+    if len(lines) < 2:
+        raise DriverError("session.tsv 没有数据行")
+    header = lines[0].split("\t")
+    rows = []
+    for line in lines[1:]:
+        if line.startswith("truncated="):
+            if line.split("=", 1)[1] == "true":
+                raise DriverError("session.tsv 已达记录上限被截断，证据不完整")
+            continue
+        fields = line.split("\t")
+        if len(fields) != len(header):
+            raise DriverError("session.tsv 列数与表头不一致")
+        rows.append(dict(zip(header, fields)))
+    return rows
+
+
+def assert_delete_keeps_block(evidence):
+    """核对块内删除后块保持打开、随后的按键进入待定输入（关闭后采样已落盘）。
+
+    块内删除若关闭块，后续输入就没有可重建的输入站点而被静默丢弃；修复前
+    实现在同一位置记录 `open_block=false`。识别方式是相邻两条采样：前一条
+    块打开、后一条文本长度少 3（一个中文字符）。
+    """
+    rows = session_table(evidence)
+    for index in range(1, len(rows)):
+        previous, current = rows[index - 1], rows[index]
+        if previous["open_block"] != "true":
+            continue
+        if int(current["text_len"]) != int(previous["text_len"]) - 3:
+            continue
+        if current["open_block"] != "true":
+            raise DriverError("块内退格后块被关闭：后续输入会失去输入站点")
+        follow = rows[index + 1:index + 6]
+        accepted = any(int(row["draft_len"] or 0) > 0
+                       or row["composition_len"] not in ("", "0")
+                       for row in follow)
+        if not accepted:
+            raise DriverError("删除后按键未进入待定输入")
+        write_json(Path(evidence) / "delete-keeps-block.json", {
+            "before": previous,
+            "after": current,
+            "after_typing": follow,
+            "note": "块内删除后块保持打开并接受后续输入；修复前 open_block=false",
+        })
+        return
+    raise DriverError("采样表未记录块内删除（块打开且文本长度减 3 的相邻记录）")
+
+
 def run(driver, fixture):
     driver.wait_until_ready()
     write_text(driver.evidence / "input-source-before.txt", driver.input_source())
@@ -441,10 +496,19 @@ def run(driver, fixture):
     time.sleep(0.5)
     driver.snapshot()
 
-    # 段 D：块内退格删除一个字符。
+    # 段 D：块内退格删除一个字符。块内删除与普通输入一样必须留在打开块内；
+    # 关闭块会让后续输入失去可重建的输入站点（修复前实测 open_block=false）。
+    # 采样表只在关闭文档时落盘，判定放在关闭后的 assert_delete_keeps_block。
     driver.click_body("重新打开块执行退格")
+    time.sleep(0.4)
     driver.backspace("退格删除一个字符")
     time.sleep(0.5)
+    driver.snapshot()
+    driver.type_keys(["a"], "删除后继续输入")
+    time.sleep(0.5)
+    driver.snapshot()
+    driver.call(["press-key", "--key", "Escape"], "Escape 取消删除后的待定输入")
+    time.sleep(0.4)
     driver.snapshot()
 
     # 段 E：代码块横向滚动。打开态按块源码折行渲染，没有横向位移；先按
@@ -573,6 +637,7 @@ def run(driver, fixture):
     })
     if not all(present.values()):
         raise DriverError("关闭文档后应用侧证据文件缺失：" + json.dumps(present))
+    assert_delete_keeps_block(driver.evidence)
 
 
 def main():

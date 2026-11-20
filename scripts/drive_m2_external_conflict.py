@@ -34,7 +34,6 @@ from drive_m2_editable_window import (  # noqa: E402  复用同一真实输入�
     WindowDriver,
 )
 from drive_m2_interaction_matrix import close_document_and_wait  # noqa: E402
-from drive_m2_menu_focus import menubar_click  # noqa: E402
 from drive_m2_save_lifecycle import clear_feedback_and_open_block  # noqa: E402
 from evidence_paths import write_json, write_text  # noqa: E402
 from validation_output import require_validation_path  # noqa: E402
@@ -55,10 +54,15 @@ def fixture_state(path):
             "mtime_ns": stat.st_mtime_ns}
 
 
+def our_process(driver):
+    """按 pid 定位目标实例；按进程名会在多实例并存时命中错误实例（m2-25）。"""
+    return f"(first process whose unix id is {driver.pid})"
+
+
 def menu_states(driver, note):
     """一次读取冲突四出口与保存项的可用性；System Events 返回布尔串。"""
     script = (
-        f'tell application "System Events" to tell process "{APP_PROCESS}"\n'
+        f'tell application "System Events" to tell {our_process(driver)}\n'
         f'set names to {{"保存", "取消等待保存", "载入磁盘内容", "确认覆盖磁盘", '
         f'"重试检查磁盘", "收起冲突提示"}}\n'
         'set out to ""\n'
@@ -115,6 +119,16 @@ def panel_button(driver, snapshot):
     return driver.find_button(snapshot, "载入磁盘内容")
 
 
+def panel_click(driver, label, note):
+    """点击冲突面板自身按钮，避免 System Events 菜单点击激活窗口后立刻重新呈现。"""
+    snapshot = driver.snapshot()
+    index = driver.find_button(snapshot, label)
+    if index is None:
+        raise DriverError("冲突面板缺少按钮：" + label)
+    driver.call(["click", "--element-index", str(index)], note)
+    time.sleep(0.6)
+
+
 def external_write(driver, fixture, note):
     """同尺寸改写夹具并在写后恢复原 mtime；记录前后摘要与 mtime 核对。"""
     path = Path(fixture)
@@ -165,26 +179,79 @@ def wait_disk_change(driver, fixture, previous_sha, timeout, note):
 
 
 def activate_cycle(driver):
-    """借 Finder 失活再激活 aline，触发窗口激活的静默外改检查。"""
-    for process in ("Finder", APP_PROCESS):
+    """借 Finder 失活再激活本实例，触发窗口激活的静默外改检查。
+
+    m2-25 失败根因：上一条失败运行的应用实例仍存活时，System Events 按
+    进程名 "aline" 寻址会命中另一实例，前台切换与菜单读取都落到错误进程。
+    因此目标一律按 pid 定位，并在切换后核对前台 unix id。
+    """
+    targets = (("Finder", 'process "Finder"'),
+               (APP_PROCESS, our_process(driver)))
+    for name, target in targets:
         driver.serial += 1
-        script = (f'tell application "System Events" to set frontmost of process '
-                  f'"{process}" to true')
+        script = (f'tell application "System Events" to set frontmost of '
+                  f'{target} to true')
         started = time.time_ns()
         result = subprocess.run(["osascript", "-e", script], text=True,
                                 capture_output=True)
         write_json(driver.evidence / f"step-{driver.serial:03d}.command.json", {
-            "argv": ["osascript", "-e", f"<System Events: frontmost {process}>"],
-            "note": "激活切换：" + process,
+            "argv": ["osascript", "-e", f"<System Events: frontmost {name} (pid {driver.pid if name == APP_PROCESS else '-'})>"],
+            "note": "激活切换：" + name,
             "exit_code": result.returncode,
             "started_epoch_ns": started,
             "finished_epoch_ns": time.time_ns(),
         })
         if result.returncode != 0:
-            raise DriverError("激活切换失败（" + process + "）："
+            raise DriverError("激活切换失败（" + name + "）："
                               + result.stderr[-600:])
-        time.sleep(0.6 if process == "Finder" else 1.3)
+        time.sleep(0.6 if name == "Finder" else 1.3)
+    # 前台核对：激活必须落在被测实例上，否则后续静默检查不会发生。
+    probe = subprocess.run(
+        ["osascript", "-e",
+         'tell application "System Events" to get unix id of first application '
+         'process whose frontmost is true'],
+        text=True, capture_output=True)
+    front = probe.stdout.strip()
+    write_text(driver.evidence / "frontmost-after-activation.txt",
+               f"expected={driver.pid} actual={front}\n")
+    if front != str(driver.pid):
+        raise DriverError(f"激活后前台实例应为 {driver.pid}，实际 {front or '未取得'}")
     driver.snapshot()
+
+
+def wait_panel(driver, expected, timeout, note):
+    """轮询冲突面板呈现，等待后台静默检查结算；返回最后一次判定。"""
+    started = time.monotonic()
+    polls = 0
+    while True:
+        snapshot = driver.snapshot()
+        present = {label: driver.find_button(snapshot, label) is not None
+                   for label in CONFLICT_EXITS}
+        polls += 1
+        elapsed = round(time.monotonic() - started, 3)
+        if all(value == expected for value in present.values()) or elapsed >= timeout:
+            break
+        time.sleep(0.4)
+    write_json(driver.evidence / f"panel-wait-{driver.serial:03d}.json", {
+        "note": note, "expected": expected, "present": present,
+        "polls": polls, "waited_seconds": elapsed,
+        "ready": all(value == expected for value in present.values()),
+        "step": driver.serial,
+    })
+    return present
+
+
+def check_single_instance(driver):
+    """取证前确认没有其它 aline 实例，避免外改检查与菜单读取落到错误进程。"""
+    result = subprocess.run(["pgrep", "-f", "target/debug/aline"],
+                            text=True, capture_output=True)
+    pids = [int(part) for part in result.stdout.split() if part.strip()]
+    others = [pid for pid in pids if pid != driver.pid]
+    write_json(driver.evidence / "instance-check.json",
+               {"target": driver.pid, "others": others})
+    if others:
+        raise DriverError("存在其它 aline 实例：" + ", ".join(map(str, others))
+                          + "；先结束遗留实例再取证")
 
 
 def type_candidate(driver, keys, note):
@@ -201,6 +268,7 @@ def conflict_save(driver, note):
 
 
 def run(driver, fixture):
+    check_single_instance(driver)
     driver.wait_until_ready()
     write_text(driver.evidence / "input-source-before.txt", driver.input_source())
     before = fixture_state(fixture)
@@ -213,15 +281,17 @@ def run(driver, fixture):
 
     # ---------- 周期 1：收起 → 重新激活 → 载入磁盘 → 撤销/重做 ----------
     baseline1 = fixture_state(fixture)
-    d1 = external_write(driver, fixture, "周期 1：磁盘同尺寸改写（保存基线 440）")
+    # 先输入使文档变脏，再执行外部改写：干净文档在窗口激活检查时会按 AC-06
+    # 自动重载磁盘内容，无法构造保存冲突（m2-23 首轮即因此失败）。
     clear_feedback_and_open_block(driver, body, "进入块编辑")
     type_candidate(driver, ["n", "i"], "拼音组合 ni")
+    d1 = external_write(driver, fixture, "周期 1：磁盘同尺寸改写（保存基线 440）")
     snapshot = conflict_save(driver, "冲突保存（应呈现冲突面板）")
     presented = assert_panel(driver, True, "冲突呈现后")
     button1 = panel_button(driver, snapshot)
     if button1 is None:
         raise DriverError("冲突呈现后无障碍树没有「载入磁盘内容」按钮")
-    menubar_click(driver, "收起冲突提示", "收起冲突提示")
+    panel_click(driver, "收起冲突提示", "收起冲突提示")
     time.sleep(0.6)
     snapshot = driver.snapshot()
     dismissed = assert_panel(driver, False, "收起冲突提示后")
@@ -232,11 +302,12 @@ def run(driver, fixture):
     if still_d1["sha256"] != d1["after"]["sha256"]:
         raise DriverError("收起冲突提示后自动保存仍写盘")
     activate_cycle(driver)
+    wait_panel(driver, True, 6.0, "重新激活后等待冲突面板重新呈现")
     repres = assert_panel(driver, True, "重新激活后")
     snapshot = driver.snapshot()
     if panel_button(driver, snapshot) is None:
         raise DriverError("重新激活后冲突面板没有重新呈现")
-    menubar_click(driver, "载入磁盘内容", "载入磁盘内容")
+    panel_click(driver, "载入磁盘内容", "载入磁盘内容")
     time.sleep(1.3)
     snapshot = driver.snapshot()
     reloaded = assert_panel(driver, False, "载入磁盘后")
@@ -264,12 +335,12 @@ def run(driver, fixture):
 
     # ---------- 周期 2：确认覆盖磁盘 ----------
     baseline2 = fixture_state(fixture)  # d1 内容，440
-    d2 = external_write(driver, fixture, "周期 2：磁盘同尺寸改写（保存基线 440）")
     clear_feedback_and_open_block(driver, body, "进入块编辑")
     type_candidate(driver, ["m", "a"], "拼音组合 ma")
+    d2 = external_write(driver, fixture, "周期 2：磁盘同尺寸改写（保存基线 440）")
     conflict_save(driver, "冲突保存（应呈现冲突面板）")
     assert_panel(driver, True, "周期 2 冲突呈现后")
-    menubar_click(driver, "确认覆盖磁盘", "确认覆盖磁盘")
+    panel_click(driver, "确认覆盖磁盘", "确认覆盖磁盘")
     time.sleep(1.5)
     driver.snapshot()
     overwritten = assert_panel(driver, False, "确认覆盖后")
@@ -289,18 +360,18 @@ def run(driver, fixture):
     # ---------- 周期 3：重试检查（仍变保持；恢复基线清除） ----------
     baseline3_bytes = Path(fixture).read_bytes()
     baseline3 = fixture_state(fixture)  # 已保存的本地文本 443
-    d3 = external_write(driver, fixture, "周期 3：磁盘同尺寸改写（保存基线 443）")
     clear_feedback_and_open_block(driver, body, "进入块编辑")
     type_candidate(driver, ["h", "a", "o"], "拼音组合 hao")
+    d3 = external_write(driver, fixture, "周期 3：磁盘同尺寸改写（保存基线 443）")
     conflict_save(driver, "冲突保存（应呈现冲突面板）")
     assert_panel(driver, True, "周期 3 冲突呈现后")
-    menubar_click(driver, "重试检查磁盘", "重试检查（磁盘仍被改写）")
+    panel_click(driver, "重试检查磁盘", "重试检查（磁盘仍被改写）")
     time.sleep(1.2)
     driver.snapshot()
     retry_still = assert_panel(driver, True, "重试后磁盘仍变")
     restored = restore_bytes(driver, fixture, baseline3_bytes,
                              "恢复磁盘为保存基线字节")
-    menubar_click(driver, "重试检查磁盘", "重试检查（磁盘已恢复基线）")
+    panel_click(driver, "重试检查磁盘", "重试检查（磁盘已恢复基线）")
     time.sleep(1.4)
     driver.snapshot()
     retry_cleared = assert_panel(driver, False, "重试后磁盘恢复基线")
@@ -325,12 +396,12 @@ def run(driver, fixture):
 
     # ---------- 周期 4：收起 → 重新激活 → 载入磁盘收口 ----------
     baseline4 = fixture_state(fixture)  # 446
-    d4 = external_write(driver, fixture, "周期 4：磁盘同尺寸改写（保存基线 446）")
     clear_feedback_and_open_block(driver, body, "进入块编辑")
     type_candidate(driver, ["s", "h", "i"], "拼音组合 shi")
+    d4 = external_write(driver, fixture, "周期 4：磁盘同尺寸改写（保存基线 446）")
     conflict_save(driver, "冲突保存（应呈现冲突面板）")
     assert_panel(driver, True, "周期 4 冲突呈现后")
-    menubar_click(driver, "收起冲突提示", "收起冲突提示")
+    panel_click(driver, "收起冲突提示", "收起冲突提示")
     time.sleep(0.6)
     driver.snapshot()
     assert_panel(driver, False, "周期 4 收起后")
@@ -339,8 +410,9 @@ def run(driver, fixture):
     if still_d4["sha256"] != d4["after"]["sha256"]:
         raise DriverError("周期 4 收起后自动保存写盘")
     activate_cycle(driver)
+    wait_panel(driver, True, 6.0, "周期 4 重新激活后等待冲突面板重新呈现")
     assert_panel(driver, True, "周期 4 重新激活后")
-    menubar_click(driver, "载入磁盘内容", "载入磁盘内容收口")
+    panel_click(driver, "载入磁盘内容", "载入磁盘内容收口")
     time.sleep(1.3)
     driver.snapshot()
     final_exits = assert_panel(driver, False, "周期 4 载入磁盘后")

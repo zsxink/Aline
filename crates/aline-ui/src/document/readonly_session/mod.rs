@@ -13,7 +13,7 @@ use aline_markdown::{CancelToken, ParseBudget, ParseConfig, Parsed};
 use aline_source::{AtomicFailureKind, IoBudget, SourceBaseline, StorageBudget};
 
 use super::persistence::{
-    CloseStatus, ExternalApplyResult, ExternalCheckCommand, ExternalCheckCompletion,
+    CloseBlocker, CloseStatus, ExternalApplyResult, ExternalCheckCommand, ExternalCheckCompletion,
     ExternalCheckIntent, ExternalCheckJob, ExternalCheckRejection, ExternalConflictView,
     ExternalDiskState, ExternalObservation, OperationId, PersistenceCoordinator, SaveCommand,
     SaveError, SaveJob, SaveRejection, SaveRequest, SaveRequestError, SaveResult, SaveStatus,
@@ -2297,6 +2297,24 @@ impl ReadonlySession {
             }
             Err(OpenError::Cancelled) => Ok((OpenDisposition::Cancelled, None)),
             Err(error) => Ok((OpenDisposition::Failed(error), None)),
+        }
+    }
+
+    /// 关闭被拒后的原因提示键；只读，不改变任何状态。
+    ///
+    /// 保存失败、外部冲突与不确定发布各有不同的解除方式，必须分别提示，
+    /// 否则用户只看到「有未结算编辑」而不知道能做什么。
+    pub(crate) fn close_blocked_key(&self) -> &'static str {
+        match self
+            .document
+            .as_ref()
+            .and_then(|document| document.persistence.as_ref())
+            .map(PersistenceCoordinator::close_blocker)
+        {
+            Some(CloseBlocker::SaveFailed) => "document.close_save_failed",
+            Some(CloseBlocker::SaveConflict) => "document.close_save_conflict",
+            Some(CloseBlocker::PublishedUncertain) => "document.close_save_uncertain",
+            Some(CloseBlocker::PendingChanges) | None => "document.close_pending_changes",
         }
     }
 

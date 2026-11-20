@@ -19,7 +19,7 @@ use aline_edit::{
     PlanOutcome, RawBlockEdit, RereadFailure, SourceEdit, plan_change, plan_raw_block_input,
     validate_change,
 };
-use aline_markdown::{Block, ParseBudget, ParseConfig, Parsed, parse};
+use aline_markdown::{Block, ParseBudget, ParseConfig, Parsed, ProtectedRange, StyledRange, parse};
 use std::ops::Range;
 
 // 仅测试编译的解析调用计数，用于证明发布段不再解析。
@@ -497,6 +497,7 @@ impl DocCore {
             self.command_context().mode(),
             self.open.as_ref().and_then(OpenBlock::visual_extent),
             self.edit_budget(),
+            false,
         )?;
         let Some(buffer) = prepared.buffer else {
             return Ok(ApplyOutcome::Unchanged);
@@ -547,16 +548,20 @@ impl InputPatch {
         mode: EditMode,
         extent: Option<&Range<usize>>,
         budget: EditBudget,
+        raw_on_replace: bool,
     ) -> Result<PreparedInputPatch, DocError> {
         let snapshot = base.snapshot();
         let selection = bind_selection(snapshot, self.selections.0)?;
         let parsed = parse_for_edit(snapshot, budget)?;
         // 真实基线是输入开始前的已提交快照；草稿仍由 DocCore 保留。
         let context = EditContext::new(mode);
-        let raw_block = matches!(
-            self.source,
-            OperationSource::Typing | OperationSource::ImeCommit
-        )
+        // 原生删除虽以 Replace 发布，但与普通输入一样留在打开块内：必须重绑
+        // 可视化块范围，否则发布后只能关闭块，后续输入会静默失去输入帧。
+        let raw_block = (raw_on_replace
+            || matches!(
+                self.source,
+                OperationSource::Typing | OperationSource::ImeCommit
+            ))
         .then_some(extent)
         .flatten();
         let outcome = plan_single_patch(
@@ -629,6 +634,7 @@ pub(super) struct StagedInput<'a> {
 }
 
 impl StagedInput<'_> {
+    /// 封口待定输入组并规划命令；命令类调用方不需要块目标。
     pub(super) fn prepare(
         self,
         base: BufferEditBase,
@@ -639,6 +645,26 @@ impl StagedInput<'_> {
             EditBudget,
         ) -> Result<PlanOutcome, DocError>,
     ) -> Result<PreparedBufferEdit, DocError> {
+        self.prepare_with_target(base, None, plan_command)
+            .map(|(prepared, _)| prepared)
+    }
+
+    /// 同上，并在 `rebind_after` 存在时返回命令后的块目标。
+    ///
+    /// 原生删除必须先封口待定输入组、再在同一批次里就地删除；两批之间块范围
+    /// 会位移，必须在命令后的候选文本上重新绑定，否则只能关闭块，后续输入会
+    /// 因为没有可重建的输入站点而被静默丢弃。
+    pub(super) fn prepare_with_target(
+        self,
+        base: BufferEditBase,
+        rebind_after: Option<SelectionSpec>,
+        plan_command: impl FnOnce(
+            &Parsed,
+            &SrcSelection,
+            &EditContext,
+            EditBudget,
+        ) -> Result<PlanOutcome, DocError>,
+    ) -> Result<(PreparedBufferEdit, InputTargetUpdate), DocError> {
         let before = base.snapshot();
         let input_selection = bind_selection(before, self.group.before_selection)?;
         let input_context = EditContext::new(self.context.mode());
@@ -669,23 +695,65 @@ impl StagedInput<'_> {
                 )?
             }
         };
-        base.prepare_staged_command(
+        let candidate_extent = match (self.visual_extent, rebind_after) {
+            (Some(extent), Some(_)) => Some(transform_extent(before, &input_batch, extent)?),
+            _ => None,
+        };
+        let mut target = InputTargetUpdate::Preserve;
+        let prepared = base.prepare_staged_command(
             &input_batch,
             (&input_selection, self.selection),
             self.now_millis,
             self.budget.text(),
             |candidate, selection| {
                 let parsed = parse_for_edit(candidate, self.budget)?;
+                // 命令无净变化时也按候选文本重绑，避免封口后失去输入帧。
+                if let (Some(extent), Some(after)) = (candidate_extent.as_ref(), rebind_after) {
+                    target = rebind_visual_target(
+                        parsed.blocks(),
+                        extent,
+                        after,
+                        parsed.protected_ranges(),
+                        parsed.styled_ranges(),
+                    )?;
+                }
                 let plan = plan_command(&parsed, selection, &self.context, self.budget)?;
                 let PlanOutcome::Changed(plan) = plan else {
-                    return Ok(None);
+                    return Ok::<_, DocError>(None);
                 };
                 let change = validate_change(&plan, candidate, &parsed, selection, &self.context)
                     .map_err(DocError::Edit)?;
+                if let (Some(extent), Some(after)) = (candidate_extent.as_ref(), rebind_after) {
+                    target = rebind_visual_target(
+                        change.candidate_blocks(),
+                        extent,
+                        after,
+                        change.candidate_protected_ranges(),
+                        change.candidate_styled_ranges(),
+                    )?;
+                }
                 Ok(Some((change.batch().clone(), change.target_selection())))
             },
-        )
+        )?;
+        Ok((prepared, target))
     }
+}
+
+/// 在命令后的候选块上重绑可视化块；没有任何块完整包含目标时要求关闭块。
+fn rebind_visual_target(
+    blocks: &[Block],
+    transformed: &Range<usize>,
+    after: SelectionSpec,
+    protected: &[ProtectedRange],
+    styled: &[StyledRange],
+) -> Result<InputTargetUpdate, DocError> {
+    let head = after.head();
+    Ok(match rebound_extent(blocks, transformed, &(head..head)) {
+        Some(extent) => {
+            InputTargetUpdate::Rebind(VisualInput::from_parse(extent, protected, styled)?)
+        }
+        None => InputTargetUpdate::Close,
+    })
 }
 
 fn query_context(context: EditContext, generation: Option<u64>) -> EditContext {

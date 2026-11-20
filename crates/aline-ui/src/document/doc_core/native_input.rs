@@ -69,19 +69,35 @@ enum InputSettlement {
     /// 非测试的非 macOS 构建不编译该适配器，因此显式允许该变体暂未被构造。
     #[cfg_attr(not(any(test, target_os = "macos")), allow(dead_code))]
     Composition(SelectionSpec),
-    /// 原生窗口删除适配器专用；无头协议不依赖该结算。
+    /// 原生窗口删除适配器专用；携带删除后的折叠选区。
+    ///
+    /// 删除与普通输入一样留在打开块内：结算时只换基线、块范围和选区，
+    /// 不关闭块，否则后续输入会因没有可重建的输入站点而被静默丢弃。
     #[cfg(any(test, target_os = "macos"))]
-    Delete,
+    Delete(SelectionSpec),
     /// 关闭块；`Some` 仅在存在待定普通输入组时携带封口后的选区。
     Close(Option<SelectionSpec>),
 }
 
 impl InputSettlement {
-    fn closing_selection(self) -> Option<SelectionSpec> {
+    /// 删除结算只在原生删除适配器启用时存在，分类须与变体使用相同平台条件。
+    fn is_delete(self) -> bool {
+        match self {
+            #[cfg(any(test, target_os = "macos"))]
+            Self::Delete(_) => true,
+            Self::Typing(_) | Self::Composition(_) | Self::Close(_) => false,
+        }
+    }
+
+    /// 结算后应换到的选区；`None` 表示按历史/命令语义同步块。
+    ///
+    /// 普通输入、组合确认与块内删除都在发布后停留或重建在块内，只有
+    /// `Close` 的块关闭由 `closes_block` 单独表达。
+    fn settlement_selection(self) -> Option<SelectionSpec> {
         match self {
             Self::Typing(selection) | Self::Composition(selection) => Some(selection),
             #[cfg(any(test, target_os = "macos"))]
-            Self::Delete => None,
+            Self::Delete(selection) => Some(selection),
             Self::Close(selection) => selection,
         }
     }
@@ -163,17 +179,22 @@ impl NativeInputJob {
         };
         let extent = self.binding.visual_extent.as_ref();
         let (patch, settlement) = match self.intent {
-            FrozenInput::Single(patch, settlement) => (
-                patch.prepare(self.base, mode, extent, self.budget)?,
-                settlement,
-            ),
+            FrozenInput::Single(patch, settlement) => {
+                // 原生删除以 Replace 发布，但仍须重绑块范围才能留在块内。
+                let raw_on_replace = settlement.is_delete();
+                (
+                    patch.prepare(self.base, mode, extent, self.budget, raw_on_replace)?,
+                    settlement,
+                )
+            }
             #[cfg(any(test, target_os = "macos"))]
             FrozenInput::DeleteAfterTyping {
                 group,
                 range,
                 now_millis,
             } => {
-                let buffer = StagedInput {
+                let after = SelectionSpec::new(range.start, range.start);
+                let (buffer, target) = StagedInput {
                     group: &group,
                     visual_extent: extent,
                     selection: self.binding.selection,
@@ -181,20 +202,24 @@ impl NativeInputJob {
                     now_millis,
                     budget: self.budget,
                 }
-                .prepare(self.base, |parsed, selection, context, budget| {
-                    plan_single_patch(parsed, selection, context, None, range, "", budget)
-                })?;
+                .prepare_with_target(
+                    self.base,
+                    Some(after),
+                    |parsed, selection, context, budget| {
+                        plan_single_patch(parsed, selection, context, None, range, "", budget)
+                    },
+                )?;
                 (
                     PreparedInputPatch {
                         buffer: Some(buffer),
-                        target: InputTargetUpdate::Preserve,
+                        target,
                     },
-                    InputSettlement::Delete,
+                    InputSettlement::Delete(after),
                 )
             }
             FrozenInput::CloseBlock { patch, settlement } => {
                 let patch = match patch {
-                    Some(patch) => patch.prepare(self.base, mode, extent, self.budget)?,
+                    Some(patch) => patch.prepare(self.base, mode, extent, self.budget, false)?,
                     None => PreparedInputPatch {
                         buffer: None,
                         target: InputTargetUpdate::Preserve,
@@ -463,7 +488,7 @@ impl DocCore {
                     now_millis,
                     next_target: None,
                 },
-                InputSettlement::Delete,
+                InputSettlement::Delete(after),
             )
         };
         Ok(Some(self.freeze_native_input(identity, intent)))
@@ -489,8 +514,8 @@ impl DocCore {
             .buffer
             .as_ref()
             .and_then(|buffer| buffer.result_revision());
-        let closing_selection = settlement.closing_selection();
-        let (next_version, unchanged_selection) = match (revision, closing_selection) {
+        let settlement_selection = settlement.settlement_selection();
+        let (next_version, unchanged_selection) = match (revision, settlement_selection) {
             (Some(revision), _) => (self.version.after_commit(revision), None),
             (None, Some(selection)) => (
                 self.version.next_draft(),
@@ -518,10 +543,11 @@ impl DocCore {
         if let Some(revision) = revision {
             self.buffer.seal_pending();
             self.update_raw_input_target(patch.target);
-            if matches!(settlement, InputSettlement::Composition(_)) {
+            if matches!(settlement, InputSettlement::Composition(_)) || settlement.is_delete() {
                 self.typing_redo = None;
             }
-            if let Some(selection) = closing_selection {
+            if let Some(selection) = settlement_selection {
+                // 组合确认与块内删除都在发布后换基线并停留或重建在块内。
                 self.finish_composition(Some(revision), selection);
             } else {
                 self.sync_block_after_buffer_change();
@@ -530,7 +556,7 @@ impl DocCore {
             self.finish_native_close(close_request);
             return Ok(CommitOutcome::Committed { revision });
         }
-        if let Some(selection) = closing_selection {
+        if let Some(selection) = settlement_selection {
             self.finish_composition(None, selection);
         }
         self.finish_native_close(close_request);

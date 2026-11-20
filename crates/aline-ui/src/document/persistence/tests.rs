@@ -415,6 +415,24 @@ fn persistence_state_uncertain_publication_retains_both_baselines_and_blocks_clo
 }
 
 #[test]
+fn persistence_close_blocker_names_the_action_that_unblocks_close() -> TestResult {
+    let (_doc, mut state) = fixture(b"x\n")?;
+    state.status = SaveStatus::Failed;
+    assert_eq!(state.close_blocker(), CloseBlocker::SaveFailed);
+    state.status = SaveStatus::Conflict;
+    assert_eq!(state.close_blocker(), CloseBlocker::SaveConflict);
+    state.status = SaveStatus::PublishedUncertain;
+    assert_eq!(state.close_blocker(), CloseBlocker::PublishedUncertain);
+    state.status = SaveStatus::Idle;
+    assert_eq!(
+        state.close_blocker(),
+        CloseBlocker::PendingChanges,
+        "空闲但仍有未保存编辑时不得误导为保存失败"
+    );
+    Ok(())
+}
+
+#[test]
 fn persistence_state_rejects_path_change_in_flight_and_foreign_late_failure() -> TestResult {
     let (mut doc, mut state) = fixture(b"x\n")?;
     let initial = doc.current_snapshot(TEXT)?;

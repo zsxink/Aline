@@ -824,6 +824,20 @@ impl NativeOpenCoordinator {
         }
     }
 
+    /// 组合活动时拒绝发起打开：原生面板会夺取焦点并打断组合。
+    ///
+    /// 返回 true 时只设置 `document.composition_pending`，不改打开请求、文档或焦点。
+    pub(super) fn open_blocked_by_composition(&mut self) -> bool {
+        let composing = self
+            .session
+            .document()
+            .is_some_and(|document| document.core().composition().is_some());
+        if composing {
+            self.feedback = Some("document.composition_pending");
+        }
+        composing
+    }
+
     pub(super) fn request_open(&mut self) -> Result<OpenRequestId, OpenError> {
         // 用户开始打开/替换文档：在飞恢复立即失效，迟到完成不得接管新文档。
         self.panel.invalidate_restore();
@@ -967,7 +981,7 @@ impl NativeOpenCoordinator {
                 None
             }
             Ok((OpenDisposition::RejectedUnresolvedDocument, None)) => {
-                self.feedback = Some("document.close_pending_changes");
+                self.feedback = Some(self.session.close_blocked_key());
                 None
             }
             Err(key) => {
@@ -1007,7 +1021,9 @@ impl NativeOpenCoordinator {
                 Ok(value)
             }
             Err(crate::CloseDisposition::Refused) => {
-                self.feedback = Some("document.close_pending_changes");
+                // 拒绝原因决定用户能做什么：保存失败可重试，冲突需先处理，
+                // 不确定发布只能另存为；不能统一提示为「有未结算编辑」。
+                self.feedback = Some(self.session.close_blocked_key());
                 Err(())
             }
             Err(crate::CloseDisposition::Closed) => Err(()),
@@ -1245,6 +1261,9 @@ impl NativeWindowCopy {
         let mut errors = BTreeMap::new();
         for key in [
             "document.close_pending_changes",
+            "document.close_save_failed",
+            "document.close_save_conflict",
+            "document.close_save_uncertain",
             "document.edit_refused",
             "document.input_dropped",
             "document.input_applied_after_failure",
@@ -1679,6 +1698,12 @@ impl NativeDocumentWindow {
 
     fn open_document(&mut self, _: &OpenDocument, window: &mut Window, cx: &mut Context<Self>) {
         if self.dialog_task.is_some() {
+            return;
+        }
+        // 组合未结束时不开原生面板：面板会夺取焦点并打断组合，候选可能丢失。
+        // 必须在 `request_open` 之前判定，否则旧请求已被取消、反馈也会被清空。
+        if self.state.open_blocked_by_composition() {
+            cx.notify();
             return;
         }
         let request = match self.state.request_open() {

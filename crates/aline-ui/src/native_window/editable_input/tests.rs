@@ -255,6 +255,36 @@ fn input_recovery_rejects_stale_platform_coordinates_and_rebinds_commands() {
 }
 
 #[test]
+fn input_settlement_keeps_save_and_close_feedback_until_user_acts() {
+    // 输入类提示随下一次输入消失，保存/冲突/关闭类提示必须保留。
+    for key in [
+        "document.edit_refused",
+        "document.input_dropped",
+        "document.composition_pending",
+        "document.save_saved",
+        "document.save_cancelled",
+    ] {
+        assert!(input_feedback_cleared(key), "输入类反馈应被清除：{key}");
+    }
+    for key in [
+        "document.save_failed",
+        "document.save_conflict",
+        "document.save_uncertain",
+        "document.external_conflict",
+        "document.external_missing",
+        "document.close_pending_changes",
+        "document.close_save_failed",
+        "document.close_save_conflict",
+        "document.close_save_uncertain",
+    ] {
+        assert!(
+            !input_feedback_cleared(key),
+            "保存/关闭类反馈不得清除：{key}"
+        );
+    }
+}
+
+#[test]
 fn same_version_source_retarget_invalidates_queries_and_writes_for_old_row() -> TestResult {
     let mut state = session("ab\ncd", HistoryBudget::new(8, 4096), EditorMode::Source)?;
     let doc = state.document_mut().ok_or("没有文档")?;

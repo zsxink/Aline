@@ -81,6 +81,9 @@ pending = "Calculating…"
 
 [document]
 close_pending_changes = "This document has unsettled edits and cannot be closed or replaced yet."
+close_save_failed = "The last save failed, so this document cannot be closed or replaced yet. Retry saving or save as, then try again."
+close_save_conflict = "The file on disk conflicts with the save baseline, so this document cannot be closed or replaced yet. Load the disk version, overwrite it, or retry the check first."
+close_save_uncertain = "The last write result is unconfirmed, so this document cannot be closed or replaced yet. Save it as a new file, then try again."
 save_saved = "Saved"
 save_failed = "Save failed"
 save_conflict = "File changed on disk; not saved"

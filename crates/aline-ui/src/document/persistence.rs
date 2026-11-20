@@ -147,6 +147,19 @@ pub(crate) enum CloseStatus {
     Ready,
 }
 
+/// 关闭被拒的原因；宿主据此告诉用户下一步能做什么，而不是笼统提示「有未结算编辑」。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum CloseBlocker {
+    /// 有未保存的编辑或在途/等待项。
+    PendingChanges,
+    /// 最近一次保存失败；重试保存或另存为后可关闭。
+    SaveFailed,
+    /// 外部冲突未处理。
+    SaveConflict,
+    /// 上次写入结果未确认；只能另存为新文件后再关闭。
+    PublishedUncertain,
+}
+
 struct SavedBaseline {
     // 初次打开时，逻辑源码就是读入的精确文本。
     logical: Option<TextSnapshot>,
@@ -959,6 +972,18 @@ impl PersistenceCoordinator {
             CloseStatus::NeedsDecision
         } else {
             CloseStatus::Ready
+        }
+    }
+
+    /// 关闭被拒的原因；只在 `close_status` 非 `Ready` 时有意义，且不改变任何状态。
+    pub(super) fn close_blocker(&self) -> CloseBlocker {
+        match self.status {
+            SaveStatus::Failed => CloseBlocker::SaveFailed,
+            SaveStatus::Conflict => CloseBlocker::SaveConflict,
+            SaveStatus::PublishedUncertain => CloseBlocker::PublishedUncertain,
+            SaveStatus::Idle | SaveStatus::WaitingForComposition | SaveStatus::Saving => {
+                CloseBlocker::PendingChanges
+            }
         }
     }
 }

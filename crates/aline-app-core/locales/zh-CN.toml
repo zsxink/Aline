@@ -81,6 +81,9 @@ pending = "统计中…"
 
 [document]
 close_pending_changes = "当前文档有未结算的编辑，暂不能关闭或替换。"
+close_save_failed = "最近一次保存失败，暂不能关闭或替换。请重试保存或另存为后再试。"
+close_save_conflict = "磁盘内容与保存基线冲突，暂不能关闭或替换。请先载入磁盘内容、确认覆盖或重试检查。"
+close_save_uncertain = "上次写入结果未确认，暂不能关闭或替换。请另存为新的文件后再试。"
 save_saved = "已保存"
 save_failed = "保存失败"
 save_conflict = "文件已被外部修改，未保存"

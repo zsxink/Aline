@@ -87,6 +87,77 @@ fn native_delete_prepares_off_thread_and_restores_direction_on_undo() -> TestRes
     Ok(())
 }
 
+/// 在 Visual 模式打开首个顶层块，返回文档与块源码范围。
+fn visual_document(text: &str, at: usize) -> Result<DocCore, Box<dyn Error>> {
+    let mut doc = DocCore::new_editable(
+        text,
+        SelectionSpec::new(at, at),
+        limits(HistoryBudget::new(8, 1024)),
+    )?;
+    let snapshot = doc.current_snapshot(TEXT)?;
+    let parsed = aline_markdown::parse(
+        snapshot.text(),
+        aline_markdown::ParseConfig::m0(),
+        aline_markdown::ParseBudget::m0(),
+    )?;
+    let block = parsed.blocks().first().ok_or("夹具应有顶层块")?;
+    let identity = doc.current_input_identity()?;
+    let selection = aline_buffer::SrcSelection::new(
+        snapshot.text().src_offset(at)?,
+        snapshot.text().src_offset(at)?,
+    )?;
+    doc.open_visual_block(&identity, &parsed, block.range(), &selection)?;
+    Ok(doc)
+}
+
+#[test]
+fn native_delete_inside_visual_block_keeps_block_open_for_next_input() -> TestResult {
+    let mut doc = visual_document("甲乙", 3)?;
+    let identity = doc.current_input_identity()?;
+    let snapshot = doc.current_snapshot(TEXT)?;
+    let range = snapshot.text().src_range(3..6)?;
+    let job = doc
+        .prepare_native_delete(&identity, &range, 1)?
+        .ok_or("缺少删除准备")?;
+    doc.publish_native_input(job.run()?)?;
+    assert_eq!(doc.buffer_text()?, "甲");
+    assert!(doc.has_open_block(), "可视化块内删除后必须保持打开");
+    assert_eq!(doc.current_selection(), SelectionSpec::new(3, 3));
+    // 后续输入仍落在同一块内，而不是因块被关闭而静默丢弃。
+    doc.type_text(3, "丙", 2)?;
+    assert_eq!(
+        doc.current_snapshot(TEXT)?.full_text(TEXT)?,
+        "甲丙",
+        "删除后的后续输入必须被接受"
+    );
+    Ok(())
+}
+
+#[test]
+fn native_staged_delete_inside_visual_block_keeps_block_open_for_next_input() -> TestResult {
+    let mut doc = visual_document("甲乙", 3)?;
+    doc.type_text(3, "丙", 1)?;
+    assert_eq!(doc.open_block_draft(), Some("丙"));
+    let identity = doc.current_input_identity()?;
+    let snapshot = doc.current_snapshot(TEXT)?;
+    // 删除落在待定输入组之外，必须先封口再删除（两步发布）。
+    let range = snapshot.text().src_range(0..3)?;
+    let job = doc
+        .prepare_native_delete(&identity, &range, 2)?
+        .ok_or("缺少两步删除准备")?;
+    doc.publish_native_input(job.run()?)?;
+    assert_eq!(doc.buffer_text()?, "丙乙");
+    assert!(doc.has_open_block(), "两步删除后必须保持块打开");
+    assert_eq!(doc.current_selection(), SelectionSpec::new(0, 0));
+    doc.type_text(0, "丁", 3)?;
+    assert_eq!(
+        doc.current_snapshot(TEXT)?.full_text(TEXT)?,
+        "丁丙乙",
+        "两步删除后的后续输入必须被接受"
+    );
+    Ok(())
+}
+
 #[test]
 fn native_staged_delete_publishes_two_steps_and_keeps_draft_before_completion() -> TestResult {
     let mut doc = document("甲乙", SelectionSpec::new(3, 3))?;
