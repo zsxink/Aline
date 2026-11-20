@@ -144,6 +144,75 @@ fn publish_with_cancellation(
         .map_err(|error| format!("{error:?}").into())
 }
 
+/// 1x1 RGBA PNG；真实窗口恢复后由驱动独立解码核对像素尺寸。
+const SEED_PNG: &[u8] = &[
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
+    0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41, 0x54, 0x78, 0xda, 0x63, 0xfc, 0xcf, 0xc0, 0x50,
+    0x0f, 0x00, 0x04, 0x85, 0x01, 0x80, 0x84, 0xa9, 0x8c, 0x21, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45,
+    0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+];
+
+/// 真实窗口图片恢复证据播种入口：以生产恢复编码器向隔离 HOME 的生产根写入
+/// 一条含内嵌 PNG 的完整代，供 `scripts/drive_m2_recovery_image.py` 启动
+/// 真实 aline 消费。
+///
+/// 仅在显式设置 `ALINE_RECOVERY_SEED_HOME` 与 `ALINE_RECOVERY_SEED_TARGET`
+/// 时执行；默认忽略，不参与常规测试。HOME 必须与当前进程 HOME 不同，避免
+/// 写入真实恢复根。测试只编码记录，不写目标夹具。
+#[test]
+#[ignore = "证据播种：需 --ignored 与 ALINE_RECOVERY_SEED_HOME/TARGET"]
+fn seed_recovery_generation_with_embedded_png_for_real_window() -> Result<(), Box<dyn Error>> {
+    let home = std::env::var_os("ALINE_RECOVERY_SEED_HOME")
+        .map(PathBuf::from)
+        .ok_or("缺少 ALINE_RECOVERY_SEED_HOME")?;
+    let target = std::env::var_os("ALINE_RECOVERY_SEED_TARGET")
+        .map(PathBuf::from)
+        .ok_or("缺少 ALINE_RECOVERY_SEED_TARGET")?;
+    if !home.is_absolute() || !target.is_absolute() {
+        return Err("播种 HOME 与目标夹具必须是绝对路径".into());
+    }
+    if std::env::var_os("HOME").as_deref() == Some(home.as_os_str()) {
+        return Err("播种 HOME 不得等于当前进程 HOME，避免写入真实恢复根".into());
+    }
+    if !target.is_file() {
+        return Err("播种目标夹具不存在".into());
+    }
+    let root = super::create_default_root(&home).map_err(|error| format!("{error:?}"))?;
+    let store = RecoveryStore::open(root).map_err(|error| format!("{error:?}"))?;
+    let document = open_lineage(&store)?;
+    // 固定临时文档/资源身份：0xa1 / 0xb2，扩展名 png。
+    let locator = "aline-temp:00000000000000a1/00000000000000b2.png";
+    let source = format!("# 恢复图片验收\n\n![内嵌图片]({locator})\n\n源文件不应被改写。\n");
+    let input = RecoveryGenerationInput {
+        path_generation: 7,
+        captured_composition: false,
+        path: RecoveryPath::from_os_path(&target),
+        anchor_byte: 0,
+        head_byte: 0,
+        source,
+        logical_saved: None,
+        baseline: None,
+        resources: vec![resource(locator, SEED_PNG)],
+    };
+    let cancellation = Cancellation::new();
+    let generation = match store
+        .publish(document, input, &cancellation)
+        .map_err(|error| format!("{error:?}"))?
+    {
+        RecoveryPublishOutcome::Published { generation, .. } => generation,
+        other => return Err(format!("期望 Published，实际 {other:?}").into()),
+    };
+    println!(
+        "ALINE-RECOVERY-SEED document={} generation={} locator={} target_name={}",
+        document.directory_name(),
+        generation,
+        locator,
+        target.file_name().unwrap_or_default().to_string_lossy()
+    );
+    Ok(())
+}
+
 fn read_next(
     store: &RecoveryStore,
     document: RecoveryDocumentId,

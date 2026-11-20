@@ -50,6 +50,8 @@ CONTENT_BOTTOM = 630.0
 CODE_BLOCK_X = 440.0
 CODE_BLOCK_Y = 514.0
 SCROLL_INJECTOR_SOURCE = ROOT / "scripts" / "inject_scroll_wheel.swift"
+KEY_INJECTOR_SOURCE = ROOT / "scripts" / "inject_key.swift"
+LIST_WINDOWS_SOURCE = ROOT / "scripts" / "list_windows.swift"
 STARTUP_TIMEOUT = 30.0
 STARTUP_POLL = 0.2
 
@@ -64,6 +66,8 @@ class WindowDriver:
         self.evidence = evidence
         self.serial = 0
         self._injector = None
+        self._key_injector = None
+        self._window_lister = None
         self._window_origin = None
 
     def call(self, args, note="", allow_missing_window=False):
@@ -169,6 +173,75 @@ class WindowDriver:
         if result.returncode != 0:
             raise DriverError("滚轮注入失败：" + result.stderr[-600:])
 
+    def inject_keys(self, keycodes, note, names=None):
+        """向系统 HID 事件流注入物理键盘按键序列。
+
+        注入器编译自仓库内 ``scripts/inject_key.swift``，与真实键盘走同一条
+        平台通道，因此事件只到当前前台应用；调用方必须先确认前台是被测实例。
+        命令记录只引用仓库相对脚本名，不写机器路径。
+        """
+        if self._key_injector is None:
+            cache = Path(tempfile.mkdtemp(prefix="aline-key-injector-"))
+            binary = cache / "inject_key"
+            build = subprocess.run(
+                ["swiftc", "-O", str(KEY_INJECTOR_SOURCE), "-o", str(binary)],
+                text=True, capture_output=True)
+            if build.returncode != 0:
+                raise DriverError("按键注入器编译失败：" + build.stderr[-800:])
+            self._key_injector = binary
+        self.serial += 1
+        started = time.time_ns()
+        result = subprocess.run(
+            [str(self._key_injector)] + [str(code) for code in keycodes],
+            text=True, capture_output=True)
+        write_json(self.evidence / f"step-{self.serial:03d}.command.json", {
+            "argv": ["scripts/inject_key.swift"] + [str(code) for code in keycodes],
+            "note": note,
+            "exit_code": result.returncode,
+            "started_epoch_ns": started,
+            "finished_epoch_ns": time.time_ns(),
+            "virtual_keys": list(keycodes),
+            "key_names": list(names or []),
+        })
+        if result.stdout.strip():
+            write_text(self.evidence / f"step-{self.serial:03d}.stdout", result.stdout)
+        if result.returncode != 0:
+            raise DriverError("按键注入失败：" + result.stderr[-600:])
+
+    def capture_windows(self, note, record_name="candidate-windows.json"):
+        """记录被测窗口与输入法候选窗的几何（不含窗口名称/候选内容）。"""
+        if self._window_lister is None:
+            cache = Path(tempfile.mkdtemp(prefix="aline-window-lister-"))
+            binary = cache / "list_windows"
+            build = subprocess.run(
+                ["swiftc", "-O", str(LIST_WINDOWS_SOURCE), "-o", str(binary)],
+                text=True, capture_output=True)
+            if build.returncode != 0:
+                raise DriverError("窗口列表工具编译失败：" + build.stderr[-800:])
+            self._window_lister = binary
+        self.serial += 1
+        started = time.time_ns()
+        result = subprocess.run([str(self._window_lister), str(self.pid)],
+                                text=True, capture_output=True)
+        try:
+            windows = json.loads(result.stdout or "[]")
+        except json.JSONDecodeError:
+            windows = []
+        write_json(self.evidence / f"step-{self.serial:03d}.command.json", {
+            "argv": ["scripts/list_windows.swift", str(self.pid)],
+            "note": note,
+            "exit_code": result.returncode,
+            "started_epoch_ns": started,
+            "finished_epoch_ns": time.time_ns(),
+        })
+        write_json(self.evidence / f"step-{self.serial:03d}.windows.json",
+                   {"windows": windows})
+        write_json(self.evidence / record_name,
+                   {"windows": windows, "note": note})
+        if result.returncode != 0:
+            raise DriverError("窗口列表读取失败：" + result.stderr[-600:])
+        return windows
+
     def title(self):
         return (self.snapshot().get("window") or {}).get("title") or ""
 
@@ -254,63 +327,122 @@ class WindowDriver:
                         return int(match.group(2))
         return None
 
-    def open_document(self, path):
-        """打开面板 → 前往文件夹 → 粘贴绝对路径 → 定位夹具 → 打开。
+    def osascript(self, script, note):
+        """文件面板属于系统面板服务窗口：面板内按键经 System Events 投递。"""
+        self.serial += 1
+        started = time.time_ns()
+        result = subprocess.run(
+            ["osascript", "-e", 'tell application "System Events" to ' + script],
+            text=True, capture_output=True)
+        write_json(self.evidence / f"step-{self.serial:03d}.command.json",
+                   {"argv": ["osascript", "-e", "<System Events: " + note + ">"],
+                    "note": note, "exit_code": result.returncode,
+                    "started_epoch_ns": started, "finished_epoch_ns": time.time_ns()})
+        if result.returncode != 0:
+            raise DriverError(note + "失败：" + result.stderr[-600:])
+        return result
 
-        路径逐次核对：第一次回车后若面板仍停在列表且夹具未选中，先按 Right
-        进入所选文件夹的下一列（列视图会选中首个文件）；仍未选中再点击无障碍
-        树里的夹具行。「打开」按钮仅在未禁用时点击，否则回车。
+    def open_document(self, path):
+        """打开面板 → 前往文件夹（System Events）→ 直接写路径字段 → 回车导航 →
+        核对面板区位与选中文件 → 打开。
+
+        面板属于系统面板服务窗口：orca 直投热键在冷启动后不一定到达面板，
+        实测粘贴不可靠，而路径字段可写（set-value）。导航后先核对 `Where:`
+        与选中文件再打开，最后用唯一文件名核对窗口标题，避免误开同名文件；
+        前往文件夹未弹出时回退到列视图行容器打开。
         """
-        self.call(["hotkey", "--key", OPEN_PANEL_KEY], "打开文件面板")
-        time.sleep(1.2)
-        self.call(["hotkey", "--key", GO_TO_FOLDER_KEY], "前往文件夹")
-        time.sleep(1.2)
-        self.call(["paste-text", "--text", str(path)], "粘贴夹具绝对路径")
-        time.sleep(1.5)
-        self.call(["press-key", "--key", "Return"], "确认路径")
-        time.sleep(1.5)
-        for _attempt in range(3):
-            snapshot = self.snapshot()
-            if Path(path).name in ((snapshot.get("window") or {}).get("title") or ""):
-                return
-            # 列视图的 `open` 辅助动作挂在行容器上；文本域执行 AXOpen 会报错。
-            container = self.find_row_container(snapshot, Path(path).name)
-            if container is not None:
-                try:
-                    self.call(["perform-secondary-action", "--element-index", str(container),
-                               "--action", "open"], "通过行容器辅助动作打开")
-                except DriverError as error:
-                    write_text(self.evidence / "secondary-action-fallback.txt", str(error)[:600])
-                time.sleep(1.2)
-                if Path(path).name in self.title():
-                    return
-                self.call(["click", "--element-index", str(container)], "点击行容器打开")
-                time.sleep(1.2)
-                if Path(path).name in self.title():
-                    return
-            self.call(["press-key", "--key", "Right"], "列视图进入下一列")
-            time.sleep(0.6)
-            snapshot = self.snapshot()
-            if Path(path).name in ((snapshot.get("window") or {}).get("title") or ""):
-                return
-            tree = self.tree_text(snapshot)
-            row = self.find_row(snapshot, Path(path).name)
-            selected = row is not None and re.search(
-                r'^\s*' + str(row) + r' text field \(selected', tree, re.M)
-            if row is not None and not selected:
-                container = self.find_row_container(snapshot, Path(path).name)
-                target = container if container is not None else row
-                self.call(["click", "--element-index", str(target)], "选中夹具行")
-                time.sleep(0.8)
+        target = str(path)
+        name = Path(path).name
+        for attempt in range(1, 3):
+            self.call(["hotkey", "--key", OPEN_PANEL_KEY], "打开文件面板")
+            deadline = time.monotonic() + 8.0
+            while True:
                 snapshot = self.snapshot()
-            button = self.find_enabled_button(snapshot, OPEN_BUTTON_LABEL)
-            if button is not None:
-                self.call(["click", "--element-index", str(button)], "点击打开按钮")
-            else:
-                self.call(["press-key", "--key", "Return"], "回车打开")
+                tree = self.tree_text(snapshot)
+                if "Where:" in tree:
+                    break
+                if time.monotonic() >= deadline:
+                    break
+                time.sleep(0.5)
+            self.osascript('keystroke "g" using {command down, shift down}',
+                           "打开前往文件夹")
+            time.sleep(1.0)
+
+            def path_field():
+                current = self.snapshot()
+                current_tree = self.tree_text(current)
+                hit = re.search(r'^\s*(\d+) text field \(settable\), Value: /',
+                                current_tree, re.M)
+                return (int(hit.group(1)) if hit else None), current, current_tree
+
+            field, snapshot, tree = path_field()
+            if field is None:
+                # System Events 偶发没有到达面板服务窗口；orca 直投再试一次。
+                self.call(["hotkey", "--key", GO_TO_FOLDER_KEY],
+                          "打开前往文件夹（orca 直投）")
+                time.sleep(1.0)
+                field, snapshot, tree = path_field()
+            if field is None:
+                # 前往文件夹未弹出：面板已停在上次目录时可按行容器辅助动作打开。
+                container = self.find_row_container(snapshot, name)
+                if container is not None:
+                    try:
+                        self.call(["perform-secondary-action", "--element-index",
+                                   str(container), "--action", "open"],
+                                  "通过行容器辅助动作打开")
+                    except DriverError as error:
+                        write_text(self.evidence / "secondary-action-fallback.txt",
+                                   str(error)[:600])
+                    time.sleep(1.2)
+                    if name in self.title():
+                        return
+                    self.call(["click", "--element-index", str(container)],
+                              "点击行容器打开")
+                    time.sleep(1.2)
+                    if name in self.title():
+                        return
+                # 关闭面板后重试，避免下一轮 Cmd+O 落在已打开的面板上。
+                self.osascript("key code 53", "关闭文件面板")
+                time.sleep(0.8)
+                continue
+            self.call(["set-value", "--element-index", str(field),
+                       "--value", target], "写入夹具绝对路径")
+            time.sleep(0.4)
+            self.osascript("key code 36", "回车确认路径")
+            time.sleep(1.2)
+            where = None
+            selected = None
+            for _ in range(10):
+                snapshot = self.snapshot()
+                tree = self.tree_text(snapshot)
+                where = re.search(
+                    r'^\s*(\d+) pop up button Where:, Value: (.*)$', tree, re.M)
+                # 选中行后面还跟着 Secondary Actions，不能用行尾锚点。
+                selected = re.search(
+                    r'^\s*(\d+) text field \(selected, settable\), Value: '
+                    + re.escape(name), tree, re.M)
+                if where is not None and selected is not None:
+                    break
+                time.sleep(0.2)
+            write_json(self.evidence / "open-panel.json", {
+                "attempt": attempt,
+                "where": where.group(2) if where else None,
+                "selected": selected is not None,
+                "note": "前往文件夹导航后的面板区位与选中文件",
+            })
+            if (where is None or where.group(2) != Path(path).parent.name
+                    or selected is None):
+                # 面板可能停在别处；关闭面板后重来一轮。
+                self.osascript("key code 53", "关闭文件面板")
+                time.sleep(0.8)
+                continue
+            self.osascript("key code 36", "回车打开所选夹具")
             time.sleep(1.5)
-            if Path(path).name in self.title():
+            if name in self.title():
                 return
+            self.call(["hotkey", "--key", CLOSE_DOCUMENT_KEY], "关闭误开的文档",
+                      allow_missing_window=True)
+            time.sleep(1.0)
         raise DriverError("打开的文档与目标不符：" + self.title())
 
     def heading_point(self):

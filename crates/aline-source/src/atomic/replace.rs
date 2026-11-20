@@ -791,6 +791,43 @@ mod tests {
         Ok(())
     }
 
+    /// 真实平台交换成功、目录同步失败时仍生成完整回执并清理 staging。
+    ///
+    /// 替换回调走 macOS `RENAME_SWAP`，仅在 `sync_parent` 接缝注入错误；用于
+    /// 证明「已替换但持久性不确定」的事实分类不依赖路径 rename 替身。
+    #[test]
+    fn replacement_platform_swap_reports_uncertain_durability_when_directory_sync_fails()
+    -> TestResult {
+        use std::cell::Cell;
+
+        let directory = TestDir::new()?;
+        let cancel = Cancellation::new();
+        let prepared = prepare(&directory, &cancel)?;
+        let encoded_baseline = prepared.prepared.encoded.baseline_id().clone();
+        let sync_calls = Cell::new(0);
+        let receipt =
+            prepared.publish_with(&cancel, transfer_metadata, publish_existing_checked, |_| {
+                sync_calls.set(sync_calls.get() + 1);
+                Err(io::Error::from(io::ErrorKind::PermissionDenied))
+            })?;
+        assert_eq!(sync_calls.get(), 1, "目录同步只应在交换后尝试一次");
+        assert_eq!(receipt.target_path(), directory.target());
+        assert_eq!(receipt.replaced_version(), DiskVersion::from_value(2));
+        assert_eq!(receipt.version(), DiskVersion::from_value(3));
+        assert_eq!(receipt.input_baseline_id(), &encoded_baseline);
+        assert_eq!(receipt.bytes(), SAVED);
+        assert!(matches!(
+            receipt.durability(),
+            ReplacementDurability::Uncertain(error)
+                if error.kind() == io::ErrorKind::PermissionDenied
+        ));
+        assert!(matches!(receipt.cleanup(), ReplacementCleanup::Removed));
+        assert_eq!(receipt.into_baseline()?.storage().bytes(), SAVED);
+        assert_eq!(fs::read(directory.target())?, SAVED);
+        assert!(!directory.staging().exists());
+        Ok(())
+    }
+
     #[test]
     fn replacement_permission_and_rename_errors_preserve_target_and_staging() -> TestResult {
         use std::cell::Cell;
