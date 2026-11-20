@@ -85,6 +85,11 @@ impl NativeInputCoordinates {
 pub(crate) struct BoundInputCoordinates<'a>(&'a Projection);
 
 impl BoundInputCoordinates<'_> {
+    /// 借用已经复验的只读投影，供同一输入行的布局锚点共享映射。
+    pub(crate) fn projection(&self) -> &Projection {
+        self.0
+    }
+
     /// 绑定平台输入单位。代理对中间、反向和越界范围均拒绝。
     pub(crate) fn utf16_range(
         &self,

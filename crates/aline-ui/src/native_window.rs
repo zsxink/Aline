@@ -1547,6 +1547,7 @@ struct NativeDocumentWindow {
     loaded_name: Option<SharedString>,
     reader: Option<ReaderSurface>,
     source_input_site: Option<editable_input::SourceInputSite>,
+    visual_input_restore: Option<edit_actions::VisualInputRestore>,
     input_frame: Option<editable_input::InputFrame>,
     composing_input_frame: Option<editable_input::InputFrame>,
     input_task: Option<Task<()>>,
@@ -1609,6 +1610,7 @@ impl NativeDocumentWindow {
             loaded_name: None,
             reader: None,
             source_input_site: None,
+            visual_input_restore: None,
             input_frame: None,
             composing_input_frame: None,
             input_task: None,
@@ -2670,12 +2672,12 @@ impl NativeDocumentWindow {
             && let Some(range) = reader.input_row(document, row)
             && let Some(site) =
                 editable_input::InputSite::for_row(document, range, self.source_input_site.as_ref())
-            && let Some((input, frame)) =
+            && let Some((input, frame, geometry)) =
                 editable_input::render(document, site, self.focus.clone(), cx)
         {
             self.input_frame = Some(frame);
             // 输入行由编辑框自行处理组合与点击，不套阅读行守卫。
-            return reader.wrap_input_row(row, input);
+            return reader.wrap_input_row(document, row, input, geometry);
         }
         let failure = self
             .copy
@@ -3335,6 +3337,7 @@ impl Render for NativeDocumentWindow {
                             .border_color(rgb(tokens::BORDER))
                             .hover(|style| style.bg(rgba(tokens::HOVER)))
                             .on_click(cx.listener(|this, _, _, cx| {
+                                this.visual_input_restore = None;
                                 if let Some(reader) = &this.reader {
                                     reader.cancel_restore();
                                     cx.notify();
@@ -3343,6 +3346,7 @@ impl Render for NativeDocumentWindow {
                             .on_key_down(cx.listener(|this, event: &gpui::KeyDownEvent, _, cx| {
                                 if event.keystroke.key == "enter" || event.keystroke.key == "space"
                                 {
+                                    this.visual_input_restore = None;
                                     if let Some(reader) = &this.reader {
                                         reader.cancel_restore();
                                         cx.notify();
@@ -3540,9 +3544,12 @@ impl Render for NativeDocumentWindow {
                 if this.close_focused_find(window, cx) || this.escape_document_input(window, cx) {
                     return;
                 }
-                if let Some(reader) = &this.reader
-                    && reader.cancel_restore()
-                {
+                let input_restore_cancelled = this.visual_input_restore.take().is_some();
+                let navigation_cancelled = this
+                    .reader
+                    .as_ref()
+                    .is_some_and(ReaderSurface::cancel_restore);
+                if navigation_cancelled || input_restore_cancelled {
                     cx.notify();
                 }
             }))

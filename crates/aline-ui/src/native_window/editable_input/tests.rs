@@ -14,6 +14,13 @@ use std::{error::Error, io::Cursor, path::Path};
 const TEXT: TextBudget = TextBudget::new(4096);
 type TestResult = Result<(), Box<dyn Error>>;
 
+const MULTILINE_BLOCK: &str = concat!(
+    "line01\nline02\nline03\nline04\nline05\nline06\nline07\nline08\nline09\nline10\n",
+    "line11\nline12\nline13\nline14\nline15\nline16\nline17\nline18\nline19\nline20\n",
+    "line21\nline22\nline23\nline24\nline25\nline26\nline27\nline28\nline29\nline30\n",
+    "line31\nline32\nline33\nline34\nline35\nline36\nline37\nline38\nline39\nline40",
+);
+
 struct File(&'static str);
 impl ReadonlyFileAccess for File {
     type Reader = Cursor<&'static [u8]>;
@@ -72,6 +79,103 @@ fn view(doc: &mut ReadonlyDocument) -> Result<InputView, Box<dyn Error>> {
 fn apply(doc: &mut ReadonlyDocument, site: &InputView, edit: InputIntent) -> Result<(), DocError> {
     let current = doc.current_snapshot()?;
     edit.apply(site, &current, doc, 1)
+}
+
+#[test]
+fn multiline_visual_input_geometry_keeps_a_mid_block_source_anchor() -> TestResult {
+    let mut state = session(
+        MULTILINE_BLOCK,
+        HistoryBudget::new(8, 4096),
+        EditorMode::Source,
+    )?;
+    let doc = state.document_mut().ok_or("没有文档")?;
+    let identity = doc.input_identity()?;
+    let current = doc.current_snapshot()?;
+    // 独立预期：前 29 行各 7 字节，第 30 行第三个 ASCII 字符后的端点是 206。
+    let selection = SrcSelection::new(
+        current.text().src_offset(206)?,
+        current.text().src_offset(206)?,
+    )?;
+    doc.edit_core()?.select(&identity, &selection)?;
+    doc.switch_mode(EditorMode::Visual)?;
+    let identity = doc.input_identity()?;
+    let current = doc.current_snapshot()?;
+    assert!(doc.open_visual_at(&identity, current.selection())?);
+    let row = doc
+        .parsed()
+        .snapshot()
+        .src_range(0..MULTILINE_BLOCK.len())?;
+    let input_site = InputSite::for_row(doc, row, None).ok_or("没有多行输入站点")?;
+    let view = InputView::new(doc, input_site).ok_or("没有多行输入投影")?;
+    let bound = view.bound(&view.identity).ok_or("没有受检投影")?;
+    assert_eq!(bound.drawn_text(), MULTILINE_BLOCK);
+    let mapped = bound
+        .projection()
+        .drawn_at(current.selection().head(), aline_buffer::Affinity::After)?;
+    assert_eq!(mapped.value().byte_offset(), 206);
+    assert_eq!(
+        bound
+            .projection()
+            .source_at(mapped.value(), aline_buffer::Affinity::After)?
+            .value(),
+        current.selection().head()
+    );
+    assert!(input_geometry_matches(&view.identity, doc));
+    assert_eq!(doc.core().history_node_count(), 0);
+    assert_eq!(doc.core().buffer_text()?, MULTILINE_BLOCK);
+
+    doc.switch_mode(EditorMode::Source)?;
+    let source_row = doc.parsed().snapshot().src_range(203..209)?;
+    let source_site =
+        InputSite::for_row(doc, source_row, None).ok_or("反切源码后应有第30行站点")?;
+    let source_view = InputView::new(doc, source_site).ok_or("反切源码后应有输入投影")?;
+    let source_bound = source_view
+        .bound(&source_view.identity)
+        .ok_or("没有源码输入绑定")?;
+    assert_eq!(source_bound.drawn_text(), "line30");
+    let current = doc.current_snapshot()?;
+    assert_eq!(
+        source_bound
+            .projection()
+            .drawn_at(current.selection().head(), aline_buffer::Affinity::After)?
+            .value()
+            .byte_offset(),
+        3
+    );
+    assert_eq!(doc.core().current_selection(), SelectionSpec::new(206, 206));
+    assert_eq!(doc.core().history_node_count(), 0);
+    Ok(())
+}
+
+#[test]
+fn input_geometry_identity_rejects_input_config_mode_and_foreign_document_changes() -> TestResult {
+    for scenario in ["input", "config", "request", "mode", "document"] {
+        let mut state = session("ab", HistoryBudget::new(8, 4096), EditorMode::Source)?;
+        let doc = state.document_mut().ok_or("没有文档")?;
+        let view = view(doc)?;
+        assert!(input_geometry_matches(&view.identity, doc));
+        match scenario {
+            "input" => apply(doc, &view, InputIntent::Replace(None, "X".to_owned()))?,
+            "config" => doc.edit_core()?.advance_parse_config()?,
+            "request" => {
+                doc.edit_core()?.begin_document_request()?;
+            }
+            "mode" => {
+                doc.switch_mode(EditorMode::Visual)?;
+            }
+            _ => {}
+        }
+        if scenario == "document" {
+            let other = session("ab", HistoryBudget::new(8, 4096), EditorMode::Source)?;
+            assert!(!input_geometry_matches(
+                &view.identity,
+                other.document().ok_or("没有文档")?
+            ));
+        } else {
+            assert!(!input_geometry_matches(&view.identity, doc), "{scenario}");
+        }
+    }
+    Ok(())
 }
 
 #[test]

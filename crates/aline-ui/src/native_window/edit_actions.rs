@@ -1,33 +1,107 @@
 //! 原生编辑动作和剪贴板入口。文档核心负责语义与历史，窗口负责平台副作用及派生视图。
 
-use aline_buffer::{BufferError, TextBudget};
+use aline_buffer::{BufferError, SelectionSpec, TextBudget};
 use aline_markdown::Parsed;
 use gpui::{App, ClipboardEntry, ClipboardItem, Context, Window};
 
 use super::readonly_layout::{LayoutError, ReaderIndex};
 use super::{NativeDocumentWindow, NativeOpenCoordinator, ReaderSurface, layout_error_key};
 use crate::{
-    DocError, EditorMode, ParseRefreshCompletion, ParseRefreshDisposition, ParseRefreshJob,
-    ReadonlyDocument,
+    DocError, DocumentId, EditorMode, ParseConfigGeneration, ParseRefreshCompletion,
+    ParseRefreshDisposition, ParseRefreshJob, ReadonlyDocument, WorkingVersion,
 };
 
 const MAX_READER_ROWS: usize = 1_000_000;
+
+/// 切回 Visual 后的一次输入恢复请求；只保留身份与源选区，不持有第二份文本。
+/// 当前解析尚未就绪时沿用既有刷新链，任何输入、选区或目标变化都会作废请求。
+/// 窗口是唯一所有者；成功、拒绝、取消定位/Escape、反切 Source 和关闭/替换均释放。
+pub(super) struct VisualInputRestore {
+    document: DocumentId,
+    version: WorkingVersion,
+    parse_config: ParseConfigGeneration,
+    selection: SelectionSpec,
+}
+
+impl VisualInputRestore {
+    fn new(document: &ReadonlyDocument) -> Self {
+        let core = document.core();
+        Self {
+            document: core.document_id().clone(),
+            version: core.version(),
+            parse_config: core.parse_config_generation(),
+            selection: core.current_selection(),
+        }
+    }
+
+    fn matches(&self, document: &ReadonlyDocument) -> bool {
+        let core = document.core();
+        document.is_editable()
+            && core.is_document_alive()
+            && core.document_id() == &self.document
+            && core.mode() == EditorMode::Visual
+            && !core.has_open_block()
+            && core.version() == self.version
+            && core.parse_config_generation() == self.parse_config
+            && core.current_selection() == self.selection
+    }
+
+    fn apply(self, document: &mut ReadonlyDocument) -> Result<(), DocError> {
+        if !self.matches(document) {
+            return Err(DocError::StaleResult);
+        }
+        let identity = document.input_identity()?;
+        let current = document.current_snapshot()?;
+        // 受保护区仍只定位；合法可编辑块沿用统一开块映射与零字节/零历史协议。
+        document.open_visual_at(&identity, current.selection())?;
+        Ok(())
+    }
+}
 
 impl NativeDocumentWindow {
     pub(super) fn request_view(
         &mut self,
         mode: EditorMode,
-        window: &Window,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) {
         let before = self.state.session.document().map(|doc| doc.core().mode());
         self.switch_view(mode, cx);
+        // 模式按钮会暂借焦点；只有真正切换成功后归还正文，不能在组合拒绝时抢焦点。
+        if self.state.session.document().is_some_and(|document| {
+            document.is_editable() && Some(document.core().mode()) != before
+        }) {
+            self.visual_input_restore = (mode == EditorMode::Visual)
+                .then(|| self.state.session.document().map(VisualInputRestore::new))
+                .flatten();
+            self.restore_visual_input();
+            self.focus.focus(window, cx);
+        }
         if self.state.session.document().is_some_and(|document| {
             document.is_editable()
                 && Some(document.core().mode()) != before
                 && !document.is_parse_current()
         }) {
             self.refresh_after_edit(window, cx);
+        }
+    }
+
+    fn restore_visual_input(&mut self) {
+        let Some(restore) = self.visual_input_restore.take() else {
+            return;
+        };
+        let Some(document) = self.state.session.document_mut() else {
+            return;
+        };
+        if !restore.matches(document) {
+            return;
+        }
+        if !document.is_parse_current() {
+            self.visual_input_restore = Some(restore);
+            return;
+        }
+        if let Err(error) = restore.apply(document) {
+            self.state.feedback = Some(edit_error_key(error));
         }
     }
 
@@ -97,6 +171,7 @@ impl NativeDocumentWindow {
                     });
                 this.parse_task = None;
                 if let Some((reader, generation)) = prepared {
+                    this.restore_visual_input();
                     if let Some(document) = this.state.session.document()
                         && let Err(error) = reader
                             .scroll_to_source(document, document.core().current_selection().head())
@@ -346,6 +421,172 @@ mod tests {
             .ok_or("missing document")?
             .switch_mode(EditorMode::Source)?;
         Ok(state)
+    }
+
+    #[test]
+    fn visual_mode_restore_waits_for_current_parse_then_reopens_without_editing()
+    -> Result<(), Box<dyn Error>> {
+        let mut state = open(b"alpha\n\nbeta\n", true)?;
+        state.edit(EditAction::Paste, |_| Ok(Some("X".to_owned())), 1)?;
+        let document = state.session.document_mut().ok_or("missing document")?;
+        document.switch_mode(EditorMode::Visual)?;
+        let version = document.core().version();
+        let selection = document.core().current_selection();
+        let history = document.core().history_node_count();
+        let before = document.core().buffer_text()?;
+        assert!(!document.is_parse_current());
+        assert!(matches!(
+            VisualInputRestore::new(document).apply(document),
+            Err(DocError::StaleResult)
+        ));
+        assert!(!document.core().has_open_block());
+        let restore = VisualInputRestore::new(document);
+        let job = state.queue_refresh()?.ok_or("missing parse job")?;
+        let (_, applied) = state.refresh_finished(job.run(), |_, _| Ok(()));
+        assert_eq!(applied, Some(()));
+        let document = state.session.document_mut().ok_or("missing document")?;
+        restore.apply(document)?;
+        assert!(document.core().has_open_block());
+        assert_eq!(document.core().buffer_text()?, before);
+        assert_eq!(document.core().version(), version);
+        assert_eq!(document.core().current_selection(), selection);
+        assert_eq!(document.core().history_node_count(), history);
+        Ok(())
+    }
+
+    #[test]
+    fn visual_mode_restore_rejects_changed_selection_and_foreign_document()
+    -> Result<(), Box<dyn Error>> {
+        let mut state = open(b"alpha\n\nbeta\n", true)?;
+        let document = state.session.document_mut().ok_or("missing document")?;
+        document.switch_mode(EditorMode::Visual)?;
+        let selection_restore = VisualInputRestore::new(document);
+        let foreign_restore = VisualInputRestore::new(document);
+        let identity = document.input_identity()?;
+        let current = document.current_snapshot()?;
+        let selection = aline_buffer::SrcSelection::new(
+            current.text().src_offset(3)?,
+            current.text().src_offset(1)?,
+        )?;
+        document.edit_core()?.select(&identity, &selection)?;
+        let version = document.core().version();
+        assert!(matches!(
+            selection_restore.apply(document),
+            Err(DocError::StaleResult)
+        ));
+        assert_eq!(
+            document.core().current_selection(),
+            SelectionSpec::new(3, 1)
+        );
+        assert_eq!(document.core().version(), version);
+        assert!(!document.core().has_open_block());
+
+        assert!(state.close_document());
+        let job = open_job(&mut state)?;
+        let (_, applied) =
+            state.read_finished(job.read_with(&Files(b"alpha\n\nbeta\n")), |_| Ok(()));
+        assert_eq!(applied, Some(()));
+        let document = state.session.document_mut().ok_or("missing document")?;
+        assert!(matches!(
+            foreign_restore.apply(document),
+            Err(DocError::StaleResult)
+        ));
+        assert!(!document.core().has_open_block());
+        assert_eq!(document.core().history_node_count(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn visual_mode_restore_keeps_protected_source_selection_closed() -> Result<(), Box<dyn Error>> {
+        let mut state = open(b"---\nt: x\n---\n\nbody\n", true)?;
+        let document = state.session.document_mut().ok_or("missing document")?;
+        document.switch_mode(EditorMode::Visual)?;
+        let version = document.core().version();
+        let selection = document.core().current_selection();
+        VisualInputRestore::new(document).apply(document)?;
+        assert!(!document.core().has_open_block());
+        assert_eq!(document.core().buffer_text()?, "---\nt: x\n---\n\nbody\n");
+        assert_eq!(document.core().version(), version);
+        assert_eq!(document.core().current_selection(), selection);
+        assert_eq!(document.core().history_node_count(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn visual_mode_restore_preserves_directional_selection_without_new_history()
+    -> Result<(), Box<dyn Error>> {
+        for (anchor, head) in [(1, 3), (3, 1)] {
+            let mut state = open(b"alpha\n\nbeta\n", true)?;
+            let document = state.session.document_mut().ok_or("missing document")?;
+            let identity = document.input_identity()?;
+            let current = document.current_snapshot()?;
+            let selection = aline_buffer::SrcSelection::new(
+                current.text().src_offset(anchor)?,
+                current.text().src_offset(head)?,
+            )?;
+            document.edit_core()?.select(&identity, &selection)?;
+            document.switch_mode(EditorMode::Visual)?;
+            let version = document.core().version();
+            VisualInputRestore::new(document).apply(document)?;
+            assert!(document.core().has_open_block());
+            assert_eq!(
+                document.core().current_selection(),
+                SelectionSpec::new(anchor, head)
+            );
+            assert_eq!(document.core().version(), version);
+            assert_eq!(document.core().buffer_text()?, "alpha\n\nbeta\n");
+            assert_eq!(document.core().history_node_count(), 0);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn visual_mode_restore_is_invalidated_by_input_config_new_block_or_reverse_switch()
+    -> Result<(), Box<dyn Error>> {
+        for scenario in ["input", "config", "new-block", "source"] {
+            let mut state = open(b"alpha\n\nbeta\n", true)?;
+            let document = state.session.document_mut().ok_or("missing document")?;
+            document.switch_mode(EditorMode::Visual)?;
+            let restore = VisualInputRestore::new(document);
+            match scenario {
+                "input" => {
+                    state.edit(EditAction::Paste, |_| Ok(Some("Q".to_owned())), 1)?;
+                }
+                "config" => document.edit_core()?.advance_parse_config()?,
+                "new-block" => {
+                    let identity = document.input_identity()?;
+                    let current = document.current_snapshot()?;
+                    assert!(document.open_visual_at(&identity, current.selection())?);
+                }
+                _ => {
+                    document.switch_mode(EditorMode::Source)?;
+                }
+            }
+            let document = state.session.document_mut().ok_or("missing document")?;
+            let before = (
+                document.core().version(),
+                document.core().current_selection(),
+                document.core().buffer_text()?,
+                document.core().has_open_block(),
+                document.core().history_node_count(),
+            );
+            assert!(
+                matches!(restore.apply(document), Err(DocError::StaleResult)),
+                "{scenario}"
+            );
+            assert_eq!(
+                before,
+                (
+                    document.core().version(),
+                    document.core().current_selection(),
+                    document.core().buffer_text()?,
+                    document.core().has_open_block(),
+                    document.core().history_node_count(),
+                ),
+                "{scenario}"
+            );
+        }
+        Ok(())
     }
 
     #[test]

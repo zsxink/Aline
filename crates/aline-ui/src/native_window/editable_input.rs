@@ -28,10 +28,15 @@
 //! 同步退化」只适用于后台 job 结果失败与准备段 `Ok(None)` 的内部不一致（`recover`），
 //! 不覆盖这一分支。
 
-use std::{cell::RefCell, collections::VecDeque, ops::Range, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    collections::VecDeque,
+    ops::Range,
+    rc::Rc,
+};
 
 use aline_buffer::{BufferError, SrcOffset, SrcRange, SrcSelection, TextBudget};
-use aline_markdown::{MappingBudget, ProjectionId};
+use aline_markdown::{MappingBudget, Projection, ProjectionId};
 use gpui::{
     AnyElement, App, Bounds, ClipboardItem, Context, FocusHandle, InputHandler, MouseButton,
     Pixels, Point, StyledText, UTF16Selection, WeakEntity, Window, canvas, div, fill, point,
@@ -1106,6 +1111,42 @@ struct InputGeometry {
 #[derive(Clone)]
 pub(super) struct InputFrame(Rc<RefCell<Option<InputView>>>);
 
+/// 输入行与阅读行共享的实际文本几何；只读投影和布局来自同一次 render。
+/// 窗口弱引用只用于复验身份，不保活文档，也不拥有第二个滚动状态。
+pub(super) struct InputRowLayout {
+    pub(super) projection: Projection,
+    pub(super) prepared: PreparedLayout,
+    pub(super) text_bounds: Rc<Cell<Option<Bounds<Pixels>>>>,
+    identity: InputIdentity,
+    host: WeakEntity<NativeDocumentWindow>,
+}
+
+fn input_geometry_matches(identity: &InputIdentity, document: &ReadonlyDocument) -> bool {
+    let core = document.core();
+    core.is_document_alive()
+        && identity.document_id() == core.document_id()
+        && identity.working_version() == core.version()
+        && identity.parse_config_generation() == core.parse_config_generation()
+        && identity.request_id() == core.derived_request_id()
+}
+
+impl InputRowLayout {
+    pub(super) fn matches(&self, document: &ReadonlyDocument) -> bool {
+        input_geometry_matches(&self.identity, document)
+    }
+
+    pub(super) fn is_current(&self, cx: &App) -> bool {
+        self.host
+            .read_with(cx, |host, _| {
+                host.state
+                    .session
+                    .document()
+                    .is_some_and(|document| self.matches(document))
+            })
+            .unwrap_or(false)
+    }
+}
+
 impl InputFrame {
     /// 在最新快照上重建帧内局部投影；没有可重建站点或站点失效时清空该帧。
     ///
@@ -1771,6 +1812,7 @@ impl NativeDocumentWindow {
             .is_some_and(|document| !document.is_parse_current());
         self.input_frame = None;
         self.source_input_site = None;
+        self.visual_input_restore = None;
         self.composing_input_frame = None;
         self.state.feedback = None;
         if refresh {
@@ -1790,6 +1832,7 @@ impl NativeDocumentWindow {
         self.input_task = None;
         self.input_frame = None;
         self.source_input_site = None;
+        self.visual_input_restore = None;
         self.composing_input_frame = None;
     }
 
@@ -2055,7 +2098,7 @@ pub(super) fn render(
     site: InputSite,
     focus: FocusHandle,
     cx: &Context<NativeDocumentWindow>,
-) -> Option<(AnyElement, InputFrame)> {
+) -> Option<(AnyElement, InputFrame, InputRowLayout)> {
     let (_, current) = InputView::current(document)?;
     let view = InputView::new(document, site)?;
     let bound = view.bound(&view.identity)?;
@@ -2074,6 +2117,15 @@ pub(super) fn render(
         selected.end
     };
     let layout = PreparedLayout::new(styled.layout().clone());
+    let text_bounds = Rc::new(Cell::new(None));
+    let layout_bounds = text_bounds.clone();
+    let row_layout = InputRowLayout {
+        projection: bound.projection().clone(),
+        prepared: layout.clone(),
+        text_bounds,
+        identity: view.identity.clone(),
+        host: cx.entity().downgrade(),
+    };
     let prepainted = layout.clone();
     let host = cx.entity().downgrade();
     let click_host = host.clone();
@@ -2091,7 +2143,10 @@ pub(super) fn render(
             .min_h(px(LINE_HEIGHT))
             .line_height(px(LINE_HEIGHT))
             .child(styled)
-            .on_children_prepainted(move |_, _, _| prepainted.mark_prepainted())
+            .on_children_prepainted(move |bounds, _, _| {
+                prepainted.mark_prepainted();
+                layout_bounds.set(bounds.first().copied());
+            })
             .on_mouse_down(MouseButton::Left, move |event, window, cx| {
                 let Some(byte) = click_layout
                     .index_for_position(event.position)
@@ -2182,6 +2237,7 @@ pub(super) fn render(
             )
             .into_any_element(),
         frame,
+        row_layout,
     ))
 }
 

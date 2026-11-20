@@ -21,6 +21,7 @@ use gpui::{
     list, point, prelude::*, px, rgb, rgba, size,
 };
 
+use super::editable_input::InputRowLayout;
 use super::geometry::{
     BODY_FONT_SIZE, BODY_LINE_HEIGHT, ContentMetrics, SCROLLBAR_WIDTH, content_metrics,
 };
@@ -382,9 +383,44 @@ fn default_metrics() -> ContentMetrics {
 struct MeasuredRow {
     row: usize,
     token: LayoutToken,
-    projection: Projection,
-    prepared: PreparedLayout,
+    geometry: RowGeometry,
     bounds: Bounds<Pixels>,
+}
+
+#[derive(Clone)]
+enum RowGeometry {
+    Reading(Projection, PreparedLayout),
+    Input(Rc<InputRowLayout>),
+}
+
+impl RowGeometry {
+    fn projection(&self) -> &Projection {
+        match self {
+            Self::Reading(projection, _) => projection,
+            Self::Input(input) => &input.projection,
+        }
+    }
+
+    fn prepared(&self) -> &PreparedLayout {
+        match self {
+            Self::Reading(_, prepared) => prepared,
+            Self::Input(input) => &input.prepared,
+        }
+    }
+
+    fn matches(&self, document: &ReadonlyDocument) -> bool {
+        match self {
+            Self::Reading(_, _) => true,
+            Self::Input(input) => input.matches(document),
+        }
+    }
+
+    fn is_current(&self, cx: &App) -> bool {
+        match self {
+            Self::Reading(_, _) => true,
+            Self::Input(input) => input.is_current(cx),
+        }
+    }
 }
 
 /// 行级命中回调；参数与 `ReaderSurface::render_row` 的调用方约定一致。
@@ -501,15 +537,7 @@ impl ReaderSurface {
         if !self.heights.borrow().matches_key(&key) {
             reset = true;
             let has_layout = self.heights.borrow().token().is_some();
-            let anchor = if has_layout {
-                self.restores
-                    .borrow()
-                    .pending()
-                    .map(|target| target.anchor)
-                    .or_else(|| self.capture_viewport_anchor(document).ok())
-            } else {
-                None
-            };
+            let anchor = self.reset_anchor(document)?;
             self.heights.borrow_mut().prepare(key)?;
             self.measured.borrow_mut().clear();
             // 列表按像素滚动时，未测量行若按零高度计入总高，End 后 PageUp
@@ -540,6 +568,35 @@ impl ReaderSurface {
         self.rendered.set(0);
         Ok(reset)
     }
+
+    /// 布局重建时选择统一源码锚点；普通重排沿用当前视口位置。
+    fn reset_anchor(
+        &self,
+        document: &ReadonlyDocument,
+    ) -> Result<Option<SourceAnchor>, LayoutError> {
+        if self.mode != document.core().mode()
+            && document.is_editable()
+            && document.is_parse_current()
+        {
+            // 真正切模式恢复当前源选区；旧视口锚点可能是多行块首，不能覆盖光标。
+            // 未就绪解析仍交既有刷新链，禁止在旧快照上解释新的源码端点。
+            let source = document
+                .parsed()
+                .snapshot()
+                .src_offset(document.core().current_selection().head())
+                .map_err(|_| LayoutError::InvalidRange)?;
+            return SourceAnchor::new(document.parsed(), source, Affinity::After, 0.0).map(Some);
+        }
+        if self.heights.borrow().token().is_none() {
+            return Ok(None);
+        }
+        Ok(self
+            .restores
+            .borrow()
+            .pending()
+            .map(|target| target.anchor)
+            .or_else(|| self.capture_viewport_anchor(document).ok()))
+    }
     /// 在帧末给未测量行补统一高度提示。
     ///
     /// GPUI `list` 在首次布局或宽度变化时会重建未测量行并清空高度提示，
@@ -563,13 +620,11 @@ impl ReaderSurface {
             .item_ix
             .min(self.index.row_count(self.mode).saturating_sub(1));
         let token = self.heights.borrow().token();
-        if let Some(measured) = self
-            .measured
-            .borrow()
-            .iter()
-            .rev()
-            .find(|measured| measured.row == row && Some(measured.token) == token)
-        {
+        if let Some(measured) = self.measured.borrow().iter().rev().find(|measured| {
+            measured.row == row
+                && Some(measured.token) == token
+                && measured.geometry.matches(document)
+        }) {
             let viewport_top = self
                 .rail_bounds
                 .get()
@@ -578,14 +633,16 @@ impl ReaderSurface {
                 measured.bounds.left(),
                 viewport_top.max(measured.bounds.top()),
             );
-            if let Ok(candidate) = measured.prepared.index_for_position(point) {
+            if let Ok(candidate) = measured.geometry.prepared().index_for_position(point) {
                 let local_drawn = match candidate {
                     Ok(local_drawn) | Err(local_drawn) => local_drawn,
                 };
-                if let Ok(Some(glyph)) = measured.prepared.position_for_index(local_drawn) {
+                if let Ok(Some(glyph)) =
+                    measured.geometry.prepared().position_for_index(local_drawn)
+                {
                     return self.index.anchor_from_local(
                         document.parsed(),
-                        &measured.projection,
+                        measured.geometry.projection(),
                         local_drawn,
                         Affinity::Before,
                         f32::from(glyph.y - viewport_top),
@@ -668,30 +725,43 @@ impl ReaderSurface {
             .ok()
     }
 
-    pub(super) fn wrap_input_row(&self, row: usize, input: AnyElement) -> AnyElement {
+    pub(super) fn wrap_input_row(
+        &self,
+        document: &ReadonlyDocument,
+        row: usize,
+        input: AnyElement,
+        geometry: InputRowLayout,
+    ) -> AnyElement {
         let metrics = self.metrics.get();
         let last_row = self.index.row_count(self.mode).saturating_sub(1);
-        div()
-            .w_full()
-            .flex()
-            .justify_center()
-            .child(
-                div()
-                    .w_full()
-                    .max_w(px(metrics.column_width))
-                    .px(px(metrics.padding_x))
-                    .pt(px(if row == 0 { metrics.padding_top } else { 0.0 }))
-                    .pb(px(if row == last_row {
-                        metrics.padding_bottom
-                    } else {
-                        0.0
-                    }))
-                    .font_family(CODE_FONT)
-                    .text_size(px(BODY_FONT_SIZE))
-                    .whitespace_normal()
-                    .child(input),
-            )
-            .into_any_element()
+        let outer = div().w_full().flex().justify_center().child(
+            div()
+                .w_full()
+                .max_w(px(metrics.column_width))
+                .px(px(metrics.padding_x))
+                .pt(px(if row == 0 { metrics.padding_top } else { 0.0 }))
+                .pb(px(if row == last_row {
+                    metrics.padding_bottom
+                } else {
+                    0.0
+                }))
+                .font_family(CODE_FONT)
+                .text_size(px(BODY_FONT_SIZE))
+                .whitespace_normal()
+                .child(input),
+        );
+        // 输入行使用自身的受检投影、实际文本布局及 bounds，不能把块内第 N 行
+        // 的源码锚点按整个块首结算。旧输入身份或旧布局 token 不参与恢复。
+        let text_bounds = geometry.text_bounds.clone();
+        self.measured_row(
+            outer,
+            row,
+            self.heights.borrow().token(),
+            Some(RowGeometry::Input(Rc::new(geometry))),
+            text_bounds,
+            document.core().document_id().clone(),
+        )
+        .into_any_element()
     }
 
     pub(super) fn render_row(
@@ -828,7 +898,8 @@ impl ReaderSurface {
             outer,
             row,
             token,
-            geometry_projection.map(|projection| (projection, prepared.clone())),
+            geometry_projection
+                .map(|projection| RowGeometry::Reading(projection, prepared.clone())),
             text_bounds,
             restore_document,
         );
@@ -1205,6 +1276,8 @@ impl ReaderSurface {
             SharedString::from(format!("reader-row-{}-{source_start}", self.generation));
         let click_prepared = geometry.as_ref().map(|(_, prepared)| prepared.clone());
         let outer = div().w_full().flex().justify_center().child(content);
+        let geometry =
+            geometry.map(|(projection, prepared)| RowGeometry::Reading(projection, prepared));
         let outer = self.measured_row(outer, row, token, geometry, text_bounds, document_id);
         let outer = outer.id(element_id);
         let outer = if let Some(target) =
@@ -1325,7 +1398,7 @@ impl ReaderSurface {
         outer: Div,
         row: usize,
         token: Option<LayoutToken>,
-        geometry: Option<(Projection, PreparedLayout)>,
+        geometry: Option<RowGeometry>,
         text_bounds: Rc<Cell<Option<Bounds<Pixels>>>>,
         document_id: DocumentId,
     ) -> Div {
@@ -1346,9 +1419,12 @@ impl ReaderSurface {
             cache
                 .borrow_mut()
                 .record(token, row, f32::from(item_bounds.size.height));
-            if let (Some((projection, prepared)), Some(text_bounds)) =
+            if let (Some(geometry), Some(text_bounds)) =
                 (geometry.as_ref(), text_bounds.get())
             {
+                if !geometry.is_current(cx) {
+                    return;
+                }
                 let mut rows = measured.borrow_mut();
                 if let Some(old) = rows.iter().position(|measured| measured.row == row) {
                     rows.remove(old);
@@ -1359,8 +1435,7 @@ impl ReaderSurface {
                 rows.push_back(MeasuredRow {
                     row,
                     token,
-                    projection: projection.clone(),
-                    prepared: prepared.clone(),
+                    geometry: geometry.clone(),
                     bounds: text_bounds,
                 });
             }
@@ -1375,17 +1450,21 @@ impl ReaderSurface {
             let glyph = geometry
                 .as_ref()
                 .zip(text_bounds.get())
-                .and_then(|((projection, prepared), _)| {
-                    projection
+                .and_then(|(geometry, _)| {
+                    geometry.projection()
                         .drawn_at(pending.anchor.source(), pending.anchor.affinity())
                         .ok()
                         .and_then(|local| {
-                            prepared
+                            geometry.prepared()
                                 .position_for_index(local.value().byte_offset())
                                 .ok()
                                 .flatten()
                         })
                 });
+            // 有输入布局却无法证明锚点属于该投影时拒绝恢复，不回退到块首。
+            if matches!(geometry.as_ref(), Some(RowGeometry::Input(_))) && glyph.is_none() {
+                return;
+            }
             let offset = restore_offset(
                 glyph,
                 item_bounds.top(),
@@ -1405,8 +1484,10 @@ impl ReaderSurface {
                 let restore_alive = restore_alive.clone();
                 let restore_cache = restore_cache.clone();
                 let viewport_bounds = viewport_bounds.clone();
-                window.defer(cx, move |window, _| {
-                    if !restore_alive.get() || restore_cache.borrow().token() != Some(token) {
+                let restore_geometry = geometry.clone();
+                window.defer(cx, move |window, cx| {
+                    if !restore_alive.get() || restore_cache.borrow().token() != Some(token)
+                        || restore_geometry.as_ref().is_some_and(|geometry| !geometry.is_current(cx)) {
                         return;
                     }
                     if restore_state
@@ -1641,6 +1722,104 @@ mod tests {
 
     use super::super::readonly_content::InlineStyle;
     use super::*;
+
+    #[test]
+    fn mode_roundtrip_anchor_keeps_the_nonfirst_source_line()
+    -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{
+            DocLimits, ReadonlyFileAccess, ReadonlyFileInput, ReadonlyOpenLimits, ReadonlySession,
+        };
+        use aline_buffer::{HistoryBudget, LineIndexBudget, SrcSelection, TextBudget};
+        use aline_markdown::{ParseBudget, ParseConfig};
+        use aline_source::StorageBudget;
+        use std::{io::Cursor, path::Path};
+
+        struct File(Vec<u8>);
+        impl ReadonlyFileAccess for File {
+            type Reader = Cursor<Vec<u8>>;
+            fn open(&self, _: &Path) -> std::io::Result<ReadonlyFileInput<Self::Reader>> {
+                Ok(ReadonlyFileInput::new(
+                    Cursor::new(self.0.clone()),
+                    self.0.len() as u64,
+                    true,
+                ))
+            }
+        }
+        let text = (1..=40)
+            .map(|line| format!("line{line:02}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let mut session = ReadonlySession::new(
+            ReadonlyOpenLimits::new(
+                StorageBudget::new(4096),
+                DocLimits::new(
+                    TextBudget::new(4096),
+                    LineIndexBudget::new(128),
+                    HistoryBudget::new(8, 4096),
+                ),
+                ParseConfig::m0(),
+                ParseBudget::m0(),
+            )
+            .with_editing(),
+        );
+        let request = session.request_open()?;
+        let job = session
+            .accept_selection(&request, Some(vec!["fixture.md".into()]))?
+            .ok_or("没有打开任务")?;
+        session.accept_open(job.read_with(&File(text.as_bytes().to_vec())));
+        let document = session.document_mut().ok_or("没有文档")?;
+        document.switch_mode(EditorMode::Source)?;
+        let identity = document.input_identity()?;
+        let current = document.current_snapshot()?;
+        let selection = SrcSelection::new(
+            current.text().src_offset(206)?,
+            current.text().src_offset(206)?,
+        )?;
+        document.edit_core()?.select(&identity, &selection)?;
+        let mut reader = ReaderSurface::new(document, 1, None)?;
+        let environment = LayoutEnvironment::new(600.0, 2.0, 0, true, 16.0, 25.0)?;
+        reader.heights.borrow_mut().prepare(LayoutKey::new(
+            document,
+            EditorMode::Source,
+            environment,
+        ))?;
+
+        document.switch_mode(EditorMode::Visual)?;
+        let identity = document.input_identity()?;
+        let current = document.current_snapshot()?;
+        assert!(document.open_visual_at(&identity, current.selection())?);
+        let visual = reader.reset_anchor(document)?.ok_or("没有可视化恢复锚点")?;
+        assert_eq!(visual.source().byte_offset(), 206);
+        assert_eq!(
+            reader
+                .index
+                .row_for_anchor(document.parsed(), EditorMode::Visual, &visual)?,
+            0
+        );
+        reader.mode = EditorMode::Visual;
+        reader.heights.borrow_mut().prepare(LayoutKey::new(
+            document,
+            EditorMode::Visual,
+            environment,
+        ))?;
+
+        document.switch_mode(EditorMode::Source)?;
+        let source = reader.reset_anchor(document)?.ok_or("没有源码恢复锚点")?;
+        assert_eq!(source.source().byte_offset(), 206);
+        assert_eq!(
+            reader
+                .index
+                .row_for_anchor(document.parsed(), EditorMode::Source, &source)?,
+            29
+        );
+        assert_eq!(
+            document.core().current_selection(),
+            aline_buffer::SelectionSpec::new(206, 206)
+        );
+        assert_eq!(document.core().buffer_text()?, text);
+        assert_eq!(document.core().history_node_count(), 0);
+        Ok(())
+    }
 
     fn leaf(drawn: Range<usize>, style: InlineStyle, kind: LeafKind) -> Leaf {
         Leaf { drawn, style, kind }
