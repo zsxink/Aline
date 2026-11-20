@@ -426,19 +426,66 @@ def open_document(driver, fixture):
         system_events(driver, 'keystroke "g" using {command down, shift down}',
                       "打开前往文件夹")
         time.sleep(1.0)
-        snapshot = driver.snapshot()
-        field = None
-        for line in driver.tree_text(snapshot).splitlines():
-            match = re.match(r'^\s*(\d+) text field \(settable\), Value: /', line)
-            if match:
-                field = int(match.group(1))
+
+        def path_field_index():
+            current = driver.snapshot()
+            current_tree = driver.tree_text(current)
+            for current_line in current_tree.splitlines():
+                hit = re.match(r'^\s*(\d+) text field \(settable\), Value: /',
+                               current_line)
+                if hit:
+                    return int(hit.group(1)), current, current_tree
+            return None, current, current_tree
+
+        field, snapshot, tree = path_field_index()
         if field is None:
-            raise native.DriverError("前往文件夹面板没有可写路径字段")
-        driver.call(["set-value", "--element-index", str(field), "--value", target],
-                    "写入夹具绝对路径")
-        time.sleep(0.4)
-        system_events(driver, "key code 36", "回车确认路径")
-        time.sleep(1.2)
+            # System Events 偶发没有到达面板服务窗口；orca 直接向应用投递再试一次。
+            driver.call(["hotkey", "--key", native.GO_TO_FOLDER_KEY],
+                        "打开前往文件夹（orca 直投）")
+            time.sleep(1.0)
+            field, snapshot, tree = path_field_index()
+        if field is not None:
+            driver.call(["set-value", "--element-index", str(field), "--value", target],
+                        "写入夹具绝对路径")
+            time.sleep(0.4)
+            system_events(driver, "key code 36", "回车确认路径")
+            time.sleep(1.2)
+        else:
+            # 面板已按上次选择停到夹具目录：用行容器 open 辅助动作直接打开。
+            where0 = re.search(r'^\s*(\d+) pop up button Where:, Value: (.*)$', tree, re.M)
+            row = driver.find_row(snapshot, fixture.name)
+            if where0 is None or where0.group(2) != fixture.parent.name or row is None:
+                raise native.DriverError(
+                    "文件面板既没有可写路径字段，也未停在夹具目录")
+            container = driver.find_row_container(snapshot, fixture.name)
+            if container is None:
+                raise native.DriverError("面板行容器缺失，无法执行 open 辅助动作")
+            try:
+                driver.call(["perform-secondary-action", "--element-index", str(container),
+                             "--action", "open"], "行容器 open 辅助动作")
+            except native.DriverError as error:
+                write_text(driver.evidence / "secondary-action-fallback.txt",
+                           str(error)[:600])
+            time.sleep(1.5)
+            if driver.snapshot()["window"]["title"] == fixture.name:
+                write_json(driver.evidence / "open-panel.json", {
+                    "attempt": attempt,
+                    "where": where0.group(2),
+                    "opened_by": "secondary-action",
+                    "note": "前往文件夹未弹出时经面板行容器辅助动作打开夹具",
+                })
+                return
+            driver.call(["click", "--element-index", str(container)], "点击行容器打开")
+            time.sleep(1.5)
+            if driver.snapshot()["window"]["title"] == fixture.name:
+                write_json(driver.evidence / "open-panel.json", {
+                    "attempt": attempt,
+                    "where": where0.group(2),
+                    "opened_by": "row-click",
+                    "note": "前往文件夹未弹出时经面板行容器点击打开夹具",
+                })
+                return
+            raise native.DriverError("面板行容器打开夹具后窗口标题不符")
         where = None
         selected = None
         for _ in range(10):
