@@ -1,7 +1,7 @@
 {
   "format": 1,
   "reviewed": true,
-  "review_evidence": "docs/decisions.md#21-2026-11-02-m1-原生后端候选与准入暂停",
+  "review_evidence": "docs/decisions.md#21-2026-11-02-m1-原生后端候选与准入暂停; docs/decisions.md §36（2026-11-12 生产来源准入）",
   "purpose": "正式八成员 workspace 的 GPUI 精确子图；不准许自动更新指纹",
   "workspace_features": {
     "aline": {},
@@ -15,25 +15,25 @@
   },
   "scenarios": {
     "all": {
-      "gpui_subtree_sha256": "e8b4330d9a42fd80a3587d939106807bbf3ded16708919b514f95e2466b132bf"
+      "gpui_subtree_sha256": "3a57cfcb0907ceec19418888259685bec9021706510b8f4acdb2c294559cf69d"
     },
     "all-features": {
-      "gpui_subtree_sha256": "e8b4330d9a42fd80a3587d939106807bbf3ded16708919b514f95e2466b132bf"
+      "gpui_subtree_sha256": "3a57cfcb0907ceec19418888259685bec9021706510b8f4acdb2c294559cf69d"
     },
     "macos-arm": {
-      "gpui_subtree_sha256": "c7a62d9185d8555b550e34367066bf65ebd75a3d34f1a6645dfa5a09b59a7fcf"
+      "gpui_subtree_sha256": "0fd9fbdc366bfc2e37b96f3c895e7f3bc7278c4284ea29269cc2f6773ada4815"
     },
     "macos-intel": {
-      "gpui_subtree_sha256": "3ba0baf76f67797824be1ad3d156df8a0d4369082cc464759c52469a7036604e"
+      "gpui_subtree_sha256": "a7cf9d9e5abfa209a8c54961daa64a4c426a6c4a1c16d122967083c839c20819"
     },
     "windows-x64": {
-      "gpui_subtree_sha256": "5e248cb4f27cfd83b90b2e3ede593294e51b1a702e41a41110881527efbdc66c"
+      "gpui_subtree_sha256": "d417bf93757eb0bb96dbe012e5c2861a5deeb6e22a2b94d695d8d179bbbf2159"
     },
     "linux-x64": {
-      "gpui_subtree_sha256": "ae06690df66eb9809ec614153a32c86d70b3ab4b4c5e65adf15ab2267148ee8e"
+      "gpui_subtree_sha256": "80bca853c98ef36a2f12a008c0baf1f6115442a3324d2b5a1ea266a6b6064c5b"
     },
     "linux-arm": {
-      "gpui_subtree_sha256": "c4512e5e89b8102f50376bee404dcbef48087eb46e84e450eeda42d3c909c831"
+      "gpui_subtree_sha256": "639218209d396e02c15885620d2dd10630148ee435f1d76a42199412788dccb4"
     }
   },
   "exceptions": {
@@ -167,8 +167,19 @@
     },
     "core": {
       "package": "gpui-pre@0.3.9",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "checksum": "34f61c1cfd36fc9c436af09308c963822ae27a45a84feb21a77ba5c9e051f1c0"
+      "source": "local-patch",
+      "path": "vendor/gpui-pre-0.3.9",
+      "tree_sha256": "583595b2529317b7c578b74396ff500f04899502ab41b4652f9b58424fa1846f",
+      "files": {
+        "Cargo.toml": "43ac0a636d1283313dbb48810ff32c0f6b55737824a886bd9fad37735ec0c56c",
+        "LICENSE-APACHE": "752daf2fb234ca4a1fa372c073fe127f44b7b90fd2529ae44273a64f9d53da7a",
+        "src/elements/text.rs": "0d694cc11c81c09adaefaf60333da74f086c108729dbd7e6fe414f36934e0a58",
+        "src/text_system.rs": "30ca45d4393b626d05cff89db2354e48f67f6ad9250ca7aa6604040c38d56210",
+        "src/text_system/cjk_soft_break.rs": "739526f83e2172f648eca12c5d45c7ce8ef98f3fe664e6c8915003bef7b15b10",
+        "src/text_system/line.rs": "f2cb84c676508b5d4f9bbb09017690d924f37a5800f15812ec19055c6152e504",
+        "src/text_system/line_layout.rs": "80d41a01bc480c0be647a5a0e587e4a5cf1fb8fe9fb38edf2086c2997ade11a1",
+        "src/text_system/line_wrapper.rs": "928a6897e447894629c1e0531e7a3bee0b81c0e2aa14b2a7f2d3909d150f6571"
+      }
     },
     "packages": [
       {

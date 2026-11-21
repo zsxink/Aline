@@ -8,7 +8,12 @@ use aline_buffer::SelectionSpec;
 use aline_markdown::parse_with_cancel;
 use aline_source::{DiskVersion, StorageSnapshot, decode};
 
-use super::{DocCore, OpenError, ReadonlyDocument, ReadonlyOpenCompletion, ReadonlyOpenJob};
+use crate::document::persistence::PersistenceCoordinator;
+
+use super::{
+    DocCore, OpenError, OpenTimings, ReadonlyDocument, ReadonlyOpenCompletion, ReadonlyOpenJob,
+    StageTimer,
+};
 
 const READ_CHUNK_BYTES: usize = 16 * 1024;
 
@@ -129,17 +134,23 @@ impl ReadonlyOpenJob {
 
     /// 经指定只读适配器执行同一流程；取消/错误均不返回部分文档。
     pub fn read_with(self, files: &impl ReadonlyFileAccess) -> ReadonlyOpenCompletion {
-        let result = self.build_candidate(files);
+        let (result, timings) = match self.build_candidate(files) {
+            Ok((document, timings)) => (Ok(document), timings),
+            Err(error) => (Err(error), OpenTimings::default()),
+        };
         ReadonlyOpenCompletion {
             request: self.request,
             result,
+            timings,
         }
     }
 
+    /// 返回候选文档与三段真实耗时；失败时不产生部分文档，也不报计时。
     fn build_candidate(
         &self,
         files: &impl ReadonlyFileAccess,
-    ) -> Result<ReadonlyDocument, OpenError> {
+    ) -> Result<(ReadonlyDocument, OpenTimings), OpenError> {
+        let read_started = StageTimer::start();
         self.check_cancel()?;
         let mut input = files
             .open(&self.path)
@@ -160,7 +171,9 @@ impl ReadonlyOpenJob {
         let baseline = decode(&storage, self.limits.storage)
             .map_err(OpenError::Decode)?
             .into_baseline();
+        let read_decode = read_started.finish();
         self.check_cancel()?;
+        let snapshot_started = StageTimer::start();
         // 文档文本预算必须在 UI 全文副本与 StringBuffer 行索引分配之前拒绝。
         if baseline.source().len() > self.limits.document.text().max_bytes() {
             return Err(OpenError::BudgetExceeded);
@@ -170,13 +183,18 @@ impl ReadonlyOpenJob {
             .try_reserve_exact(baseline.source().len())
             .map_err(OpenError::Allocation)?;
         source.push_str(baseline.source());
-        let mut core =
+        let mut core = if self.limits.editable {
+            DocCore::new_editable(source, SelectionSpec::new(0, 0), self.limits.document)
+        } else {
             DocCore::new_readonly(source, SelectionSpec::new(0, 0), self.limits.document)
-                .map_err(OpenError::Document)?;
+        }
+        .map_err(OpenError::Document)?;
         let snapshot = core
             .current_snapshot(self.limits.document.text())
             .map_err(OpenError::Document)?;
         let identity = core.begin_document_request().map_err(OpenError::Document)?;
+        let snapshot_timing = snapshot_started.finish();
+        let parse_started = StageTimer::start();
         let parsed = parse_with_cancel(
             snapshot.text(),
             self.limits.config,
@@ -193,12 +211,59 @@ impl ReadonlyOpenJob {
         self.check_cancel()?;
         core.accept_document_result(&identity)
             .map_err(OpenError::Document)?;
-        Ok(ReadonlyDocument {
-            path: self.path.clone(),
-            baseline,
-            core,
-            parsed,
-        })
+        let parse_mapping = parse_started.finish();
+        let timings = OpenTimings {
+            read_decode,
+            snapshot: snapshot_timing,
+            parse_mapping,
+            ..OpenTimings::default()
+        };
+        // 只有可编辑且目标为绝对路径时才建立可写关联；文件对话框返回绝对路径，
+        // 非绝对路径只可能来自注入读取器/测试，此时没有可写目标可关联。
+        // 只读文档不持有保存协调器；此失败分支正常不可达，映射为无效路径输入。
+        let persistence = if self.limits.editable && self.path.is_absolute() {
+            Some(
+                PersistenceCoordinator::new(
+                    core.document_id().clone(),
+                    self.path.clone(),
+                    baseline.clone(),
+                )
+                .map_err(|_| OpenError::Io(std::io::ErrorKind::InvalidInput))?,
+            )
+        } else {
+            None
+        };
+        Ok((
+            ReadonlyDocument {
+                path: self.path.clone(),
+                baseline,
+                core,
+                parsed,
+                parsed_identity: identity,
+                pending_parse: None,
+                editable: self.limits.editable,
+                limits: self.limits.document,
+                persistence,
+                storage_budget: self.limits.storage,
+                external: None,
+                external_pause: false,
+                reload_pause: false,
+                reload_mark: None,
+                autosave: super::AutosaveScheduler::default(),
+                recovery: None,
+                resources: None,
+                temp_root: None,
+                image_settings: super::ImageSettings::default(),
+                association: None,
+                pending_migration: None,
+                next_association: 0,
+                parse_budget: self.limits.parse,
+                recovered_origin: None,
+                deferred_recovery: None,
+                recovery_pending_arm: false,
+            },
+            timings,
+        ))
     }
 
     fn read_bounded(&self, reader: &mut impl Read, limit: usize) -> Result<Vec<u8>, OpenError> {

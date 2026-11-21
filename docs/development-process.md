@@ -4,7 +4,7 @@
 
 ## 1. 开发阶段
 
-按架构指引 §13 的 `M0 → M1 → M2 → M3 → M4 → M5 → M6` 顺序推进。当前从 M0 开始。各阶段的范围和出口完全沿用架构指引 §13；不得因 OpenSpec 变更归档或实现任务关闭而推定阶段出口通过。
+按架构指引 §13 的 `M0 → M1 → M2 → M3 → M4 → M5 → M6` 顺序推进。M1 单文档只读阶段出口已于 2026-11-13 按[决定 §43](./decisions.md#43-2026-11-13-m1-阶段出口裁决macos-arm64-范围)在 macOS arm64 范围裁决收口；M2 可编辑核心已开始，当前先推进[`m2-editable-core`](../openspec/changes/m2-editable-core/tasks.md)的 V-08 身份/事务方案与独立审查。该前置通过前，W4/W5 不接生产保存、恢复或原生 IME 路径。阶段出口仍按架构指引 §13 与验证计划逐项核对，不能因 OpenSpec 任务完成、变更归档或出口裁决而推定任一 V 项、跨平台能力或发布门禁通过。各阶段的范围和出口完全沿用架构指引 §13。
 
 | 阶段 | 范围 | 交接要求 |
 |---|---|---|
@@ -41,6 +41,43 @@ OpenSpec 使用仓库根目录 `openspec/` 下的 `spec-driven` schema，所有�
 
 提交使用 Conventional Commits 和 AGENTS.md 的 scope 规则。CodeGraph 用于代码存在后的符号/调用关系探索；重构或新增代码后运行 `codegraph sync`，并在提交前确认 `codegraph status` 无陈旧索引。CodeGraph 索引数据库为本机生成物，不提交。
 
+### 3.1 研究采纳与工程实践落点（2026-11-05）
+
+[决定 QMD-01](./decisions.md#25-2026-11-05-quiet-md-工程实践采纳qmd-01) 已把 [quiet-md 调研](./quiet-md-study.md) 中不改变产品契约的工程/验证方法回写现行规范；治理 delta 已并入已归档（2026-11-13）的 OpenSpec change [`m1-single-window-readonly`](../openspec/changes/archive/2026-11-13-m1-single-window-readonly/proposal.md)，该部分只记录方法与边界，不批准任何 W 项。下列 W0～W7 在研究时是**工作分解与建议顺序**；2026-11-08 用户要求继续 W1～W7 实施，W1/W2/W3/W6/W7 已完成并归档，W4/W5 仍待 M2 前置。该实施授权不批准新增依赖、vendor 或降低验收标准；W4/W5 必须等待 M2 前置（M1 出口已于 2026-11-13 按[决定 §43](./decisions.md#43-2026-11-13-m1-阶段出口裁决macos-arm64-范围)收口，V-08 身份/事务方案仍未完成）。
+
+| 工作流 | 落点与阶段 | 前置/边界 |
+|---|---|---|
+| W0 治理门 | 每个工作流拆成可独立验收的 OpenSpec change，先写范围、非目标、证据表 | 用户批准对应 change；研究文档不是第二权威 |
+| W1 离屏视觉证据 | M1 补充证据；先做依赖准入与能力 spike | 锁定 GPUI 的 `test-support` feature、`gpui_macos` 平台实现与 `image` 未准入不引入；不替代真实窗口/IME/平台证据 |
+| W2 中文排版与字体 | M1 字体实验与 V-04；先测量后决定是否 vendor | 不直接移植 quiet-md 的 GPUI 0.2.2 补丁，不先 fork 三个 gpui-pre 包 |
+| W3 引擎随机不变量 | M1 可并行；M2/M3 扩展 | 只加测试与确定性 RNG，不加生产依赖；默认 seed/步数按 CI 时间立项 |
+| W4 保存/恢复/外改 | M2；对应 SAFE-04/05/07/08、V-08 | 1 秒自动保存与 10 秒恢复分开；不在 M1 提前实现半套 |
+| W5 IME 与输入 | M2；TA-01/ED-01、V-07 | 真实中文输入法证据不能被纯状态机或模拟替代 |
+| W6 语义 token | M1 小步；M4 完整 | 不改视觉与主题包 schema；不挤占 M1 关键路径 |
+| W7 工程门禁/性能/文档 | 持续；服务 M1 任务 7.1 与 V-05 | 不另建第二套门禁；性能报告字段按 R-11-01/S-14-03 |
+
+当前独立 change 索引（不表示任务或平台验证完成）；W1/W2/W3/W6/W7 已于 2026-11-13 归档，W4/W5 仍为进行中：
+
+| 工作流 | Change |
+|---|---|
+| W1 | [`m1-visual-evidence-spike`](../openspec/changes/archive/2026-11-13-m1-visual-evidence-spike/tasks.md) |
+| W2 | [`m1-cjk-typography-font-evidence`](../openspec/changes/archive/2026-11-13-m1-cjk-typography-font-evidence/tasks.md) |
+| W3 | [`engine-fuzz-invariants`](../openspec/changes/archive/2026-11-13-engine-fuzz-invariants/tasks.md) |
+| W4 | [`qmd-w4-persistence-recovery`](../openspec/changes/qmd-w4-persistence-recovery/tasks.md) |
+| W5 | [`qmd-w5-native-ime-input`](../openspec/changes/qmd-w5-native-ime-input/tasks.md) |
+| W6 | [`m1-ui-semantic-tokens`](../openspec/changes/archive/2026-11-13-m1-ui-semantic-tokens/tasks.md) |
+| W7 | [`m1-engineering-evidence-gates`](../openspec/changes/archive/2026-11-13-m1-engineering-evidence-gates/tasks.md) |
+
+- 随机测试失败必须留下可复跑的 seed、步号、操作日志和最小输入；最小输入整理成正式夹具后提交，原始日志只留 `logs/validation/`。不得用测试辅助函数把已知语义丢失规范化后当作通过。
+- W1/W2/W3/W6/W7 已在 M1 范围完成并归档（2026-11-13）；W4/W5 已独立建档，M1 出口已于 2026-11-13 收口，但两者仍须等待 M2 前置（V-08 身份/事务方案）；M4 完整主题、vendor 或新依赖仍须具体裁决。
+- W2 实测后的最小修复准备另由 [`m1-cjk-linebreak-core-fix`](../openspec/changes/archive/2026-11-13-m1-cjk-linebreak-core-fix/tasks.md) 承接；用户方向决定见[决定 §28](./decisions.md#28-2026-11-09-w2-中文断行最小修复准备)，具体来源准入与修复实测尚未完成。
+- 2026-11-12：[决定 §35](./decisions.md#35-2026-11-12-m1-剩余七项裁决与受控失败实验) 对 W2 的「先测量后决定是否 vendor」给出结论——M1 接受中文避头尾已知限制、vendor 推到 M2 出现 caret/IME 后重新评估，`m1-cjk-linebreak-core-fix` 以 evidence-only 收尾。上表 W2 行的「先测量后决定」与「不先 fork 三个 gpui-pre 包」仍然成立；M2 若决定 vendor，仍须重走依赖准入与具体裁决。
+
+- 2026-11-12 追加更正（决定 §36）：上条「`m1-cjk-linebreak-core-fix` 以 evidence-only 收尾、vendor 推到 M2」的执行边界已被决定 §36 推翻——生产树已接入 `vendor/gpui-pre-0.3.9` 与 `[patch.crates-io]`，来源、全树摘要与 8 文件身份由策略资产登记并在每次门禁重算。W2 行的其它原则，以及「变更来源仍须重走依赖准入与具体裁决」不变。
+- 2026-11-19 状态更新：V-08 身份/事务方案独立审查已通过，W4/W5 已进入实现（不再是「等待 M2 前置」）。W4 当前 12/14，未完成 2.2 平台故障注入与其他平台、5.2 真实 macOS 中文 UI 操作链；W5 当前 6/13，真实窗口已取得组合期拒绝、平台自然提交、查找面板逐项/替换分项，但菜单借焦、窗口失活、IME 取消、候选窗几何、跨虚拟滚动与三平台未测。任务勾选或分项证据不使 V-07/V-08 整项通过，阶段出口仍按架构 §13 与验证计划判定。
+- quiet-md 的数值、平台能力、vendor 补丁和测试覆盖只能作为待核对线索，不能直接写成 Aline 设计值或验收证据；引用时标明“参考/待验证”。
+- 工作流若改变验收方式、依赖图、跨模块契约或阶段范围，先更新 OpenSpec change 与相应现行规范，再写依赖该变化的代码；研究文档中的建议 change 名称不自动生效。
+
 ## 4. 当前启动清单
 
 - [x] 初始化 OpenSpec `spec-driven`，工件语言 zh-CN，配置 Codex 工作流技能。
@@ -69,7 +106,9 @@ OpenSpec 使用仓库根目录 `openspec/` 下的 `spec-driven` schema，所有�
 
 ### 5.1 本地运行产物
 
-- stdout/stderr、command JSON、环境快照、metadata/tree dump、扫描清单、覆盖率/性能原始数据、截图、执行时生成的夹具副本、临时探针及 Agent brief/分析/逐轮 report/review，统一写 `logs/validation/<任务>/<运行编号>/`。验证脚本默认创建唯一运行目录，显式输出目录也必须位于 `logs/validation/`；CI 同样遵守。测试自身的隔离文件工作区可用系统临时目录，构建缓存留 `target/`；当前交接另按 §5.2 放 `tmp/`。
+- stdout/stderr、command JSON、环境快照、metadata/tree dump、扫描清单、覆盖率/性能原始数据、截图、执行时生成的夹具副本、临时探针及 Agent brief/分析/逐轮 report/review，统一写 `logs/validation/<任务>/<运行编号>/`。验证脚本默认创建唯一运行目录，显式输出目录也必须位于 `logs/validation/`；CI 同样遵守。测试自身的隔离文件工作区可用系统临时目录，构建缓存留 `target/` 或系统临时目录且不得写进 `logs/validation/`；当前交接另按 §5.2 放 `tmp/`。
+- 通用门禁统一由 `scripts/check_workspace.py --output-dir logs/validation/<任务>/<轮次>` 进入，子检查写入同一轮次目录；不裸跑 `check_lints.py` / `check_engineering.py` 等子脚本生成散落的默认 `run-*`。
+- 每类通用门禁原始输出最多保留最近一次成功运行；结论回填后，旧 `run-*`、空目录、0 字节 stdout/stderr 与遗留构建缓存由 `scripts/prune_validation_logs.py` 回收。脚本默认 dry-run，`--apply` 才删除；被 tracked 文档/OpenSpec 引用、近 7 天运行及当前任务目录默认保留。
 - 调试与审查期间保留所需输出，结束后可清理，不永久保留每次成功运行。仍在调查的失败或争议、阶段验收依赖的原始证据，完成核对与摘要迁移前保留。CI 产物采用有限保留期，不回灌 Git。
 - 本地记录经 `scripts/evidence_paths.py` 归一化；文档使用仓库相对路径或占位符，不记录本机绝对路径、正文或敏感信息。
 - 本地日志不能成为他人复跑的必要输入。有回归价值的探针先整理成正式测试/脚本，提交最小输入与独立预期；不可自动复现的实验保留必要摘要。缺失旧证据就注明不足，不补造历史。

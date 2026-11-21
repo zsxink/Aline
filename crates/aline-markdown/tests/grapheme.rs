@@ -119,6 +119,59 @@ fn old_and_partial_projections_are_rejected() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+fn local_identity_source_graphemes_use_full_source_context_and_stay_in_scope()
+-> Result<(), Box<dyn Error>> {
+    let text = "前e\u{301}👩‍💻，\r\n尾";
+    let snapshot = TextSnapshot::new(text.to_owned(), TextBudget::new(64))?;
+    // 可编辑范围从组合簇开头到 CRLF 末尾；算法仍需读取快照上下文，结果不能越界。
+    let projection = Projection::identity(
+        snapshot.clone(),
+        snapshot.src_range(3..22)?,
+        MappingBudget::new(64, 64),
+    )?;
+    let start = snapshot.src_offset(3)?;
+    let combining_interior = snapshot.src_offset(4)?;
+    let emoji_end = snapshot.src_offset(17)?;
+    let crlf_end = snapshot.src_offset(22)?;
+
+    assert!(projection.is_source_grapheme_boundary(&start)?);
+    assert!(!projection.is_source_grapheme_boundary(&combining_interior)?);
+    assert_eq!(
+        projection
+            .adjacent_source_grapheme_boundary(&start, true)?
+            .map(|offset| offset.byte_offset()),
+        Some(6)
+    );
+    assert_eq!(
+        projection
+            .adjacent_source_grapheme_boundary(&emoji_end, true)?
+            .map(|offset| offset.byte_offset()),
+        Some(20)
+    );
+    assert_eq!(
+        projection
+            .adjacent_source_grapheme_boundary(&crlf_end, false)?
+            .map(|offset| offset.byte_offset()),
+        Some(20)
+    );
+    assert!(matches!(
+        projection.adjacent_source_grapheme_boundary(&crlf_end, true),
+        Err(GraphemeError::Mapping(
+            aline_markdown::MappingError::SourceOutsideProjection
+        ))
+    ));
+
+    let outside = snapshot.src_offset(25)?;
+    assert!(matches!(
+        projection.is_source_grapheme_boundary(&outside),
+        Err(GraphemeError::Mapping(
+            aline_markdown::MappingError::SourceOutsideProjection
+        ))
+    ));
+    Ok(())
+}
+
+#[test]
 fn visual_navigation_maps_back_only_through_projection() -> Result<(), Box<dyn Error>> {
     let snapshot = TextSnapshot::new("**e\u{301}** X\n".to_owned(), TextBudget::new(64))?;
     let parsed = parse(&snapshot, ParseConfig::m0(), ParseBudget::m0())?;

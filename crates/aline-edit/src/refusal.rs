@@ -23,6 +23,10 @@ pub enum BudgetKind {
     Parse,
     /// 映射索引预算超限。
     Mapping,
+    /// 源码查找命中数超限。
+    FindMatches,
+    /// Unicode 查找的模式、前缀表与边界队列超出工作字节预算。
+    FindWorkspace,
 }
 
 impl BudgetKind {
@@ -35,6 +39,8 @@ impl BudgetKind {
             Self::CandidateBytes => "CandidateBytes",
             Self::Parse => "Parse",
             Self::Mapping => "Mapping",
+            Self::FindMatches => "FindMatches",
+            Self::FindWorkspace => "FindWorkspace",
         }
     }
 }
@@ -96,10 +102,20 @@ pub enum EditRefusal {
     },
     /// 代次相同但快照身份不同；旧计划不得复活。
     WrongSnapshot,
+    /// 查找结果所属文档、工作版本或查询代次已变化。
+    StaleFindResults,
+    /// 空查询没有可替换的命中。
+    EmptyFindQuery,
+    /// 查询无匹配，或指定命中已不在本批结果内。
+    FindMatchUnavailable,
     /// 解析结果或映射不属于当前快照/投影。
     ProjectionMismatch,
     /// 计划生成后选区已变化。
     SelectionMismatch,
+    /// 封口候选与发起命令时的逻辑源码不完全相同。
+    CandidateContentMismatch,
+    /// 输入组本身不能作为封口后的独立命令重新规划。
+    UnsupportedReplan,
     /// 范围内原文与调用方期望片段不符。
     ExpectedFragmentMismatch {
         /// 复验失败的源码范围。
@@ -144,6 +160,10 @@ pub enum EditRefusal {
     EmptySelection,
     /// 当前最小协议只允许单条所见替换。
     UnsupportedVisualBatch,
+    /// 原文输入对应的打开范围已不是当前解析的顶层块。
+    InvalidRawBlock,
+    /// 原文输入的补丁超出了打开块的实际范围。
+    RawInputOutsideBlock,
     /// 内部计划不满足构造不变量。
     InvalidPlan,
     /// 结果长度累计溢出。
@@ -168,8 +188,13 @@ impl EditRefusal {
             Self::WrongMode { .. } => "WrongMode",
             Self::WrongVersion { .. } => "WrongVersion",
             Self::WrongSnapshot => "WrongSnapshot",
+            Self::StaleFindResults => "StaleFindResults",
+            Self::EmptyFindQuery => "EmptyFindQuery",
+            Self::FindMatchUnavailable => "FindMatchUnavailable",
             Self::ProjectionMismatch => "ProjectionMismatch",
             Self::SelectionMismatch => "SelectionMismatch",
+            Self::CandidateContentMismatch => "CandidateContentMismatch",
+            Self::UnsupportedReplan => "UnsupportedReplan",
             Self::ExpectedFragmentMismatch { .. } => "ExpectedFragmentMismatch",
             Self::OutOfBounds { .. } => "OutOfBounds",
             Self::ReversedRange => "ReversedRange",
@@ -179,6 +204,8 @@ impl EditRefusal {
             Self::HtmlBoundary { .. } => "HtmlBoundary",
             Self::EmptySelection => "EmptySelection",
             Self::UnsupportedVisualBatch => "UnsupportedVisualBatch",
+            Self::InvalidRawBlock => "InvalidRawBlock",
+            Self::RawInputOutsideBlock => "RawInputOutsideBlock",
             Self::InvalidPlan => "InvalidPlan",
             Self::LengthOverflow => "LengthOverflow",
             Self::Allocation => "Allocation",

@@ -74,11 +74,13 @@ def execute(argv, directory, output, label, env):
 def run(output):
     output = output_directory('public-api', output)
     isolation = json.loads((ROOT / 'scripts/fixtures/isolation.json').read_text())
-    isolated_home = resolve_path(isolation['cargo_home']) or isolation['cargo_home']
+    isolated_home = os.environ.get('CARGO_HOME') or resolve_path(isolation['cargo_home']) or isolation['cargo_home']
     if not Path(isolated_home).is_dir():
         raise ValueError('登记的隔离 Cargo 缓存不存在: ' + isolated_home)
-    env = dict(os.environ, CARGO_HOME=os.environ.get('CARGO_HOME') or isolated_home,
-               RUSTUP_TOOLCHAIN='1.98.1', CARGO_NET_OFFLINE='true', CARGO_TARGET_DIR=str(output / 'cargo-target'))
+    # 构建缓存不是证据，放系统临时目录并在结束时删除，不写入 logs/validation。
+    cargo_target = Path(tempfile.mkdtemp(prefix='aline-cargo-target-'))
+    env = dict(os.environ, CARGO_HOME=isolated_home,
+               RUSTUP_TOOLCHAIN='1.98.1', CARGO_NET_OFFLINE='true', CARGO_TARGET_DIR=str(cargo_target))
     setup = '''
 let snapshot = aline_buffer::TextSnapshot::new(String::from("甲😀"), aline_buffer::TextBudget::new(64))?;
 let projection = aline_markdown::Projection::identity(snapshot.clone(), snapshot.src_range(0..7)?, aline_markdown::MappingBudget::new(64, 16))?;
@@ -143,8 +145,10 @@ let _navigation_empty: bool = parsed.navigation().is_empty();
             print(name, '符合预期' if passed else '失败', flush=True)
     finally:
         shutil.rmtree(work, ignore_errors=True)
+        shutil.rmtree(cargo_target, ignore_errors=True)
     summary = {'passed': all(record['passed'] for record in records), 'cases': records,
                'fixture_basis': '夹具在本次 logs/validation 输出内编译，证据清单中的相对依赖路径以该工作目录为基准',
+               'build_cache': '<tmp>/aline-cargo-target-*，运行结束删除，不作为证据保留',
                'scope': '当前 macOS 工具链真实编译，未运行非法夹具，不声明其他平台或完整引擎业务'}
     write_json(output / 'summary.json', summary)
     return 0 if summary['passed'] else 1

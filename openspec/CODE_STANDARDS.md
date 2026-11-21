@@ -156,6 +156,9 @@ cargo test --workspace
 | i18n | key 集、插值一致性及用户文案来源检查 | M0 catalog 接线起建立 |
 | 模块/模式/所有者 | 评审核对本文件 §2～4；记录真实调用路径与适用/不适用理由 | 即日起人工执行；行数不代替判断 |
 | UI/IME/文件失败/性能 | 真事件、逐步故障、端到端/平台样本；记录未覆盖项 | 按 M0～M6 / V-01～V-09 执行，当前未完成 |
+| QMD-01 方法证据 | 来源标注；fuzz 失败 seed、步号、操作日志、最小输入；性能报告字段；保存/恢复分离与平台受检替换；IME 显式清理与坐标投影；语义 token、中文排版与离屏证据边界 | 方法已回写 docs，并由 change `m1-single-window-readonly` 的 `engineering-governance` delta 记录；W1～W7 已按用户实施指令各有独立 change，进度见开发流程 §3.1 的索引；W4/W5 保留 M2 前置。静态 UI/catalog/token 与测量自测已接现有 workspace 入口，真实性能和平台证据仍独立验收 |
+
+QMD-01 与 M1 change 的治理 delta 只记录工程/验证方法采纳，不新增自动门禁、依赖、夹具或平台证据。落实某方法需要新增依赖、改变验收方式或跨模块契约时，按开发流程 §2 逐项另建 change；不能以本表或研究文档替代评审、实测或阶段出口。研究方法的具体字段以 [决定 §25](../docs/decisions.md#25-2026-11-05-quiet-md-工程实践采纳qmd-01)、[架构规范](../docs/architecture-guide.md)、[引擎设计](../docs/engine-design.md)、[Rust 规范](../docs/rust-style-guide.md)与[验证计划](../docs/v1-validation-plan.md)的对应条目为准。
 
 新增或修改自动守卫必须有正例和最小违规反例，证明既可正常通过又能拒绝目标违规；说明覆盖范围和盲区。不能仅凭脚本退出 0、grep 无命中或配置表存在宣称架构合规。尚无自动化时给出具体人工步骤和观察结果。
 
@@ -164,6 +167,8 @@ cargo test --workspace
 ### 6.3 产物与交接的存放
 
 按[开发流程 §5](../docs/development-process.md#5-仓库产物与提交边界)提交代码、可复现测试/脚本、独立输入与预期、现行规范和必要 OpenSpec 工件。§6.1～6.2 的“记录/证据”不要求另建报告：原始命令、环境、stdout/stderr、逐轮分析/审查原文留 `logs/validation/`，同一任务只在 `tmp/` 维护一份不追踪的当前交接。必要决定和阶段/平台验证摘要回填既有入口，不以提交大量文档替代可执行回归。
+
+本地验证输出必须有有限保留期：每类通用门禁最多保留最近一次成功运行；旧 `run-*`、空目录、0 字节日志和遗留构建缓存由 `scripts/prune_validation_logs.py` 回收，默认 dry-run，`--apply` 才删除。构建缓存 MUST NOT 写入 `logs/validation/`，应放系统临时目录或仓库 `target/` 并在结束时清理。回收脚本 MUST 跳过被 tracked 文档/OpenSpec 引用、近期运行与当前任务目录，并以正例和最小违规反例证明这些保留边界。
 
 ## 7. 参考来源与采纳边界
 

@@ -9,7 +9,7 @@ import sys
 from engineering_dependencies import MEMBERS, load_json
 from evidence_paths import display_path, write_json
 from validation_output import output_directory
-from check_engineering import ADMISSION_POLICY, ROOT, POLICY, SCENARIOS, record_command, sha256
+from check_engineering import ADMISSION_POLICY, ROOT, SCENARIOS, record_command, sha256
 
 
 def run(output=None):
@@ -120,7 +120,9 @@ def run(output=None):
         baseline_records.append(target_record)
     baseline_metadata_record, baseline_tree_record = baseline_records
     # 冻结 M0 图必须继续使用其原 hash 预期；正式策略更新到 M1 后，历史反例不能借新值漂移。
-    baseline_policy = load_json(POLICY)
+    # 2026-11-12：正式策略的 core 改为已登记的本地来源后，冻结 0.3.9 注册表图不能再读正式
+    # 策略（否则历史反例会被新身份误伤），改为读取与图一起冻结的策略副本。
+    baseline_policy = load_json(baseline / "policy-baseline.json")
     m0_hashes = {
         "all": "cfb02f486601ea7deabbb3f00e252a09a584ae4ffd1edc27f1d826bd50da6793",
         "all-features": "cfb02f486601ea7deabbb3f00e252a09a584ae4ffd1edc27f1d826bd50da6793",

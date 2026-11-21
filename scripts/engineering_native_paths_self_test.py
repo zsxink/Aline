@@ -2,6 +2,7 @@
 
 import argparse
 import copy
+import hashlib
 import io
 from pathlib import Path
 import unittest
@@ -216,9 +217,110 @@ class NativePathTests(unittest.TestCase):
             with self.assertRaisesRegex(Violation, "规则|身份|场景"): check(data)
 
 
+class LocalSourceTests(unittest.TestCase):
+    """本地来源身份：发布包 + 逐文件锚点 + 全树摘要，任一漂移失败关闭。"""
+
+    def make(self, root):
+        vendor = Path(root) / "vendor" / "gpui-pre-0.3.9"
+        (vendor / "src").mkdir(parents=True, exist_ok=True)
+        (vendor / "src" / "lib.rs").write_bytes(b"// synthetic local source\n")
+        (vendor / "Cargo.toml").write_bytes(b"[package]\nname = \"gpui-pre\"\n")
+        rows = sorted((path.relative_to(vendor).as_posix(), path) for path in vendor.rglob("*") if path.is_file())
+        tree = hashlib.sha256(("\n".join(rel + "\0" + hashlib.sha256(p.read_bytes()).hexdigest() for rel, p in rows) + "\n").encode()).hexdigest()
+        spec = {"package": CORE, "source": "local-patch", "path": "vendor/gpui-pre-0.3.9", "tree_sha256": tree,
+                "files": {rel: hashlib.sha256(p.read_bytes()).hexdigest() for rel, p in rows}}
+        return spec
+
+    def data(self, spec, root):
+        data, by_key = fixture(); ident = by_key[CORE]
+        package = data["packages"][ident]
+        vendor = Path(root) / "vendor" / "gpui-pre-0.3.9"
+        package["id"] = "path+file://" + str(vendor.resolve()) + "#" + CORE
+        package["manifest_path"] = str((vendor / "Cargo.toml").resolve())
+        package["source"] = None
+        data["lock"][CORE] = {"name": "gpui-pre", "version": "0.3.9"}
+        data["policy"]["native_backend"]["core"] = spec
+        return data
+
+    def check(self, data, root):
+        from engineering_native_paths import check_native_paths
+        return check_native_paths(**data, scenario="all", repo_root=root)
+
+    def test_registered_local_core_passes(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as root:
+            result = self.check(self.data(self.make(root), root), root)
+            self.assertEqual(set(result), {"forbidden", "sidecars"})
+
+    def test_tree_file_path_and_missing_root_drift_fail_closed(self):
+        import shutil, tempfile
+        for change, pattern in (("tree", "目录树漂移"), ("file", "已审查文件漂移"),
+                                ("path", "身份/路径漂移"), ("root", "工作树根"), ("missing", "目录缺失")):
+            with tempfile.TemporaryDirectory() as root:
+                spec = self.make(root); data = self.data(spec, root)
+                if change == "tree": spec["tree_sha256"] = "0" * 64
+                elif change == "file": spec["files"]["src/lib.rs"] = "0" * 64
+                elif change == "path": spec["path"] = "vendor/other"
+                elif change == "missing": shutil.rmtree(Path(root) / "vendor" / "gpui-pre-0.3.9")
+                with self.assertRaisesRegex(Violation, pattern):
+                    self.check(data, None if change == "root" else root)
+
+    def test_local_identity_is_rejected_outside_core_position(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as root:
+            spec = self.make(root); data = self.data(spec, root)
+            data["policy"]["native_backend"]["packages"][0] = spec
+            with self.assertRaisesRegex(Violation, "本地来源身份不允许"):
+                self.check(data, root)
+
+    def test_symlink_in_local_source_fails_closed(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as root:
+            spec = self.make(root)
+            (Path(root) / "vendor" / "gpui-pre-0.3.9" / "link").symlink_to(Path(root) / "vendor" / "gpui-pre-0.3.9" / "src")
+            with self.assertRaisesRegex(Violation, "符号链接"):
+                self.check(self.data(spec, root), root)
+
+    def test_external_same_suffix_identity_and_manifest_are_rejected(self):
+        """仓库外同后缀副本不能让门禁核对仓库内字节、构建使用外部字节。
+
+        覆盖三类外部根：临时目录，以及会被通用路径规范化误认成 <repo> 的
+        /Users/<任意用户>/Project/editor/Aline 与 /home/<任意用户>/...。
+        """
+        import tempfile
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as outside:
+            for base in (str(Path(outside)), "/Users/Shared/Project/editor/Aline",
+                         "/home/Shared/Project/editor/Aline"):
+                for form in ("id", "manifest", "both"):
+                    with self.subTest(base=base, form=form):
+                        data = self.data(self.make(root), root)
+                        ident = next(key for key in data["packages"] if key.endswith("#" + CORE))
+                        package = data["packages"][ident]
+                        if form in ("id", "both"):
+                            package["id"] = "path+file://" + str(Path(base) / "vendor" / "gpui-pre-0.3.9") + "#" + CORE
+                        if form in ("manifest", "both"):
+                            package["manifest_path"] = str(Path(base) / "vendor" / "gpui-pre-0.3.9" / "Cargo.toml")
+                        with self.assertRaisesRegex(Violation, "身份/路径漂移"):
+                            self.check(data, root)
+
+    def test_symlinked_ancestor_directory_fails_closed(self):
+        """vendor 本身是指向仓库外目录的符号链接时，即使字节相同也必须拒绝。"""
+        import shutil, tempfile
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as outside:
+            spec = self.make(root)
+            shutil.move(str(Path(root) / "vendor"), str(Path(outside) / "vendor"))
+            (Path(root) / "vendor").symlink_to(Path(outside) / "vendor")
+            data = self.data(spec, root)
+            with self.assertRaisesRegex(Violation, "路径含符号链接"):
+                self.check(data, root)
+
+
 def run(output=None):
     output = output_directory("native-path-self-test", output); stream = io.StringIO()
-    result = unittest.TextTestRunner(stream=stream, verbosity=2).run(unittest.defaultTestLoader.loadTestsFromTestCase(NativePathTests))
+    loader = unittest.defaultTestLoader
+    suite = unittest.TestSuite([loader.loadTestsFromTestCase(NativePathTests),
+                                loader.loadTestsFromTestCase(LocalSourceTests)])
+    result = unittest.TextTestRunner(stream=stream, verbosity=2).run(suite)
     text = stream.getvalue(); write_text(output / "tests.txt", text)
     write_json(output / "summary.json", {"passed": result.wasSuccessful(), "tests": result.testsRun,
         "failures": len(result.failures), "errors": len(result.errors), "kind": "独立合成的最短路径回归，不是实际 Cargo 图或原生运行"})

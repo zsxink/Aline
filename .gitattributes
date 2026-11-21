@@ -1,0 +1,2 @@
+# 固定字节金样保留原始行尾，避免文本归一化或空白检查改写
+crates/aline-ui/tests/fixtures/recovery/*.bytes binary

@@ -8,14 +8,22 @@
 mod budget;
 mod command;
 mod errors;
+mod find;
+mod input;
 mod permissions;
 mod plan;
 mod refusal;
+mod replan;
 mod reread;
 mod validate;
 
 pub use budget::EditBudget;
 pub use command::{EditCommand, EditContext, EditMode, GroupReason, InlineFormat, SourceEdit};
+pub use find::{
+    FindBudget, FindCase, FindMatch, FindReplacement, FindResults, FindVersion, find_matches,
+    plan_find_replace,
+};
+pub use input::{RawBlockEdit, plan_raw_block_input};
 pub use plan::{ChangePlan, NoChangeReason, PlanOutcome, Preview, plan_change};
 pub use refusal::{BudgetKind, EditRefusal, RereadFailure};
 pub use validate::{ValidatedChange, validate_change};

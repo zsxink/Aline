@@ -343,6 +343,10 @@ impl Projection {
     }
 
     /// 字素算法需要完整上下文；局部投影不能假定切口是字素边界。
+    pub(super) fn source_snapshot(&self) -> &TextSnapshot {
+        &self.snapshot
+    }
+
     pub(super) fn has_full_source_context(&self) -> bool {
         self.source.byte_range() == (0..self.snapshot.len_bytes())
     }

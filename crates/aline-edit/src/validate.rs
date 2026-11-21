@@ -1,7 +1,7 @@
 //! 计划消费前的完整复验：工作版本、投影、选区、期望片段与候选重读。
 
 use aline_buffer::{CheckedBatch, SelectionSpec, SrcSelection, TextSnapshot};
-use aline_markdown::Parsed;
+use aline_markdown::{Block, Parsed, ProtectedRange, StyledRange};
 
 use crate::command::{EditContext, GroupReason};
 use crate::errors::{map_batch_error, map_buffer_error};
@@ -15,6 +15,9 @@ use crate::reread::{build_candidate, verify};
 pub struct ValidatedChange<'a> {
     plan: &'a ChangePlan,
     batch: &'a CheckedBatch,
+    candidate_blocks: Vec<Block>,
+    candidate_protected_ranges: Vec<ProtectedRange>,
+    candidate_styled_ranges: Vec<StyledRange>,
 }
 
 impl<'a> ValidatedChange<'a> {
@@ -47,6 +50,23 @@ impl<'a> ValidatedChange<'a> {
     pub fn preview(&self) -> &Preview {
         self.plan.preview()
     }
+
+    /// 返回复验候选的顶层块，供文档所有者定位补丁后的选区。
+    ///
+    /// 范围绑定独立候选快照。在同一批次成功发布后，须按实际 Buffer 快照重新绑定。
+    pub fn candidate_blocks(&self) -> &[Block] {
+        &self.candidate_blocks
+    }
+
+    /// 返回与候选顶层块绑定同一快照的受保护源码范围。
+    pub fn candidate_protected_ranges(&self) -> &[ProtectedRange] {
+        &self.candidate_protected_ranges
+    }
+
+    /// 返回与候选顶层块绑定同一快照的 HTML 样式源码范围。
+    pub fn candidate_styled_ranges(&self) -> &[StyledRange] {
+        &self.candidate_styled_ranges
+    }
 }
 
 /// 在真实写入前，用当前快照、解析结果和选区复验计划。
@@ -60,41 +80,7 @@ pub fn validate_change<'a>(
     selection: &SrcSelection,
     context: &EditContext,
 ) -> Result<ValidatedChange<'a>, EditRefusal> {
-    if context.has_pending_input() {
-        return Err(EditRefusal::PendingInput);
-    }
-    if context.has_composition() {
-        return Err(EditRefusal::CompositionActive);
-    }
-    if context.mode() != plan.mode() {
-        return Err(EditRefusal::WrongMode {
-            expected: plan.mode(),
-            actual: context.mode(),
-        });
-    }
-    if snapshot.revision() != plan.before_revision() {
-        return Err(EditRefusal::WrongVersion {
-            expected: plan.before_revision(),
-            actual: snapshot.revision(),
-        });
-    }
-    if snapshot.id() != plan.before_snapshot_id() {
-        return Err(EditRefusal::WrongSnapshot);
-    }
-    if parsed.snapshot().id() != snapshot.id() || parsed.projection().snapshot_id() != snapshot.id()
-    {
-        return Err(EditRefusal::ProjectionMismatch);
-    }
-    if parsed.projection().id() != plan.before_projection_id() {
-        return Err(EditRefusal::ProjectionMismatch);
-    }
-    snapshot
-        .validate_selection(selection)
-        .map_err(map_buffer_error)?;
-    if selection != plan.before_selection() {
-        return Err(EditRefusal::SelectionMismatch);
-    }
-    plan.batch().validate(snapshot).map_err(map_batch_error)?;
+    validate_binding(plan, snapshot, parsed, selection, context)?;
     for expectation in &plan.expectations {
         let range = snapshot
             .src_range(expectation.range.clone())
@@ -123,9 +109,65 @@ pub fn validate_change<'a>(
         plan.budget,
     )?;
     ensure_target_selection(&candidate.snapshot, plan.target_selection())?;
-
     Ok(ValidatedChange {
         plan,
         batch: plan.batch(),
+        candidate_blocks: copy_metadata(candidate.parsed.blocks())?,
+        candidate_protected_ranges: copy_metadata(candidate.parsed.protected_ranges())?,
+        candidate_styled_ranges: copy_metadata(candidate.parsed.styled_ranges())?,
     })
+}
+
+pub(crate) fn validate_binding(
+    plan: &ChangePlan,
+    snapshot: &TextSnapshot,
+    parsed: &Parsed,
+    selection: &SrcSelection,
+    context: &EditContext,
+) -> Result<(), EditRefusal> {
+    if context.has_pending_input() {
+        return Err(EditRefusal::PendingInput);
+    }
+    if context.has_composition() {
+        return Err(EditRefusal::CompositionActive);
+    }
+    if context.mode() != plan.mode() {
+        return Err(EditRefusal::WrongMode {
+            expected: plan.mode(),
+            actual: context.mode(),
+        });
+    }
+    plan.validate_find_query_generation(context.find_query_generation())?;
+    if snapshot.revision() != plan.before_revision() {
+        return Err(EditRefusal::WrongVersion {
+            expected: plan.before_revision(),
+            actual: snapshot.revision(),
+        });
+    }
+    if snapshot.id() != plan.before_snapshot_id() {
+        return Err(EditRefusal::WrongSnapshot);
+    }
+    if parsed.snapshot().id() != snapshot.id() || parsed.projection().snapshot_id() != snapshot.id()
+    {
+        return Err(EditRefusal::ProjectionMismatch);
+    }
+    if parsed.projection().id() != plan.before_projection_id() {
+        return Err(EditRefusal::ProjectionMismatch);
+    }
+    snapshot
+        .validate_selection(selection)
+        .map_err(map_buffer_error)?;
+    if selection != plan.before_selection() {
+        return Err(EditRefusal::SelectionMismatch);
+    }
+    plan.batch().validate(snapshot).map_err(map_batch_error)
+}
+
+fn copy_metadata<T: Clone>(metadata: &[T]) -> Result<Vec<T>, EditRefusal> {
+    // 范围复制沿用解析预算限制后的条目数，分配仍须显式检查。
+    let mut copy = Vec::new();
+    copy.try_reserve_exact(metadata.len())
+        .map_err(|_| EditRefusal::Allocation)?;
+    copy.extend_from_slice(metadata);
+    Ok(copy)
 }

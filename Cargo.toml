@@ -32,6 +32,13 @@ unicode-segmentation = "=1.13.3"
 toml = { version = "=1.1.8", default-features = false, features = ["std", "parse", "serde"] }
 rust-embed = { version = "=8.13.0", default-features = false, features = ["debug-embed"] }
 
+# 已准入的本地来源：crates.io 发布包 + 已审查的中文避头尾补丁。
+# 字节身份由 scripts/engineering_policy.json 的 native_backend.core（tree_sha256 +
+# files）与 scripts/dependency_admission_policy.json 的 license.local_paths
+# 在每次门禁运行时重新核对；来源与补丁证据见 vendor/PROVENANCE.json。
+[patch.crates-io]
+gpui-pre = { path = "vendor/gpui-pre-0.3.9" }
+
 [workspace.lints.rust]
 unsafe_code = "forbid"
 missing_docs = "warn"

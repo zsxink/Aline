@@ -206,7 +206,7 @@ struct SavePoint {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct RecordPlan {
+struct RecordPlan {
     truncate_to: usize,
     merge_node: Option<usize>,
     remove_nodes: usize,
@@ -259,14 +259,13 @@ impl History {
         Ok(total)
     }
 
-    pub(crate) fn prepare_record(
+    fn prepare_record(
         &self,
         step: &HistoryStep,
-        source: OperationSource,
         now_millis: u64,
     ) -> Result<RecordPlan, BufferError> {
         let truncate_to = self.cursor;
-        let merge_node = if source == OperationSource::Typing && truncate_to > 0 {
+        let merge_node = if step.source() == OperationSource::Typing && truncate_to > 0 {
             let index = truncate_to - 1;
             let node = self.nodes.get(index);
             match node {
@@ -290,8 +289,17 @@ impl History {
         let prospective_nodes = truncate_to
             .checked_add(if merge_node.is_some() { 0 } else { 1 })
             .ok_or(BufferError::LengthOverflow)?;
+        self.prepare_record_capacity(prospective_nodes, step_bytes(step)?, merge_node)
+    }
+
+    fn prepare_record_capacity(
+        &self,
+        prospective_nodes: usize,
+        added_bytes: usize,
+        merge_node: Option<usize>,
+    ) -> Result<RecordPlan, BufferError> {
+        let truncate_to = self.cursor;
         let existing_bytes = self.bytes_across(truncate_to)?;
-        let added_bytes = step_bytes(step)?;
         let protected = self.protected_prefix(truncate_to);
         let mut removed_bytes = 0usize;
         let mut last_candidate = None;
@@ -339,7 +347,7 @@ impl History {
         })
     }
 
-    pub(crate) fn commit_record(&mut self, plan: RecordPlan, step: HistoryStep, now_millis: u64) {
+    fn truncate_and_trim_for_record(&mut self, plan: RecordPlan) {
         self.nodes.truncate(plan.truncate_to);
         self.cursor = plan.truncate_to;
         if let Some(point) = &mut self.saved
@@ -358,28 +366,86 @@ impl History {
                 *index = index.saturating_sub(plan.remove_nodes);
             }
         }
-        let step = Arc::new(step);
-        if let Some(merge_node) = plan.merge_node {
-            let index = merge_node.saturating_sub(plan.remove_nodes);
-            if let Some(node) = self.nodes.get_mut(index) {
-                node.steps.push(step);
-                node.pending = true;
-                node.last_input_at = now_millis;
-                return;
-            }
+    }
+
+    /// 预算与容量受检后，发布候选命令及其有变化的输入节点。
+    pub(crate) fn record_staged_command(
+        &mut self,
+        typing: Option<Arc<HistoryStep>>,
+        command: Arc<HistoryStep>,
+        now_millis: u64,
+    ) -> Result<(), BufferError> {
+        debug_assert!(
+            typing
+                .as_ref()
+                .is_none_or(|step| step.source() == OperationSource::Typing)
+        );
+        debug_assert_eq!(command.source(), OperationSource::Command);
+        let prospective_nodes = self
+            .cursor
+            .checked_add(1 + usize::from(typing.is_some()))
+            .ok_or(BufferError::LengthOverflow)?;
+        let typing_bytes = typing.as_deref().map(step_bytes).transpose()?.unwrap_or(0);
+        let added_bytes = typing_bytes
+            .checked_add(step_bytes(&command)?)
+            .ok_or(BufferError::LengthOverflow)?;
+        let plan = self.prepare_record_capacity(prospective_nodes, added_bytes, None)?;
+        let needed = prospective_nodes
+            .checked_sub(plan.remove_nodes)
+            .ok_or(BufferError::LengthOverflow)?;
+        let typing = typing
+            .map(|step| sealed_node(step, now_millis))
+            .transpose()?;
+        let command = sealed_node(command, now_millis)?;
+        self.nodes
+            .try_reserve(needed.saturating_sub(self.nodes.len()))
+            .map_err(BufferError::Allocation)?;
+
+        self.truncate_and_trim_for_record(plan);
+        self.seal_pending();
+        if let Some(typing) = typing {
+            self.nodes.push(typing);
         }
-        let source = step.source();
-        if let Some(previous) = self.nodes.get_mut(self.cursor.saturating_sub(1)) {
-            previous.pending = false;
+        self.nodes.push(command);
+        self.cursor = self.nodes.len();
+        Ok(())
+    }
+
+    /// 在修改历史前预留新增节点或步骤的容量。
+    pub(crate) fn record(
+        &mut self,
+        step: Arc<HistoryStep>,
+        now_millis: u64,
+    ) -> Result<(), BufferError> {
+        let plan = self.prepare_record(&step, now_millis)?;
+        if let Some(index) = plan.merge_node {
+            let node = self
+                .nodes
+                .get_mut(index)
+                .ok_or(BufferError::HistoryContextMismatch)?;
+            node.steps.try_reserve(1).map_err(BufferError::Allocation)?;
+            // 被合并节点在受保护前缀之后，截断和裁剪均会保留此节点。
+            node.steps.push(step);
+            node.pending = true;
+            node.last_input_at = now_millis;
+            self.truncate_and_trim_for_record(plan);
+            return Ok(());
         }
-        let last_input_at = now_millis;
-        self.nodes.push(HistoryNode {
-            source,
-            steps: vec![step],
-            pending: source == OperationSource::Typing,
-            last_input_at,
-        });
-        self.cursor = self.cursor.saturating_add(1);
+        let retained = plan
+            .truncate_to
+            .checked_sub(plan.remove_nodes)
+            .ok_or(BufferError::HistoryContextMismatch)?;
+        let needed = retained.checked_add(1).ok_or(BufferError::LengthOverflow)?;
+        let mut node = sealed_node(step, now_millis)?;
+        node.pending = node.source == OperationSource::Typing;
+        self.nodes
+            .try_reserve(needed.saturating_sub(self.nodes.len()))
+            .map_err(BufferError::Allocation)?;
+        self.truncate_and_trim_for_record(plan);
+        self.seal_pending();
+        self.nodes.push(node);
+        self.cursor = self.nodes.len();
+        Ok(())
     }
 
     pub(crate) fn undo_move(&self) -> Option<HistoryMove> {
@@ -397,6 +463,22 @@ impl History {
         Some(HistoryMove {
             steps: node.steps.clone(),
         })
+    }
+
+    /// 下一次撤销将触及的源码范围并集；逆补丁使用 after 坐标。
+    ///
+    /// 只读查询，不移动光标、不改文本或选区；没有可撤销节点时返回 `None`。
+    pub(crate) fn undo_target_ranges(&self) -> Option<Vec<Range<usize>>> {
+        let node = self.nodes.get(self.cursor.checked_sub(1)?)?;
+        Some(collect_patch_ranges(&node.steps, true))
+    }
+
+    /// 下一次重做将触及的源码范围并集；正补丁使用 before 坐标。
+    ///
+    /// 只读查询，不移动光标、不改文本或选区；没有可重做节点时返回 `None`。
+    pub(crate) fn redo_target_ranges(&self) -> Option<Vec<Range<usize>>> {
+        let node = self.nodes.get(self.cursor)?;
+        Some(collect_patch_ranges(&node.steps, false))
     }
 
     pub(crate) fn commit_undo(&mut self) {
@@ -486,6 +568,20 @@ impl History {
         Some(HistoryStepHandle(last.clone()))
     }
 
+    pub(crate) fn node_steps(
+        &self,
+        index: usize,
+    ) -> Option<impl DoubleEndedIterator<Item = HistoryStepHandle> + '_> {
+        Some(
+            self.nodes
+                .get(index)?
+                .steps
+                .iter()
+                .cloned()
+                .map(HistoryStepHandle),
+        )
+    }
+
     pub(crate) fn len(&self) -> usize {
         self.nodes.len()
     }
@@ -501,6 +597,35 @@ impl History {
     pub(crate) fn can_redo(&self) -> bool {
         self.cursor < self.nodes.len()
     }
+}
+
+/// 汇总节点内各步补丁区间；撤销取逆补丁，重做取正补丁。
+fn collect_patch_ranges(steps: &[Arc<HistoryStep>], inverse: bool) -> Vec<Range<usize>> {
+    let mut ranges = Vec::new();
+    for step in steps {
+        let patches = if inverse {
+            step.inverse_patches()
+        } else {
+            step.forward_patches()
+        };
+        ranges.extend(patches.iter().map(|(range, _)| range.clone()));
+    }
+    ranges
+}
+
+fn sealed_node(step: Arc<HistoryStep>, now_millis: u64) -> Result<HistoryNode, BufferError> {
+    let mut steps = Vec::new();
+    steps
+        .try_reserve_exact(1)
+        .map_err(BufferError::Allocation)?;
+    let source = step.source();
+    steps.push(step);
+    Ok(HistoryNode {
+        source,
+        steps,
+        pending: false,
+        last_input_at: now_millis,
+    })
 }
 
 fn can_merge(previous: &HistoryStep, current: &HistoryStep) -> bool {

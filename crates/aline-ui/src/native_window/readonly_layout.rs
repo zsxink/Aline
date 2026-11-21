@@ -2,15 +2,19 @@
 
 use std::collections::VecDeque;
 use std::fmt;
+use std::ops::Range;
 use std::rc::Rc;
 
+use super::readonly_content::{Block, ContentError, ContentIndex, ContentRow};
 use crate::{DocumentId, EditorMode, ReadonlyDocument, WorkingVersion};
-use aline_buffer::{Affinity, LineIndex, LineIndexBudget, SnapshotId, SrcOffset, SrcRange};
-use aline_markdown::{
-    DrawnRange, MappingBudget, Parsed, PresentationKind, PresentationNode, Projection, ProjectionId,
+use aline_buffer::{
+    Affinity, LineIndex, LineIndexBudget, SnapshotId, SrcOffset, SrcRange, TextBudget,
 };
+use aline_markdown::{MappingBudget, Parsed, Projection, ProjectionId};
 
 const SOURCE_FRAGMENT_BYTES: usize = 4096;
+// 在 UTF-8 字符内部截断时，非末片最多回退三个字节。
+const MIN_FULL_SOURCE_FRAGMENT_BYTES: usize = SOURCE_FRAGMENT_BYTES - 3;
 const DEFAULT_SOURCE_THRESHOLD: usize = 4 * 1024 * 1024;
 
 pub(super) fn initial_view(source_bytes: usize) -> (EditorMode, Option<&'static str>) {
@@ -19,6 +23,28 @@ pub(super) fn initial_view(source_bytes: usize) -> (EditorMode, Option<&'static 
     } else {
         (EditorMode::Visual, None)
     }
+}
+
+/// Visual 行的有效绘制范围；代码正文的终止换行不构成额外可见行。
+///
+/// 隐藏结构、缺口行和空代码块没有可见文字，返回 `None`，由空投影保留
+/// “点击落到行首”的只读命中语义，但不得把源码回退成正文。
+fn visual_drawn(parsed: &Parsed, row: &ContentRow) -> Option<Range<usize>> {
+    let drawn = row.drawn.as_ref()?;
+    if drawn.is_empty() {
+        return None;
+    }
+    let mut end = drawn.end;
+    if matches!(&row.block, Block::Code { .. }) {
+        let text = parsed.projection().drawn_text();
+        if text.as_bytes().get(end - 1) == Some(&b'\n') {
+            end -= 1;
+            if end > drawn.start && text.as_bytes().get(end - 1) == Some(&b'\r') {
+                end -= 1;
+            }
+        }
+    }
+    (end > drawn.start).then_some(drawn.start..end)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -54,25 +80,37 @@ impl ItemLayoutBudget {
         }
     }
 }
-struct VisualRow {
-    source: SrcRange,
-    drawn: Option<DrawnRange>,
-    nodes: usize,
-    columns: usize,
-}
-
 pub(super) struct ReaderIndex {
     snapshot: SnapshotId,
+    projection: ProjectionId,
     source: Vec<SrcRange>,
-    visual: Vec<VisualRow>,
+    visual: ContentIndex,
 }
 impl ReaderIndex {
     pub(super) fn new(document: &ReadonlyDocument, max_rows: usize) -> Result<Self, LayoutError> {
-        let parsed = document.parsed();
+        Self::from_parsed(document.parsed(), max_rows, document.text_budget())
+    }
+
+    pub(super) fn from_parsed(
+        parsed: &Parsed,
+        max_rows: usize,
+        budget: TextBudget,
+    ) -> Result<Self, LayoutError> {
         let snapshot = parsed.snapshot();
-        let text = document.baseline().source();
-        let lines = LineIndex::build(text, LineIndexBudget::new(max_rows))
+        let full_range = snapshot
+            .src_range(0..snapshot.len_bytes())
+            .map_err(|_| LayoutError::InvalidRange)?;
+        let text = snapshot
+            .slice(&full_range, budget)
             .map_err(|_| LayoutError::Budget)?;
+        let lines = LineIndex::build(&text, LineIndexBudget::new(max_rows))
+            .map_err(|_| LayoutError::Budget)?;
+        // 每个逻辑行占至少一项，额外项只来自先前已切下的完整分片。
+        // 打开阶段已限制全文字节数，因此分片开销随该上限有界。
+        let max_source_rows = lines
+            .line_count()
+            .checked_add(text.len() / MIN_FULL_SOURCE_FRAGMENT_BYTES)
+            .ok_or(LayoutError::Budget)?;
         let mut source = Vec::new();
         for line in 0..lines.line_count() {
             let range = lines.line_range(line).ok_or(LayoutError::InvalidRange)?;
@@ -87,7 +125,7 @@ impl ReaderIndex {
                 if src_end < src_start || (src_end == src_start && src_start != range.end) {
                     return Err(LayoutError::InvalidRange);
                 }
-                if source.len() >= max_rows {
+                if source.len() >= max_source_rows {
                     return Err(LayoutError::Budget);
                 }
                 source.try_reserve(1).map_err(|_| LayoutError::Budget)?;
@@ -102,65 +140,26 @@ impl ReaderIndex {
                 src_start = src_end;
             }
         }
-        let mut visual = Vec::new();
-        let mut source_end = 0;
-        for node in parsed.presentation() {
-            let range = node.source_range().byte_range();
-            if range.start < source_end {
-                return Err(LayoutError::InvalidRange);
-            }
-            if range.start > source_end {
-                push_row(
-                    &mut visual,
-                    max_rows,
-                    VisualRow {
-                        source: snapshot
-                            .src_range(source_end..range.start)
-                            .map_err(|_| LayoutError::InvalidRange)?,
-                        drawn: None,
-                        nodes: 1,
-                        columns: 0,
-                    },
-                )?;
-            }
-            let (nodes, columns) = node_cost(node)?;
-            push_row(
-                &mut visual,
-                max_rows,
-                VisualRow {
-                    source: node.source_range().clone(),
-                    drawn: Some(node.drawn_range().clone()),
-                    nodes,
-                    columns,
-                },
-            )?;
-            source_end = range.end;
-        }
-        if source_end < snapshot.len_bytes() || visual.is_empty() {
-            push_row(
-                &mut visual,
-                max_rows,
-                VisualRow {
-                    source: snapshot
-                        .src_range(source_end..snapshot.len_bytes())
-                        .map_err(|_| LayoutError::InvalidRange)?,
-                    drawn: None,
-                    nodes: 1,
-                    columns: 0,
-                },
-            )?;
-        }
+        let visual = ContentIndex::new(parsed, max_rows).map_err(content_error)?;
         Ok(Self {
             snapshot: snapshot.id().clone(),
+            projection: parsed.projection().id().clone(),
             source,
             visual,
         })
+    }
+    pub(super) fn snapshot_id(&self) -> &SnapshotId {
+        &self.snapshot
     }
     pub(super) fn row_count(&self, mode: EditorMode) -> usize {
         match mode {
             EditorMode::Visual => self.visual.len(),
             EditorMode::Source => self.source.len(),
         }
+    }
+    /// 返回可视化行计划；行号来自同一 `ReaderIndex` 的虚拟顺序。
+    pub(super) fn content_row(&self, row: usize) -> Option<&ContentRow> {
+        self.visual.row(row)
     }
     pub(super) fn source_range(
         &self,
@@ -172,8 +171,9 @@ impl ReaderIndex {
         match mode {
             EditorMode::Visual => self
                 .visual
-                .get(row)
-                .map(|row| row.source.clone())
+                .row(row)
+                .map(|row| snapshot_range(parsed, row.source.clone()))
+                .transpose()?
                 .ok_or(LayoutError::InvalidRange),
             EditorMode::Source => self
                 .source
@@ -192,18 +192,30 @@ impl ReaderIndex {
     ) -> Result<(), LayoutError> {
         let source = self.source_range(parsed, mode, row)?;
         let visual = if mode == EditorMode::Visual {
-            self.visual.get(row)
+            self.visual.row(row)
         } else {
             None
         };
-        let bytes = visual
-            .and_then(|row| row.drawn.as_ref())
-            .filter(|drawn| !drawn.byte_range().is_empty())
-            .map_or(source.len_bytes(), |drawn| drawn.byte_range().len());
+        let bytes = if mode == EditorMode::Visual {
+            visual
+                .and_then(|row| visual_drawn(parsed, row))
+                .map_or(0, |drawn| drawn.len())
+        } else {
+            source.len_bytes()
+        };
         if bytes > budget.bytes {
             return Err(LayoutError::ItemBytes {
                 needed: bytes,
                 limit: budget.bytes,
+            });
+        }
+        // 列预算先于节点预算：超宽表格的具体原因应报 TableColumns，
+        // 而不是被截断行的节点哨兵归为 ItemNodes。
+        let columns = visual.map_or(0, |row| row.columns);
+        if columns > budget.columns {
+            return Err(LayoutError::TableColumns {
+                needed: columns,
+                limit: budget.columns,
             });
         }
         let nodes = visual.map_or(1, |row| row.nodes);
@@ -211,13 +223,6 @@ impl ReaderIndex {
             return Err(LayoutError::ItemNodes {
                 needed: nodes,
                 limit: budget.nodes,
-            });
-        }
-        let columns = visual.map_or(0, |row| row.columns);
-        if columns > budget.columns {
-            return Err(LayoutError::TableColumns {
-                needed: columns,
-                limit: budget.columns,
             });
         }
         Ok(())
@@ -237,17 +242,32 @@ impl ReaderIndex {
         )?;
         let source = self.source_range(parsed, mode, row)?;
         let budget = MappingBudget::new(max_bytes, max_bytes.saturating_add(1));
-        if mode == EditorMode::Visual
-            && let Some(drawn) = self
+        if mode == EditorMode::Visual {
+            if let Some(drawn) = self
                 .visual
-                .get(row)
-                .and_then(|row| row.drawn.as_ref())
-                .filter(|drawn| !drawn.byte_range().is_empty())
-        {
-            return parsed
-                .projection()
-                .window(drawn, budget)
-                .map_err(|_| LayoutError::Budget);
+                .row(row)
+                .and_then(|row| visual_drawn(parsed, row))
+            {
+                return parsed
+                    .projection()
+                    .drawn_range(drawn)
+                    .map_err(|_| LayoutError::InvalidRange)
+                    .and_then(|drawn| {
+                        parsed
+                            .projection()
+                            .window(&drawn, budget)
+                            .map_err(|_| LayoutError::Budget)
+                    });
+            }
+            // 无可见文字的行用空绘制投影：正文为空，命中仍经同一映射落到行首。
+            return Projection::from_segments(
+                parsed.snapshot().clone(),
+                source,
+                String::new(),
+                Vec::new(),
+                budget,
+            )
+            .map_err(|_| LayoutError::Budget);
         }
         Projection::identity(parsed.snapshot().clone(), source, budget)
             .map_err(|_| LayoutError::Budget)
@@ -302,61 +322,61 @@ impl ReaderIndex {
             .validate_offset(&anchor.source)
             .map_err(|_| LayoutError::StaleInput)?;
         let src_off = anchor.source.byte_offset();
+        let count = self.row_count(mode);
         let after = match mode {
             EditorMode::Visual => self
                 .visual
-                .partition_point(|row| row.source.byte_range().start <= src_off),
+                .rows()
+                .partition_point(|row| row.source.start <= src_off),
             EditorMode::Source => self
                 .source
                 .partition_point(|range| range.byte_range().start <= src_off),
         };
-        let range_at = |row: usize| match mode {
-            EditorMode::Visual => self.visual.get(row).map(|row| &row.source),
-            EditorMode::Source => self.source.get(row),
+        let range_at = |row: usize| -> Option<Range<usize>> {
+            match mode {
+                EditorMode::Visual => self.visual.row(row).map(|row| row.source.clone()),
+                EditorMode::Source => self.source.get(row).map(|range| range.byte_range()),
+            }
         };
         // 这里只比较同一源码坐标；目标局部绘制位置仍由 Projection::drawn_at 计算。
         let mut row = after.saturating_sub(1);
         if anchor.affinity == Affinity::Before
             && row > 0
-            && range_at(row).is_some_and(|range| range.byte_range().start == src_off)
-            && range_at(row - 1).is_some_and(|range| range.byte_range().end == src_off)
+            && range_at(row).is_some_and(|range| range.start == src_off)
+            && range_at(row - 1).is_some_and(|range| range.end == src_off)
         {
             row -= 1;
         }
-        let range = range_at(row).ok_or(LayoutError::InvalidRange)?.byte_range();
-        if src_off < range.start || src_off > range.end {
+        // 锚点可以落在块间空白或隐藏标记上；前进到下一行，末行保持可恢复。
+        if range_at(row).is_some_and(|range| src_off > range.end) && row + 1 < count {
+            row += 1;
+        }
+        if range_at(row).is_none() {
             return Err(LayoutError::InvalidRange);
         }
         Ok(row)
     }
-    fn check(&self, parsed: &Parsed) -> Result<(), LayoutError> {
-        if &self.snapshot == parsed.snapshot().id() {
+    pub(super) fn check(&self, parsed: &Parsed) -> Result<(), LayoutError> {
+        if &self.snapshot == parsed.snapshot().id() && &self.projection == parsed.projection().id()
+        {
             Ok(())
         } else {
             Err(LayoutError::StaleInput)
         }
     }
 }
-fn push_row(rows: &mut Vec<VisualRow>, max_rows: usize, row: VisualRow) -> Result<(), LayoutError> {
-    if rows.len() >= max_rows {
-        return Err(LayoutError::Budget);
+fn content_error(error: ContentError) -> LayoutError {
+    match error {
+        ContentError::Budget => LayoutError::Budget,
+        ContentError::InvalidRange => LayoutError::InvalidRange,
     }
-    rows.try_reserve(1).map_err(|_| LayoutError::Budget)?;
-    rows.push(row);
-    Ok(())
 }
-fn node_cost(node: &PresentationNode) -> Result<(usize, usize), LayoutError> {
-    let mut nodes = 1usize;
-    let mut columns = match node.kind() {
-        PresentationKind::Table { alignments } => alignments.len(),
-        _ => 0,
-    };
-    for child in node.children() {
-        let (child_nodes, child_columns) = node_cost(child)?;
-        nodes = nodes.checked_add(child_nodes).ok_or(LayoutError::Budget)?;
-        columns = columns.max(child_columns);
-    }
-    Ok((nodes, columns))
+
+fn snapshot_range(parsed: &Parsed, range: Range<usize>) -> Result<SrcRange, LayoutError> {
+    parsed
+        .snapshot()
+        .src_range(range)
+        .map_err(|_| LayoutError::InvalidRange)
 }
 
 #[derive(Clone)]
@@ -366,7 +386,7 @@ pub(super) struct SourceAnchor {
     viewport_delta: f32,
 }
 impl SourceAnchor {
-    fn new(
+    pub(super) fn new(
         parsed: &Parsed,
         source: SrcOffset,
         affinity: Affinity,
@@ -569,8 +589,8 @@ impl LayoutKey {
         environment: LayoutEnvironment,
     ) -> Self {
         Self {
-            document: document.core().document_id().clone(),
-            version: document.core().version(),
+            document: document.parsed_identity().document_id().clone(),
+            version: document.parsed_identity().working_version(),
             snapshot: document.parsed().snapshot().id().clone(),
             projection: document.parsed().projection().id().clone(),
             config: document.parsed().config(),
@@ -647,5 +667,691 @@ impl LayoutCache {
     #[cfg(any(test, debug_assertions))]
     pub(super) fn len(&self) -> usize {
         self.heights.len()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        DocLimits, ParseRefreshDisposition, ReadonlyDocument, ReadonlyFileAccess,
+        ReadonlyFileInput, ReadonlyOpenLimits, ReadonlySession,
+    };
+    use std::error::Error;
+    use std::io::{self, Cursor};
+    use std::path::{Path, PathBuf};
+
+    use aline_buffer::{HistoryBudget, LineIndexBudget, TextBudget};
+    use aline_markdown::{ParseBudget, ParseConfig};
+    use aline_source::StorageBudget;
+
+    struct Files<'a>(&'a [u8]);
+    impl<'a> ReadonlyFileAccess for Files<'a> {
+        type Reader = Cursor<&'a [u8]>;
+        fn open(&self, _: &Path) -> io::Result<ReadonlyFileInput<Self::Reader>> {
+            Ok(ReadonlyFileInput::new(
+                Cursor::new(self.0),
+                self.0.len() as u64,
+                true,
+            ))
+        }
+    }
+    fn session(bytes: &[u8]) -> Result<ReadonlySession, Box<dyn Error>> {
+        open_fixture(bytes, false)
+    }
+    fn open_fixture(bytes: &[u8], editable: bool) -> Result<ReadonlySession, Box<dyn Error>> {
+        let max = 1024 * 1024;
+        let limits = ReadonlyOpenLimits::new(
+            StorageBudget::new(max),
+            DocLimits::new(
+                TextBudget::new(max),
+                LineIndexBudget::new(100_000),
+                HistoryBudget::new(0, 0),
+            ),
+            ParseConfig::m0(),
+            ParseBudget::m0(),
+        );
+        let mut session = ReadonlySession::new(if editable {
+            limits.with_editing()
+        } else {
+            limits
+        });
+        let request = session.request_open()?;
+        let job = session
+            .accept_selection(&request, Some(vec![PathBuf::from("fixture.md")]))?
+            .ok_or("job")?;
+        session.accept_open(job.read_with(&Files(bytes)));
+        Ok(session)
+    }
+
+    #[test]
+    fn source_index_uses_candidate_snapshot_after_unicode_line_edits() -> Result<(), Box<dyn Error>>
+    {
+        use aline_buffer::TextSnapshot;
+        use std::sync::Arc;
+
+        let budget = TextBudget::new(4096);
+        let original = TextSnapshot::new("a\nb\nc".to_owned(), budget)?;
+        // 删除首行，写入两行含多字节字符的内容。
+        let overlay = TextSnapshot::with_overlay(
+            &original,
+            original.src_range(0..2)?,
+            Arc::new("汉\r\n🙂\n".to_owned()),
+            budget,
+        )?;
+        let parsed = aline_markdown::parse(&overlay, ParseConfig::m0(), ParseBudget::m0())?;
+        let index = ReaderIndex::from_parsed(&parsed, 64, budget)?;
+        assert_eq!(index.row_count(EditorMode::Source), 4);
+        for (row, (bytes, expected)) in [(0..3, "汉"), (5..9, "🙂"), (10..11, "b"), (12..13, "c")]
+            .into_iter()
+            .enumerate()
+        {
+            let range = index.source_range(&parsed, EditorMode::Source, row)?;
+            assert_eq!(range.byte_range(), bytes);
+            assert_eq!(overlay.slice(&range, budget)?, expected);
+        }
+        assert!(overlay.src_offset(1).is_err());
+        let original_parsed =
+            aline_markdown::parse(&original, ParseConfig::m0(), ParseBudget::m0())?;
+        assert_eq!(index.check(&original_parsed), Err(LayoutError::StaleInput));
+        assert_eq!(
+            ReaderIndex::from_parsed(&original_parsed, 64, budget)?.row_count(EditorMode::Source),
+            3
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn refresh_index_failure_preserves_the_previous_parse_and_index() -> Result<(), Box<dyn Error>>
+    {
+        let mut session = open_fixture(b"a\nb\nc", true)?;
+        let document = session.document().ok_or("missing document")?;
+        let initial_index = ReaderIndex::new(document, 64)?;
+        let projection = document.parsed().projection().id().clone();
+        let completion = session.begin_parse_refresh()?.run();
+        let result = session.accept_parse_refresh_with(completion, |document, candidate| {
+            ReaderIndex::from_parsed(candidate, 1, document.text_budget())
+        });
+        assert!(matches!(result, Err(LayoutError::Budget)));
+
+        let document = session.document().ok_or("missing document")?;
+        assert_eq!(document.parsed().projection().id(), &projection);
+        initial_index.check(document.parsed())?;
+        let completion = session.begin_parse_refresh()?.run();
+        let (disposition, prepared_index) = session
+            .accept_parse_refresh_with(completion, |document, candidate| {
+                ReaderIndex::from_parsed(candidate, 64, document.text_budget())
+            })?;
+        let document = session.document().ok_or("missing document")?;
+        assert!(matches!(disposition, ParseRefreshDisposition::Applied));
+        prepared_index
+            .ok_or("missing index")?
+            .check(document.parsed())?;
+        assert_eq!(
+            initial_index.check(document.parsed()),
+            Err(LayoutError::StaleInput)
+        );
+        Ok(())
+    }
+    fn environment(width: f32) -> Result<LayoutEnvironment, Box<dyn Error>> {
+        Ok(LayoutEnvironment::new(width, 2.0, 1, true, 16.0, 24.0)?)
+    }
+
+    #[test]
+    fn source_rows_keep_crlf_isolated_cr_and_terminal_empty_line() -> Result<(), Box<dyn Error>> {
+        let session = session("中\r\n\tlast\rpart\n".as_bytes())?;
+        let document = session.document().ok_or("document")?;
+        let index = ReaderIndex::new(document, 100)?;
+        assert_eq!(index.row_count(EditorMode::Source), 3);
+        let expected = [(0..3, "中"), (5..15, "\tlast\rpart"), (16..16, "")];
+        for (row, (source, text)) in expected.into_iter().enumerate() {
+            assert_eq!(
+                index
+                    .source_range(document.parsed(), EditorMode::Source, row)?
+                    .byte_range(),
+                source
+            );
+            assert_eq!(
+                index
+                    .projection(document.parsed(), EditorMode::Source, row, 4096)?
+                    .drawn_text(),
+                text
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn visual_rows_without_visible_text_project_empty_text_and_keep_source_start()
+    -> Result<(), Box<dyn Error>> {
+        let session = session(b"<!-- hidden -->\n\nword\n\n```\n```\n")?;
+        let document = session.document().ok_or("document")?;
+        let index = ReaderIndex::new(document, 100)?;
+        let mut hidden = false;
+        let mut gap = false;
+        let mut empty_code = false;
+        for row in 0..index.row_count(EditorMode::Visual) {
+            let content = index.content_row(row).ok_or("row")?;
+            let projection =
+                index.projection(document.parsed(), EditorMode::Visual, row, 65_536)?;
+            match &content.block {
+                Block::Code { lines, .. }
+                    if content.drawn.as_ref().is_some_and(|drawn| drawn.is_empty()) =>
+                {
+                    empty_code = true;
+                    assert_eq!(lines.len(), 1);
+                    assert_eq!(projection.drawn_text(), "");
+                }
+                Block::Text { .. } if content.drawn.is_none() => {
+                    if content.source.len() > 1 {
+                        hidden = true;
+                    } else {
+                        gap = true;
+                    }
+                    assert_eq!(projection.drawn_text(), "");
+                }
+                _ => {}
+            }
+            if projection.drawn_text().is_empty() {
+                let mapped = projection
+                    .source_at(&projection.drawn_offset(0)?, aline_buffer::Affinity::After)?;
+                assert_eq!(mapped.value().byte_offset(), content.source.start);
+            }
+        }
+        assert!(hidden && gap && empty_code);
+        Ok(())
+    }
+
+    #[test]
+    fn code_rows_trim_terminal_line_break_from_visual_projection() -> Result<(), Box<dyn Error>> {
+        let first = session(b"```rust\none\n\nthree\n```\n")?;
+        let document = first.document().ok_or("document")?;
+        let index = ReaderIndex::new(document, 100)?;
+        let content = index.content_row(0).ok_or("row")?;
+        let Block::Code { lines, .. } = &content.block else {
+            return Err("expected code row".into());
+        };
+        assert_eq!(lines.len(), 3);
+        assert_eq!(
+            index
+                .projection(document.parsed(), EditorMode::Visual, 0, 65_536)?
+                .drawn_text(),
+            "one\n\nthree"
+        );
+        let blank = session(b"```\n\n```\n")?;
+        let document = blank.document().ok_or("blank document")?;
+        let index = ReaderIndex::new(document, 100)?;
+        let content = index.content_row(0).ok_or("blank row")?;
+        let Block::Code { lines, .. } = &content.block else {
+            return Err("expected blank code row".into());
+        };
+        assert_eq!(lines.len(), 1);
+        assert_eq!(
+            index
+                .projection(document.parsed(), EditorMode::Visual, 0, 65_536)?
+                .drawn_text(),
+            ""
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn visual_rows_partition_source_and_reveal_source_anchor_after_reflow()
+    -> Result<(), Box<dyn Error>> {
+        let session = session(b"# Head\n\nfirst\n\nlast")?;
+        let document = session.document().ok_or("document")?;
+        let index = ReaderIndex::new(document, 100)?;
+        let count = index.row_count(EditorMode::Visual);
+        assert!(count >= 3);
+        let mut source_end = 0;
+        for row in 0..count {
+            let range = index
+                .source_range(document.parsed(), EditorMode::Visual, row)?
+                .byte_range();
+            assert_eq!(range.start, source_end);
+            source_end = range.end;
+        }
+        assert_eq!(source_end, 19);
+        let anchor = index.anchor(document.parsed(), EditorMode::Source, 4, 7.0)?;
+        let visual_row = index.row_for_anchor(document.parsed(), EditorMode::Visual, &anchor)?;
+        assert_eq!(
+            index
+                .projection(document.parsed(), EditorMode::Visual, visual_row, 4096)?
+                .drawn_text(),
+            "last"
+        );
+        assert_eq!(anchor.viewport_delta(), 7.0);
+        Ok(())
+    }
+
+    #[test]
+    fn width_scale_font_wrap_and_projection_identity_invalidate_heights()
+    -> Result<(), Box<dyn Error>> {
+        let a = session(b"same")?;
+        let b = session(b"same")?;
+        let a = a.document().ok_or("a")?;
+        let b = b.document().ok_or("b")?;
+        let mut cache = LayoutCache::new(2);
+        let key = LayoutKey::new(a, EditorMode::Visual, environment(600.0)?);
+        assert!(cache.prepare(key.clone())?);
+        let token = cache.token().ok_or("token")?;
+        assert!(cache.record(token, 0, 48.0));
+        assert!(cache.matches_key(&key));
+        assert!(!cache.prepare(key)?);
+        assert_eq!(cache.height(0), Some(48.0));
+        for key in [
+            LayoutKey::new(a, EditorMode::Visual, environment(400.0)?),
+            LayoutKey::new(
+                a,
+                EditorMode::Visual,
+                LayoutEnvironment::new(400.0, 1.0, 1, true, 16.0, 24.0)?,
+            ),
+            LayoutKey::new(
+                a,
+                EditorMode::Visual,
+                LayoutEnvironment::new(400.0, 1.0, 2, true, 16.0, 24.0)?,
+            ),
+            LayoutKey::new(
+                a,
+                EditorMode::Visual,
+                LayoutEnvironment::new(400.0, 1.0, 2, false, 16.0, 24.0)?,
+            ),
+            LayoutKey::new(a, EditorMode::Source, environment(400.0)?),
+            LayoutKey::new(b, EditorMode::Visual, environment(400.0)?),
+        ] {
+            assert!(cache.prepare(key)?);
+            assert_eq!(cache.height(0), None);
+            assert!(!cache.record(token, 0, 999.0));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn cache_is_bounded_and_stable_measurement_does_not_request_new_layout()
+    -> Result<(), Box<dyn Error>> {
+        let session = session(b"line")?;
+        let document = session.document().ok_or("document")?;
+        let mut cache = LayoutCache::new(2);
+        cache.prepare(LayoutKey::new(
+            document,
+            EditorMode::Source,
+            environment(600.0)?,
+        ))?;
+        let token = cache.token().ok_or("token")?;
+        assert!(cache.record(token, 0, 24.0));
+        assert!(!cache.record(token, 0, 24.0));
+        assert!(cache.record(token, 1, 96.0));
+        assert_eq!(cache.height(0), Some(24.0));
+        assert_eq!(cache.height(1), Some(96.0));
+        for row in 2..1000 {
+            cache.record(token, row, 24.0);
+            assert!(cache.len() <= 2);
+        }
+        assert_eq!(cache.height(0), None);
+        assert!(!cache.record(token, 1000, f32::NAN));
+        assert!(!cache.record(token, 1000, -1.0));
+        assert_eq!(cache.len(), 2);
+        Ok(())
+    }
+
+    #[test]
+    fn stale_anchors_and_layout_budget_are_rejected() -> Result<(), Box<dyn Error>> {
+        let a = session(b"a\nb")?;
+        let b = session(b"a\nb")?;
+        let a = a.document().ok_or("a")?;
+        let b = b.document().ok_or("b")?;
+        assert!(ReaderIndex::new(a, 1).is_err());
+        let index = ReaderIndex::new(a, 100)?;
+        let anchor = index.anchor(a.parsed(), EditorMode::Source, 1, 0.0)?;
+        assert!(
+            index
+                .row_for_anchor(b.parsed(), EditorMode::Source, &anchor)
+                .is_err()
+        );
+        assert!(
+            index
+                .projection(a.parsed(), EditorMode::Source, 1, 0)
+                .is_err()
+        );
+        assert!(LayoutEnvironment::new(0.0, 2.0, 1, true, 16.0, 24.0).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn initial_source_policy_uses_strict_four_mib_source_byte_threshold() {
+        let threshold = 4 * 1024 * 1024;
+        for bytes in [0, threshold - 1, threshold] {
+            assert_eq!(initial_view(bytes), (EditorMode::Visual, None));
+        }
+        assert_eq!(
+            initial_view(threshold + 1),
+            (EditorMode::Source, Some("reading.large_source"))
+        );
+    }
+
+    #[test]
+    fn long_source_line_is_readable_through_checked_unicode_safe_fragments()
+    -> Result<(), Box<dyn Error>> {
+        let text = format!("{}中{}", "a".repeat(4095), "tail".repeat(20_000));
+        let session = session(text.as_bytes())?;
+        let document = session.document().ok_or("document")?;
+        let index = ReaderIndex::new(document, 100_000)?;
+        assert!(index.row_count(EditorMode::Source) > 2);
+        let mut restored = String::new();
+        let mut source_end = 0;
+        for row in 0..index.row_count(EditorMode::Source) {
+            let source = index.source_range(document.parsed(), EditorMode::Source, row)?;
+            assert_eq!(source.byte_range().start, source_end);
+            source_end = source.byte_range().end;
+            assert!(source.len_bytes() <= 4096);
+            let projection = index.projection(document.parsed(), EditorMode::Source, row, 4096)?;
+            restored.push_str(projection.drawn_text());
+        }
+        assert_eq!(source_end, text.len());
+        assert_eq!(restored, text);
+        assert_eq!(
+            index
+                .source_range(document.parsed(), EditorMode::Source, 0)?
+                .byte_range(),
+            0..4095
+        );
+        assert_eq!(
+            index
+                .source_range(document.parsed(), EditorMode::Source, 1)?
+                .byte_range()
+                .start,
+            4095
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn giant_visual_item_is_rejected_before_projection_and_source_remains_accessible()
+    -> Result<(), Box<dyn Error>> {
+        let text = "a".repeat(65_537);
+        let session = session(text.as_bytes())?;
+        let document = session.document().ok_or("document")?;
+        let index = ReaderIndex::new(document, 100_000)?;
+        assert!(matches!(
+            index.preflight(
+                document.parsed(),
+                EditorMode::Visual,
+                0,
+                ItemLayoutBudget::new(65_536, 4096, 256)
+            ),
+            Err(LayoutError::ItemBytes {
+                needed: 65_537,
+                limit: 65_536
+            })
+        ));
+        assert!(matches!(
+            index.projection(document.parsed(), EditorMode::Visual, 0, 65_536),
+            Err(LayoutError::ItemBytes { .. })
+        ));
+        assert!(
+            index
+                .projection(document.parsed(), EditorMode::Source, 0, 4096)
+                .is_ok()
+        );
+        // 节点预算按该行要 shape 的文本片段计数：单段文本为 1，零预算必然拒绝。
+        assert!(matches!(
+            index.preflight(
+                document.parsed(),
+                EditorMode::Visual,
+                0,
+                ItemLayoutBudget::new(100_000, 0, 256)
+            ),
+            Err(LayoutError::ItemNodes {
+                needed: 1,
+                limit: 0
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn wide_table_column_budget_is_independent_from_small_text_bytes() -> Result<(), Box<dyn Error>>
+    {
+        let session = session(b"|a|b|c|\n|-|-|-|\n|x|y|z|\n")?;
+        let document = session.document().ok_or("document")?;
+        let index = ReaderIndex::new(document, 100)?;
+        assert!(matches!(
+            index.preflight(
+                document.parsed(),
+                EditorMode::Visual,
+                0,
+                ItemLayoutBudget::new(65_536, 4096, 2)
+            ),
+            Err(LayoutError::TableColumns {
+                needed: 3,
+                limit: 2
+            })
+        ));
+        assert!(
+            index
+                .preflight(
+                    document.parsed(),
+                    EditorMode::Visual,
+                    0,
+                    ItemLayoutBudget::new(65_536, 4096, 3)
+                )
+                .is_ok()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn internal_source_anchor_survives_mode_width_and_font_layout_keys()
+    -> Result<(), Box<dyn Error>> {
+        let text = format!("prefix {} tail", "word ".repeat(3000));
+        let session = session(text.as_bytes())?;
+        let document = session.document().ok_or("document")?;
+        let index = ReaderIndex::new(document, 100_000)?;
+        let visual = index.projection(document.parsed(), EditorMode::Visual, 0, 65_536)?;
+        let anchor = index.anchor_from_local(
+            document.parsed(),
+            &visual,
+            10_007,
+            aline_buffer::Affinity::Before,
+            -5.0,
+        )?;
+        assert_eq!(anchor.source().byte_offset(), 10_007);
+        assert_eq!(anchor.affinity(), aline_buffer::Affinity::Before);
+        assert_ne!(
+            anchor.source().byte_offset(),
+            index
+                .source_range(document.parsed(), EditorMode::Visual, 0)?
+                .byte_range()
+                .start
+        );
+        let mut cache = LayoutCache::new(8);
+        cache.prepare(LayoutKey::new(
+            document,
+            EditorMode::Visual,
+            environment(600.0)?,
+        ))?;
+        for (mode, environment) in [
+            (EditorMode::Source, environment(300.0)?),
+            (
+                EditorMode::Visual,
+                LayoutEnvironment::new(800.0, 2.0, 2, true, 20.0, 30.0)?,
+            ),
+        ] {
+            cache.prepare(LayoutKey::new(document, mode, environment))?;
+            let row = index.row_for_anchor(document.parsed(), mode, &anchor)?;
+            let projection = index.projection(document.parsed(), mode, row, 65_536)?;
+            let local = projection.drawn_at(anchor.source(), aline_buffer::Affinity::Before)?;
+            let rebound = projection.source_at(local.value(), aline_buffer::Affinity::Before)?;
+            assert_eq!(rebound.value(), anchor.source());
+            assert_eq!(anchor.viewport_delta(), -5.0);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn deferred_anchor_restore_rejects_old_tokens_documents_and_cancellation()
+    -> Result<(), Box<dyn Error>> {
+        let a = session(b"first\nsecond")?;
+        let b = session(b"first\nsecond")?;
+        let a = a.document().ok_or("a")?;
+        let b = b.document().ok_or("b")?;
+        let index = ReaderIndex::new(a, 100)?;
+        let anchor = index.anchor(a.parsed(), EditorMode::Source, 1, 3.0)?;
+        let mut cache = layout_cache_for_restore(a)?;
+        let old_layout = cache.token().ok_or("old layout")?;
+        let mut restores = RestoreState::new(
+            a.core().document_id().clone(),
+            a.parsed().snapshot().id().clone(),
+        );
+        let old_request = restores.begin(anchor.clone(), 1, old_layout)?;
+        cache.prepare(LayoutKey::new(a, EditorMode::Source, environment(300.0)?))?;
+        let layout = cache.token().ok_or("layout")?;
+        let request = restores.begin(anchor, 1, layout)?;
+        assert!(!restores.cancel(&old_request));
+        assert!(
+            restores
+                .take_for_row(&old_request, a.core().document_id(), layout, 1)
+                .is_none()
+        );
+        assert!(
+            restores
+                .take_for_row(&request, b.core().document_id(), layout, 1)
+                .is_none()
+        );
+        assert!(
+            restores
+                .take_for_row(&request, a.core().document_id(), old_layout, 1)
+                .is_none()
+        );
+        assert!(
+            restores
+                .take_for_row(&request, a.core().document_id(), layout, 0)
+                .is_none()
+        );
+        assert!(restores.pending().is_some());
+        assert!(restores.schedule_for_row(&request, a.core().document_id(), layout, 1));
+        assert!(!restores.schedule_for_row(&request, a.core().document_id(), layout, 1));
+        assert!(restores.cancel(&request));
+        assert!(
+            restores
+                .take_for_row(&request, a.core().document_id(), layout, 1)
+                .is_none()
+        );
+        let request = restores.begin(
+            index.anchor(a.parsed(), EditorMode::Source, 1, 3.0)?,
+            1,
+            layout,
+        )?;
+        let restored = restores
+            .take_for_row(&request, a.core().document_id(), layout, 1)
+            .ok_or("restore")?;
+        assert_eq!(restored.source().byte_offset(), 6);
+        assert!(!restores.cancel_current());
+        assert!(
+            restores
+                .take_for_row(&request, a.core().document_id(), layout, 1)
+                .is_none()
+        );
+        Ok(())
+    }
+    fn layout_cache_for_restore(
+        document: &ReadonlyDocument,
+    ) -> Result<LayoutCache, Box<dyn Error>> {
+        let mut cache = LayoutCache::new(8);
+        cache.prepare(LayoutKey::new(
+            document,
+            EditorMode::Source,
+            environment(600.0)?,
+        ))?;
+        Ok(cache)
+    }
+
+    #[test]
+    fn truncated_giant_table_is_rejected_by_item_nodes_and_source_stays_readable()
+    -> Result<(), Box<dyn Error>> {
+        let mut text = String::from("| a | b |\n| --- | --- |\n");
+        for _ in 0..4096 {
+            text.push_str("| x | y |\n");
+        }
+        let table_session = session(text.as_bytes())?;
+        let document = table_session.document().ok_or("table")?;
+        let index = ReaderIndex::new(document, 100_000)?;
+        assert!(matches!(
+            index.projection(document.parsed(), EditorMode::Visual, 0, 65_536),
+            Err(LayoutError::ItemNodes { .. })
+        ));
+        // 源码视图保留完整内容，可继续逐行阅读。
+        assert!(
+            index
+                .projection(document.parsed(), EditorMode::Source, 0, 65_536)
+                .is_ok()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn exact_visual_byte_limit_and_default_table_column_limit_are_enforced()
+    -> Result<(), Box<dyn Error>> {
+        let text = "a".repeat(65_536);
+        let bytes_session = session(text.as_bytes())?;
+        let document = bytes_session.document().ok_or("document")?;
+        let index = ReaderIndex::new(document, 100_000)?;
+        assert_eq!(
+            index
+                .projection(document.parsed(), EditorMode::Visual, 0, 65_536)?
+                .drawn_text()
+                .len(),
+            65_536
+        );
+        for columns in [256, 257] {
+            let row = format!("|{}|\n", vec!["a"; columns].join("|"));
+            let delimiter = format!("|{}|\n", vec!["---"; columns].join("|"));
+            let text = format!("{row}{delimiter}{row}");
+            let table_session = session(text.as_bytes())?;
+            let document = table_session.document().ok_or("table")?;
+            let index = ReaderIndex::new(document, 100_000)?;
+            let projected = index.projection(document.parsed(), EditorMode::Visual, 0, 65_536);
+            if columns == 256 {
+                assert!(projected.is_ok());
+            } else {
+                assert!(matches!(
+                    projected,
+                    Err(LayoutError::TableColumns {
+                        needed: 257,
+                        limit: 256
+                    })
+                ));
+            }
+            assert!(
+                index
+                    .projection(document.parsed(), EditorMode::Source, 0, 4096)
+                    .is_ok()
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn source_item_budget_counts_fragments_beyond_the_logical_line_cap()
+    -> Result<(), Box<dyn Error>> {
+        // 三条 5000 字节的逻辑行恰用满 3 行预算，分片后是 6 个虚拟项。
+        let line = "a".repeat(5000);
+        let text = format!("{line}\n{line}\n{line}");
+        let session = session(text.as_bytes())?;
+        let document = session.document().ok_or("document")?;
+        let index = ReaderIndex::new(document, 3)?;
+        assert_eq!(index.row_count(EditorMode::Source), 6);
+        let mut restored = String::new();
+        for row in 0..index.row_count(EditorMode::Source) {
+            let source = index.source_range(document.parsed(), EditorMode::Source, row)?;
+            assert!(source.len_bytes() <= 4096);
+            restored.push_str(
+                index
+                    .projection(document.parsed(), EditorMode::Source, row, 4096)?
+                    .drawn_text(),
+            );
+        }
+        assert_eq!(restored, text.replace('\n', ""));
+        Ok(())
     }
 }

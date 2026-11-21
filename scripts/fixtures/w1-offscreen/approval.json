@@ -1,0 +1,39 @@
+{
+  "schema": "aline-w1-offscreen-approval/v1",
+  "approval_basis": "2026-11-09 用户按 docs/decisions.md §27 批准精确隔离 W1 macOS arm64 图及 option-ext 本机选包口径",
+  "scope": "isolated-offscreen-spike-only",
+  "target": "aarch64-apple-darwin",
+  "candidate_lock_sha256": "6bb7d273edc39dc7153faf6417cac2c697364d0273926c198a06f74f0c94cf06",
+  "candidate_root_manifest_sha256": "2a377feeb2a9f10321d129d149ea3dc0338ae0d5dcaaf6c7e45067da1ccf7e25",
+  "source_inputs_sha256": {
+    "Cargo.toml": "4009b515fccdc3a6661baa338192559dbc5fb07c7dcab813a8c35ed36eef5d79",
+    "Cargo.lock": "254a5007754dfdff3d1a3f5954b4aa7a0df167dfa2696907e526daf6d72f03f7",
+    "app/Cargo.toml": "ccdac4137a306c92d0aa6ee7fff724ff39fa375b64a1332e84f7e7ced25ad8d6",
+    "crates/aline-app-core/Cargo.toml": "3464404b60e098c8aaf66ccb49ccdab42553c590345c96798cf6dc7e2b40aaaa",
+    "crates/aline-source/Cargo.toml": "e4c37ce4d88f066be8f8bf4787edf7caad0c2a4aafa4d1ea9db739fb2236b334",
+    "crates/aline-buffer/Cargo.toml": "f5d0145c3d9a95c2ddcd55070a612382fcb667a9aed59f39c99fac16680cdfa2",
+    "crates/aline-markdown/Cargo.toml": "c8566444c6e87a1dfe2ed35debfc567b83c9d112e2f15c431a95836154c8284c",
+    "crates/aline-edit/Cargo.toml": "3bb5550dcffe97808906d7fe2f46feb597a6138c5b30786af6ad4f713bb648d8",
+    "crates/aline-plugin/Cargo.toml": "13caae719f5845fa42c4487092bfb30311e425632d5c93d77adcc9ec149ed2a9",
+    "crates/aline-ui/Cargo.toml": "7f8e8a1f86475582c7befcd7382c3c0d32af95face850f89b98334405242a4f3"
+  },
+  "full_graph_sha256": "b972cd08b2eb025deef16aea5b698d298369c55007d3239e022e30b759ffccdb",
+  "gpui_subtree_sha256": "2dd7f852cdec117c5bd768d3eac1572253a0ffb0f12e9a8aca0402ca73f7f32f",
+  "metadata_packages": 507,
+  "selected_packages": 357,
+  "added_metadata_packages": 72,
+  "added_selected_packages": 23,
+  "changed_packages": 9,
+  "branch_purposes": {
+    "futures-concurrency": "仅 W1 隔离上游 test-support 的并发辅助",
+    "postage": "仅 W1 隔离上游测试通道及其 blocking 辅助",
+    "proptest": "仅 W1 隔离上游 test-support；包含 fork/timeout 测试辅助",
+    "web-time": "仅 W1 隔离上游测试时钟",
+    "zed-scap": "W1 隔离上游 wayland/x11 的非 macOS target metadata 分支，macOS arm64 tree 不得选中"
+  },
+  "provenance": {
+    "metadata_sha256": "3b9f26ba804825dc9028d330767e2066db64501feca40c047019000c44d34aef",
+    "tree_sha256": "b7e5bcde1cd7bbf6c7e121b52061006faeda6896291b36ad0286536ed3d81e63",
+    "filtered_metadata_sha256": "120f443d3d27dcd3459734dcbd747efe021ed5497d803672ffa9072241b63880"
+  }
+}

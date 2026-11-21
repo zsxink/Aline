@@ -10,6 +10,7 @@ import re
 from collections import defaultdict
 
 from engineering_dependencies import Violation, normalized_edge, package_key, reachable, route
+from engineering_native_paths import local_patch_spec, verify_local_identity
 
 _TOKEN = re.compile(r"\s*(\(|\)|[A-Za-z0-9][A-Za-z0-9.+-]*)")
 _KEYWORDS = {"AND", "OR", "WITH"}
@@ -367,7 +368,36 @@ def identity_problems(group):
             if not isinstance(group.get(name), str) or not group[name].strip()]
 
 
-def check_admission(packages, nodes, roots, selected, lock, policy, scenario, with_ledger=False):
+def _local_path_rules(policy, groups):
+    """本地来源（crates.io 发布包 + 已审查补丁）的精确登记。
+
+    只有显式登记且字节身份完全一致的本地包才允许出现在图里；许可证、分组与
+    逐文件/全树摘要都参与核对，缺一即失败关闭。格式不合法与未登记分开报告。
+    """
+    rules = policy.get("local_paths", [])
+    if not isinstance(rules, list):
+        raise Violation("本地来源登记必须为列表")
+    required = {"package", "source", "path", "tree_sha256", "files", "license", "group", "basis"}
+    registered = {}
+    for rule in rules:
+        if (not isinstance(rule, dict) or set(rule) != required
+                or any(not isinstance(rule[key], str) or not rule[key] for key in ("license", "group", "basis"))):
+            raise Violation("本地来源登记格式无效")
+        local_patch_spec({key: rule[key] for key in ("package", "source", "path", "tree_sha256", "files")})
+        if rule["group"] not in groups:
+            raise Violation("本地来源登记分组未登记: " + rule["package"])
+        try:
+            if atoms(parse_expression(rule["license"])) != {rule["license"]}:
+                raise ExpressionError("本地来源许可证只接受一个精确原子")
+        except ExpressionError as error:
+            raise Violation("本地来源许可证格式无效: " + str(error)) from error
+        if rule["package"] in registered:
+            raise Violation("本地来源登记重复: " + rule["package"])
+        registered[rule["package"]] = rule
+    return registered
+
+
+def check_admission(packages, nodes, roots, selected, lock, policy, scenario, with_ledger=False, repo_root=None):
     if policy.get("format") != 1 or not policy.get("reviewed"):
         raise Violation("依赖准入策略未登记或未审查")
     license_policy = policy.get("license", {})
@@ -381,6 +411,7 @@ def check_admission(packages, nodes, roots, selected, lock, policy, scenario, wi
         for edge in nodes[parent]["deps"]:
             incoming[edge["pkg"]].append(normalized_edge(packages, parent, edge))
     assigned, branches, groups, group_roots = _apply_groups(packages, nodes, roots, policy, lock, incoming)
+    local_rules = _local_path_rules(license_policy, groups)
     exceptions = _exact_license_exceptions(license_policy, packages, nodes, roots, lock, assigned, groups, group_roots, incoming)
     rows = []
     group_counts = defaultdict(int)
@@ -396,7 +427,17 @@ def check_admission(packages, nodes, roots, selected, lock, policy, scenario, wi
         if identity in selected and not group.get("selected_allowed", True):
             raise Violation("已选包未进入运行时准入分组: " + key)
         if not workspace and package.get("source") is None:
-            local_paths.append(key)
+            rule = local_rules.get(key)
+            if rule is None:
+                local_paths.append(key)
+            else:
+                verify_local_identity(package, lock[key],
+                                      {field: rule[field] for field in ("package", "source", "path", "tree_sha256", "files")},
+                                      repo_root)
+                if package.get("license") != rule["license"]:
+                    raise Violation("本地来源许可证漂移: " + key)
+                if assigned[identity] != rule["group"]:
+                    raise Violation("本地来源准入分组不符: " + key)
         review = license_review(package, license_policy, workspace, exceptions.get(identity))
         verdicts[review["verdict"]] += 1
         group_counts[group["id"]] += 1
@@ -424,6 +465,7 @@ def check_admission(packages, nodes, roots, selected, lock, policy, scenario, wi
                "packages": len(packages), "selected": len(selected),
                "groups": dict(sorted(group_counts.items())),
                "license_verdicts": dict(sorted(verdicts.items())),
+               "local_sources": sorted(local_rules),
                "elections": elections,
                "limits": "本账本核对登记策略与 metadata/lock/tree 身份；不构成法律意见，"
                          "不把 metadata 包存在当作已构建选包，也不证明跨平台原生构建。"}

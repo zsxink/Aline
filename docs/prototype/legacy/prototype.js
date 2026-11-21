@@ -32,7 +32,7 @@ $('#settings-open').onclick=$('#status-settings').onclick=()=>openSettings();$('
 function page(title,desc,body){return `<section class="settings-page" id="settings-page-${title}" data-settings-page="${title}"><h2>${title}</h2><p class="settings-intro">${desc}</p>${body}</section>`}
 function group(title,body){return `<section class="settings-group"><div class="settings-group-heading"><h3 class="settings-group-title">${title}</h3><button class="settings-reset" type="button">恢复默认</button></div>${body}</section>`}
 const settings={
- '通用':page('通用','管理文件行为与启动方式。',group('文件',row('自动保存','编辑时自动保存到文件系统',toggle(true))+row('自动保存间隔','文件有修改时才会执行保存　默认 30 秒 · 范围 1–2147483',input('30','number','秒'))+row('显示不支持格式的文件','关闭后文件树仅显示 Markdown 与图片',toggle(false)))+group('启动',row('恢复上次工作区','启动时打开上次使用的文件夹',toggle(true)))),
+ '通用':page('通用','管理文件行为与启动方式。',group('语言',row('界面语言','默认跟随系统；文档内容与文件名不会自动翻译。',`<select id="language-select" class="setting-control" data-setting-key="aline.prototype.locale" aria-label="界面语言"><option value="system">跟随系统</option><option value="zh-CN">简体中文</option><option value="en">English</option></select>`))+group('文件',row('自动保存','编辑时自动保存到文件系统',toggle(true))+row('自动保存间隔','文件有修改时才会执行保存　默认 30 秒 · 范围 1–2147483',input('30','number','秒'))+row('显示不支持格式的文件','关闭后文件树仅显示 Markdown 与图片',toggle(false)))+group('启动',row('恢复上次工作区','启动时打开上次使用的文件夹',toggle(true)))),
  '外观':page('外观','调整界面配色与阅读舒适度。',
    group('模式',`<div class="appearance-mode-options" role="group" aria-label="主题模式"><button class="appearance-mode-option selected" data-mode="light" aria-pressed="true"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1v1.5M8 13.5V15M1 8h1.5M13.5 8H15M3 3l1 1m8 8 1 1m0-10-1 1m-8 8-1 1"/></svg>白天</button><button class="appearance-mode-option" data-mode="dark" aria-pressed="false"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 10.5A6.5 6.5 0 0 1 5.5 2a6.5 6.5 0 1 0 8 8.5Z"/></svg>夜间</button><button class="appearance-mode-option" data-mode="sepia" aria-pressed="false"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2.5h10v11H3zM5 5h6M5 7.5h6M5 10h4"/></svg>护眼</button></div>${row('随系统切换','根据系统外观自动切换白天或夜间；手动切换模式时自动关闭。',`<button class="toggle" role="switch" data-follow-system aria-label="随系统切换" aria-checked="false"></button>`)}`)+
    group('字体与排版',row('正文字号','',select('18 px',['14 px','16 px','18 px','20 px','22 px']))+row('行高','',select('1.6 · 标准',['1.5 · 紧凑','1.6 · 标准','1.7 · 舒展','1.8 · 宽松','2.0 · 双倍'])))+
@@ -63,6 +63,7 @@ function syncSettingsLocation(){
  let current=pages[0];
  for(const section of pages){if(section.getBoundingClientRect().top<=probe)current=section;else break;}
  const page=current.dataset.settingsPage;
+ $('#settings-current-page').dataset.page=page;
  $('#settings-current-page').textContent=page;
  $$('#settings-nav button').forEach(button=>{const active=button.dataset.page===page;button.classList.toggle('active',active);if(active)button.setAttribute('aria-current','location');else button.removeAttribute('aria-current')});
 }
@@ -92,7 +93,7 @@ function syncPluginSettingsVisibility(){
   const enabled=toggle?.classList.contains('active')??true;
   button.hidden=!enabled;
   if(section)section.hidden=!enabled;
-  if(!enabled&&section?.dataset.settingsPage===$('#settings-current-page').textContent)setPage('插件');
+  if(!enabled&&section?.dataset.settingsPage===$('#settings-current-page').dataset.page)setPage('插件');
  });
  const group=$('#plugin-settings-nav-group');
  if(group)group.hidden=!group.querySelector('button[data-plugin-settings]:not([hidden])');

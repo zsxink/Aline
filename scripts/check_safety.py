@@ -37,9 +37,13 @@ CANONICAL_MEMBERS = {
 RUNTIME = {'OnceLock', 'LazyLock', 'Mutex', 'RwLock'}
 INTERIOR = RUNTIME | {'AtomicBool', 'AtomicUsize', 'AtomicU64', 'AtomicI64', 'AtomicPtr', 'Cell', 'RefCell', 'UnsafeCell'}
 PANIC_MACROS = {'panic', 'unreachable', 'assert', 'assert_eq', 'assert_ne', 'todo', 'unimplemented'}
+# 2026-11-18 用户准入的最小自包含 FFI（docs/decisions.md §44）。只有 workspace 扫描
+# 中该成员相对路径允许 unsafe token；--file 诊断模式、其他成员与同成员其他文件仍按
+# unsafe-owned 拒绝。路径比较使用相对仓库根的正斜杠路径。
+UNSAFE_ALLOWLIST = {'crates/aline-source/src/atomic/platform/macos.rs'}
 
 
-def scan(source, path, kind):
+def scan(source, path, kind, allow_unsafe=False):
     """返回结构化拒绝；未知/损坏词法也拒绝，不退化成无命中。"""
     failures = []
     def reject(token, rule):
@@ -61,7 +65,7 @@ def scan(source, path, kind):
         previous = tokens[index - 1].value if index else ''
         following = tokens[index + 1].value if index + 1 < len(tokens) else ''
         testing = kind.endswith('-test') or index in marked
-        if value == 'unsafe':
+        if value == 'unsafe' and not allow_unsafe:
             reject(token, 'unsafe-owned')
         if value == 'static' and following == 'mut':
             reject(token, 'mutable-static')
@@ -264,7 +268,13 @@ def member_scan(root, relative, package, scanned):
     test_files |= test_targets - production_targets
     for path in files:
         kind = ('engine' if engine else 'ui') + ('-test' if path in test_files else '-production')
-        result, _ = scan(path.read_text(), path, kind)
+        # 准入清单按仓库相对路径比对；无法相对化的落点一律不享受例外。
+        try:
+            allow_unsafe = Path(os.path.realpath(path)).relative_to(
+                Path(os.path.realpath(root))).as_posix() in UNSAFE_ALLOWLIST
+        except ValueError:
+            allow_unsafe = False
+        result, _ = scan(path.read_text(), path, kind, allow_unsafe)
         failures.extend(result)
         scanned.append({'file': str(path.relative_to(root)), 'kind': kind})
     return failures
@@ -508,6 +518,22 @@ def self_test(output):
             link.symlink_to(outside_dir if shape == 'dir' else target)
         run_case(name, [sys.executable, str(Path(__file__).resolve()), '--root', str(fake_root)], list(expected),
                  '符号链接按真实落点判定：逃逸成员外必须拒绝（%s）；留在成员内必须照常受扫' % label)
+    # Ruling I（2026-11-18 准入，docs/decisions.md §44）：仅 workspace 扫描中该仓库
+    # 相对路径允许 unsafe token；同成员其他文件、其他成员的同名相对路径与 --file
+    # 诊断模式都继续按 unsafe-owned 拒绝。期望先于实现手写。
+    unsafe_cases = [
+        ('unsafe-allowlisted-ffi-file',
+         {'crates/aline-source/src/atomic/platform/macos.rs': 'unsafe fn transferred() {}\n'}, []),
+        ('unsafe-outside-allowlist',
+         {'crates/aline-source/src/lib.rs': 'unsafe fn bad() {}\n'}, ['unsafe-owned']),
+        ('unsafe-same-path-other-member',
+         {'crates/aline-buffer/src/atomic/platform/macos.rs': 'unsafe fn bad() {}\n'}, ['unsafe-owned']),
+    ]
+    for name, overrides, expected in unsafe_cases:
+        fake_root = work / 'workspace-fixtures' / name
+        build_workspace(fake_root, overrides=overrides)
+        run_case(name, [sys.executable, str(Path(__file__).resolve()), '--root', str(fake_root)], expected,
+                 'Ruling I：只有准入清单中的仓库相对路径放行 unsafe；其他落点保持 unsafe-owned')
     # 复核 R06：悬空符号链接作 target 时，target 声明与目录枚举会看到同一落点；
     # 规则集合相同但重复诊断会误导修复方向，故此处额外断言失败条数为 1。
     dangling_root = work / 'workspace-fixtures' / 'dangling-target-symlink'

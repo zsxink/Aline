@@ -18,37 +18,76 @@ manifest = json.loads((BASE / 'inventory.json').read_text())
 errors = []
 checked = []
 missing_sources = []
-updates = {}
 shared_icon = REPO / 'docs/assets/app-icon/aline.png'
-update_paths = {'docs/assets/aline.png', 'docs/prototype/legacy/assets/aline.png',
-                'docs/prototype/legacy/index.html'}
-records = manifest.get('authorized_updates', [])
-if records and (len(records) != len(update_paths) or
-                {record['path'] for record in records} != update_paths):
-    errors.append('图标授权变更必须恰好覆盖两份旧图标和原型入口')
+added_entries = {entry['path']: entry for entry in manifest.get('added_files', [])}
 original_hashes = {entry['target']: entry['sha256'] for entry in manifest['entries'] if entry['target']}
-for record in records:
-    name = record['path']
-    if name not in update_paths or record['old_sha256'] != original_hashes.get(name):
-        errors.append('图标授权变更原始身份不符：' + name)
+
+# 授权变更按路径形成从原始身份到当前字节的链；删除必须是链的最后一项。
+chains = {}
+for record in manifest.get('authorized_updates', []):
+    chains.setdefault(record['path'], []).append(record)
+final_hash = {}
+deleted = set()
+for name, chain in chains.items():
+    if name not in original_hashes:
+        errors.append('授权变更指向未登记路径：' + name)
         continue
-    if (record['replacement'] != 'docs/assets/app-icon/aline.png' or not shared_icon.is_file() or
-            hashlib.sha256(shared_icon.read_bytes()).hexdigest() != record['replacement_sha256']):
-        errors.append('新共享图标缺失或身份不符：' + name)
+    expected = original_hashes[name]
+    valid = True
+    for index, record in enumerate(chain):
+        if record.get('old_sha256') != expected:
+            errors.append('授权变更链不连续：' + name)
+            valid = False
+            break
+        action = record.get('action')
+        if action == 'delete':
+            if index != len(chain) - 1 or record.get('new_sha256') is not None:
+                errors.append('删除必须是授权链最后一项：' + name)
+                valid = False
+                break
+            deleted.add(name)
+            expected = None
+        elif action in ('update', 'replace_icon_reference'):
+            if not record.get('new_sha256'):
+                errors.append('授权变更缺少新哈希：' + name)
+                valid = False
+                break
+            expected = record['new_sha256']
+        else:
+            errors.append('未知授权变更动作：' + name)
+            valid = False
+            break
+    if not valid:
         continue
+    final_hash[name] = expected
     target = REPO / name
-    if name.endswith('.png'):
-        valid = record['action'] == 'delete' and record['new_sha256'] is None and not target.exists() and not target.is_symlink()
-    else:
-        data = target.read_bytes() if target.is_file() else b''
-        new_ref, old_ref = b'../../assets/app-icon/aline.png', b'./assets/aline.png'
-        valid = (record['action'] == 'replace_icon_reference' and data.count(new_ref) == 3 and
-                 hashlib.sha256(data).hexdigest() == record['new_sha256'] and
-                 hashlib.sha256(data.replace(new_ref, old_ref)).hexdigest() == record['old_sha256'])
-    if valid:
-        updates[name] = record
-    else:
-        errors.append('图标授权变更当前状态不符：' + name)
+    if name in deleted:
+        if target.exists() or target.is_symlink():
+            errors.append('授权删除的文件仍存在：' + name)
+    elif not target.is_file() or hashlib.sha256(target.read_bytes()).hexdigest() != expected:
+        errors.append('授权变更后当前字节不符：' + name)
+
+# 图标例外仍须恰好覆盖两份旧图与原型入口，且当前入口保留三处新引用。
+icon_targets = {'docs/assets/aline.png', 'docs/prototype/legacy/assets/aline.png'}
+icon_deletes = [record for record in manifest.get('authorized_updates', [])
+                if record.get('action') == 'delete']
+icon_index = [record for record in manifest.get('authorized_updates', [])
+              if record.get('action') == 'replace_icon_reference']
+if {record['path'] for record in icon_deletes} != icon_targets:
+    errors.append('图标授权变更必须恰好覆盖两份旧图标')
+if len(icon_index) != 1 or icon_index[0]['path'] != 'docs/prototype/legacy/index.html':
+    errors.append('原型入口必须恰好记录一次图标引用替换')
+for record in icon_deletes + icon_index:
+    if (record.get('replacement') != 'docs/assets/app-icon/aline.png' or
+            not shared_icon.is_file() or
+            hashlib.sha256(shared_icon.read_bytes()).hexdigest() != record.get('replacement_sha256')):
+        errors.append('新共享图标缺失或身份不符：' + record['path'])
+index_path = LEGACY / 'index.html'
+if index_path.is_file():
+    data = index_path.read_bytes()
+    new_ref, old_ref = b'../../assets/app-icon/aline.png', b'./assets/aline.png'
+    if data.count(new_ref) != 3 or old_ref in data:
+        errors.append('原型入口图标引用数量不符')
 
 for entry in manifest['entries']:
     source = REPO / entry['source']
@@ -59,16 +98,24 @@ for entry in manifest['entries']:
         missing_sources.append(entry['source'])
     if not entry['target']:
         continue
-    if entry['target'] in updates:
-        checked.append(entry['target'])
+    name = entry['target']
+    if name in final_hash:
+        checked.append(name)
         continue
-    target = REPO / entry['target']
+    target = REPO / name
     if not target.is_file() or hashlib.sha256(target.read_bytes()).hexdigest() != entry['sha256']:
-        errors.append('副本缺失或字节不同：' + entry['target'])
-    checked.append(entry['target'])
+        errors.append('副本缺失或字节不同：' + name)
+    checked.append(name)
+
+for name, entry in added_entries.items():
+    target = REPO / name
+    if (not target.is_file() or target.stat().st_size != entry['bytes'] or
+            hashlib.sha256(target.read_bytes()).hexdigest() != entry['sha256']):
+        errors.append('新增授权文件缺失或字节不同：' + name)
+
 expected = {entry['target'] for entry in manifest['entries']
-            if entry['target'] and '/legacy/' in entry['target'] and
-            not (entry['target'] in updates and updates[entry['target']]['action'] == 'delete')}
+            if entry['target'] and '/legacy/' in entry['target'] and entry['target'] not in deleted}
+expected |= set(added_entries)
 actual = {str(path.relative_to(REPO)) for path in LEGACY.rglob('*') if path.is_file()}
 if expected != actual:
     errors.append('历史目录文件集合不同：' + str(sorted(expected ^ actual)))
@@ -94,7 +141,7 @@ for path in sorted(LEGACY.rglob('*')):
                 errors.append('外部启动资源：' + value)
             continue
         target = (path.parent / unquote(url.path)).resolve()
-        shared = target == shared_icon and len(updates) == len(update_paths)
+        shared = target == shared_icon
         if (not target.is_relative_to(LEGACY) and not shared) or not target.is_file():
             errors.append('静态资源缺失或越界：' + value)
         references.append({'from':str(path.relative_to(REPO)),
@@ -131,7 +178,7 @@ thread.start()
 http_checked = 0
 try:
     http_files = {path for path in LEGACY.rglob('*') if path.is_file()}
-    if len(updates) == len(update_paths):
+    if shared_icon.is_file():
         http_files.add(shared_icon)
     for path in sorted(http_files):
         if not path.is_file():
@@ -148,7 +195,8 @@ finally:
 
 print(json.dumps({'scope':'只读副本/静态资源/本机 HTTP，不执行 JS，不等于主题规范或 V 验收',
     'inventory_entries':len(manifest['entries']), 'legacy_files':len(actual),
-    'authorized_icon_updates_checked':len(updates),
+    'authorized_icon_updates_checked':len(icon_deletes) + len(icon_index),
+    'added_files_checked':len(added_entries),
     'target_hashes_checked':len(checked), 'missing_originals':missing_sources,
     'static_references':references, 'external_hyperlinks':sorted(external_links),
     'themes':themes, 'http_files_checked':http_checked, 'errors':errors}, ensure_ascii=False, indent=2))

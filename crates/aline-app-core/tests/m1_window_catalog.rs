@@ -18,6 +18,50 @@ fn native_window_copy_exists_in_both_catalogs() {
                 "window.readonly",
                 "action.open",
                 "action.close_document",
+                "action.save",
+                "action.load_disk",
+                "action.confirm_overwrite",
+                "action.save_as",
+                "action.retry_external_check",
+                "action.dismiss_conflict",
+                "action.cancel_save_wait",
+                "document.save_saved",
+                "document.save_failed",
+                "document.save_conflict",
+                "document.save_uncertain",
+                "document.save_waiting",
+                "document.save_cancelled",
+                "document.save_busy",
+                "document.save_unavailable",
+                "document.external_conflict",
+                "document.external_missing",
+                "document.external_unreadable",
+                "document.external_unsupported",
+                "document.external_reloaded",
+                "document.external_deferred",
+                "document.external_failed",
+                "document.reload_undo_paused",
+                "document.conflict_baseline",
+                "document.conflict_local",
+                "document.conflict_disk",
+                "document.recovery_failed",
+                "document.recovery_incomplete",
+                "document.save_resources_failed",
+                "document.save_migration_retry",
+                "document.save_target_failed",
+                "document.resource_insert_failed",
+                "document.recovery_disabled",
+                "document.recovery_panel_title",
+                "document.recovery_restore",
+                "document.recovery_restore_failed",
+                "document.recovery_discard",
+                "document.recovery_discard_prompt",
+                "document.recovery_discard_confirm",
+                "document.recovery_discard_cancel",
+                "document.recovery_discard_failed",
+                "document.recovery_scan_failed",
+                "document.recovery_restored",
+                "document.recovery_unnamed",
                 "action.visual_view",
                 "action.source_view",
                 "menu.file",
@@ -31,15 +75,64 @@ fn native_window_copy_exists_in_both_catalogs() {
                 "open_error.dialog",
                 "app.platform_unavailable",
                 "startup.window_failed",
+                "startup.no_display",
                 "startup.language_fallback",
                 "reading.large_source",
+                "reading.parse_budget_fallback",
+                "reading.parse_raw_fallback",
                 "reading.layout_budget",
                 "action.cancel_navigation",
+                // 带 `{count}` 插值的键由下方插值测试单独覆盖。
+                "status.pending",
             ] {
                 let translated = translator.t(key);
                 assert!(
                     matches!(translated, Ok(value) if !value.trim().is_empty()),
                     "missing or empty {key} in {locale:?}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn status_counts_interpolate_the_single_count_placeholder() {
+    for locale in [Locale::ZhCn, Locale::En] {
+        let translator = Translator::embedded(locale);
+        assert!(
+            translator.is_ok(),
+            "catalog must be embedded for {locale:?}"
+        );
+        if let Ok(translator) = translator {
+            for key in ["status.characters", "status.lines"] {
+                let translated = translator.t_with(key, &[("count", "12")]);
+                assert!(
+                    matches!(translated, Ok(value) if value.contains("12") && !value.contains('{')),
+                    "missing count interpolation for {key} in {locale:?}"
+                );
+                assert!(
+                    translator.t_with(key, &[]).is_err(),
+                    "count placeholder must be required for {key} in {locale:?}"
+                );
+            }
+            let pending = translator.t("status.pending");
+            assert!(
+                matches!(pending, Ok(value) if !value.contains('{') && !value.trim().is_empty()),
+                "status.pending must be a literal in {locale:?}"
+            );
+            // 带插值的恢复键不能经 `t()` 读取，改由 `t_with` 断言插值与必填。
+            for (key, placeholder) in [
+                ("document.recovery_record", "id"),
+                ("document.recovery_unrecoverable", "count"),
+            ] {
+                let translated = translator.t_with(key, &[(placeholder, "7")]);
+                assert!(
+                    matches!(translated, Ok(value) if value.contains('7') && !value.contains('{')),
+                    "missing {placeholder} interpolation for {key} in {locale:?}"
+                );
+                assert!(
+                    translator.t_with(key, &[]).is_err(),
+                    "{placeholder} placeholder must be required for {key} in {locale:?}"
                 );
             }
         }

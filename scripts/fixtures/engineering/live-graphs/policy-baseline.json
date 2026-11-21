@@ -1,0 +1,571 @@
+{
+  "format": 1,
+  "reviewed": true,
+  "review_evidence": "docs/decisions.md#21-2026-11-02-m1-原生后端候选与准入暂停",
+  "purpose": "正式八成员 workspace 的 GPUI 精确子图；不准许自动更新指纹",
+  "workspace_features": {
+    "aline": {},
+    "aline-ui": {},
+    "aline-plugin": {},
+    "aline-edit": {},
+    "aline-markdown": {},
+    "aline-buffer": {},
+    "aline-source": {},
+    "aline-app-core": {}
+  },
+  "scenarios": {
+    "all": {
+      "gpui_subtree_sha256": "e8b4330d9a42fd80a3587d939106807bbf3ded16708919b514f95e2466b132bf"
+    },
+    "all-features": {
+      "gpui_subtree_sha256": "e8b4330d9a42fd80a3587d939106807bbf3ded16708919b514f95e2466b132bf"
+    },
+    "macos-arm": {
+      "gpui_subtree_sha256": "c7a62d9185d8555b550e34367066bf65ebd75a3d34f1a6645dfa5a09b59a7fcf"
+    },
+    "macos-intel": {
+      "gpui_subtree_sha256": "3ba0baf76f67797824be1ad3d156df8a0d4369082cc464759c52469a7036604e"
+    },
+    "windows-x64": {
+      "gpui_subtree_sha256": "5e248cb4f27cfd83b90b2e3ede593294e51b1a702e41a41110881527efbdc66c"
+    },
+    "linux-x64": {
+      "gpui_subtree_sha256": "ae06690df66eb9809ec614153a32c86d70b3ab4b4c5e65adf15ab2267148ee8e"
+    },
+    "linux-arm": {
+      "gpui_subtree_sha256": "c4512e5e89b8102f50376bee404dcbef48087eb46e84e450eeda42d3c909c831"
+    }
+  },
+  "exceptions": {
+    "regex-automata@0.4.18": {
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "ad8553b9b26413251cbf30e620595c7a41b3887f03da04579c0e6b0d6a06b4b2",
+      "incoming": [
+        {
+          "from": "regex@1.13.1",
+          "to": "regex-automata@0.4.18",
+          "alias": "regex_automata",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ]
+        }
+      ],
+      "scenarios": [
+        "all",
+        "all-features",
+        "macos-arm",
+        "macos-intel",
+        "windows-x64",
+        "linux-x64",
+        "linux-arm"
+      ]
+    },
+    "regex-syntax@0.8.11": {
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4",
+      "incoming": [
+        {
+          "from": "regex-automata@0.4.18",
+          "to": "regex-syntax@0.8.11",
+          "alias": "regex_syntax",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ]
+        },
+        {
+          "from": "regex@1.13.1",
+          "to": "regex-syntax@0.8.11",
+          "alias": "regex_syntax",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ]
+        },
+        {
+          "from": "proptest@1.12.0",
+          "to": "regex-syntax@0.8.11",
+          "alias": "regex_syntax",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ]
+        }
+      ],
+      "scenarios": [
+        "all",
+        "all-features",
+        "macos-arm",
+        "macos-intel",
+        "windows-x64",
+        "linux-x64",
+        "linux-arm"
+      ]
+    },
+    "regex@1.13.1": {
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "f020237b6c8eed93db2e2cb53c00c60a8e1bc73da7d073199a1180401450218d",
+      "incoming": [
+        {
+          "from": "gpui-pre@0.3.9",
+          "to": "regex@1.13.1",
+          "alias": "regex",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ]
+        }
+      ],
+      "scenarios": [
+        "all",
+        "all-features",
+        "macos-arm",
+        "macos-intel",
+        "windows-x64",
+        "linux-x64",
+        "linux-arm"
+      ]
+    },
+    "wasip2@1.0.4+wasi-0.2.12": {
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "b67efb37e106e55ce722a510d6b5f9c17f083e5fc79afc2badeb12cc313d9487",
+      "incoming": [
+        {
+          "from": "getrandom@0.3.4",
+          "to": "wasip2@1.0.4+wasi-0.2.12",
+          "alias": "wasip2",
+          "kinds": [
+            {
+              "kind": null,
+              "target": "cfg(all(target_arch = \"wasm32\", target_os = \"wasi\", target_env = \"p2\"))"
+            }
+          ]
+        }
+      ],
+      "scenarios": [
+        "all",
+        "all-features"
+      ]
+    }
+  },
+  "native_backend": {
+    "root": {
+      "package": "gpui-pre-macos@0.3.9",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "c7c988b7e49775cc8542dbe48d5a10e073d8e898a023ef3ff3d24f33363e9863"
+    },
+    "core": {
+      "package": "gpui-pre@0.3.9",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "34f61c1cfd36fc9c436af09308c963822ae27a45a84feb21a77ba5c9e051f1c0"
+    },
+    "packages": [
+      {
+        "package": "gpui-pre-macos@0.3.9",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "c7c988b7e49775cc8542dbe48d5a10e073d8e898a023ef3ff3d24f33363e9863"
+      },
+      {
+        "package": "gpui-pre-apple@0.3.9",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "b52f58893fe1a0836464428dfad2b5eaf42c9c303a9638f4c2aced5a69072a15"
+      }
+    ],
+    "incoming": [
+      {
+        "from": "aline-ui@0.1.0",
+        "to": "gpui-pre-macos@0.3.9",
+        "alias": "gpui_macos",
+        "kinds": [
+          {
+            "kind": null,
+            "target": "cfg(target_os = \"macos\")"
+          }
+        ]
+      }
+    ]
+  },
+  "native_path_exceptions": {
+    "wasi@0.11.1+wasi-snapshot-preview1": {
+      "path": [
+        {
+          "package": "gpui-pre-macos@0.3.9",
+          "source": "registry+https://github.com/rust-lang/crates.io-index",
+          "checksum": "c7c988b7e49775cc8542dbe48d5a10e073d8e898a023ef3ff3d24f33363e9863"
+        },
+        {
+          "package": "gpui-pre-apple@0.3.9",
+          "source": "registry+https://github.com/rust-lang/crates.io-index",
+          "checksum": "b52f58893fe1a0836464428dfad2b5eaf42c9c303a9638f4c2aced5a69072a15"
+        },
+        {
+          "package": "zed-font-kit@0.14.1-zed",
+          "source": "registry+https://github.com/rust-lang/crates.io-index",
+          "checksum": "a3898e450f36f852edda72e3f985c34426042c4951790b23b107f93394f9bff5"
+        },
+        {
+          "package": "dirs@5.0.1",
+          "source": "registry+https://github.com/rust-lang/crates.io-index",
+          "checksum": "44c45a9d03d6676652bcb5e724c7e988de1acad23a711b5217ab9cbecbec2225"
+        },
+        {
+          "package": "dirs-sys@0.4.1",
+          "source": "registry+https://github.com/rust-lang/crates.io-index",
+          "checksum": "520f05a5cbd335fae5a99ff7a6ab8627577660ee5cfd6a94a6a929b52ff0321c"
+        },
+        {
+          "package": "redox_users@0.4.6",
+          "source": "registry+https://github.com/rust-lang/crates.io-index",
+          "checksum": "ba009ff324d1fc1b900bd1fdb31564febe58a8ccc8a6fdbb93b543d33b13ca43"
+        },
+        {
+          "package": "getrandom@0.2.17",
+          "source": "registry+https://github.com/rust-lang/crates.io-index",
+          "checksum": "ff2abc00be7fca6ebc474524697ae276ad847ad0a6b3faa4bcb027e9a4614ad0"
+        },
+        {
+          "package": "wasi@0.11.1+wasi-snapshot-preview1",
+          "source": "registry+https://github.com/rust-lang/crates.io-index",
+          "checksum": "ccf3ec651a847eb01de73ccad15eb7d99f80485de043efb2f370cd654f4ea44b"
+        }
+      ],
+      "edges": [
+        {
+          "from": "gpui-pre-macos@0.3.9",
+          "to": "gpui-pre-apple@0.3.9",
+          "alias": "gpui_apple",
+          "kinds": [
+            {
+              "kind": null,
+              "target": "cfg(target_os = \"macos\")"
+            }
+          ]
+        },
+        {
+          "from": "gpui-pre-apple@0.3.9",
+          "to": "zed-font-kit@0.14.1-zed",
+          "alias": "font_kit",
+          "kinds": [
+            {
+              "kind": null,
+              "target": "cfg(any(target_os = \"macos\", target_os = \"ios\"))"
+            }
+          ]
+        },
+        {
+          "from": "zed-font-kit@0.14.1-zed",
+          "to": "dirs@5.0.1",
+          "alias": "dirs",
+          "kinds": [
+            {
+              "kind": null,
+              "target": "cfg(not(any(target_arch = \"wasm32\", target_family = \"windows\", target_os = \"android\", target_env = \"ohos\")))"
+            }
+          ]
+        },
+        {
+          "from": "dirs@5.0.1",
+          "to": "dirs-sys@0.4.1",
+          "alias": "dirs_sys",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ]
+        },
+        {
+          "from": "dirs-sys@0.4.1",
+          "to": "redox_users@0.4.6",
+          "alias": "redox_users",
+          "kinds": [
+            {
+              "kind": null,
+              "target": "cfg(target_os = \"redox\")"
+            }
+          ]
+        },
+        {
+          "from": "redox_users@0.4.6",
+          "to": "getrandom@0.2.17",
+          "alias": "getrandom",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ]
+        },
+        {
+          "from": "getrandom@0.2.17",
+          "to": "wasi@0.11.1+wasi-snapshot-preview1",
+          "alias": "wasi",
+          "kinds": [
+            {
+              "kind": null,
+              "target": "cfg(target_os = \"wasi\")"
+            }
+          ]
+        }
+      ],
+      "selected_scenarios": [
+        "all",
+        "all-features"
+      ],
+      "unselected_scenarios": [
+        "all",
+        "all-features",
+        "macos-arm",
+        "macos-intel",
+        "windows-x64",
+        "linux-x64",
+        "linux-arm"
+      ],
+      "basis": "2026-11-02 用户批准精确 macOS 后端目标分支；all/all-features 为合并图，所有桌面 target tree 必须不选中，metadata-only 路径仍受精确身份/全部路径限制"
+    },
+    "wasip2@1.0.4+wasi-0.2.12": {
+      "selected_scenarios": [
+        "all",
+        "all-features"
+      ],
+      "unselected_scenarios": [
+        "all",
+        "all-features",
+        "macos-arm",
+        "macos-intel",
+        "windows-x64",
+        "linux-x64",
+        "linux-arm"
+      ],
+      "basis": "用户2026-11-02批准：同一精确wasip2包在macOS后端root可达metadata路径的14条边，含原5边及新增9边；仅desktop metadata-only可出现，desktop target trees不选中；全部身份/edge/target精确匹配",
+      "packages": [
+        {
+          "package": "getrandom@0.3.4",
+          "source": "registry+https://github.com/rust-lang/crates.io-index",
+          "checksum": "899def5c37c4fd7b2664648c28120ecec138e4d395b459e5ca34f9cce2dd77fd"
+        },
+        {
+          "package": "gpui-pre-apple@0.3.9",
+          "source": "registry+https://github.com/rust-lang/crates.io-index",
+          "checksum": "b52f58893fe1a0836464428dfad2b5eaf42c9c303a9638f4c2aced5a69072a15"
+        },
+        {
+          "package": "gpui-pre-macos@0.3.9",
+          "source": "registry+https://github.com/rust-lang/crates.io-index",
+          "checksum": "c7c988b7e49775cc8542dbe48d5a10e073d8e898a023ef3ff3d24f33363e9863"
+        },
+        {
+          "package": "gpui-pre-scheduler@0.3.9",
+          "source": "registry+https://github.com/rust-lang/crates.io-index",
+          "checksum": "83f342555282a59ed8dd58dd7e0a920524fa8ef6aa8c8f30e2edb7019a8f72cb"
+        },
+        {
+          "package": "image@0.25.10",
+          "source": "registry+https://github.com/rust-lang/crates.io-index",
+          "checksum": "85ab80394333c02fe689eaf900ab500fbd0c2213da414687ebf995a65d5a6104"
+        },
+        {
+          "package": "rand@0.9.5",
+          "source": "registry+https://github.com/rust-lang/crates.io-index",
+          "checksum": "b9ef1d0d795eb7d84685bca4f72f3649f064e6641543d3a8c415898726a57b41"
+        },
+        {
+          "package": "rand_chacha@0.9.0",
+          "source": "registry+https://github.com/rust-lang/crates.io-index",
+          "checksum": "d3022b5f1df60f26e1ffddd6c66e8aa15de382ae63b3a0c1bfc0e4d3e3f325cb"
+        },
+        {
+          "package": "rand_core@0.9.5",
+          "source": "registry+https://github.com/rust-lang/crates.io-index",
+          "checksum": "76afc826de14238e6e8c374ddcc1fa19e374fd8dd986b0d2af0d02377261d83c"
+        },
+        {
+          "package": "rav1e@0.8.1",
+          "source": "registry+https://github.com/rust-lang/crates.io-index",
+          "checksum": "43b6dd56e85d9483277cde964fd1bdb0428de4fec5ebba7540995639a21cb32b"
+        },
+        {
+          "package": "ravif@0.13.0",
+          "source": "registry+https://github.com/rust-lang/crates.io-index",
+          "checksum": "e52310197d971b0f5be7fe6b57530dcd27beb35c1b013f29d66c1ad73fbbcc45"
+        },
+        {
+          "package": "wasip2@1.0.4+wasi-0.2.12",
+          "source": "registry+https://github.com/rust-lang/crates.io-index",
+          "checksum": "b67efb37e106e55ce722a510d6b5f9c17f083e5fc79afc2badeb12cc313d9487"
+        }
+      ],
+      "edges": [
+        {
+          "from": "gpui-pre-macos@0.3.9",
+          "to": "gpui-pre-scheduler@0.3.9",
+          "alias": "scheduler",
+          "kinds": [
+            {
+              "kind": null,
+              "target": "cfg(target_os = \"macos\")"
+            }
+          ]
+        },
+        {
+          "from": "gpui-pre-scheduler@0.3.9",
+          "to": "rand@0.9.5",
+          "alias": "rand",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ]
+        },
+        {
+          "from": "rand@0.9.5",
+          "to": "rand_core@0.9.5",
+          "alias": "rand_core",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ]
+        },
+        {
+          "from": "rand_core@0.9.5",
+          "to": "getrandom@0.3.4",
+          "alias": "getrandom",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ]
+        },
+        {
+          "from": "getrandom@0.3.4",
+          "to": "wasip2@1.0.4+wasi-0.2.12",
+          "alias": "wasip2",
+          "kinds": [
+            {
+              "kind": null,
+              "target": "cfg(all(target_arch = \"wasm32\", target_os = \"wasi\", target_env = \"p2\"))"
+            }
+          ]
+        },
+        {
+          "alias": "gpui_apple",
+          "from": "gpui-pre-macos@0.3.9",
+          "kinds": [
+            {
+              "kind": null,
+              "target": "cfg(target_os = \"macos\")"
+            }
+          ],
+          "to": "gpui-pre-apple@0.3.9"
+        },
+        {
+          "alias": "image",
+          "from": "gpui-pre-apple@0.3.9",
+          "kinds": [
+            {
+              "kind": null,
+              "target": "cfg(any(target_os = \"macos\", target_os = \"ios\"))"
+            }
+          ],
+          "to": "image@0.25.10"
+        },
+        {
+          "alias": "image",
+          "from": "gpui-pre-macos@0.3.9",
+          "kinds": [
+            {
+              "kind": null,
+              "target": "cfg(target_os = \"macos\")"
+            }
+          ],
+          "to": "image@0.25.10"
+        },
+        {
+          "alias": "rand",
+          "from": "rav1e@0.8.1",
+          "kinds": [
+            {
+              "kind": null,
+              "target": "cfg(fuzzing)"
+            }
+          ],
+          "to": "rand@0.9.5"
+        },
+        {
+          "alias": "rand_chacha",
+          "from": "rand@0.9.5",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ],
+          "to": "rand_chacha@0.9.0"
+        },
+        {
+          "alias": "rand_chacha",
+          "from": "rav1e@0.8.1",
+          "kinds": [
+            {
+              "kind": null,
+              "target": "cfg(fuzzing)"
+            }
+          ],
+          "to": "rand_chacha@0.9.0"
+        },
+        {
+          "alias": "rand_core",
+          "from": "rand_chacha@0.9.0",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ],
+          "to": "rand_core@0.9.5"
+        },
+        {
+          "alias": "rav1e",
+          "from": "ravif@0.13.0",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            },
+            {
+              "kind": null,
+              "target": "cfg(target = \"wasm32-unknown-unknown\")"
+            }
+          ],
+          "to": "rav1e@0.8.1"
+        },
+        {
+          "alias": "ravif",
+          "from": "image@0.25.10",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ],
+          "to": "ravif@0.13.0"
+        }
+      ]
+    }
+  }
+}

@@ -1,6 +1,6 @@
 # Aline 文档入口
 
-当前已有八成员 Cargo workspace、无头引擎与工程守卫；2026-11-02 用户验收裁决将 M0 出口记为通过（验收豁免，非证据性验证；逐包人工复核、E2/E4/E5/E7 整项、E3 全量、E6 未测项与 V-01～V-09 仍未执行，见[验证计划](./v1-validation-plan.md)）。M1 未在本轮启动。实现任务见已归档的[M0 OpenSpec tasks](../openspec/changes/archive/2026-11-02-m0-engine-foundation/tasks.md)。
+当前已有八成员 Cargo workspace、无头引擎与工程守卫，以及 M1 的原生单窗口只读界面；2026-11-02 用户验收裁决将 M0 出口记为通过（验收豁免，非证据性验证；逐包人工复核、E2/E4/E5/E7 整项、E3 全量、E6 未测项未执行，V-01～V-09 均未整项通过，已执行与未测的分项见[验证计划](./v1-validation-plan.md)）。M1 实现任务已按 2026-11-03 apply 授权完成并于 2026-11-13 归档，阶段出口已于同日按[决定 §43](./decisions.md#43-2026-11-13-m1-阶段出口裁决macos-arm64-范围)在 macOS arm64 范围裁决收口；M2 正在执行[`m2-editable-core`](../openspec/changes/m2-editable-core/tasks.md)（10/18），V-08 身份/事务方案独立审查已通过，W4（12/14）与 W5（6/13）已进入实现。2026-11-19 真实窗口已取得组合期拒绝、平台自然提交与查找面板逐项/替换分项证据，但保存→重开→冲突→恢复真实 UI 操作链、完整中文 IME 矩阵、代码块真实水平滚动与三平台仍未取证；W4/W5 生产行为仍受各自验收条件约束，不把任务勾选或方案审查写成 V-07/V-08 整项通过。各 V 项整项状态、未测平台与保留缺口仍以[验证计划](./v1-validation-plan.md)和已归档的[M1 OpenSpec tasks](../openspec/changes/archive/2026-11-13-m1-single-window-readonly/tasks.md)为准。实现任务另见已归档的[M0 OpenSpec tasks](../openspec/changes/archive/2026-11-02-m0-engine-foundation/tasks.md)。
 
 PRD定义产品结果，AGENTS铁律及已确认架构/专项约束实现，验证计划负责证据状态，decisions负责决定追踪。OpenSpec承载工程基线和拟议变更，不能覆盖已确认决定；资料无法按职责解释的冲突列入待确认，不按日期或目录自行裁决。
 
@@ -27,15 +27,16 @@ PRD定义产品结果，AGENTS铁律及已确认架构/专项约束实现，验�
 ## 可复现验证入口
 
 - 单元/集成测试：`crates/*/tests/`及源码旁测试；固定输入/独立预期在各crate的 `tests/fixtures/`。
-- 工程门禁与反例：`scripts/check_workspace.py`、`check_engineering.py`、`check_lints.py`、`check_safety.py`、`check_public_api.py`、`check_validation_output.py`，输入在 `scripts/fixtures/`。
+- 工程门禁与反例：`scripts/check_workspace.py`、`check_engineering.py`、`check_lints.py`、`check_safety.py`、`check_public_api.py`、`check_validation_output.py`、`check_ui_catalog.py`、`check_ui_tokens.py`，输入在 `scripts/fixtures/`。
+- UI 文案守卫检查直接 UI 字面串与翻译调用的字面首参 key（变量/数组间接 key 仍须人工复核）；宏、动态串与别名仍须人工复核，双语键和占位符一致性由 `aline-app-core` 测试覆盖。颜色守卫检查组件生产源码的直接字面色，不代替真实截图。
 - Rust提交仍执行AGENTS列出的fmt/clippy/test；统一入口需要已安装工具链及已核对的隔离Cargo缓存，不自动下载。依赖图解析不代表跨平台构建。
 - 验证运行输出放 `logs/validation/`，换会话只维护一份 `tmp/<任务>-resume.md`，两者不追踪。保留规则见[开发流程 §5](./development-process.md#5-仓库产物与提交边界)。本地输出不得成为复跑必要输入。
 
 ## 研究、历史与资源
 
-- [Zed复核](./zed-notes.md)、[WordCraft调研](./wordcraft-study.md)、[Splat调研](./splat-study.md)是参考研究，不能替代锁定源码核对与Aline实测。
+- [Zed复核](./zed-notes.md)、[WordCraft调研](./wordcraft-study.md)、[Splat调研](./splat-study.md)、[quiet-md调研与采纳方案](./quiet-md-study.md)是参考研究，不能替代锁定源码核对与Aline实测。quiet-md 的 W0～W7 原为工作分解；2026-11-08 用户要求继续逐项实施，W1～W7 已各有独立 change（见[开发流程 §3.1](./development-process.md#31-研究采纳与工程实践落点2026-11-05)），W4/W5 已按 M2 前置进入实现（尚有余项与真实平台证据缺口）；其不改变产品契约的工程/验证方法已按[决定 QMD-01](./decisions.md#25-2026-11-05-quiet-md-工程实践采纳qmd-01)回写现行规范，并由 OpenSpec change [`m1-single-window-readonly`](../openspec/changes/archive/2026-11-13-m1-single-window-readonly/proposal.md) 记录治理 delta，不代表已实施或已验证。
 - [确认归档](./archive/)及[迁移历史证据](./archive/migration-evidence/README.md)保存已确认决定与必要研究来源，不自动取得现行规范效力。
-- [历史原型](./prototype/README.md)为用户已确认长期保留的只读参考，且是原生 UI 的布局与控件邻接参照（[UI 规范 §4.1](./ui-spec.md#41-原型布局对照实现参照)）；PROTO-01/03来源/许可事实仍待补证，原型主题不是正式schema 1包。
+- [历史原型](./prototype/README.md)为用户已确认长期保留的参考，且是原生 UI 的布局与控件邻接参照（[UI 规范 §4.1](./ui-spec.md#41-原型布局对照实现参照)）；除图标删除与 2026-11-03 语言切换两次记录在案的授权变更外不改历史字节；PROTO-01/03来源/许可事实仍待补证，原型主题不是正式schema 1包。
 - [应用图标](./assets/app-icon/README.md)、[素材来源](./assets/provenance.md)、[架构总览](./assets/v1-architecture.svg)、[模块目录](./assets/v1-modules.svg)分别负责正式资源、来源与规划视图。
 
 2026-11-01已按用户要求清理旧过程报告/审计目录，必要决定与状态已迁入现有入口，见[收敛决定](./decisions.md#18-2026-11-01-仓库过程产物收敛)。现行文档中的旧报告引用标为历史并指向清理前Git版本；它们只说明当时分项，不能证明当前工作树或M0/V出口。原 `docs_bak/`、`reports/` 也已授权删除；不为恢复过程痕迹重新生成目录。

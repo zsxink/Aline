@@ -7,10 +7,11 @@
 use std::ops::Range;
 
 use aline_buffer::{DocumentRevision, SelectionSpec};
+use aline_markdown::ProtectionKind;
 
 use crate::document::composition::CompositionState;
 
-/// 普通输入组：在空白源码范围上累积的单区间替换。
+/// 普通输入组：在一个源码范围上累积的单区间替换。
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct TypingGroup {
     pub(crate) range: Range<usize>,
@@ -33,19 +34,53 @@ pub(crate) enum DraftSlot {
     Composition(CompositionState),
 }
 
-/// 唯一打开块。
+/// 文档当前的输入目标。
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum InputTarget {
+    /// M0 无头入口，保留原有生命周期和语义。
+    Legacy,
+    /// 已检验的可视化块边界，排除尾部分隔换行，独立于草稿补丁范围。
+    Visual(VisualInput),
+    /// 源码模式的唯一输入组槽；不表示打开了一个可视化块。
+    Source,
+}
+
+/// 与打开块基线共享源码坐标的范围和保护约束。
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct VisualInput {
+    pub(crate) extent: Range<usize>,
+    pub(crate) protections: Vec<VisualProtection>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct VisualProtection {
+    pub(crate) range: Range<usize>,
+    pub(crate) kind: ProtectionKind,
+}
+
+/// 唯一打开块与输入槽。
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct OpenBlock {
     pub(crate) baseline_revision: DocumentRevision,
+    pub(crate) target: InputTarget,
     pub(crate) range: Range<usize>,
     pub(crate) baseline_fragment: String,
     pub(crate) selection: SelectionSpec,
     pub(crate) draft: DraftSlot,
-    /// 最近一次被撤销的普通输入组；只允许按顺序重做。
-    pub(crate) undone_typing: Option<TypingGroup>,
 }
 
 impl OpenBlock {
+    pub(crate) fn visual_extent(&self) -> Option<&Range<usize>> {
+        self.visual_input().map(|target| &target.extent)
+    }
+
+    pub(crate) fn visual_input(&self) -> Option<&VisualInput> {
+        match &self.target {
+            InputTarget::Visual(target) => Some(target),
+            InputTarget::Legacy | InputTarget::Source => None,
+        }
+    }
+
     /// 返回当前草稿文本（普通输入组或组合候选）。
     pub(crate) fn current_draft(&self) -> Option<&str> {
         match &self.draft {

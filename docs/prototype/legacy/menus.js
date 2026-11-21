@@ -64,7 +64,7 @@
       if (entry.divider) return '<div class="app-menu-divider" role="separator"></div>';
       const disabled = entry.disabled ? ' disabled aria-disabled="true"' : '';
       const submenuAttr = entry.submenu ? ' aria-haspopup="menu" aria-expanded="false"' : '';
-      const row = `<button class="app-menu-item${entry.submenu?' has-submenu':''}${entry.danger?' danger':''}" role="menuitem" data-index="${index}"${disabled}${submenuAttr}><span>${esc(entry.label)}</span>${entry.shortcut?`<kbd>${esc(entry.shortcut)}</kbd>`:''}${entry.submenu?'<span class="app-menu-chevron">›</span>':''}</button>`;
+      const row = `<button class="app-menu-item${entry.submenu?' has-submenu':''}${entry.danger?' danger':''}" role="menuitem" data-index="${index}" data-label="${esc(entry.label)}"${disabled}${submenuAttr}><span>${esc(entry.label)}</span>${entry.shortcut?`<kbd>${esc(entry.shortcut)}</kbd>`:''}${entry.submenu?'<span class="app-menu-chevron">›</span>':''}</button>`;
       return entry.submenu ? `<div class="app-menu-entry">${row}<div class="app-menu-submenu" role="menu" hidden>${renderItems(entry.submenu)}</div></div>` : row;
     }).join('');
   }
@@ -121,7 +121,7 @@
     const row=event.target.closest('.app-menu-item');
     if (!row || row.disabled || row.closest('.context-menu-popup')) return;
     if (row.classList.contains('has-submenu')) { openSubmenu(row.parentElement); return; }
-    const label=row.querySelector('span')?.textContent || '';
+    const label=row.dataset.label || row.querySelector('span')?.textContent || '';
     closeMenu();
     if (row.dataset.mode) window.setAppearanceMode?.(row.dataset.mode,true);
     else if (row.dataset.palette) window.setPaletteFamily?.(row.dataset.palette);

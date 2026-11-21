@@ -5,7 +5,9 @@ use std::ops::Range;
 
 use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
 
-use super::{DrawnOffset, MappingError, Projection};
+use aline_buffer::{Affinity, SrcOffset, TextBudget, TextSnapshot};
+
+use super::{DrawnOffset, MappingError, MappingPrecision, Projection};
 
 const SCAN_LIMIT: usize = 4096;
 const CHUNK_LIMIT: usize = 256;
@@ -78,6 +80,63 @@ impl Projection {
         self.move_grapheme(offset, false)
     }
 
+    /// 在完整源码上下文中判断当前局部恒等投影的一个端点。
+    ///
+    /// 映射必须是 Exact，不把局部片段首尾误判为字素边界。源码视图每次最多只读取受预算的小段。
+    pub fn is_source_grapheme_boundary(&self, offset: &SrcOffset) -> Result<bool, GraphemeError> {
+        self.source_grapheme_navigator(offset)?.boundary()
+    }
+
+    /// 在完整源码上下文中取相邻字素端点。返回值仍须落在当前局部恒等投影的 Exact 范围内。
+    pub fn adjacent_source_grapheme_boundary(
+        &self,
+        offset: &SrcOffset,
+        forward: bool,
+    ) -> Result<Option<SrcOffset>, GraphemeError> {
+        let mut navigator = self.source_grapheme_navigator(offset)?;
+        if !navigator.boundary()? {
+            return Err(GraphemeError::NotGraphemeBoundary);
+        }
+        let next = if forward {
+            navigator.scan(GraphemeCursor::next_boundary)?
+        } else {
+            navigator.scan(GraphemeCursor::prev_boundary)?
+        };
+        let Some(next) = next else {
+            return Ok(None);
+        };
+        let source = self
+            .source_snapshot()
+            .src_offset(next)
+            .map_err(|error| GraphemeError::Mapping(MappingError::Source(error)))?;
+        self.check_source_grapheme_mapping(&source)?;
+        Ok(Some(source))
+    }
+
+    fn check_source_grapheme_mapping(&self, offset: &SrcOffset) -> Result<(), GraphemeError> {
+        if self
+            .drawn_at(offset, Affinity::Before)
+            .map_err(GraphemeError::Mapping)?
+            .precision()
+            != MappingPrecision::Exact
+        {
+            return Err(GraphemeError::IncompleteProjection);
+        }
+        Ok(())
+    }
+
+    fn source_grapheme_navigator<'a>(
+        &'a self,
+        offset: &SrcOffset,
+    ) -> Result<Navigator<'a>, GraphemeError> {
+        self.check_source_grapheme_mapping(offset)?;
+        let snapshot = self.source_snapshot();
+        let byte = snapshot
+            .validate_offset(offset)
+            .map_err(|error| GraphemeError::Mapping(MappingError::Source(error)))?;
+        Ok(Navigator::for_context(TextContext::Source(snapshot), byte))
+    }
+
     fn move_grapheme(
         &self,
         offset: &DrawnOffset,
@@ -109,8 +168,49 @@ impl Projection {
     }
 }
 
+#[derive(Clone, Copy)]
+enum TextContext<'a> {
+    Drawn(&'a str),
+    Source(&'a TextSnapshot),
+}
+
+impl TextContext<'_> {
+    fn len(self) -> usize {
+        match self {
+            Self::Drawn(text) => text.len(),
+            Self::Source(snapshot) => snapshot.len_bytes(),
+        }
+    }
+
+    fn is_char_boundary(self, byte: usize) -> bool {
+        match self {
+            Self::Drawn(text) => text.is_char_boundary(byte),
+            Self::Source(snapshot) => snapshot.is_char_boundary(byte).unwrap_or(false),
+        }
+    }
+}
+
+impl<'a> TextContext<'a> {
+    fn slice(self, bytes: Range<usize>) -> Result<std::borrow::Cow<'a, str>, GraphemeError> {
+        match self {
+            Self::Drawn(text) => text
+                .get(bytes)
+                .map(std::borrow::Cow::Borrowed)
+                .ok_or(GraphemeError::InvalidCursorState),
+            Self::Source(snapshot) => {
+                let range = snapshot
+                    .src_range(bytes)
+                    .map_err(|error| GraphemeError::Mapping(MappingError::Source(error)))?;
+                snapshot
+                    .slice(&range, TextBudget::new(CHUNK_LIMIT))
+                    .map_err(|error| GraphemeError::Mapping(MappingError::Source(error)))
+            }
+        }
+    }
+}
+
 struct Navigator<'a> {
-    text: &'a str,
+    text: TextContext<'a>,
     cursor: GraphemeCursor,
     chunk: Range<usize>,
     supplied: usize,
@@ -118,7 +218,11 @@ struct Navigator<'a> {
 
 impl<'a> Navigator<'a> {
     fn new(text: &'a str, byte: usize) -> Self {
-        // 保留一部分前文，避免常规短簇每次都触发额外回扫；不复制文本。
+        Self::for_context(TextContext::Drawn(text), byte)
+    }
+
+    fn for_context(text: TextContext<'a>, byte: usize) -> Self {
+        // 保留一部分前文，避免短簇反复回扫。源码只在所需块跨 overlay 接缝时复制。
         let mut start = byte.saturating_sub(CHUNK_LIMIT / 2);
         while !text.is_char_boundary(start) {
             start += 1;
@@ -153,24 +257,18 @@ impl<'a> Navigator<'a> {
         query: impl Fn(&mut GraphemeCursor, &str, usize) -> Result<T, GraphemeIncomplete>,
     ) -> Result<T, GraphemeError> {
         loop {
-            let chunk = self
-                .text
-                .get(self.chunk.clone())
-                .ok_or(GraphemeError::InvalidCursorState)?;
-            self.charge(chunk.len())?;
-            match query(&mut self.cursor, chunk, self.chunk.start) {
+            self.charge(self.chunk.len())?;
+            let chunk = self.text.slice(self.chunk.clone())?;
+            match query(&mut self.cursor, &chunk, self.chunk.start) {
                 Ok(value) => return Ok(value),
                 Err(GraphemeIncomplete::PreContext(end)) => {
                     if end == 0 || end > self.text.len() || !self.text.is_char_boundary(end) {
                         return Err(GraphemeError::InvalidCursorState);
                     }
                     let context_range = preceding_chunk(self.text, end);
-                    let context = self
-                        .text
-                        .get(context_range.clone())
-                        .ok_or(GraphemeError::InvalidCursorState)?;
-                    self.charge(context.len())?;
-                    self.cursor.provide_context(context, context_range.start);
+                    self.charge(context_range.len())?;
+                    let context = self.text.slice(context_range.clone())?;
+                    self.cursor.provide_context(&context, context_range.start);
                 }
                 Err(GraphemeIncomplete::NextChunk) if self.chunk.end < self.text.len() => {
                     self.chunk = following_chunk(self.text, self.chunk.end);
@@ -184,7 +282,7 @@ impl<'a> Navigator<'a> {
     }
 }
 
-fn following_chunk(text: &str, start: usize) -> Range<usize> {
+fn following_chunk(text: TextContext, start: usize) -> Range<usize> {
     let mut end = start.saturating_add(CHUNK_LIMIT).min(text.len());
     while !text.is_char_boundary(end) {
         end -= 1;
@@ -192,7 +290,7 @@ fn following_chunk(text: &str, start: usize) -> Range<usize> {
     start..end
 }
 
-fn preceding_chunk(text: &str, end: usize) -> Range<usize> {
+fn preceding_chunk(text: TextContext, end: usize) -> Range<usize> {
     let mut start = end.saturating_sub(CHUNK_LIMIT);
     while !text.is_char_boundary(start) {
         start += 1;

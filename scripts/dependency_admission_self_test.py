@@ -293,10 +293,98 @@ class ExactLicenseTests(unittest.TestCase):
             with self.assertRaises(Violation): admit(data)
 
 
+def local_fixture(root):
+    """在已批准的最小图上增加一个本地来源包；图与字节均为合成夹具。"""
+    import hashlib
+    vendor = Path(root) / "vendor" / "gpui-local-0.0.0"
+    (vendor / "src").mkdir(parents=True, exist_ok=True)
+    (vendor / "src" / "lib.rs").write_bytes(b"// synthetic local source\n")
+    rows = sorted((path.relative_to(vendor).as_posix(), path) for path in vendor.rglob("*") if path.is_file())
+    files = {rel: hashlib.sha256(path.read_bytes()).hexdigest() for rel, path in rows}
+    tree = hashlib.sha256(("\n".join(rel + "\0" + digest for rel, digest in sorted(files.items())) + "\n").encode()).hexdigest()
+    data = fixture()
+    ident = "path+file://" + str(vendor.resolve()) + "#gpui-local@0.0.0"
+    data["packages"][ident] = {"id": ident, "name": "gpui-local", "version": "0.0.0",
+                               "source": None, "license": "Apache-2.0",
+                               "manifest_path": str((vendor / "Cargo.toml").resolve())}
+    data["nodes"][ident] = {"id": ident, "deps": [], "features": []}
+    data["lock"]["gpui-local@0.0.0"] = {"name": "gpui-local", "version": "0.0.0"}
+    ui = find(data, "aline-ui")
+    data["nodes"][ui]["deps"].append({"pkg": ident, "name": "gpui_local", "dep_kinds": [{"kind": None, "target": None}]})
+    data["selected"].add(ident)
+    data["policy"]["groups"].insert(-1, {
+        "id": "local-source", "rule": {"kind": "closure", "roots": ["gpui-local"], "optional": True},
+        "selected_allowed": True, "purpose": "本地来源合成夹具", "consumer": "aline-ui",
+        "alternatives": "无", "necessity": "验证本地来源字节身份与准入登记"})
+    rule = {"package": "gpui-local@0.0.0", "source": "local-patch", "path": "vendor/gpui-local-0.0.0",
+            "tree_sha256": tree, "files": files, "license": "Apache-2.0", "group": "local-source",
+            "basis": "合成夹具：只验证登记与字节核对，不代表真实准入"}
+    data["policy"]["license"]["local_paths"] = [rule]
+    return data
+
+
+class LocalSourceAdmissionTests(unittest.TestCase):
+    def admit(self, data, root):
+        return check_admission(**data, scenario="synthetic-local-source", with_ledger=True, repo_root=root)
+
+    def test_registered_local_source_passes_and_is_reported(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as root:
+            data = local_fixture(root)
+            result = self.admit(data, root)
+            self.assertEqual(result["summary"]["local_sources"], ["gpui-local@0.0.0"])
+            row = next(row for row in result["ledger"]["packages"] if row["name"] == "gpui-local")
+            self.assertIsNone(row["source"])
+            self.assertEqual(row["group"], "local-source")
+
+    def test_unregistered_local_source_is_rejected(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as root:
+            data = local_fixture(root)
+            data["policy"]["license"]["local_paths"] = []
+            with self.assertRaisesRegex(Violation, "未登记的本地路径包"):
+                self.admit(data, root)
+
+    def test_local_source_identity_and_license_drift_are_rejected(self):
+        import tempfile
+        for change, pattern in (("tree", "目录树漂移"), ("file", "已审查文件漂移"),
+                                ("license", "许可证漂移"), ("group", "准入分组不符")):
+            with tempfile.TemporaryDirectory() as root:
+                data = local_fixture(root); rule = data["policy"]["license"]["local_paths"][0]
+                if change == "tree": rule["tree_sha256"] = "0" * 64
+                elif change == "file": rule["files"]["src/lib.rs"] = "0" * 64
+                elif change == "license": rule["license"] = "MIT"
+                elif change == "group": rule["group"] = "gpui-macos-backend"
+                with self.assertRaisesRegex(Violation, pattern):
+                    self.admit(data, root)
+
+    def test_local_source_path_is_bound_to_worktree_root(self):
+        """仓库外同后缀副本必须拒绝，账本通道与原生规则共用同一绑定。"""
+        import tempfile
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as outside:
+            bases = (str(Path(outside)), "/Users/Shared/Project/editor/Aline",
+                     "/home/Shared/Project/editor/Aline")
+            for base in bases:
+                for form in ("id", "manifest", "both"):
+                    with self.subTest(base=base, form=form):
+                        data = local_fixture(root)
+                        ident = next(key for key in data["packages"] if data["packages"][key]["name"] == "gpui-local")
+                        package = data["packages"][ident]
+                        if form in ("id", "both"):
+                            package["id"] = "path+file://" + str(Path(base) / "vendor" / "gpui-local-0.0.0") + "#gpui-local@0.0.0"
+                        if form in ("manifest", "both"):
+                            package["manifest_path"] = str(Path(base) / "vendor" / "gpui-local-0.0.0" / "Cargo.toml")
+                        with self.assertRaisesRegex(Violation, "身份/路径漂移"):
+                            self.admit(data, root)
+
+
 def run(output=None):
     output = output_directory("dependency-admission-self-test", output)
     stream = io.StringIO()
-    result = unittest.TextTestRunner(stream=stream, verbosity=2).run(unittest.defaultTestLoader.loadTestsFromTestCase(ExactLicenseTests))
+    loader = unittest.defaultTestLoader
+    result = unittest.TextTestRunner(stream=stream, verbosity=2).run(
+        unittest.TestSuite([loader.loadTestsFromTestCase(ExactLicenseTests),
+                            loader.loadTestsFromTestCase(LocalSourceAdmissionTests)]))
     text = stream.getvalue()
     write_text(output / "tests.txt", text)
     write_json(output / "summary.json", {"passed": result.wasSuccessful(), "tests": result.testsRun,

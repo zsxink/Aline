@@ -4,11 +4,14 @@ mod atomic;
 mod baseline;
 mod decode;
 mod encode;
+pub mod fs;
 mod storage;
 
 pub use atomic::{
-    AtomicFailure, AtomicFailureKind, AtomicStage, BaselineError, Cancellation, ExistingTargetKind,
-    InvalidInput, IoBudget, PreparedAtomic, Written, prepare_atomic,
+    AtomicFailure, AtomicFailureKind, AtomicStage, BaselineError, Cancellation, ExistingTarget,
+    ExistingTargetKind, InvalidInput, IoBudget, PreparedAtomic, PreparedReplacement,
+    ReplacementCleanup, ReplacementDurability, ReplacementReceipt, Written, prepare_atomic,
+    prepare_checked_replace,
 };
 pub use baseline::SourceBaseline;
 pub use decode::{DecodeError, DecodedSource, LineEnding, StorageMetadata, decode};

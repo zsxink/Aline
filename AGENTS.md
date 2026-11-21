@@ -6,7 +6,7 @@
 
 Aline —— Typora 式 Markdown 编辑器（Rust + GPUI，无 WebView），macOS / Windows / Linux 三端。技术路线继承 ElyMark 验证过的方案：**源文本是唯一事实来源 → 解析为携带"绘制文本 ↔ 源码字节"双向映射的展示树 → 按块虚拟化渲染 → 同一时刻最多一个块"打开"编辑 → 提交时对源文本做单区间补丁（单步撤销）→ 未编辑字节原样写回**。
 
-当前状态：**已有八成员 workspace、引擎与无头宿主基础，尚无可用原生界面；M0 出口已由用户 2026-11-02 验收裁决通过（验收豁免；逐包人工复核与 E2/E4/E5/E7 整项等未执行项见验证计划，不得写成已验证）。现行规范见 `docs/README.md`，验证状态见 `docs/v1-validation-plan.md`。调研、原型与历史材料不自动取得规范效力；旧过程报告和维护审计已按用户要求清理，必要决定见 `docs/decisions.md`，不恢复整套目录。**
+当前状态：**已有八成员 workspace、引擎与无头宿主基础，以及 M1 的原生单窗口只读界面（打开/渲染/点击映射/滚动，已在 macOS arm64 取证）。M1 阶段出口已于 2026-11-13 按[决定 §43](docs/decisions.md#43-2026-11-13-m1-阶段出口裁决macos-arm64-范围)在 macOS arm64 范围裁决收口。M2 已推进 `m2-editable-core`；V-08 身份/事务方案的独立审查已通过，M2 双模式编辑、查找替换、保存/自动保存/外改重载/10 秒恢复/临时资源的代码与无头回归已接线，原生文档打开已启用可编辑。2026-11-19 真实窗口已取得组合期拒绝、平台自然提交与查找面板逐项/替换分项证据；M2 当前 10/18 项完成，W4 12/14、W5 6/13。保存→重开→冲突→恢复的真实 UI 操作链、完整中文 IME 矩阵（菜单借焦/失活/取消/候选窗）、代码块真实水平滚动与 Windows/Linux/Intel 仍未取证；W4/W5 生产接线仍受各自验收条件约束，不把方案审查或无头测试写成写盘/IME 已验证。具体实现、失败与未测状态见 OpenSpec tasks、`docs/v1-validation-plan.md` 与本地 `logs/validation/m2-editable-core/2026-11-19-native-run/`。M0 出口已由用户 2026-11-02 验收裁决通过（验收豁免；逐包人工复核与 E2/E4/E5/E7 整项等未执行项见验证计划，不得写成已验证）。V-01～V-09 均未整项通过，已执行与未测的分项见 `docs/v1-validation-plan.md`。现行规范见 `docs/README.md`，验证状态见 `docs/v1-validation-plan.md`。调研、原型与历史材料不自动取得规范效力；旧过程报告和维护审计已按用户要求清理，必要决定见 `docs/decisions.md`，不恢复整套目录。**
 
 ## 文档地图（动手前必读）
 
@@ -18,9 +18,9 @@ Aline —— Typora 式 Markdown 编辑器（Rust + GPUI，无 WebView），macO
 | [docs/engine-design.md](docs/engine-design.md) | 当前引擎契约：保真与补丁、解析、坐标映射（§7）、输入组/IME、有限 HTML（§11）、依赖准入（§18.2）；历史逐章处置见 §18.1 | 理解和实现纯逻辑机制前 |
 | [docs/README.md](docs/README.md) | 当前权威关系、文档状态与阅读顺序 | 动手前先读 |
 | [docs/v1-prd.md](docs/v1-prd.md) | V1 产品范围、非目标、行为与 AC-01～AC-20 | 判断一个功能该不该做 |
-| [docs/v1-validation-plan.md](docs/v1-validation-plan.md) | V-01～V-09 实验、样本与阶段依赖，当前均未执行 | 判断技术和验收是否已有证据 |
+| [docs/v1-validation-plan.md](docs/v1-validation-plan.md) | V-01～V-09 实验、样本与阶段依赖；均未整项通过，已执行与未测的分项以本文档为准 | 判断技术和验收是否已有证据 |
 | [docs/plugin-system.md](docs/plugin-system.md) | V1 内置插件的产品行为、设置归属、启停与架构边界 | 设计或实现插件功能和插件设置前 |
-| [docs/ui-spec.md](docs/ui-spec.md) | 产品界面规范：布局/交互/视觉基线、图片只读 tab、菜单/设置/主题、键盘与中英文验收；§4.1 原型布局对照（实现参照）；UI-01～UI-06 已确认，原问题见 [UI 确认归档](docs/archive/2026-10-29-ui-decisions.md)，V 项仍未执行 | 实现或评审任何面向用户的界面 |
+| [docs/ui-spec.md](docs/ui-spec.md) | 产品界面规范：布局/交互/视觉基线、图片只读 tab、菜单/设置/主题、键盘与中文界面验收（决定 §24：人工/原生取证只做中文，双语 catalog 自动校验保留）；§4.1 原型布局对照（实现参照）；UI-01～UI-06 已确认，原问题见 [UI 确认归档](docs/archive/2026-10-29-ui-decisions.md)，V 项均未整项通过 | 实现或评审任何面向用户的界面 |
 | [docs/theme-package-spec.md](docs/theme-package-spec.md) | 自定义主题包格式、可配置样式字段、继承规则和导入校验 | 设计或实现主题包字段与主题加载前 |
 | [docs/v1-architecture.md](docs/v1-architecture.md) | 实施蓝图：crate 划分、模块骨架、各功能组实现方案、里程碑 M0–M6（历史蓝图处置见 §15） | 实现任何功能前 |
 | [docs/rust-style-guide.md](docs/rust-style-guide.md) | Rust 代码规范：强制/建议/待验证、S/C 规则检查、工具链、坐标分型、错误/panic/unsafe、测试与提交；RS-01～RS-05/ED-01 已确认，原问题见 [确认归档](docs/archive/2026-10-29-rust-style-decisions.md) | 写任何 Rust 代码前 |
@@ -28,6 +28,7 @@ Aline —— Typora 式 Markdown 编辑器（Rust + GPUI，无 WebView），macO
 | [docs/zed-notes.md](docs/zed-notes.md) | Zed逐主题复核与完整历史证据入口；旧“照搬”标签不作当前决定，主线与gpui-pre有API代差 | UI / GPUI 实现时仅作机制线索，须核对锁定源码及 V 验证 |
 | [docs/decisions.md](docs/decisions.md) | 决策时间线 + 常设决定清单（含 2026-10-26 复核裁决） | 争议选型查先例 |
 | [docs/wordcraft-study.md](docs/wordcraft-study.md) | WordCraft（storytold/wordcraft @ 0.11.0）调研：手写 markdown 解析的抗退化工程、性能案例库、保真方法论、敌意输入防御；原文实际 21 条提案，W22～W24 缺项，WC-01～WC-07 已确认A，技术验证仍未执行 | 实现自研扫描 pass、文件层/保存、安全上限、formatter 时对照 |
+| [docs/quiet-md-study.md](docs/quiet-md-study.md) | quiet-md 工程实践调研与 Aline 采纳方案（研究文档，非权威）：fuzz/不变量、性能报告、保存/恢复、IME、语义 token、中文排版、离屏证据；QMD-01 已把方法回写规范，治理 delta 已并入 change `m1-single-window-readonly`，W1～W7 已分别建立独立 change，W4/W5 保留 M2 前置（与 WordCraft W22～W24 不共用编号空间） | 做引擎测试、保存恢复、字体/主题或补强验证证据时对照；实施前按开发流程逐项建档 |
 
 ## 架构铁律（任何代码不得绕过）
 
@@ -59,7 +60,8 @@ cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 
 - **规范是实现约束（不改变上述权威分工）**：按 `openspec/CODE_STANDARDS.md` 和工程治理规格检查职责、依赖、唯一状态所有者及可测试边界；模块行数仅提示复核，不机械拆文件或 crate。相关 change 的 design 必须解释模式解决的问题、最简单可行方案、代价和验证；允许直接使用具体类型/函数，禁止无需求的模式包装。工程规则调整同步本文入口、OpenSpec 与相关现行文档，不能以局部 allow 或 design 绕过铁律。
 - **不写本机绝对路径**：文档、证据与脚本只写仓库内相对路径或 `<repo>`、`<tmp>`、`<home>` 等占位符，不记录本机用户目录、临时目录或仓库外磁盘位置；生成证据的脚本统一经 `scripts/evidence_paths.py` 归一化，读回时用 `resolve_path` 还原。shebang 的解释器行是唯一例外。
-- **提交可复现资产，运行产物留本地**：按 [开发流程 §5](docs/development-process.md#5-仓库产物与提交边界)保留代码、单元/集成测试、独立金样、最小失败输入和可复跑脚本；命令记录、stdout/stderr、临时夹具及 Agent 逐轮 report/review 等写 `logs/validation/...`，不因是 `.md` 就提交。换会话只在 `tmp/<任务>-resume.md` 维护一份不追踪的当前交接；必要决定回写规范，平台/手工验证摘要回填验证计划。旧过程材料按需查 Git，不重建报告目录或改写历史。
+- **W1 隔离验证例外（2026-11-09）**：用户批准决定 §27 的精确 `gpui_macos=[font-kit,test-support]` 测试图，仅限 logs 内 macOS arm64 spike；生产清单/锁/features 不变。精确图、五条分支、72 个新增 metadata 包及 9 包变化以固定批准资产核对，漂移重新审计，不作全包或许可证泛化许可。`option-ext@0.2.0` 的已批准精确路径可在 macOS tree 选中；`dwrote/libloading` 仍不得被 desktop tree 选中。
+- **提交可复现资产，运行产物留本地**：按 [开发流程 §5](docs/development-process.md#5-仓库产物与提交边界)保留代码、单元/集成测试、独立金样、最小失败输入和可复跑脚本；命令记录、stdout/stderr、临时夹具及 Agent 逐轮 report/review 等写 `logs/validation/...`，不因是 `.md` 就提交。每类通用门禁最多保留最近一次成功运行，构建缓存不得写入 `logs/validation/`，旧运行由 `scripts/prune_validation_logs.py` 默认 dry-run 回收；被文档引用及当前任务证据保留。换会话只在 `tmp/<任务>-resume.md` 维护一份不追踪的当前交接；必要决定回写规范，平台/手工验证摘要回填验证计划。旧过程材料按需查 Git，不重建报告目录或改写历史。
 - **按里程碑推进**（v1-architecture 第 13 章）：M0 引擎地基 → M1 单文档只读 → M2 可编辑核心（可日用）→ M3 命令与表格 → M4 插件与主题 → M5 应用壳 → M6 收尾。阶段可形成内部预览，验收按三平台分别取证；先 macOS 后 Windows/Linux 验证，正式 V1 三平台同发（PRD §9、V-01）。
 - 新增依赖先对照 engine-design §18.2 和 v1-architecture §3.2 的准入规则，同类功能不得引入第二个库。2026-11-02 起 `scripts/check_engineering.py` 默认执行逐依赖准入检查（用途分组/选包/许可证），传 `--ledger <path>` 时另存逐包账本，失败关闭；实际执行与限制见架构 §3.2 R14 记录，不把策略核对写成法律意见或跨平台构建证明。
 - 实现期对照：ElyMark 完整历史关键文件索引已保全于 `docs/archive/migration-evidence/engine-design.md`，当前入口见 engine-design §18.3；Zed 克隆放在仓库外的参考目录，不随本仓库分发（gpui 新架构与锁定的 gpui-pre 存在 API 代差，机制线索参考 docs/zed-notes.md §0及其完整历史证据，具体 API 及性能结论须重新取证）。Aline 全部自写实现，外部源码只作对照参考。
