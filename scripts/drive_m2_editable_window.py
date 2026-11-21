@@ -125,6 +125,16 @@ class WindowDriver:
 
     def snapshot(self):
         snapshot = self.call(["get-app-state"])["snapshot"]
+        # Orca 在树未变化时只返回 "No change…" 增量说明；沿用上次完整树，
+        # 否则按钮/行查找会把「无变化」误判为「元素消失」（run-1 失败轮）。
+        tree = snapshot.get("treeText", "")
+        if "No change in the accessibility tree" in tree:
+            cached = getattr(self, "_last_full_tree", None)
+            if cached is not None:
+                snapshot = dict(snapshot)
+                snapshot["treeText"] = cached
+        elif tree:
+            self._last_full_tree = tree
         window = snapshot.get("window") or {}
         if "x" in window and "y" in window:
             self._window_origin = (float(window["x"]), float(window["y"]))
