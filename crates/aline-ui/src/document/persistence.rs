@@ -17,7 +17,7 @@ use aline_source::{
     StorageSnapshot, decode, encode,
 };
 
-use super::{CurrentSnapshot, DocumentId, WaitHandle};
+use super::{CurrentSnapshot, DocError, DocumentId, WaitHandle};
 
 mod execute;
 mod external;
@@ -232,6 +232,8 @@ pub(super) struct FrozenWrite {
     logical: Option<TextSnapshot>,
     mode: WriteMode,
     cancellation: Cancellation,
+    /// 已发布但未关联的侧目标；重试覆盖前必须逐字节复验该事实。
+    association_expected: Option<SourceBaseline>,
 }
 
 /// 编码由冻结工作创建，随后用其 bytes 核对实际发布回执。
@@ -470,6 +472,14 @@ pub(crate) struct WriteCompletion {
     outcome: WriteOutcome,
 }
 
+impl WriteCompletion {
+    /// 文件是否已越过不可逆发布点（含基线不可确认的部分发布）。
+    /// 会话据此决定引用候选是否可被本回执消费；未发布结算必须保留候选。
+    pub(crate) fn is_published(&self) -> bool {
+        !matches!(self.outcome, WriteOutcome::NotPublished(_))
+    }
+}
+
 /// 每个完成项连同实际冻结输入交给会话完成后续结算。拒绝采用不吞掉已发布事实。
 pub(super) struct WriteSettlement {
     /// 只由测试校验结算归属。
@@ -480,6 +490,8 @@ pub(super) struct WriteSettlement {
     pub(super) snapshot: CurrentSnapshot,
     pub(super) path: PathBuf,
     pub(super) adopted: bool,
+    /// 文件已经发布，但当前核心拒绝引用/资源结算，仍保持旧目标关联。
+    pub(super) association_deferred: bool,
     /// 关联成功时的目标路径与基线；会话据此更新展示路径。
     pub(super) association: Option<(PathBuf, SourceBaseline)>,
     pub(super) outcome: WriteOutcome,
@@ -537,6 +549,8 @@ pub(super) struct PersistenceCoordinator {
     active: Option<ActiveWrite>,
     status: SaveStatus,
     closing: bool,
+    /// 最近的侧目标发布事实；不作为当前文档的保存基线或目标关联。
+    partial_association: Option<(PathBuf, SourceBaseline)>,
 }
 
 impl PersistenceCoordinator {
@@ -566,6 +580,7 @@ impl PersistenceCoordinator {
             active: None,
             status: SaveStatus::Idle,
             closing: false,
+            partial_association: None,
         })
     }
 
@@ -597,6 +612,7 @@ impl PersistenceCoordinator {
             active: None,
             status: SaveStatus::Idle,
             closing: false,
+            partial_association: None,
         })
     }
 
@@ -655,6 +671,11 @@ impl PersistenceCoordinator {
                 overwrite: true,
             },
         };
+        let association_expected = self
+            .partial_association
+            .as_ref()
+            .filter(|(path, _)| path == &queued.path)
+            .map(|(_, baseline)| baseline.clone());
         Ok(FrozenWrite {
             owner: self.owner.clone(),
             operation: queued.operation,
@@ -665,6 +686,7 @@ impl PersistenceCoordinator {
             logical: self.target.saved.logical.clone(),
             mode,
             cancellation,
+            association_expected,
         })
     }
 
@@ -725,9 +747,92 @@ impl PersistenceCoordinator {
             snapshot: job.snapshot,
             path: job.path,
             adopted,
+            association_deferred: false,
             association,
             outcome,
         }
+    }
+
+    /// 关联写盘只能在文档候选发布成功后挂接目标；拒绝时仍登记真实侧目标发布。
+    pub(super) fn reconcile_association(
+        &mut self,
+        completion: WriteCompletion,
+        publish_core: impl FnOnce() -> Result<(), DocError>,
+    ) -> WriteSettlement {
+        let valid = self.is_current_association(&completion);
+        let job = &completion.job;
+        let next_generation_valid = match job.mode {
+            WriteMode::Associate {
+                kind: WriteKind::SaveAs,
+                ..
+            } => self.target.generation.0.checked_add(1).is_some(),
+            _ => true,
+        };
+        if valid
+            && let WriteOutcome::Published { storage, .. } = &completion.outcome
+            && (!next_generation_valid || publish_core().is_err())
+        {
+            self.active = None;
+            self.status = SaveStatus::PublishedUncertain;
+            self.partial_association = Some((job.path.clone(), storage.clone()));
+            return WriteSettlement {
+                operation: job.operation,
+                snapshot: job.snapshot.clone(),
+                path: job.path.clone(),
+                adopted: true,
+                association_deferred: true,
+                association: None,
+                outcome: completion.outcome,
+            };
+        }
+        let settlement = self.reconcile(completion);
+        // 防御不变量：任何「已发布但未采纳」的当前关联回执都必须登记侧目标
+        // 写盘事实，重试覆盖前逐字节复验；正常代次耗尽已走上面的 deferred 分支。
+        if valid
+            && !settlement.adopted
+            && let WriteOutcome::Published { storage, .. } = &settlement.outcome
+        {
+            self.status = SaveStatus::PublishedUncertain;
+            self.partial_association = Some((settlement.path.clone(), storage.clone()));
+        }
+        settlement
+    }
+
+    /// 候选只可由当前关联写盘回执消费；旧回执不得取走在途的新候选。
+    pub(super) fn is_current_association(&self, completion: &WriteCompletion) -> bool {
+        let job = &completion.job;
+        Arc::ptr_eq(&job.owner, &self.owner)
+            && job.snapshot.document_id() == &self.document
+            && self
+                .active
+                .as_ref()
+                .is_some_and(|active| active.operation == job.operation)
+            && job.generation == self.target.generation
+            && job.path.is_absolute()
+            && matches!(job.mode, WriteMode::Associate { .. })
+    }
+
+    /// 文档所有者提供真实受检候选；组合等待已在关联流程先行处理。
+    pub(super) fn queue_association_snapshot(
+        &mut self,
+        snapshot: CurrentSnapshot,
+        kind: WriteKind,
+        path: PathBuf,
+    ) -> Result<OperationId, SaveError> {
+        if snapshot.document_id() != &self.document || !path.is_absolute() {
+            return Err(SaveError::ForeignDocument);
+        }
+        let operation = self.next_operation()?;
+        if self
+            .partial_association
+            .as_ref()
+            .is_some_and(|(partial, _)| partial == &path)
+        {
+            // 此处只授予重试资格；实际覆盖还要核对侧目标的完整存储 bytes。
+            self.status = SaveStatus::Idle;
+        }
+        self.enqueue(operation, snapshot, kind, path);
+        Ok(operation)
     }
 
     fn apply_outcome(&mut self, job: &FrozenWrite, outcome: &WriteOutcome) -> bool {
@@ -745,7 +850,12 @@ impl PersistenceCoordinator {
                     }
                     WriteMode::Associate { kind, .. } => {
                         if self
-                            .associate_new_target_inner(*kind, job.path.clone(), storage.clone())
+                            .associate_new_target_inner(
+                                *kind,
+                                job.path.clone(),
+                                storage.clone(),
+                                job.snapshot.text().clone(),
+                            )
                             .is_err()
                         {
                             return false;
@@ -780,6 +890,7 @@ impl PersistenceCoordinator {
         kind: WriteKind,
         path: PathBuf,
         baseline: SourceBaseline,
+        logical: TextSnapshot,
     ) -> Result<(), SaveError> {
         if !path.is_absolute() {
             return Err(SaveError::InvalidPath);
@@ -798,12 +909,13 @@ impl PersistenceCoordinator {
             path,
             generation,
             saved: SavedBaseline {
-                logical: None,
+                logical: Some(logical),
                 storage: baseline,
             },
             creating: false,
         };
         self.status = SaveStatus::Idle;
+        self.partial_association = None;
         Ok(())
     }
 

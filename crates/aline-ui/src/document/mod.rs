@@ -82,7 +82,7 @@ pub(crate) use resources::{
 /// 4.2a 会话已消费的资源面；从这里导入避免会话与资源模块直接耦合。
 pub(crate) use resources::{
     ImageSettings, MigrationCompletion, MigrationError, ResourceCatalog, ResourceCleanupJob,
-    ResourceError, ResourceMapping, ResourceMigrationJob, TempRoot, locator_spans,
+    ResourceError, ResourceMigrationJob, TempRoot, locator_spans,
 };
 
 pub use mode::{EditorMode, ModeSwitchOutcome};

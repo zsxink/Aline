@@ -12,6 +12,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use aline_markdown::{CancelToken, ParseBudget, ParseConfig, Parsed};
 use aline_source::{AtomicFailureKind, IoBudget, SourceBaseline, StorageBudget};
 
+use super::doc_core::PreparedMigration;
 use super::persistence::{
     CloseBlocker, CloseStatus, ExternalApplyResult, ExternalCheckCommand, ExternalCheckCompletion,
     ExternalCheckIntent, ExternalCheckJob, ExternalCheckRejection, ExternalConflictView,
@@ -41,7 +42,7 @@ use super::persistence::WriteKind;
 use super::recovery::MAX_RESOURCE_COUNT;
 use super::{
     ImageSettings, MigrationCompletion, MigrationError, ResourceCatalog, ResourceCleanupJob,
-    ResourceError, ResourceMapping, ResourceMigrationJob, TempRoot, locator_spans,
+    ResourceError, ResourceMigration, ResourceMigrationJob, TempRoot, locator_spans,
 };
 mod autosave;
 mod read;
@@ -199,7 +200,6 @@ pub(crate) enum AssociationCommand {
     /// 载荷保存命令由宿主执行；测试只匹配变体。
     #[allow(dead_code)]
     Save(SaveCommand),
-    Cancelled,
     Rejected(SaveRejection),
 }
 
@@ -246,9 +246,8 @@ struct AssociationState {
 struct PendingMigration {
     target: PathBuf,
     kind: WriteKind,
-    /// 上一次引用映射；重试直接复用已重写文本，不再重新扫描。
-    #[allow(dead_code)]
-    mappings: Vec<ResourceMapping>,
+    migration: Option<ResourceMigration>,
+    prepared: Option<PreparedMigration>,
 }
 
 /// 已完整构造且可阅读的单文档；存储基线与 DocCore 共同保留读取事实。
@@ -285,7 +284,7 @@ pub struct ReadonlyDocument {
     image_settings: ImageSettings,
     /// 首次保存/另存为的资源迁移与写盘关联。
     association: Option<AssociationState>,
-    /// 已完成的引用迁移；写入失败时保留，供同一目标重试。
+    /// 已复制资源及尚未发布的引用候选；失败时保留目标与材料供受检重试。
     pending_migration: Option<PendingMigration>,
     /// 关联操作序号；迟到完成项按此丢弃。
     #[cfg_attr(not(test), allow(dead_code))]
@@ -508,46 +507,40 @@ impl ReadonlyDocument {
             Some(pending) => (pending.target.clone(), pending.kind),
             None => return Err(SaveRejection::NoTarget),
         };
-        let snapshot = self
-            .current_snapshot()
-            .map_err(|_| SaveRejection::Internal)?;
-        let source = snapshot
-            .full_text(self.limits.text())
-            .map_err(|_| SaveRejection::Internal)?;
-        let has_locator = self.resources.as_ref().is_some_and(|catalog| {
-            catalog
-                .entries()
-                .iter()
-                .any(|entry| source.contains(&entry.locator))
-        });
         let operation = self.next_association;
         self.next_association = self.next_association.wrapping_add(1);
         let cancellation = Cancellation::new();
-        if has_locator {
-            let job =
-                self.freeze_migration(operation, kind, target.clone(), cancellation.clone())?;
-            self.association = Some(AssociationState {
-                operation,
-                kind,
-                target,
-                cancellation,
-                phase: AssociationPhase::Copying,
-                wait: None,
-                save_operation: None,
-            });
-            return Ok(AssociationStep::Run(job));
-        }
-        let (job, save_operation) = self.enqueue_association_write(kind, target.clone())?;
+        let previous = self
+            .pending_migration
+            .as_mut()
+            .and_then(|pending| pending.migration.take());
+        let job = if previous.is_none() {
+            Some(self.freeze_migration(operation, kind, target.clone(), cancellation.clone())?)
+        } else {
+            None
+        };
         self.association = Some(AssociationState {
             operation,
             kind,
             target,
             cancellation,
-            phase: AssociationPhase::Writing,
+            phase: AssociationPhase::Copying,
             wait: None,
-            save_operation: Some(save_operation),
+            save_operation: None,
         });
-        Ok(AssociationStep::Write(job))
+        if let Some(migration) = previous {
+            Ok(self.association_prepared(
+                MigrationCompletion {
+                    document: self.core.document_id().clone(),
+                    operation,
+                    result: Ok(migration),
+                    cancelled: false,
+                },
+                0,
+            ))
+        } else {
+            Ok(AssociationStep::Run(job.ok_or(SaveRejection::Internal)?))
+        }
     }
 
     /// 关联等待是否仍属于当前状态；迟到句柄不得结算新关联。
@@ -557,7 +550,7 @@ impl ReadonlyDocument {
         })
     }
 
-    /// 平台自然结束关联等待：确认后进入复制阶段，取消则清理状态。
+    /// 平台自然确认或取消组合后都继续保存意图；只有用户取消等待才撤销保存。
     pub(crate) fn finish_association_wait(
         &mut self,
         handle: WaitHandle,
@@ -580,10 +573,6 @@ impl ReadonlyDocument {
             .is_err()
         {
             return AssociationCommand::Rejected(SaveRejection::Internal);
-        }
-        if outcome == PublicationOutcome::PlatformCancelled {
-            self.association = None;
-            return AssociationCommand::Cancelled;
         }
         let job = match self.freeze_migration(operation, kind, target, cancellation) {
             Ok(job) => job,
@@ -713,6 +702,10 @@ impl ReadonlyDocument {
         } else {
             None
         };
+        let history = self
+            .core
+            .resource_history()
+            .map_err(|_| SaveRejection::Internal)?;
         Ok(ResourceMigrationJob::new(
             self.core.document_id().clone(),
             operation,
@@ -725,7 +718,8 @@ impl ReadonlyDocument {
             temp_directory,
             self.limits.text(),
             cancellation,
-        ))
+        )
+        .with_history(history))
     }
 
     /// 迁移完成后按关联目标入队并生成后台写盘工作。
@@ -734,6 +728,7 @@ impl ReadonlyDocument {
         &mut self,
         kind: WriteKind,
         target: PathBuf,
+        snapshot: super::CurrentSnapshot,
     ) -> Result<(SaveJob, OperationId), SaveRejection> {
         if self.persistence.is_none() {
             let coordinator = PersistenceCoordinator::new_untitled(
@@ -745,36 +740,27 @@ impl ReadonlyDocument {
             self.persistence = Some(coordinator);
         }
         let staging = save_staging_candidate(&target)?;
-        let request = {
+        let operation = {
             let coordinator = self.persistence.as_mut().ok_or(SaveRejection::Internal)?;
-            match kind {
-                WriteKind::SaveAs => {
-                    coordinator.request_save_as(&mut self.core, self.limits.text(), target.clone())
-                }
-                WriteKind::Create | WriteKind::Existing => {
-                    coordinator.request_save(&mut self.core, self.limits.text())
-                }
-            }
-        };
-        let operation = match request {
-            Ok(SaveRequest::Queued(operation)) => operation,
-            Ok(SaveRequest::Waiting(_)) => return Err(SaveRejection::Busy),
-            Err(error) => return Err(save_request_rejection(&error)),
+            coordinator
+                .queue_association_snapshot(snapshot, kind, target.clone())
+                .map_err(|_| SaveRejection::Internal)?
         };
         let job = self.start_queued_save(operation, staging)?;
         Ok((job, operation))
     }
 
-    /// 失败后保留同一目标/类型与本次引用映射，供 `retry_association` 直接重试。
+    /// 复制或候选准备失败后保留同一目标/类型，重试时重新冻结当前资源清单。
     ///
     /// 仅在关联仍存在时记录，避免覆盖此前保留的待重试目标；回滚语义不变：
     /// 只撤回本次新建资产，文档字节、目标与用户模式均不改动。
-    fn retain_pending_migration(&mut self, mappings: Vec<ResourceMapping>) {
+    fn retain_pending_migration(&mut self) {
         if let Some(state) = self.association.as_ref() {
             self.pending_migration = Some(PendingMigration {
                 target: state.target.clone(),
                 kind: state.kind,
-                mappings,
+                migration: None,
+                prepared: None,
             });
         }
     }
@@ -802,7 +788,7 @@ impl ReadonlyDocument {
             Err(error) => {
                 if error == MigrationError::StaleResourceSet {
                     // 资源集已变化：保留同一目标，重试时按当前目录重新迁移。
-                    self.retain_pending_migration(Vec::new());
+                    self.retain_pending_migration();
                 }
                 self.association = None;
                 return AssociationStep::Settled(if error == MigrationError::StaleResourceSet {
@@ -816,7 +802,7 @@ impl ReadonlyDocument {
             Ok(identity) => identity,
             Err(_) => {
                 migration.rollback_assets();
-                self.retain_pending_migration(migration.mappings.clone());
+                self.retain_pending_migration();
                 self.association = None;
                 return AssociationStep::Settled(AssociationOutcome::NeedsRetry);
             }
@@ -825,7 +811,7 @@ impl ReadonlyDocument {
             Ok(snapshot) => snapshot,
             Err(_) => {
                 migration.rollback_assets();
-                self.retain_pending_migration(migration.mappings.clone());
+                self.retain_pending_migration();
                 self.association = None;
                 return AssociationStep::Settled(AssociationOutcome::NeedsRetry);
             }
@@ -834,7 +820,7 @@ impl ReadonlyDocument {
             Ok(source) => source,
             Err(_) => {
                 migration.rollback_assets();
-                self.retain_pending_migration(migration.mappings.clone());
+                self.retain_pending_migration();
                 self.association = None;
                 return AssociationStep::Settled(AssociationOutcome::NeedsRetry);
             }
@@ -846,13 +832,29 @@ impl ReadonlyDocument {
                     && !mappings.iter().any(|mapping| mapping.from == entry.locator)
             })
         });
-        if new_locator {
+        let relative_covered = self
+            .path
+            .parent()
+            .filter(|_| self.path.is_absolute())
+            .is_none_or(|directory| {
+                self.core.resource_history().is_ok_and(|history| {
+                    migration.covers_relative_resources(
+                        &source,
+                        &history,
+                        directory,
+                        &self.image_settings,
+                        self.limits.text(),
+                    )
+                })
+            });
+        if new_locator || !relative_covered || !migration.assets_unchanged() {
             migration.rollback_assets();
-            self.retain_pending_migration(migration.mappings.clone());
+            self.retain_pending_migration();
             self.association = None;
             return AssociationStep::Settled(AssociationOutcome::NeedsRetry);
         }
         let spans = locator_spans(&source, mappings);
+        let mut prepared = None;
         if !spans.is_empty() {
             let edits = spans
                 .iter()
@@ -879,7 +881,7 @@ impl ReadonlyDocument {
                         }
                         Err(_) => {
                             migration.rollback_assets();
-                            self.retain_pending_migration(migration.mappings.clone());
+                            self.retain_pending_migration();
                             self.association = None;
                             return AssociationStep::Settled(AssociationOutcome::NeedsRetry);
                         }
@@ -908,21 +910,23 @@ impl ReadonlyDocument {
                 budget,
             ) {
                 Ok(PlanOutcome::Changed(plan)) => {
-                    if self
+                    match self
                         .core
-                        .apply_migration_change(&identity, parsed, &plan, now_millis)
-                        .is_err()
+                        .prepare_migration_change(&identity, parsed, &plan, now_millis)
                     {
-                        migration.rollback_assets();
-                        self.retain_pending_migration(migration.mappings.clone());
-                        self.association = None;
-                        return AssociationStep::Settled(AssociationOutcome::NeedsRetry);
+                        Ok(candidate) => prepared = Some(candidate),
+                        Err(_) => {
+                            migration.rollback_assets();
+                            self.retain_pending_migration();
+                            self.association = None;
+                            return AssociationStep::Settled(AssociationOutcome::NeedsRetry);
+                        }
                     }
                 }
                 Ok(PlanOutcome::Unchanged(_)) => {}
                 Err(_) => {
                     migration.rollback_assets();
-                    self.retain_pending_migration(migration.mappings.clone());
+                    self.retain_pending_migration();
                     self.association = None;
                     return AssociationStep::Settled(AssociationOutcome::NeedsRetry);
                 }
@@ -932,7 +936,11 @@ impl ReadonlyDocument {
             Some(state) => (state.target.clone(), state.kind),
             None => return AssociationStep::Settled(AssociationOutcome::Stale),
         };
-        match self.enqueue_association_write(kind, target.clone()) {
+        let write_snapshot = prepared
+            .as_ref()
+            .map_or(&snapshot, PreparedMigration::snapshot)
+            .clone();
+        match self.enqueue_association_write(kind, target.clone(), write_snapshot) {
             Ok((job, operation)) => {
                 if let Some(state) = self.association.as_mut() {
                     state.phase = AssociationPhase::Writing;
@@ -941,7 +949,8 @@ impl ReadonlyDocument {
                 self.pending_migration = Some(PendingMigration {
                     target,
                     kind,
-                    mappings: migration.mappings,
+                    migration: Some(migration),
+                    prepared,
                 });
                 AssociationStep::Write(job)
             }
@@ -1051,12 +1060,81 @@ impl ReadonlyDocument {
         if !self.editable {
             return Err(SaveRequestError::Input(DocError::ReadOnly));
         }
-        let coordinator = self
+        let current_association = self
             .persistence
-            .as_mut()
-            .ok_or(SaveRequestError::Queue(SaveError::InvalidPath))?;
-        let settlement = coordinator.reconcile(completion);
+            .as_ref()
+            .is_some_and(|coordinator| coordinator.is_current_association(&completion));
+        // 候选只能被已发布的回执消费；冲突/失败/取消保留候选供同一目标重试。
+        let published_receipt = completion.is_published();
+        let settlement = if self.pending_migration.is_some() && current_association {
+            let association_alive = self.association.is_some();
+            let pending = self
+                .pending_migration
+                .as_ref()
+                .ok_or(SaveRequestError::Queue(SaveError::InvalidPath))?;
+            let candidate = pending.migration.as_ref();
+            let source = self
+                .core
+                .current_snapshot(self.limits.text())
+                .ok()
+                .and_then(|snapshot| snapshot.full_text(self.limits.text()).ok());
+            let resources_covered = source.as_ref().is_some_and(|source| {
+                candidate.is_some_and(|migration| {
+                    migration.assets_unchanged()
+                        && self.resources.as_ref().is_none_or(|catalog| {
+                            catalog.entries().iter().all(|entry| {
+                                !source.contains(&entry.locator)
+                                    || migration
+                                        .mappings
+                                        .iter()
+                                        .any(|mapping| mapping.from == entry.locator)
+                            })
+                        })
+                        && self
+                            .path
+                            .parent()
+                            .filter(|_| self.path.is_absolute())
+                            .is_none_or(|directory| {
+                                self.core.resource_history().is_ok_and(|history| {
+                                    migration.covers_relative_resources(
+                                        source,
+                                        &history,
+                                        directory,
+                                        &self.image_settings,
+                                        self.limits.text(),
+                                    )
+                                })
+                            })
+                })
+            });
+            let coordinator = self
+                .persistence
+                .as_mut()
+                .ok_or(SaveRequestError::Queue(SaveError::InvalidPath))?;
+            let pending_slot = &mut self.pending_migration;
+            let core = &mut self.core;
+            coordinator.reconcile_association(completion, move || {
+                if !association_alive || !resources_covered || core.composition().is_some() {
+                    return Err(DocError::StaleResult);
+                }
+                // 只有已发布回执才消费候选；未发布结算保留候选供重试。
+                if published_receipt
+                    && let Some(prepared) = pending_slot
+                        .as_mut()
+                        .and_then(|pending| pending.prepared.take())
+                {
+                    core.publish_migration_change(prepared)?;
+                }
+                Ok(())
+            })
+        } else {
+            self.persistence
+                .as_mut()
+                .ok_or(SaveRequestError::Queue(SaveError::InvalidPath))?
+                .reconcile(completion)
+        };
         if settlement.adopted
+            && !settlement.association_deferred
             && let WriteOutcome::Published { storage, .. } = &settlement.outcome
         {
             // 成功发布即按实际写出字节建立磁盘基线；即使目录同步未确认
@@ -1070,6 +1148,19 @@ impl ReadonlyDocument {
             self.reload_mark = None;
         }
         if settlement.adopted {
+            if !matches!(settlement.outcome, WriteOutcome::NotPublished(_))
+                && let Some(migration) = self
+                    .pending_migration
+                    .as_mut()
+                    .filter(|pending| pending.target == settlement.path)
+                    .and_then(|pending| pending.migration.as_mut())
+            {
+                migration.protect_published_assets();
+            }
+            if settlement.association_deferred {
+                self.association = None;
+                return Ok(settlement);
+            }
             if let Some((path, baseline)) = settlement.association.clone() {
                 // 首次保存/另存为已发布：展示路径与实际基线一起改为新目标。
                 self.path = path;
@@ -1087,16 +1178,9 @@ impl ReadonlyDocument {
                     | WriteOutcome::PublishedReceiptMismatch(_)
                     | WriteOutcome::PublishedBaselineFailed { .. }
                     | WriteOutcome::PublishedNewBaselineFailed { .. } => {
-                        // 已发布但基线不可确认：路径随实际目标更新，保留关闭 guard 的
-                        // PublishedUncertain 判定；没有可采纳的基线可替换。
-                        self.path = settlement.path.clone();
-                        self.external = None;
-                        self.external_pause = false;
-                        self.reload_pause = false;
-                        self.reload_mark = None;
+                        // 实际侧目标已发布，但没有可确认基线或可提交引用：保持旧关联，
+                        // 保留重试材料与 PublishedUncertain 关闭 guard。
                         self.association = None;
-                        self.pending_migration = None;
-                        self.attach_deferred_recovery();
                     }
                     WriteOutcome::NotPublished(_) => {
                         // 写入失败/冲突：保留已完成的迁移映射供同一目标重试。
@@ -1126,6 +1210,14 @@ impl ReadonlyDocument {
         let pending = self.recovery_pending_arm;
         self.recovery_pending_arm = false;
         pending
+    }
+
+    /// 待重试迁移是否仍保留引用候选；只读，供结算契约测试核对候选消费时机。
+    #[cfg(test)]
+    pub(crate) fn pending_migration_prepared(&self) -> bool {
+        self.pending_migration
+            .as_ref()
+            .is_some_and(|pending| pending.prepared.is_some())
     }
 
     /// 关联等待/复制/写盘或待重试迁移是否活动。
@@ -1737,6 +1829,9 @@ impl ReadonlyDocument {
         if !settlement.adopted {
             // 迟到或外来的完成项不得覆盖当前状态或反馈。
             return SaveResult::Stale;
+        }
+        if settlement.association_deferred {
+            return SaveResult::SavedUncertain;
         }
         // Minor 1 记录：取消完成项在 `apply_outcome` 中一律返回未采纳，因此会先归
         // `Stale`；`SaveResult::Cancelled` 目前经 adopted 路径不可达。用户主动取消

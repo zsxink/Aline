@@ -2447,7 +2447,6 @@ fn association_copy(
         AssociationCommand::Run(job) => Ok(job.run()),
         AssociationCommand::Save(_) => Err("该目标应进入关联迁移而非直接保存".into()),
         AssociationCommand::Wait(_) => Err("无组合输入时应直接复制".into()),
-        AssociationCommand::Cancelled => Err("关联不应在开始前取消".into()),
         AssociationCommand::Rejected(rejection) => Err(format!("关联被拒: {rejection:?}").into()),
     }
 }
@@ -2523,6 +2522,83 @@ fn untitled_first_save_associates_path_only_after_write() -> TestResult {
     assert_eq!(document.persistence_is_creating(), Some(false));
     let snapshot = document.current_snapshot()?;
     assert_eq!(document.persistence_is_dirty(&snapshot), Some(false));
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn association_platform_cancelled_composition_continues_original_save_intent() -> TestResult {
+    for kind in [WriteKind::Create, WriteKind::SaveAs] {
+        let directory = TempSaveDir::create("aline-assoc-ime-cancel")?;
+        let original = directory.0.join("original.md");
+        let target = directory.0.join("out/notes.md");
+        std::fs::create_dir_all(target.parent().ok_or("parent")?)?;
+        let mut session = if kind == WriteKind::Create {
+            untitled_editable_session(None)?
+        } else {
+            std::fs::write(&original, b"x\n")?;
+            editable_absolute_session(&original)?
+        };
+        let document = session.document_mut().ok_or("document")?;
+        document
+            .edit_core()?
+            .open_block(0..2, SelectionSpec::new(1, 1))?;
+        document.edit_core()?.composition_start("ni", 0)?;
+        let AssociationCommand::Wait(handle) =
+            document.begin_association_save(kind, target.clone(), 0)
+        else {
+            return Err("组合期关联应等待".into());
+        };
+        document.edit_core()?.composition_cancel(1)?;
+        let AssociationCommand::Run(copy) =
+            document.finish_association_wait(handle, PublicationOutcome::PlatformCancelled, 2)
+        else {
+            return Err("平台取消组合后必须继续原保存意图".into());
+        };
+        let job = association_write_job(&mut session, copy.run())?;
+        assert!(run_association_write(&mut session, job)?.adopted);
+        assert_eq!(std::fs::read(&target)?, b"x\n");
+        assert_eq!(session.document().ok_or("document")?.core().undo_depth(), 0);
+        assert_eq!(session.document().ok_or("document")?.path(), target);
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn create_cancelled_after_staging_sync_never_publishes_target() -> TestResult {
+    let directory = TempSaveDir::create("aline-create-staging-cancel")?;
+    let target = directory.0.join("notes.md");
+    let (mut core, _) = fixture(b"x\n")?;
+    let mut state = PersistenceCoordinator::new_untitled(
+        core.document_id().clone(),
+        target.clone(),
+        baseline(b"x\n", 0)?,
+    )
+    .map_err(|error| format!("{error:?}"))?;
+    queue(&mut state, &mut core)?;
+    let frozen = start(&mut state)?;
+    let cancellation = frozen.cancellation().clone();
+    let mut staged_path = None;
+    let completion = super::execute::run_create_using(frozen, TEXT, STORAGE, |parent, bytes| {
+        let staged = aline_source::fs::create_staging(parent, ".aline-test-cancel", bytes)?;
+        staged_path = Some(staged.path().to_path_buf());
+        cancellation.cancel();
+        Ok(staged)
+    });
+    assert!(matches!(
+        completion.outcome,
+        WriteOutcome::NotPublished(WriteStop::Cancelled)
+    ));
+    assert!(!target.exists(), "同步 staging 后取消不得发布用户目标");
+    assert!(
+        !staged_path.ok_or("实际staging路径")?.exists(),
+        "未发布staging应按身份清理"
+    );
+    let settlement = state.reconcile(completion);
+    assert!(!settlement.adopted);
+    assert_eq!(core.undo_depth(), 0);
+    assert_eq!(core.buffer_text()?, "x\n");
     Ok(())
 }
 
@@ -2627,12 +2703,27 @@ fn first_save_write_failure_keeps_pending_migration_for_retry() -> TestResult {
     let target = directory.0.join("out/notes.md");
     let out = target.parent().ok_or("target parent")?;
     std::fs::create_dir_all(out)?;
-    let mut session = untitled_editable_session(Some(root))?;
+    let mut session = untitled_editable_session(Some(root.clone()))?;
     let locator = stage_image(&mut session, "pic.png", b"png")?;
     append_text(&mut session, &locator)?;
+    let before = current_text(&mut session)?;
+    let (version, selection, undo, redo) = {
+        let core = session.document().ok_or("应存在可编辑文档")?.core();
+        (
+            core.version(),
+            core.current_selection(),
+            core.undo_depth(),
+            core.redo_depth(),
+        )
+    };
 
     let completion = association_copy(&mut session, WriteKind::Create, &target)?;
     let job = association_write_job(&mut session, completion)?;
+    assert_eq!(
+        current_text(&mut session)?,
+        before,
+        "写盘前引用候选不得发布"
+    );
     // 迁移已把资产复制到目标目录；把目录设为只读，令真正写盘失败。
     std::fs::set_permissions(out, std::fs::Permissions::from_mode(0o500))?;
     let completion = job.run();
@@ -2649,6 +2740,68 @@ fn first_save_write_failure_keeps_pending_migration_for_retry() -> TestResult {
         let document = session.document_mut().ok_or("应存在可编辑文档")?;
         assert_eq!(document.path(), Path::new("untitled.md"));
         assert_eq!(document.close_status(), CloseStatus::NeedsDecision);
+        let core = document.core();
+        assert_eq!(core.version(), version, "写盘失败不得提交引用或推进版本");
+        assert_eq!(core.current_selection(), selection);
+        assert_eq!((core.undo_depth(), core.redo_depth()), (undo, redo));
+    }
+    assert_eq!(
+        current_text(&mut session)?,
+        before,
+        "失败后临时 locator 必须仍可恢复"
+    );
+    {
+        use crate::document::recovery::{
+            RecoveryConfig, RecoveryResourceSource, RecoveryRoot, RecoveryStart, RecoveryStore,
+        };
+        use crate::document::resources::TempResourceSource;
+        use std::sync::Arc;
+
+        let recovery_dir = directory.0.join("recovery");
+        std::fs::create_dir(&recovery_dir)?;
+        std::fs::set_permissions(&recovery_dir, std::fs::Permissions::from_mode(0o700))?;
+        let store = RecoveryStore::open(
+            RecoveryRoot::open(&recovery_dir).map_err(|error| format!("{error:?}"))?,
+        )
+        .map_err(|error| format!("{error:?}"))?;
+        let source = TempResourceSource::new(root.clone());
+        assert_eq!(
+            source
+                .read(&locator, 4096)
+                .map_err(|error| format!("{error:?}"))?,
+            b"png"
+        );
+        let document = session.document_mut().ok_or("document")?;
+        document.attach_recovery(RecoveryConfig {
+            store: store.clone(),
+            resources: Arc::new(source),
+        });
+        document.recovery_arm(0);
+        assert_eq!(document.recovery_deadline(), Some(10_000));
+        let Some(RecoveryStart::Prepare(job)) = document.recovery_start(10_000) else {
+            return Err("失败后10秒恢复应冻结原临时引用".into());
+        };
+        let prepared = job.run();
+        let Some(RecoveryStart::Publish(job)) = document.recovery_prepared(prepared, 10_000) else {
+            return Err("临时图片可读时恢复应完整发布".into());
+        };
+        let settlement = job.run();
+        assert!(settlement.published.is_some());
+        document.recovery_settled(settlement, 10_000);
+        let scan = store.scan().map_err(|error| format!("{error:?}"))?;
+        let lineage = scan
+            .recoverable_lineages()
+            .first()
+            .copied()
+            .ok_or("恢复谱系")?;
+        let generation = lineage.latest_complete().ok_or("完整恢复代")?.generation;
+        let restored = store
+            .recover(lineage.document, generation)
+            .map_err(|error| format!("{error:?}"))?;
+        assert_eq!(restored.source, before, "恢复不得引用尚未关联的新目录");
+        assert_eq!(restored.resources.len(), 1);
+        assert_eq!(restored.resources[0].reference, locator);
+        assert_eq!(restored.resources[0].bytes, b"png");
     }
 
     let retry = session
@@ -2666,6 +2819,64 @@ fn first_save_write_failure_keeps_pending_migration_for_retry() -> TestResult {
     let document = session.document_mut().ok_or("应存在可编辑文档")?;
     assert_eq!(document.path(), target);
     assert_eq!(document.close_status(), CloseStatus::Ready);
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn association_normalized_bytes_keep_logical_saved_baseline() -> TestResult {
+    for (raw, expected) in [
+        (b"a\r\nb\nc\r\n".as_slice(), b"aB\r\nb\r\nc\r\n".as_slice()),
+        (
+            b"\xef\xbb\xbfa\r\nb\nc\r\n".as_slice(),
+            b"\xef\xbb\xbfaB\r\nb\r\nc\r\n".as_slice(),
+        ),
+        (b"a\r\nb\rc\n".as_slice(), b"aB\nb\rc\n".as_slice()),
+    ] {
+        for kind in [WriteKind::Create, WriteKind::SaveAs] {
+            let directory = TempSaveDir::create("aline-assoc-logical")?;
+            let original = directory.0.join("original.md");
+            let target = directory.0.join("out/notes.md");
+            std::fs::create_dir_all(target.parent().ok_or("target parent")?)?;
+            let mut session = if kind == WriteKind::Create {
+                untitled_editable_session_with(raw, None)?
+            } else {
+                std::fs::write(&original, raw)?;
+                editable_absolute_session(&original)?
+            };
+            {
+                let document = session.document_mut().ok_or("应存在可编辑文档")?;
+                let len = document.current_snapshot()?.len_bytes();
+                let core = document.edit_core()?;
+                core.open_block(0..len, SelectionSpec::new(1, 1))?;
+                core.type_text(1, "B", 0)?;
+                core.leave_block(1)?;
+            }
+            let logical = current_text(&mut session)?;
+            let completion = association_copy(&mut session, kind, &target)?;
+            let job = association_write_job(&mut session, completion)?;
+            let settlement = run_association_write(&mut session, job)?;
+            assert!(settlement.adopted);
+            assert_eq!(std::fs::read(&target)?, expected);
+            let document = session.document_mut().ok_or("应存在可编辑文档")?;
+            let current = document.current_snapshot()?;
+            assert_eq!(current.full_text(TEXT)?, logical, "编码不得修改源码行尾");
+            assert_eq!(
+                document.persistence_is_dirty(&current),
+                Some(false),
+                "成功另存的逻辑输入应干净"
+            );
+            assert_eq!(document.close_status(), CloseStatus::Ready);
+            document.edit_core()?.undo()?;
+            let undone = document.current_snapshot()?;
+            assert_eq!(document.persistence_is_dirty(&undone), Some(true));
+            document.edit_core()?.redo()?;
+            let redone = document.current_snapshot()?;
+            assert_eq!(document.persistence_is_dirty(&redone), Some(false));
+            assert_eq!(document.close_status(), CloseStatus::Ready);
+            assert_eq!(std::fs::read(&target)?, expected, "Undo/Redo 不写盘");
+        }
+    }
     Ok(())
 }
 
@@ -2712,6 +2923,48 @@ fn first_save_undoes_reference_rewrite_without_deleting_temp() -> TestResult {
         current_text(&mut session)?.contains("./assets/pic.png"),
         "Redo 应回到新引用"
     );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn first_save_reference_candidate_keeps_pending_typing_until_success() -> TestResult {
+    let directory = TempSaveDir::create("aline-assoc-pending")?;
+    let root = temp_resource_root(&directory.0.join("home"))?;
+    let target = directory.0.join("out/notes.md");
+    std::fs::create_dir_all(target.parent().ok_or("parent")?)?;
+    let mut session = untitled_editable_session(Some(root))?;
+    let locator = stage_image(&mut session, "pic.png", b"png")?;
+    append_text(&mut session, &locator)?;
+    let before_buffer;
+    {
+        let document = session.document_mut().ok_or("document")?;
+        let len = document.current_snapshot()?.len_bytes();
+        let core = document.edit_core()?;
+        core.open_block(0..len, SelectionSpec::new(1, 1))?;
+        before_buffer = core.buffer_text()?;
+        core.type_text(1, "B", 20)?;
+    }
+    let before = current_text(&mut session)?;
+    let depth = session.document().ok_or("document")?.core().undo_depth();
+    let copy = association_copy(&mut session, WriteKind::Create, &target)?;
+    let job = association_write_job(&mut session, copy)?;
+    assert_eq!(
+        session.document().ok_or("document")?.core().buffer_text()?,
+        before_buffer
+    );
+    assert_eq!(current_text(&mut session)?, before);
+    assert_eq!(
+        session.document().ok_or("document")?.core().undo_depth(),
+        depth
+    );
+    assert!(run_association_write(&mut session, job)?.adopted);
+    assert_eq!(current_text(&mut session)?, "xB./assets/pic.png\n");
+    let core = session.document_mut().ok_or("document")?.edit_core()?;
+    core.undo()?;
+    assert_eq!(core.buffer_text()?, before, "首步Undo只撤系统引用补丁");
+    core.undo()?;
+    assert_eq!(core.buffer_text()?, before_buffer, "第二步Undo撤普通输入组");
     Ok(())
 }
 
@@ -2943,6 +3196,576 @@ fn save_as_copies_relative_assets_and_keeps_original() -> TestResult {
     );
     assert_eq!(std::fs::read(&target)?, b"x\n![x](./assets/pic.png)\n");
     assert_eq!(session.document().ok_or("应存在可编辑文档")?.path(), target);
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn save_as_new_relative_asset_after_copy_requires_complete_retry() -> TestResult {
+    let directory = TempSaveDir::create("aline-assoc-relative-race")?;
+    let old = directory.0.join("old");
+    std::fs::create_dir_all(old.join("assets"))?;
+    let original = old.join("notes.md");
+    std::fs::write(&original, b"x\n")?;
+    std::fs::write(old.join("assets/new.png"), b"new-image")?;
+    let mut session = editable_absolute_session(&original)?;
+    session
+        .document_mut()
+        .ok_or("document")?
+        .switch_mode(EditorMode::Source)?;
+    let target = directory.0.join("new/notes.md");
+    std::fs::create_dir_all(target.parent().ok_or("target parent")?)?;
+    let completion = association_copy(&mut session, WriteKind::SaveAs, &target)?;
+    append_text(&mut session, "![b](./assets/new.png)")?;
+    let before = current_text(&mut session)?;
+    assert!(matches!(
+        session
+            .document_mut()
+            .ok_or("document")?
+            .association_prepared(completion, 1),
+        AssociationStep::Settled(AssociationOutcome::NeedsRetry)
+    ));
+    assert!(!target.exists());
+    assert_eq!(current_text(&mut session)?, before);
+    let retry = session
+        .document_mut()
+        .ok_or("document")?
+        .retry_association()
+        .map_err(|error| format!("{error:?}"))?;
+    let AssociationStep::Run(copy) = retry else {
+        return Err("新增相对资产必须重新完整复制".into());
+    };
+    let job = association_write_job(&mut session, copy.run())?;
+    assert!(run_association_write(&mut session, job)?.adopted);
+    assert_eq!(
+        std::fs::read(target.parent().ok_or("parent")?.join("assets/new.png"))?,
+        b"new-image"
+    );
+    assert_eq!(std::fs::read_to_string(&target)?, before);
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn save_as_preserves_relative_images_reachable_only_through_undo_or_redo() -> TestResult {
+    for redo_only in [false, true] {
+        let directory = TempSaveDir::create("aline-assoc-history-assets")?;
+        let old = directory.0.join("old");
+        std::fs::create_dir_all(old.join("assets"))?;
+        let original = old.join("notes.md");
+        std::fs::write(&original, b"x\n")?;
+        std::fs::write(old.join("assets/pic.png"), b"historical-image")?;
+        let mut session = editable_absolute_session(&original)?;
+        session
+            .document_mut()
+            .ok_or("document")?
+            .switch_mode(EditorMode::Source)?;
+        append_text(&mut session, "![x](./assets/pic.png)")?;
+        if redo_only {
+            session
+                .document_mut()
+                .ok_or("document")?
+                .edit_core()?
+                .undo()?;
+        } else {
+            let document = session.document_mut().ok_or("document")?;
+            let len = document.current_snapshot()?.len_bytes();
+            let core = document.edit_core()?;
+            core.open_block(0..len, SelectionSpec::new(1, len - 1))?;
+            let identity = core.current_input_identity()?;
+            core.replace_selection(&identity, "", 3)?;
+        }
+        assert_eq!(current_text(&mut session)?, "x\n");
+        for target in [
+            directory.0.join("new/notes.md"),
+            directory.0.join("again/notes.md"),
+        ] {
+            std::fs::create_dir_all(target.parent().ok_or("target parent")?)?;
+            let completion = association_copy(&mut session, WriteKind::SaveAs, &target)?;
+            let job = association_write_job(&mut session, completion)?;
+            assert!(run_association_write(&mut session, job)?.adopted);
+            assert_eq!(
+                std::fs::read(target.parent().ok_or("parent")?.join("assets/pic.png"))?,
+                b"historical-image"
+            );
+        }
+        let document = session.document_mut().ok_or("document")?;
+        if redo_only {
+            document.edit_core()?.redo()?;
+        } else {
+            document.edit_core()?.undo()?;
+        }
+        assert!(
+            document
+                .current_snapshot()?
+                .full_text(TEXT)?
+                .contains("./assets/pic.png")
+        );
+        assert_eq!(
+            std::fs::read(
+                document
+                    .path()
+                    .parent()
+                    .ok_or("parent")?
+                    .join("assets/pic.png")
+            )?,
+            b"historical-image"
+        );
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn save_as_preserves_relative_image_in_uncommitted_typing_redo() -> TestResult {
+    let directory = TempSaveDir::create("aline-assoc-typing-redo")?;
+    let old = directory.0.join("old");
+    std::fs::create_dir_all(old.join("assets"))?;
+    let original = old.join("notes.md");
+    std::fs::write(&original, b"x\n")?;
+    std::fs::write(old.join("assets/pic.png"), b"pending-redo-image")?;
+    let mut session = editable_absolute_session(&original)?;
+    let document = session.document_mut().ok_or("document")?;
+    document.switch_mode(EditorMode::Source)?;
+    let core = document.edit_core()?;
+    core.open_block(0..2, SelectionSpec::new(1, 1))?;
+    core.type_text(1, "![x](./assets/pic.png)", 0)?;
+    core.undo()?;
+    assert_eq!(
+        core.history_node_count(),
+        0,
+        "待定redo不得提前进入Buffer历史"
+    );
+    // redo_depth 只计 Buffer 节点（草稿重做不计数）；待定 redo 由目标范围证明。
+    assert_eq!(core.redo_depth(), 0);
+    assert_eq!(
+        core.redo_target_ranges(),
+        Some(std::iter::once(1..1).collect()),
+        "待定redo应保留原输入组的插入起点"
+    );
+    for target in [
+        directory.0.join("new/notes.md"),
+        directory.0.join("again/notes.md"),
+    ] {
+        std::fs::create_dir_all(target.parent().ok_or("parent")?)?;
+        let copy = association_copy(&mut session, WriteKind::SaveAs, &target)?;
+        let job = association_write_job(&mut session, copy)?;
+        assert!(run_association_write(&mut session, job)?.adopted);
+        assert_eq!(
+            std::fs::read(target.parent().ok_or("parent")?.join("assets/pic.png"))?,
+            b"pending-redo-image"
+        );
+        assert_eq!(
+            session
+                .document()
+                .ok_or("document")?
+                .core()
+                .history_node_count(),
+            0
+        );
+    }
+    let document = session.document_mut().ok_or("document")?;
+    document.edit_core()?.redo()?;
+    assert!(
+        document
+            .current_snapshot()?
+            .full_text(TEXT)?
+            .contains("./assets/pic.png")
+    );
+    assert_eq!(
+        std::fs::read(
+            document
+                .path()
+                .parent()
+                .ok_or("parent")?
+                .join("assets/pic.png")
+        )?,
+        b"pending-redo-image"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn save_as_nested_configured_asset_refuses_before_any_copy() -> TestResult {
+    let directory = TempSaveDir::create("aline-assoc-nested")?;
+    let old = directory.0.join("old");
+    std::fs::create_dir_all(old.join("assets/sub"))?;
+    let original = old.join("notes.md");
+    let source = b"![a](./assets/pic.png)\n![b](./assets/sub/pic.png)\n";
+    std::fs::write(&original, source)?;
+    std::fs::write(old.join("assets/pic.png"), b"flat")?;
+    std::fs::write(old.join("assets/sub/pic.png"), b"nested")?;
+    let mut session = editable_absolute_session(&original)?;
+    let target = directory.0.join("new/notes.md");
+    std::fs::create_dir_all(target.parent().ok_or("parent")?)?;
+    let copy = association_copy(&mut session, WriteKind::SaveAs, &target)?;
+    assert_eq!(
+        copy.result.err(),
+        Some(crate::document::MigrationError::InvalidTarget)
+    );
+    assert!(!target.exists());
+    assert!(
+        !target.parent().ok_or("parent")?.join("assets").exists(),
+        "不能先复制平面文件再发现坏层级"
+    );
+    assert_eq!(std::fs::read(&original)?, source);
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn association_asset_deletion_or_identity_replacement_never_publishes_reference() -> TestResult {
+    for after_write in [false, true] {
+        for replace in [false, true] {
+            let directory = TempSaveDir::create("aline-assoc-asset-proof")?;
+            let root = temp_resource_root(&directory.0.join("home"))?;
+            let target = directory.0.join("out/notes.md");
+            std::fs::create_dir_all(target.parent().ok_or("parent")?)?;
+            let mut session = untitled_editable_session(Some(root))?;
+            let locator = stage_image(&mut session, "pic.png", b"png")?;
+            append_text(&mut session, &locator)?;
+            let before = current_text(&mut session)?;
+            let copy = association_copy(&mut session, WriteKind::Create, &target)?;
+            let asset = target.parent().ok_or("parent")?.join("assets/pic.png");
+            let mutate = |asset: &Path| -> std::io::Result<()> {
+                if replace {
+                    // 同尺寸不同内容 + 新身份：同时踩中字节比对与身份核验。
+                    let replacement = asset.with_extension("replacement");
+                    std::fs::write(&replacement, b"PNG")?;
+                    std::fs::rename(replacement, asset)
+                } else {
+                    std::fs::remove_file(asset)
+                }
+            };
+            if after_write {
+                let job = association_write_job(&mut session, copy)?;
+                let completion = job.run();
+                mutate(&asset)?;
+                let settlement = session
+                    .document_mut()
+                    .ok_or("document")?
+                    .settle_save(completion)
+                    .map_err(|error| format!("{error:?}"))?;
+                assert!(settlement.adopted && settlement.association_deferred);
+                assert!(matches!(settlement.outcome, WriteOutcome::Published { .. }));
+                assert!(target.exists(), "已发生文件发布不可被抹掉");
+            } else {
+                mutate(&asset)?;
+                assert!(matches!(
+                    session
+                        .document_mut()
+                        .ok_or("document")?
+                        .association_prepared(copy, 1),
+                    AssociationStep::Settled(AssociationOutcome::NeedsRetry)
+                ));
+                assert!(!target.exists());
+            }
+            assert_eq!(current_text(&mut session)?, before);
+            assert_eq!(
+                session.document().ok_or("document")?.path(),
+                Path::new("untitled.md")
+            );
+        }
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn first_save_changed_source_after_write_keeps_old_association_and_checks_retry_target()
+-> TestResult {
+    let directory = TempSaveDir::create("aline-assoc-after-write")?;
+    let root = temp_resource_root(&directory.0.join("home"))?;
+    let target = directory.0.join("out/notes.md");
+    std::fs::create_dir_all(target.parent().ok_or("target parent")?)?;
+    let mut session = untitled_editable_session(Some(root))?;
+    let locator = stage_image(&mut session, "pic.png", b"png")?;
+    append_text(&mut session, &locator)?;
+    let copy = association_copy(&mut session, WriteKind::Create, &target)?;
+    let job = association_write_job(&mut session, copy)?;
+    let written = job.run();
+    append_text(&mut session, "B")?;
+    let before = current_text(&mut session)?;
+    let settlement = session
+        .document_mut()
+        .ok_or("document")?
+        .settle_save(written)
+        .map_err(|error| format!("{error:?}"))?;
+    assert!(settlement.adopted && settlement.association_deferred);
+    assert!(
+        matches!(settlement.outcome, WriteOutcome::Published { .. }),
+        "不能丢弃已发生的写盘事实"
+    );
+    assert_eq!(
+        session.document().ok_or("document")?.path(),
+        Path::new("untitled.md")
+    );
+    assert_eq!(current_text(&mut session)?, before);
+    assert!(before.contains(&locator));
+    assert_eq!(std::fs::read(&target)?, b"x./assets/pic.png\n");
+    std::fs::write(&target, b"external replacement")?;
+    let retry = session
+        .document_mut()
+        .ok_or("document")?
+        .retry_association()
+        .map_err(|error| format!("{error:?}"))?;
+    let AssociationStep::Write(job) = retry else {
+        return Err("已复制资产应复用候选重试".into());
+    };
+    let retry_settlement = run_association_write(&mut session, job)?;
+    assert!(matches!(
+        retry_settlement.outcome,
+        WriteOutcome::NotPublished(WriteStop::Conflict)
+    ));
+    assert_eq!(
+        std::fs::read(&target)?,
+        b"external replacement",
+        "部分发布重试不得盲目覆盖外改"
+    );
+    assert_eq!(current_text(&mut session)?, before);
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn association_foreign_completion_cannot_consume_current_reference_candidate() -> TestResult {
+    let directory = TempSaveDir::create("aline-assoc-foreign")?;
+    let root = temp_resource_root(&directory.0.join("home"))?;
+    let target = directory.0.join("out/notes.md");
+    std::fs::create_dir_all(target.parent().ok_or("target parent")?)?;
+    let mut session = untitled_editable_session(Some(root))?;
+    let locator = stage_image(&mut session, "pic.png", b"png")?;
+    append_text(&mut session, &locator)?;
+    let copy = association_copy(&mut session, WriteKind::Create, &target)?;
+    let job = association_write_job(&mut session, copy)?;
+    let (mut other_core, mut other) = fixture(b"x\n")?;
+    queue(&mut other, &mut other_core)?;
+    let foreign = published(start(&mut other)?, b"x\n", 1, true)?;
+    assert!(
+        !session
+            .document_mut()
+            .ok_or("document")?
+            .settle_save(foreign)
+            .map_err(|error| format!("{error:?}"))?
+            .adopted
+    );
+    assert!(current_text(&mut session)?.contains(&locator));
+    let settlement = run_association_write(&mut session, job)?;
+    assert!(settlement.adopted && !settlement.association_deferred);
+    assert_eq!(current_text(&mut session)?, "x./assets/pic.png\n");
+    assert_eq!(session.document().ok_or("document")?.path(), target);
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn association_cancel_after_file_publication_keeps_reference_and_records_partial_result()
+-> TestResult {
+    let directory = TempSaveDir::create("aline-assoc-published-cancel")?;
+    let root = temp_resource_root(&directory.0.join("home"))?;
+    let target = directory.0.join("out/notes.md");
+    std::fs::create_dir_all(target.parent().ok_or("target parent")?)?;
+    let mut session = untitled_editable_session(Some(root))?;
+    let locator = stage_image(&mut session, "pic.png", b"png")?;
+    append_text(&mut session, &locator)?;
+    let before = current_text(&mut session)?;
+    let copy = association_copy(&mut session, WriteKind::Create, &target)?;
+    let job = association_write_job(&mut session, copy)?;
+    let completion = job.run();
+    session
+        .document_mut()
+        .ok_or("document")?
+        .cancel_association();
+    let document = session.document_mut().ok_or("document")?;
+    assert_eq!(
+        document.settle_save_command(completion),
+        SaveResult::SavedUncertain
+    );
+    assert_eq!(document.path(), Path::new("untitled.md"));
+    assert_eq!(document.close_status(), CloseStatus::NeedsDecision);
+    assert_eq!(current_text(&mut session)?, before);
+    assert_eq!(std::fs::read(&target)?, b"x./assets/pic.png\n");
+    assert_eq!(
+        std::fs::read(target.parent().ok_or("parent")?.join("assets/pic.png"))?,
+        b"png"
+    );
+    let retry = session
+        .document_mut()
+        .ok_or("document")?
+        .retry_association()
+        .map_err(|error| format!("{error:?}"))?;
+    let AssociationStep::Write(job) = retry else {
+        return Err("保留映射应可受检重试".into());
+    };
+    assert!(run_association_write(&mut session, job)?.adopted);
+    assert_eq!(current_text(&mut session)?, "x./assets/pic.png\n");
+    assert_eq!(
+        session.document_mut().ok_or("document")?.close_status(),
+        CloseStatus::Ready
+    );
+    Ok(())
+}
+
+/// 目标代次耗尽令已发布关联被拒时，仍须登记侧目标写盘事实；
+/// 重试覆盖前逐字节复验，外改后的目标不得被盲目覆盖。
+#[test]
+fn association_rejected_after_publication_records_side_target_for_checked_retry() -> TestResult {
+    let (mut doc, mut state) = fixture(b"x\n")?;
+    doc.type_text(1, "a", 0)?;
+    let snapshot = doc.current_snapshot(TEXT)?;
+    let side = fixture_path("assoc-exhausted-side.md");
+    state.target.generation = PathGeneration(u64::MAX);
+    state
+        .queue_association_snapshot(snapshot, WriteKind::SaveAs, side.clone())
+        .map_err(|error| format!("{error:?}"))?;
+    let work = start(&mut state)?;
+    assert!(
+        work.association_expected.is_none(),
+        "首次发布前没有侧目标事实"
+    );
+    let settlement = state.reconcile_association(published(work, b"xa\n", 1, true)?, || Ok(()));
+    assert!(
+        settlement.association_deferred,
+        "代次耗尽必须走 deferred 分支"
+    );
+    assert!(settlement.association.is_none(), "不得采纳新目标关联");
+    assert!(matches!(settlement.outcome, WriteOutcome::Published { .. }));
+    assert_eq!(state.status(), SaveStatus::PublishedUncertain);
+    assert_eq!(
+        state.partial_association.as_ref().map(|(path, _)| path),
+        Some(&side),
+        "已发布的侧目标必须登记，供重试复验"
+    );
+    // 同一侧目标重试：解冻资格并携带冻结存储基线做写前比对。
+    let snapshot = doc.current_snapshot(TEXT)?;
+    state
+        .queue_association_snapshot(snapshot, WriteKind::SaveAs, side.clone())
+        .map_err(|error| format!("{error:?}"))?;
+    let retry = start(&mut state)?;
+    assert!(
+        retry.association_expected.is_some(),
+        "重试必须携带侧目标基线，否则 run_associate 会盲目覆盖外改"
+    );
+    Ok(())
+}
+
+/// 历史覆盖按节点边界与待定 redo 判定：已提交历史引用、当前引用与待定 redo
+/// 引用都被复制；多步骤节点的逐步骤重放由 buffer `history_node_steps` 契约
+/// 测试保证（当前生产提交路径每节点单步，中间态场景不可经公共 API 构造）。
+#[cfg(target_os = "macos")]
+#[test]
+fn save_as_covers_committed_pending_and_typing_redo_references() -> TestResult {
+    let directory = TempSaveDir::create("aline-assoc-three-states")?;
+    let old = directory.0.join("old");
+    std::fs::create_dir_all(old.join("assets"))?;
+    let original = old.join("notes.md");
+    std::fs::write(&original, b"x\n")?;
+    std::fs::write(old.join("assets/committed.png"), b"committed-image")?;
+    std::fs::write(old.join("assets/pending.png"), b"pending-image")?;
+    let mut session = editable_absolute_session(&original)?;
+    session
+        .document_mut()
+        .ok_or("document")?
+        .switch_mode(EditorMode::Source)?;
+    {
+        let document = session.document_mut().ok_or("document")?;
+        let core = document.edit_core()?;
+        core.open_block(0..2, SelectionSpec::new(1, 1))?;
+        // 已提交引用：第一组键入并封口，留在当前文本与历史节点。
+        core.type_text(1, "![a](./assets/committed.png)", 0)?;
+        core.leave_block(1)?;
+        let committed_len = 1 + "![a](./assets/committed.png)".len();
+        // 待定 redo：第二组引用键入后草稿撤销，引用只在 typing_redo 可达。
+        core.open_block(
+            0..committed_len + 1,
+            SelectionSpec::new(committed_len, committed_len),
+        )?;
+        core.type_text(committed_len, "![b](./assets/pending.png)", 2000)?;
+        core.undo()?;
+        assert_eq!(core.redo_depth(), 0, "草稿撤销不进入 Buffer 历史");
+        assert_eq!(
+            core.redo_target_ranges(),
+            Some(std::iter::once(committed_len..committed_len).collect()),
+            "待定 redo 保留第二组插入起点"
+        );
+    }
+    assert_eq!(
+        current_text(&mut session)?,
+        "x![a](./assets/committed.png)\n"
+    );
+    let target = directory.0.join("new/notes.md");
+    std::fs::create_dir_all(target.parent().ok_or("target parent")?)?;
+    let completion = association_copy(&mut session, WriteKind::SaveAs, &target)?;
+    let job = association_write_job(&mut session, completion)?;
+    assert!(run_association_write(&mut session, job)?.adopted);
+    let assets = target.parent().ok_or("parent")?.join("assets");
+    assert_eq!(
+        std::fs::read(assets.join("committed.png"))?,
+        b"committed-image",
+        "当前文本与已提交历史中的引用资产必须被复制"
+    );
+    assert_eq!(
+        std::fs::read(assets.join("pending.png"))?,
+        b"pending-image",
+        "待定 redo 中的引用资产必须被复制"
+    );
+    Ok(())
+}
+
+/// 未发布（冲突/失败）结算不得消费引用候选；同一目标重试仍按重写后的候选写盘。
+#[cfg(target_os = "macos")]
+#[test]
+fn association_conflict_keeps_prepared_candidate_for_retry() -> TestResult {
+    use std::os::unix::fs::PermissionsExt;
+
+    let directory = TempSaveDir::create("aline-assoc-conflict-candidate")?;
+    let root = temp_resource_root(&directory.0.join("home"))?;
+    let target = directory.0.join("out/notes.md");
+    let out = target.parent().ok_or("target parent")?;
+    std::fs::create_dir_all(out)?;
+    let mut session = untitled_editable_session(Some(root))?;
+    let locator = stage_image(&mut session, "pic.png", b"png")?;
+    append_text(&mut session, &locator)?;
+    let before = current_text(&mut session)?;
+    assert!(before.contains(&locator));
+
+    let completion = association_copy(&mut session, WriteKind::Create, &target)?;
+    let job = association_write_job(&mut session, completion)?;
+    // 迁移已复制资产；只读目录令首次写盘失败（NotPublished）。
+    std::fs::set_permissions(out, std::fs::Permissions::from_mode(0o500))?;
+    let completion = job.run();
+    std::fs::set_permissions(out, std::fs::Permissions::from_mode(0o700))?;
+    let settlement = session
+        .document_mut()
+        .ok_or("document")?
+        .settle_save(completion)
+        .map_err(|error| format!("{error:?}"))?;
+    assert!(matches!(settlement.outcome, WriteOutcome::NotPublished(_)));
+    assert!(!target.exists());
+    assert_eq!(current_text(&mut session)?, before, "未发布不得提交引用");
+    assert!(
+        session
+            .document()
+            .ok_or("document")?
+            .pending_migration_prepared(),
+        "未发布结算必须保留引用候选供重试"
+    );
+    let retry = session
+        .document_mut()
+        .ok_or("document")?
+        .retry_association()
+        .map_err(|error| format!("{error:?}"))?;
+    let AssociationStep::Write(job) = retry else {
+        return Err("保留候选应可直接重试写盘".into());
+    };
+    assert!(run_association_write(&mut session, job)?.adopted);
+    assert_eq!(
+        std::fs::read(&target)?,
+        b"x./assets/pic.png\n",
+        "重试必须写重写后的引用，不得把临时 locator 写进新目标"
+    );
+    assert_eq!(current_text(&mut session)?, "x./assets/pic.png\n");
     Ok(())
 }
 

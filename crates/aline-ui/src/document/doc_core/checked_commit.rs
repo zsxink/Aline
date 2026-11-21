@@ -8,7 +8,7 @@ use super::{
     copy_bounded, slice_buffer,
 };
 use crate::document::open_block::{InputTarget, OpenBlock, VisualInput};
-use crate::document::{EditorMode, InputIdentity};
+use crate::document::{CurrentSnapshot, EditorMode, InputIdentity};
 use aline_buffer::{
     Affinity, AnchorTransform, ApplyOutcome, BufferEditBase, BufferError, CheckedBatch,
     OperationSource, PreparedBufferEdit, SelectionSpec, SrcSelection, TextSnapshot,
@@ -20,7 +20,7 @@ use aline_edit::{
     validate_change,
 };
 use aline_markdown::{Block, ParseBudget, ParseConfig, Parsed, ProtectedRange, StyledRange, parse};
-use std::ops::Range;
+use std::{ops::Range, sync::Arc};
 
 // 仅测试编译的解析调用计数，用于证明发布段不再解析。
 // 使用线程局部量，避免并行测试互相干扰；生产构建不包含该状态。
@@ -47,6 +47,20 @@ impl From<BufferError> for DocError {
 struct BoundContext {
     target_mode: Option<EditorMode>,
     edit_mode: Option<EditMode>,
+}
+
+/// 文件发布前准备的引用补丁；只持受检候选，不修改真实文档或历史。
+pub(crate) struct PreparedMigration {
+    identity: InputIdentity,
+    selection: SelectionSpec,
+    buffer: PreparedBufferEdit,
+    snapshot: CurrentSnapshot,
+}
+
+impl PreparedMigration {
+    pub(crate) fn snapshot(&self) -> &CurrentSnapshot {
+        &self.snapshot
+    }
 }
 
 impl DocCore {
@@ -178,24 +192,132 @@ impl DocCore {
     ///
     /// 用于首次保存/另存为的引用重写：重写是系统迁移而非用户 Visual 编辑，
     /// 因此按 Source 权限规划与应用，但成功后仍保持用户模式。
-    pub(crate) fn apply_migration_change(
+    pub(crate) fn prepare_migration_change(
         &mut self,
         identity: &InputIdentity,
         parsed: &Parsed,
         plan: &ChangePlan,
         now_millis: u64,
-    ) -> Result<CommitOutcome, DocError> {
-        self.apply_bound_change(
-            identity,
-            parsed,
-            plan,
-            None,
-            BoundContext {
-                edit_mode: Some(EditMode::Source),
-                ..BoundContext::default()
-            },
-            now_millis,
-        )
+    ) -> Result<PreparedMigration, DocError> {
+        self.ensure_writable()?;
+        if self.open.is_some() {
+            self.ensure_ready()?;
+        }
+        self.accept_document_result(identity)?;
+        if self.is_composition_active() {
+            return Err(DocError::CompositionActive);
+        }
+        let selection = bind_selection(self.cached_current_text()?, self.current_selection())?;
+        self.version.next_draft().map_err(DocError::Identity)?;
+        let context = EditContext::new(EditMode::Source);
+        let buffer = if let Some(group) = self.open.as_ref().and_then(OpenBlock::typing) {
+            let block = self.open.as_ref().ok_or(DocError::NoOpenBlock)?;
+            StagedInput {
+                group,
+                visual_extent: block.visual_extent(),
+                selection: block.selection,
+                context: EditContext::new(self.command_context().mode()),
+                now_millis,
+                budget: self.edit_budget(),
+            }
+            .prepare_migration(
+                self.buffer.edit_base(),
+                |candidate, candidate_selection, context, _| {
+                    plan.replan_on_equivalent_candidate(
+                        parsed,
+                        &selection,
+                        candidate,
+                        candidate_selection,
+                        context,
+                    )
+                    .map_err(DocError::Edit)
+                },
+            )?
+        } else {
+            let change =
+                validate_change(plan, self.buffer.snapshot(), parsed, &selection, &context)
+                    .map_err(DocError::Edit)?;
+            self.buffer.edit_base().prepare_apply(
+                change.batch(),
+                change.target_selection(),
+                OperationSource::Command,
+                now_millis,
+                self.limits.text,
+            )?
+        };
+        let version = match buffer.result_revision() {
+            Some(revision) => self
+                .version
+                .after_commit(revision)
+                .map_err(DocError::Identity)?,
+            None => self.version,
+        };
+        let snapshot = CurrentSnapshot::new(
+            self.document.clone(),
+            version,
+            buffer.result_snapshot().clone(),
+            buffer.result_selection().clone(),
+            self.resources.clone(),
+        );
+        Ok(PreparedMigration {
+            identity: identity.clone(),
+            selection: self.current_selection(),
+            buffer,
+            snapshot,
+        })
+    }
+
+    /// 实际文件发布后复验当前身份与选区，原子提交准备好的引用补丁。
+    pub(crate) fn publish_migration_change(
+        &mut self,
+        prepared: PreparedMigration,
+    ) -> Result<(), DocError> {
+        self.ensure_writable()?;
+        self.accept_document_result(&prepared.identity)?;
+        if self.current_selection() != prepared.selection || self.is_composition_active() {
+            return Err(DocError::StaleResult);
+        }
+        let outcome = self.buffer.publish_prepared(prepared.buffer)?;
+        self.settle_command_outcome(outcome)?;
+        Ok(())
+    }
+
+    /// 冻结当前真实缓冲与全部历史步骤；迁移后台只读重放，不移动历史光标。
+    pub(crate) fn resource_history(
+        &self,
+    ) -> Result<crate::document::resources::ResourceHistory, DocError> {
+        let mut nodes = Vec::new();
+        nodes
+            .try_reserve_exact(self.buffer.history_node_count())
+            .map_err(|_| DocError::ResourceBudgetExceeded)?;
+        for index in 0..self.buffer.history_node_count() {
+            let steps = self
+                .buffer
+                .history_node_steps(index)
+                .ok_or(DocError::StaleResult)?;
+            let mut node = Vec::new();
+            node.try_reserve_exact(steps.size_hint().0)
+                .map_err(|_| DocError::ResourceBudgetExceeded)?;
+            node.extend(steps);
+            nodes.push(node);
+        }
+        let typing_redo = self
+            .typing_redo
+            .as_ref()
+            .map(|redo| {
+                let snapshot = self.buffer.snapshot();
+                let range = snapshot.src_range(redo.group.range.clone())?;
+                let draft = Arc::new(copy_bounded(&redo.group.draft, self.limits.text)?);
+                TextSnapshot::with_overlay(snapshot, range, draft, self.limits.text)
+                    .map_err(DocError::Buffer)
+            })
+            .transpose()?;
+        Ok(crate::document::resources::ResourceHistory {
+            snapshot: self.buffer.snapshot().clone(),
+            nodes,
+            cursor: self.buffer.undo_depth(),
+            typing_redo,
+        })
     }
 
     /// 执行已规划的查找替换命令。
@@ -634,6 +756,26 @@ pub(super) struct StagedInput<'a> {
 }
 
 impl StagedInput<'_> {
+    /// 迁移命令按 Source 规划；待定输入仍按原用户模式复验，不能借系统权限绕过保护。
+    fn prepare_migration(
+        self,
+        base: BufferEditBase,
+        plan_command: impl FnOnce(
+            &Parsed,
+            &SrcSelection,
+            &EditContext,
+            EditBudget,
+        ) -> Result<PlanOutcome, DocError>,
+    ) -> Result<PreparedBufferEdit, DocError> {
+        self.prepare_with_command_context(
+            base,
+            None,
+            EditContext::new(EditMode::Source),
+            plan_command,
+        )
+        .map(|(prepared, _)| prepared)
+    }
+
     /// 封口待定输入组并规划命令；命令类调用方不需要块目标。
     pub(super) fn prepare(
         self,
@@ -658,6 +800,22 @@ impl StagedInput<'_> {
         self,
         base: BufferEditBase,
         rebind_after: Option<SelectionSpec>,
+        plan_command: impl FnOnce(
+            &Parsed,
+            &SrcSelection,
+            &EditContext,
+            EditBudget,
+        ) -> Result<PlanOutcome, DocError>,
+    ) -> Result<(PreparedBufferEdit, InputTargetUpdate), DocError> {
+        let context = self.context;
+        self.prepare_with_command_context(base, rebind_after, context, plan_command)
+    }
+
+    fn prepare_with_command_context(
+        self,
+        base: BufferEditBase,
+        rebind_after: Option<SelectionSpec>,
+        command_context: EditContext,
         plan_command: impl FnOnce(
             &Parsed,
             &SrcSelection,
@@ -717,12 +875,13 @@ impl StagedInput<'_> {
                         parsed.styled_ranges(),
                     )?;
                 }
-                let plan = plan_command(&parsed, selection, &self.context, self.budget)?;
+                let plan = plan_command(&parsed, selection, &command_context, self.budget)?;
                 let PlanOutcome::Changed(plan) = plan else {
                     return Ok::<_, DocError>(None);
                 };
-                let change = validate_change(&plan, candidate, &parsed, selection, &self.context)
-                    .map_err(DocError::Edit)?;
+                let change =
+                    validate_change(&plan, candidate, &parsed, selection, &command_context)
+                        .map_err(DocError::Edit)?;
                 if let (Some(extent), Some(after)) = (candidate_extent.as_ref(), rebind_after) {
                     target = rebind_visual_target(
                         change.candidate_blocks(),

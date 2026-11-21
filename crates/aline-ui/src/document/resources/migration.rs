@@ -5,10 +5,14 @@
 //! 复制阶段在后台执行，只持有快照、条目快照、设置与取消句柄。
 
 use std::fs;
+use std::io::Read;
 use std::ops::Range;
+#[cfg(target_os = "macos")]
+use std::os::unix::fs::MetadataExt;
 use std::path::{Component, Path, PathBuf};
+use std::sync::Arc;
 
-use aline_buffer::TextBudget;
+use aline_buffer::{HistoryStepHandle, TextBudget, TextSnapshot};
 use aline_source::Cancellation;
 use aline_source::fs::{self as platform_fs, FileIdentity, FsError};
 
@@ -87,6 +91,51 @@ pub(crate) struct ResourceMapping {
     pub(crate) to: String,
 }
 
+/// 源码历史的只读共享句柄；复制任务只重放补丁，不拥有可变 Buffer 或历史。
+pub(crate) struct ResourceHistory {
+    pub(crate) snapshot: TextSnapshot,
+    pub(crate) nodes: Vec<Vec<HistoryStepHandle>>,
+    pub(crate) cursor: usize,
+    pub(crate) typing_redo: Option<TextSnapshot>,
+}
+
+/// 已复制资产的路径级复验凭据：身份（dev/ino 等）＋冻结字节。
+///
+/// 残余窗口：verify→read→verify 能识别换名/替换（身份变化）与内容差异，但
+/// 「同 inode 原地改写后又在读取间隙改回」无法用路径级 stat 根治（需持 fd）。
+/// 该误判方向安全：判「未变」时目标终态仍等于冻结字节，不产生坏引用；
+/// 反向误判只导致保守拒绝重试。不得把本凭据当作跨进程强一致保证。
+#[derive(Clone, Debug)]
+struct AssetProof {
+    path: PathBuf,
+    identity: FileIdentity,
+    bytes: Arc<[u8]>,
+}
+
+impl AssetProof {
+    fn capture(path: PathBuf, bytes: Vec<u8>) -> Result<Self, MigrationError> {
+        let identity = platform_fs::verify_ordinary_file(&path).map_err(|_| MigrationError::Io)?;
+        if read_ordinary_file(&path)? != bytes
+            || platform_fs::verify_ordinary_file(&path).map_err(|_| MigrationError::Io)? != identity
+        {
+            return Err(MigrationError::StaleResourceSet);
+        }
+        Ok(Self {
+            path,
+            identity,
+            bytes: bytes.into(),
+        })
+    }
+
+    fn unchanged(&self) -> bool {
+        platform_fs::verify_ordinary_file(&self.path)
+            .is_ok_and(|identity| identity == self.identity)
+            && read_ordinary_file(&self.path).is_ok_and(|bytes| bytes == self.bytes.as_ref())
+            && platform_fs::verify_ordinary_file(&self.path)
+                .is_ok_and(|identity| identity == self.identity)
+    }
+}
+
 /// 一次迁移的成果：目标路径、引用映射与已就位的资产路径。
 #[derive(Clone, Debug)]
 #[cfg_attr(not(test), allow(dead_code))]
@@ -96,6 +145,10 @@ pub(crate) struct ResourceMigration {
     pub(crate) target: PathBuf,
     pub(crate) mappings: Vec<ResourceMapping>,
     pub(crate) copied: Vec<PathBuf>,
+    /// 当前文本与全部可撤销/可重做历史逐步骤状态中已复制的相对引用，
+    /// 供写盘前/结算时复验资源覆盖；被裁剪节点与已截断 redo 不在可达集合内。
+    pub(crate) relative_references: Vec<String>,
+    proofs: Vec<AssetProof>,
     /// 本次迁移新建的资产及创建时身份；供重写失败时按身份撤回。
     created: Vec<(PathBuf, FileIdentity)>,
     /// 资产目录；回滚后同步目录项。
@@ -105,6 +158,39 @@ pub(crate) struct ResourceMigration {
 }
 
 impl ResourceMigration {
+    pub(crate) fn assets_unchanged(&self) -> bool {
+        self.proofs.iter().all(AssetProof::unchanged)
+    }
+    /// 最新源码与逐步骤历史状态不得引入复制清单外的相对资产。
+    /// 覆盖按归一化引用字符串比较（方向保守：同文件不同写法会触发重试）。
+    pub(crate) fn covers_relative_resources(
+        &self,
+        source: &str,
+        history: &ResourceHistory,
+        directory: &Path,
+        settings: &ImageSettings,
+        budget: TextBudget,
+    ) -> bool {
+        let covers = |text: &str| {
+            discover_relative_assets(text, directory, settings)
+                .iter()
+                .all(|asset| {
+                    self.relative_references.iter().any(|known| {
+                        known.trim_start_matches("./") == asset.reference.trim_start_matches("./")
+                    })
+                })
+        };
+        let mut covered = covers(source);
+        visit_history_sources(history, budget, |historical| covered &= covers(historical)).is_ok()
+            && covered
+    }
+
+    /// Markdown 已发布后这些资产可能被侧目标引用，不能再按准备失败撤回。
+    pub(crate) fn protect_published_assets(&mut self) {
+        self.created.clear();
+        self.created_asset_dir = false;
+    }
+
     /// 撤回本次迁移新建且身份未变化的资产；已存在或非本次创建的不动。
     ///
     /// 清理失败只保留残留，不向调用方伪造成功。
@@ -142,6 +228,7 @@ pub(crate) struct ResourceMigrationJob {
     temp_directory: PathBuf,
     text_budget: TextBudget,
     cancellation: Cancellation,
+    history: Option<ResourceHistory>,
 }
 
 /// 后台迁移完成项；由会话按文档与操作序号校验是否过期。
@@ -182,7 +269,13 @@ impl ResourceMigrationJob {
             temp_directory,
             text_budget,
             cancellation,
+            history: None,
         }
+    }
+
+    pub(crate) fn with_history(mut self, history: ResourceHistory) -> Self {
+        self.history = Some(history);
+        self
     }
 
     /// 执行复制阶段；不做任何文本修改。
@@ -220,14 +313,10 @@ impl ResourceMigrationJob {
             ImageDirectory::Relative(dir) => parent.join(dir),
             ImageDirectory::Absolute(dir) => dir.clone(),
         };
-        let created_asset_dir = ensure_asset_directory(&target_dir)?;
-        let source = match self.snapshot.full_text(self.text_budget) {
-            Ok(source) => source,
-            Err(_) => {
-                rollback_assets(&target_dir, &[], created_asset_dir);
-                return Err(MigrationError::Io);
-            }
-        };
+        let source = self
+            .snapshot
+            .full_text(self.text_budget)
+            .map_err(|_| MigrationError::Io)?;
         let referenced: Vec<&TempResource> = self
             .entries
             .iter()
@@ -236,36 +325,62 @@ impl ResourceMigrationJob {
         let discovered = if self.kind == WriteKind::SaveAs {
             let document_dir = match self.current_dir.as_deref() {
                 Some(directory) => directory,
-                None => {
-                    rollback_assets(&target_dir, &[], created_asset_dir);
-                    return Err(MigrationError::InvalidTarget);
-                }
+                None => return Err(MigrationError::InvalidTarget),
             };
-            discover_relative_assets(&source, document_dir, &self.settings)
+            let mut assets = discover_relative_assets(&source, document_dir, &self.settings);
+            if let Some(history) = &self.history {
+                let visited = visit_history_sources(history, self.text_budget, |historical| {
+                    for asset in discover_relative_assets(historical, document_dir, &self.settings)
+                    {
+                        if !assets.iter().any(|known| known.absolute == asset.absolute) {
+                            assets.push(asset);
+                        }
+                    }
+                });
+                visited?;
+            }
+            assets
         } else {
             Vec::new()
         };
         if referenced.len().saturating_add(discovered.len()) > MAX_RESOURCE_COUNT {
-            rollback_assets(&target_dir, &[], created_asset_dir);
             return Err(MigrationError::TooManyResources);
         }
+        // M2 只迁移配置资产目录内的平面文件；不能把子目录文件扁平复制后保留坏引用。
+        if let (Some(current_dir), ImageDirectory::Relative(dir)) =
+            (&self.current_dir, &self.settings.directory)
+        {
+            let asset_dir = current_dir.join(dir);
+            if discovered
+                .iter()
+                .any(|asset| asset.absolute.parent() != Some(asset_dir.as_path()))
+            {
+                return Err(MigrationError::InvalidTarget);
+            }
+        }
+        let created_asset_dir = ensure_asset_directory(&target_dir)?;
         let mut created: Vec<(PathBuf, FileIdentity)> = Vec::new();
-        let (copied, mappings) =
-            match self.copy_all(&target_dir, &referenced, &discovered, &mut created) {
-                Ok(result) => result,
-                Err(error) => {
-                    rollback_assets(&target_dir, &created, created_asset_dir);
-                    return Err(error);
-                }
-            };
+        let copied_assets = match self.copy_all(&target_dir, &referenced, &discovered, &mut created)
+        {
+            Ok(result) => result,
+            Err(error) => {
+                rollback_assets(&target_dir, &created, created_asset_dir);
+                return Err(error);
+            }
+        };
         if platform_fs::sync_directory(&target_dir).is_err() {
             rollback_assets(&target_dir, &created, created_asset_dir);
             return Err(MigrationError::Io);
         }
         Ok(ResourceMigration {
             target: self.target.clone(),
-            mappings,
-            copied,
+            mappings: copied_assets.mappings,
+            copied: copied_assets.copied,
+            relative_references: discovered
+                .iter()
+                .map(|asset| asset.reference.clone())
+                .collect(),
+            proofs: copied_assets.proofs,
             created,
             asset_dir: target_dir,
             created_asset_dir,
@@ -279,9 +394,10 @@ impl ResourceMigrationJob {
         referenced: &[&TempResource],
         discovered: &[DiscoveredAsset],
         created: &mut Vec<(PathBuf, FileIdentity)>,
-    ) -> Result<(Vec<PathBuf>, Vec<ResourceMapping>), MigrationError> {
+    ) -> Result<CopiedAssets, MigrationError> {
         let mut copied = Vec::new();
         let mut mappings = Vec::new();
+        let mut proofs = Vec::new();
         let mut total_bytes = 0_u64;
         for entry in referenced {
             check_cancelled(&self.cancellation)?;
@@ -291,7 +407,9 @@ impl ResourceMigrationJob {
             let extension = resource_extension(&entry.display_name);
             let (file_name, _created) =
                 place_asset(target_dir, &stem, &extension, &bytes, created)?;
-            copied.push(target_dir.join(&file_name));
+            let path = target_dir.join(&file_name);
+            copied.push(path.clone());
+            proofs.push(AssetProof::capture(path, bytes)?);
             mappings.push(ResourceMapping {
                 from: entry.locator.clone(),
                 to: reference_text(&self.settings, target_dir, &file_name),
@@ -312,7 +430,7 @@ impl ResourceMigrationJob {
                     if metadata.file_type().is_symlink() || !metadata.is_file() {
                         return Err(MigrationError::Io);
                     }
-                    let existing = fs::read(&destination).map_err(|_| MigrationError::Io)?;
+                    let existing = read_ordinary_file(&destination)?;
                     if existing != bytes {
                         return Err(MigrationError::Io);
                     }
@@ -323,11 +441,120 @@ impl ResourceMigrationJob {
                 }
                 Err(_) => return Err(MigrationError::Io),
             }
-            copied.push(destination);
+            copied.push(destination.clone());
+            proofs.push(AssetProof::capture(destination, bytes)?);
             check_cancelled(&self.cancellation)?;
         }
-        Ok((copied, mappings))
+        Ok(CopiedAssets {
+            copied,
+            mappings,
+            proofs,
+        })
     }
+}
+
+/// 一次复制阶段的三份产物：就位路径、引用映射与逐字节复验凭据。
+struct CopiedAssets {
+    copied: Vec<PathBuf>,
+    mappings: Vec<ResourceMapping>,
+    proofs: Vec<AssetProof>,
+}
+
+/// 每次只读重放一个历史节点；输出用于后台发现资源，不形成可提交全文或新历史。
+fn visit_history_sources(
+    history: &ResourceHistory,
+    budget: TextBudget,
+    mut visit: impl FnMut(&str),
+) -> Result<(), MigrationError> {
+    let base_range = history
+        .snapshot
+        .src_range(0..history.snapshot.len_bytes())
+        .map_err(|_| MigrationError::StaleResourceSet)?;
+    let mut current = history
+        .snapshot
+        .slice(&base_range, budget)
+        .map_err(|_| MigrationError::BudgetExceeded)?
+        .into_owned();
+    for node in history
+        .nodes
+        .get(..history.cursor)
+        .ok_or(MigrationError::StaleResourceSet)?
+        .iter()
+        .rev()
+    {
+        for step in node.iter().rev() {
+            replay_history(
+                &mut current,
+                step.get().inverse_patches(),
+                step.get().after_len(),
+                budget,
+            )?;
+            // 多步骤节点的每个中间态都可经逐步撤销/重做到达，逐步骤访问。
+            visit(&current);
+        }
+    }
+    current = history
+        .snapshot
+        .slice(&base_range, budget)
+        .map_err(|_| MigrationError::BudgetExceeded)?
+        .into_owned();
+    for node in history
+        .nodes
+        .get(history.cursor..)
+        .ok_or(MigrationError::StaleResourceSet)?
+    {
+        for step in node {
+            replay_history(
+                &mut current,
+                step.get().forward_patches(),
+                step.get().before_len(),
+                budget,
+            )?;
+            // redo 分支同样逐步骤访问，覆盖多步骤节点的中间态。
+            visit(&current);
+        }
+    }
+    if let Some(redo) = &history.typing_redo {
+        let range = redo
+            .src_range(0..redo.len_bytes())
+            .map_err(|_| MigrationError::StaleResourceSet)?;
+        current = redo
+            .slice(&range, budget)
+            .map_err(|_| MigrationError::BudgetExceeded)?
+            .into_owned();
+        visit(&current);
+    }
+    Ok(())
+}
+
+fn replay_history(
+    source: &mut String,
+    patches: &[(Range<usize>, String)],
+    expected_len: usize,
+    budget: TextBudget,
+) -> Result<(), MigrationError> {
+    if source.len() != expected_len {
+        return Err(MigrationError::StaleResourceSet);
+    }
+    for (range, replacement) in patches.iter().rev() {
+        if range.start > range.end
+            || range.end > source.len()
+            || !source.is_char_boundary(range.start)
+            || !source.is_char_boundary(range.end)
+        {
+            return Err(MigrationError::StaleResourceSet);
+        }
+        let len = source
+            .len()
+            .checked_sub(range.len())
+            .and_then(|len| len.checked_add(replacement.len()))
+            .ok_or(MigrationError::BudgetExceeded)?;
+        if len > budget.max_bytes() {
+            return Err(MigrationError::BudgetExceeded);
+        }
+        source.replace_range(range.clone(), replacement);
+    }
+    Ok(())
 }
 
 /// 仅当设置为相对目录时发现既有相对资产；结果按文件名排序并去重。
@@ -482,8 +709,45 @@ fn read_temp_resource(directory: &Path, file_name: &str) -> Result<Vec<u8>, Migr
 
 #[cfg_attr(not(test), allow(dead_code))]
 fn read_ordinary_file(path: &Path) -> Result<Vec<u8>, MigrationError> {
-    platform_fs::verify_ordinary_file(path).map_err(|_| MigrationError::Io)?;
-    fs::read(path).map_err(|_| MigrationError::Io)
+    let identity = platform_fs::verify_ordinary_file(path).map_err(|_| MigrationError::Io)?;
+    let file = fs::File::open(path).map_err(|_| MigrationError::Io)?;
+    let metadata = file.metadata().map_err(|_| MigrationError::Io)?;
+    if !metadata.is_file() || metadata.len() > MAX_RESOURCE_BYTES as u64 {
+        return Err(MigrationError::BudgetExceeded);
+    }
+    #[cfg(target_os = "macos")]
+    if metadata.dev() != identity.dev || metadata.ino() != identity.ino {
+        return Err(MigrationError::StaleResourceSet);
+    }
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(
+            usize::try_from(metadata.len()).map_err(|_| MigrationError::BudgetExceeded)?,
+        )
+        .map_err(|_| MigrationError::BudgetExceeded)?;
+    let mut reader = file.take(MAX_RESOURCE_BYTES as u64 + 1);
+    let mut chunk = [0_u8; 16 * 1024];
+    loop {
+        let read = reader.read(&mut chunk).map_err(|_| MigrationError::Io)?;
+        if read == 0 {
+            break;
+        }
+        if bytes
+            .len()
+            .checked_add(read)
+            .is_none_or(|len| len > MAX_RESOURCE_BYTES)
+        {
+            return Err(MigrationError::BudgetExceeded);
+        }
+        bytes
+            .try_reserve_exact(read)
+            .map_err(|_| MigrationError::BudgetExceeded)?;
+        bytes.extend_from_slice(&chunk[..read]);
+    }
+    if platform_fs::verify_ordinary_file(path).map_err(|_| MigrationError::Io)? != identity {
+        return Err(MigrationError::StaleResourceSet);
+    }
+    Ok(bytes)
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
@@ -554,7 +818,10 @@ fn place_asset(
                 if metadata.file_type().is_symlink() || !metadata.is_file() {
                     continue;
                 }
-                let existing = fs::read(&target).map_err(|_| MigrationError::Io)?;
+                if metadata.len() != bytes.len() as u64 {
+                    continue;
+                }
+                let existing = read_ordinary_file(&target)?;
                 if existing == bytes {
                     return Ok((file_name, false));
                 }
@@ -563,7 +830,7 @@ fn place_asset(
                 match write_asset(directory, &target, bytes, created) {
                     Ok(()) => return Ok((file_name, true)),
                     Err(FsError::AlreadyExists) => {
-                        if fs::read(&target).ok().as_deref() == Some(bytes) {
+                        if read_ordinary_file(&target).ok().as_deref() == Some(bytes) {
                             return Ok((file_name, false));
                         }
                     }

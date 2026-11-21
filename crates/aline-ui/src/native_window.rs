@@ -361,11 +361,6 @@ impl NativeOpenCoordinator {
                     Some(SaveIntent::Migrate(job))
                 }
                 AssociationCommand::Save(command) => self.apply_save_command(command),
-                AssociationCommand::Cancelled => {
-                    self.save_host = SaveHost::Idle;
-                    self.feedback = Some("document.save_cancelled");
-                    None
-                }
                 AssociationCommand::Wait(_) => {
                     self.save_host = SaveHost::Idle;
                     self.feedback = Some("document.save_failed");
@@ -680,10 +675,6 @@ impl NativeOpenCoordinator {
                 None
             }
             AssociationCommand::Save(command) => self.apply_save_command(command),
-            AssociationCommand::Cancelled => {
-                self.feedback = Some("document.save_cancelled");
-                None
-            }
             AssociationCommand::Rejected(rejection) => {
                 self.feedback = Some(save_rejection_key(rejection));
                 None

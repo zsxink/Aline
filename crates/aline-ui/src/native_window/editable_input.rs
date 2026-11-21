@@ -16,9 +16,12 @@
 //! D3.6 只丢弃在途与等待输入、不设 feedback（文档已不存在，反馈无处呈现）。
 //!
 //! 菜单/快捷键显式命令（撤销、重做、剪切、粘贴、全选、模式切换）不经过
-//! `InputScheduler`；若在途 job 因此过期，重试与同步退化前会按最新文档状态重建
-//! 输入帧，命令前已排队的输入仍按序应用。帧无法重建且文档仍可编辑时，按键与
-//! IME 输入反馈 `document.input_dropped`；文档已关闭或只读时不反馈。
+//! `InputScheduler`；若在途 job 因此过期，只携带语义的输入可在最新状态重绑。
+//! 平台坐标与组合目标保留接收时的不可变投影，入口、排水、重试与同步退化共用
+//! `carries_platform_coordinates` 判定并复验来源；失效时静默拒收
+//! （`InputStep::StalePlatformOrigin`），不按新投影解释旧范围，也不丢弃其后的
+//! 语义输入；核心受检入口自身的拒绝（含 StaleResult）仍显示编辑拒绝反馈。
+//! 帧无法重建且文档仍可编辑时反馈 `document.input_dropped`；关闭或只读时不反馈。
 //! Escape 成功后清空排队输入并反馈 `document.input_dropped`。
 //!
 //! `prepare_seal` 返回 Err 时直接拒绝（`InputStep::Rejected`）：该错误来自主线程
@@ -35,7 +38,7 @@ use std::{
     rc::Rc,
 };
 
-use aline_buffer::{BufferError, SrcOffset, SrcRange, SrcSelection, TextBudget};
+use aline_buffer::{BufferError, SelectionSpec, SrcOffset, SrcRange, SrcSelection, TextBudget};
 use aline_markdown::{MappingBudget, Projection, ProjectionId};
 use gpui::{
     AnyElement, App, Bounds, ClipboardItem, Context, FocusHandle, InputHandler, MouseButton,
@@ -268,6 +271,7 @@ fn resized(range: Range<usize>, before: usize, after: usize) -> Option<Range<usi
     (range.start <= end).then_some(range.start..end)
 }
 
+#[derive(Clone)]
 struct InputView {
     site: InputSite,
     identity: InputIdentity,
@@ -685,6 +689,25 @@ enum InputIntent {
     Escape,
 }
 
+impl InputIntent {
+    /// 是否携带只在接收帧上有意义的平台 UTF-16 坐标。
+    ///
+    /// 组合期的无范围 Replace 目标是当前组合范围，同样按平台坐标对待；
+    /// 非组合的无范围 Replace 只表达「在当前选区键入」，可按最新状态重绑。
+    /// 入口三分类、捕获与排水复验共用本判定，避免手写清单漂移。
+    fn carries_platform_coordinates(&self, composing: bool) -> bool {
+        match self {
+            Self::Select(_) | Self::Mark(..) | Self::Replace(Some(_), _) => true,
+            Self::Replace(None, _) => composing,
+            Self::LineBreak
+            | Self::Delete { .. }
+            | Self::Move { .. }
+            | Self::Paste(_)
+            | Self::Escape => false,
+        }
+    }
+}
+
 /// 帧不可消费时对一次输入的处置。
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum InputRecovery {
@@ -713,19 +736,14 @@ fn input_feedback_cleared(key: &str) -> bool {
 /// 平台 UTF-16 范围只对其注册的帧有效；命令推进工作版本后，同一数值在新投影上
 /// 指向不同文本，重建后解释旧坐标会写到错误位置，因此必须拒收而不是重绑。
 /// 只携带语义（按键、删除、移动、粘贴）的意图与平台坐标无关，可在重建后按序应用。
-fn input_recovery(accepted: bool, intent: &InputIntent) -> InputRecovery {
+fn input_recovery(accepted: bool, composing: bool, intent: &InputIntent) -> InputRecovery {
     if accepted {
         return InputRecovery::Proceed;
     }
-    match intent {
-        InputIntent::Replace(..) | InputIntent::Mark(..) | InputIntent::Select(..) => {
-            InputRecovery::Reject
-        }
-        InputIntent::LineBreak
-        | InputIntent::Delete { .. }
-        | InputIntent::Move { .. }
-        | InputIntent::Paste(_)
-        | InputIntent::Escape => InputRecovery::Rebind,
+    if intent.carries_platform_coordinates(composing) {
+        InputRecovery::Reject
+    } else {
+        InputRecovery::Rebind
     }
 }
 
@@ -745,6 +763,9 @@ enum InputStep {
     Prepared(NativeInputJob),
     Sealed(NativeInputJob),
     Rejected(DocError),
+    /// 接收时来源已失效的拒收：只可能来自 `ScheduledInput::checked_view`，
+    /// 静默丢弃该条并保留后续语义输入；核心受检入口的拒绝仍走 `Rejected` 反馈。
+    StalePlatformOrigin,
     Inactive,
 }
 
@@ -899,12 +920,21 @@ impl InputIntent {
     }
 }
 
-/// 单条自持输入意图及其按键时刻。
+/// 平台坐标回调保留接收时的投影；共享映射与源码快照，不复制局部文本。
+#[derive(Clone)]
+struct PlatformInputOrigin {
+    view: InputView,
+    /// 绝对 Select 不依赖原选区；替换与组合回调必须保全其原目标。
+    selection: Option<SelectionSpec>,
+}
+
+/// 单条自持输入意图、按键时刻与平台坐标来源。
 #[derive(Clone)]
 pub(super) struct ScheduledInput {
     intent: InputIntent,
     now_millis: u64,
     retried: bool,
+    platform: Option<Box<PlatformInputOrigin>>,
 }
 
 impl ScheduledInput {
@@ -913,7 +943,122 @@ impl ScheduledInput {
             intent,
             now_millis,
             retried: false,
+            platform: None,
         }
+    }
+
+    fn capture(
+        intent: InputIntent,
+        now_millis: u64,
+        view: &InputView,
+        document: &ReadonlyDocument,
+    ) -> Self {
+        let needs_platform =
+            intent.carries_platform_coordinates(document.core().composition().is_some());
+        let selection = (!matches!(intent, InputIntent::Select(_)))
+            .then(|| document.core().current_selection());
+        let mut input = Self::new(intent, now_millis);
+        if needs_platform {
+            input.platform = Some(Box::new(PlatformInputOrigin {
+                view: view.clone(),
+                selection,
+            }));
+        }
+        input
+    }
+
+    /// 平台坐标始终在接收时的映射中消费；普通无范围键入只接受非组合逻辑选区。
+    fn checked_view<'a>(
+        &'a self,
+        current_view: &'a InputView,
+        identity: &InputIdentity,
+        current: &CurrentSnapshot,
+        document: &ReadonlyDocument,
+    ) -> Option<&'a InputView> {
+        let view = match &self.platform {
+            Some(origin) => {
+                if origin
+                    .selection
+                    .is_some_and(|selection| selection != document.core().current_selection())
+                {
+                    return None;
+                }
+                &origin.view
+            }
+            None => {
+                // 缺来源的显式平台坐标不能因调用者漏捕获而获得重绑资格。
+                if self
+                    .intent
+                    .carries_platform_coordinates(document.core().composition().is_some())
+                {
+                    return None;
+                }
+                current_view
+            }
+        };
+        view.active(identity, current, document.core().mode())?;
+        Some(view)
+    }
+
+    fn step(
+        &self,
+        view: &InputView,
+        identity: &InputIdentity,
+        current: &CurrentSnapshot,
+        document: &mut ReadonlyDocument,
+    ) -> InputStep {
+        let Some(view) = self.checked_view(view, identity, current, document) else {
+            return InputStep::StalePlatformOrigin;
+        };
+        view.step(&self.intent, identity, current, document, self.now_millis)
+    }
+
+    fn platform_is_current(&self, document: &mut ReadonlyDocument) -> bool {
+        let Some(origin) = &self.platform else {
+            return true;
+        };
+        let Some((identity, current)) = InputView::current(document) else {
+            return false;
+        };
+        self.checked_view(&origin.view, &identity, &current, document)
+            .is_some()
+    }
+
+    /// 仅成功的自身封口可续用触发回调；发布已复验冻结身份，内容并未再次变化。
+    /// 此处再核对源码站点、模式和方向选区，不给其它排队回调更新来源。
+    /// 携带来源的封口触发只可能是 Mark/组合 Replace（Select 走同步应用，
+    /// 不产生封口 job），因此 `origin.selection` 必为 Some。
+    fn after_own_seal(
+        &mut self,
+        frame: Option<&InputFrame>,
+        document: &mut ReadonlyDocument,
+    ) -> bool {
+        let Some(origin) = &mut self.platform else {
+            return true;
+        };
+        let Some(view) = frame
+            .and_then(|frame| frame.0.try_borrow().ok())
+            .and_then(|active| active.as_ref().cloned())
+        else {
+            return false;
+        };
+        if view.site.source != origin.view.site.source
+            || view.site.mode != origin.view.site.mode
+            || origin.selection != Some(document.core().current_selection())
+        {
+            return false;
+        }
+        let Some((identity, current)) = InputView::current(document) else {
+            return false;
+        };
+        if view
+            .active(&identity, &current, document.core().mode())
+            .is_none()
+        {
+            return false;
+        }
+        origin.view = view;
+        true
     }
 }
 
@@ -962,8 +1107,19 @@ enum Recovery {
     Retry,
     /// 同步退化：先应用触发意图，再按序应用等待队列。
     SyncFallback,
+    /// 平台来源已失效：只丢弃该条触发输入，排水继续消费语义队列。
+    DropStaleOrigin,
     /// 放弃活动输入并清空等待队列。
     Clear,
+}
+
+/// 一次失败处置的动作；`Retry` 携带已标记重试的同一输入，`SyncApply` 携带
+/// 待同步应用的输入。动作序列由 `plan_failure_recovery` 给出，可无头断言。
+enum FailureAction {
+    Retry(ActiveInput),
+    SyncApply(ActiveInput),
+    DropStaleOrigin,
+    Clear { document_gone: bool },
 }
 
 /// 薄壳观察到的失败场景；把窗口状态映射为纯输入，判定本身不依赖 GPUI。
@@ -1051,10 +1207,19 @@ impl InputScheduler {
     ///
     /// `Retry` 会先把活动输入标记为已重试，薄壳按意图重新执行即可；
     /// `Clear` 会清空等待队列，薄壳只负责反馈；`SyncFallback` 保留队列供同步应用。
-    fn on_failure(&mut self, active: &mut ActiveInput, scene: InputFailure) -> Recovery {
+    fn on_failure(
+        &mut self,
+        active: &mut ActiveInput,
+        scene: InputFailure,
+        platform_current: bool,
+    ) -> Recovery {
         if matches!(scene, InputFailure::DocumentGone) {
             self.pending.clear();
             return Recovery::Clear;
+        }
+        // 平台来源失效不给重试放宽身份：丢弃该条，语义队列保留待排水。
+        if !platform_current {
+            return Recovery::DropStaleOrigin;
         }
         if !active.input().retried {
             active.mark_retried();
@@ -1077,6 +1242,11 @@ impl InputScheduler {
         self.pending.push_front(input);
     }
 
+    /// 丢弃活动输入但保留等待队列；仅供来源失效的拒收路径使用。
+    fn drop_active(&mut self) {
+        self.active = None;
+    }
+
     pub(super) fn clear(&mut self) {
         self.active = None;
         self.pending.clear();
@@ -1097,6 +1267,49 @@ impl InputScheduler {
     #[cfg(test)]
     pub(super) fn pending_len(&self) -> usize {
         self.pending.len()
+    }
+
+    /// 把下一条等待输入临时置为活动项；同步退化按真实失败序列逐条判定。
+    /// 队列为空时返回 None，调用方以无活动状态收尾。
+    fn promote_pending(&mut self) -> Option<ActiveInput> {
+        let input = self.pending.pop_front()?;
+        self.active = Some(ActiveInput::Direct(input));
+        self.take_active()
+    }
+
+    /// 后台失败后的纯判定动作序列；窗口薄壳逐条执行，判定本身不依赖 GPUI。
+    ///
+    /// 首个动作针对失败的触发输入；`DropStaleOrigin` 之后对等待队列逐条继续判定
+    /// （语义输入重试一次后同步退化，平台来源失效只丢弃该条），任一终止动作结束。
+    fn plan_failure_recovery(
+        &mut self,
+        active: ActiveInput,
+        scene: InputFailure,
+        mut platform_current: impl FnMut(&ScheduledInput) -> bool,
+    ) -> Vec<FailureAction> {
+        let mut actions = Vec::new();
+        let mut next = Some(active);
+        while let Some(mut item) = next.take() {
+            let current = platform_current(item.input());
+            let action = match self.on_failure(&mut item, scene, current) {
+                Recovery::Retry => FailureAction::Retry(item),
+                Recovery::SyncFallback => FailureAction::SyncApply(item),
+                Recovery::DropStaleOrigin => {
+                    self.drop_active();
+                    FailureAction::DropStaleOrigin
+                }
+                Recovery::Clear => FailureAction::Clear {
+                    document_gone: matches!(scene, InputFailure::DocumentGone),
+                },
+            };
+            let terminal = !matches!(action, FailureAction::DropStaleOrigin);
+            actions.push(action);
+            if terminal {
+                return actions;
+            }
+            next = self.promote_pending();
+        }
+        actions
     }
 }
 
@@ -1294,11 +1507,12 @@ impl NativeDocumentWindow {
 
     /// 提交一次输入意图：空闲时立即执行，在途时入队（连续同向删除合并）。
     ///
-    /// 显式命令可能先推进版本或移动选区而使帧失效；命令类意图先按最新状态重建
-    /// 再提交，携带平台坐标的意图（Replace/Mark/Select）则按过期回调静默拒收：
-    /// 不重建、不提交、不设反馈，保留现有上下文，避免旧坐标按新投影解释。
-    /// 命令类意图无法重建时不再静默忽略：文档仍在且可编辑时反馈
-    /// `document.input_dropped`，文档已关闭或只读时按 D3.6 不反馈。
+    /// 显式命令可能先推进版本或移动选区而使帧失效；只携带语义的意图先按最新
+    /// 状态重建再提交，携带平台坐标的意图（Select/Mark/带范围 Replace，及组合期
+    /// 无范围 Replace）按过期回调静默拒收：不重建、不提交、不设反馈，保留现有
+    /// 上下文，避免旧坐标按新投影解释。非组合的无范围 Replace 只表达当前选区
+    /// 键入，与排水路径同口径按语义重绑。语义意图无法重建时不再静默忽略：
+    /// 文档仍在且可编辑时反馈 `document.input_dropped`，关闭或只读时按 D3.6 不反馈。
     fn apply_native_input(
         &mut self,
         frame: &InputFrame,
@@ -1306,7 +1520,12 @@ impl NativeDocumentWindow {
         window: &Window,
         cx: &mut Context<Self>,
     ) -> bool {
-        match input_recovery(self.frame_accepts(frame), &intent) {
+        let composing = self
+            .state
+            .session
+            .document()
+            .is_some_and(|document| document.core().composition().is_some());
+        match input_recovery(self.frame_accepts(frame), composing, &intent) {
             InputRecovery::Proceed => {}
             // 平台坐标只对其注册帧有效；命令推进版本后必须拒收。
             InputRecovery::Reject => return false,
@@ -1325,11 +1544,22 @@ impl NativeDocumentWindow {
                 }
             }
         }
-        let Some(document) = self.state.session.document_mut() else {
-            return false;
+        let now_millis = self.input_millis();
+        let (document, input) = {
+            let Ok(active) = frame.0.try_borrow() else {
+                return false;
+            };
+            let Some(view) = active.as_ref() else {
+                return false;
+            };
+            let Some(document) = self.state.session.document() else {
+                return false;
+            };
+            (
+                document.core().document_id().clone(),
+                ScheduledInput::capture(intent, now_millis, view, document),
+            )
         };
-        let document = document.core().document_id().clone();
-        let input = ScheduledInput::new(intent, self.input_millis());
         match self.input_scheduler.submit(&document, input) {
             InputSubmission::Queued => true,
             InputSubmission::Now(input) => !matches!(
@@ -1367,13 +1597,7 @@ impl NativeDocumentWindow {
             if view.active(&identity, &current, mode).is_none() {
                 return InputExecution::Inactive;
             }
-            view.step(
-                &input.intent,
-                &identity,
-                &current,
-                document,
-                input.now_millis,
-            )
+            input.step(view, &identity, &current, document)
         };
         match step {
             InputStep::Applied {
@@ -1402,6 +1626,9 @@ impl NativeDocumentWindow {
                 self.start_input_job(job, window, cx);
                 InputExecution::Started
             }
+            // 接收时来源已失效：只拒收该条，保留上下文与后面的语义按键。
+            // 核心受检入口的 StaleResult 不在此列，仍按编辑拒绝反馈。
+            InputStep::StalePlatformOrigin => InputExecution::Rejected,
             InputStep::Rejected(error) => {
                 self.state.feedback = Some(edit_error_key(error));
                 cx.notify();
@@ -1494,13 +1721,27 @@ impl NativeDocumentWindow {
             Ok((changed, was_composing, is_composing)) => {
                 let composition =
                     composition_end(&active.input().intent, was_composing, is_composing);
-                if active.is_seal() {
-                    // 触发意图尚未应用：放回队首，在新版本上重放。
-                    self.input_scheduler.requeue_front(active.into_input());
-                }
                 let frame = self.active_input_frame();
+                let mut dropped_trigger = false;
+                if active.is_seal() {
+                    let mut input = active.into_input();
+                    let continued = self
+                        .state
+                        .session
+                        .document_mut()
+                        .is_some_and(|document| input.after_own_seal(frame.as_ref(), document));
+                    if continued {
+                        self.input_scheduler.requeue_front(input);
+                    } else {
+                        dropped_trigger = true;
+                    }
+                }
                 self.settle_after_input(frame.as_ref(), changed, composition, window, cx);
                 self.drain_inputs(window, cx);
+                if dropped_trigger {
+                    self.state.feedback = Some("document.input_dropped");
+                    cx.notify();
+                }
             }
             Err(error) => self.retry_or_fallback(active, error, window, cx),
         }
@@ -1654,13 +1895,10 @@ impl NativeDocumentWindow {
         }
     }
 
-    /// 失败后执行纯判定给出的恢复动作；重试仅一次，绝不静默丢输入。
-    ///
-    /// 显式命令不经过调度，可能在 job 在途时推进版本或移动选区；重试取帧时
-    /// `active_input_frame` 会先按最新文档状态重建失效帧，使触发键与排队输入仍能按序应用。
+    /// 后台失败后的窗口薄壳：执行纯判定动作；重试未启动时按已重试状态继续判定。
     fn retry_or_fallback(
         &mut self,
-        mut active: ActiveInput,
+        active: ActiveInput,
         error: DocError,
         window: &Window,
         cx: &mut Context<Self>,
@@ -1670,14 +1908,25 @@ impl NativeDocumentWindow {
         } else {
             InputFailure::OpenDocument
         };
-        let mut retried_now = false;
-        loop {
+        let mut next = Some(active);
+        while let Some(item) = next.take() {
             let had_pending = self.input_scheduler.has_pending();
-            match self.input_scheduler.on_failure(&mut active, scene) {
-                Recovery::Retry => {
-                    retried_now = true;
-                    let escape = matches!(active.input().intent, InputIntent::Escape);
-                    let retried = active.input().clone();
+            let actions = self
+                .input_scheduler
+                .plan_failure_recovery(item, scene, |input| {
+                    self.state
+                        .session
+                        .document_mut()
+                        .is_some_and(|document| input.platform_is_current(document))
+                });
+            // 纯判定保证 Retry 只可能出现在首位，其后不跟其它动作。
+            let Some(action) = actions.into_iter().next() else {
+                return;
+            };
+            match action {
+                FailureAction::Retry(retry) => {
+                    let escape = matches!(retry.input().intent, InputIntent::Escape);
+                    let retried = retry.input().clone();
                     let started = if escape {
                         matches!(
                             self.execute_escape(retried, window, cx),
@@ -1699,10 +1948,12 @@ impl NativeDocumentWindow {
                     if started {
                         return;
                     }
+                    // 重试未启动：同一输入已标记重试，继续判定（不会再 Retry）。
+                    next = Some(retry);
                 }
-                Recovery::SyncFallback => {
+                FailureAction::SyncApply(sync) => {
                     // D2b.5：仅此拒绝路径允许一次同步应用，保证触发键不丢。
-                    let applied = self.replay_pending_sync(active.into_input(), window, cx);
+                    let applied = self.replay_pending_sync(sync.into_input(), window, cx);
                     if !applied {
                         self.input_scheduler.clear();
                     }
@@ -1714,18 +1965,20 @@ impl NativeDocumentWindow {
                     cx.notify();
                     return;
                 }
-                Recovery::Clear => {
-                    if matches!(scene, InputFailure::DocumentGone) {
-                        return;
+                FailureAction::DropStaleOrigin => {
+                    // 与排水路径同口径：静默丢弃该条，不设反馈。
+                    self.drain_inputs(window, cx);
+                    return;
+                }
+                FailureAction::Clear { document_gone } => {
+                    if !document_gone {
+                        self.state.feedback = Some(if had_pending {
+                            "document.input_dropped"
+                        } else {
+                            edit_error_key(error)
+                        });
+                        cx.notify();
                     }
-                    let escape = matches!(active.input().intent, InputIntent::Escape);
-                    if escape && !retried_now {
-                        // 入口即已重试的关闭意图再次失败：报告本次失败。
-                        self.state.feedback = Some(edit_error_key(error));
-                    } else if had_pending || !escape {
-                        self.state.feedback = Some("document.input_dropped");
-                    }
-                    cx.notify();
                     return;
                 }
             }
@@ -1773,6 +2026,10 @@ impl NativeDocumentWindow {
                 {
                     break 'replay false;
                 }
+                let Some(view) = input.checked_view(view, &identity, &current, document) else {
+                    // 旧平台坐标不执行同步退化；后续语义输入仍按序消费。
+                    continue 'replay;
+                };
                 let before = document.core().version();
                 if input
                     .intent

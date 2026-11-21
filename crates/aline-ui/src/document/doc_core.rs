@@ -31,6 +31,7 @@ use crate::document::publication::{
 };
 use crate::document::snapshot::{CurrentSnapshot, SnapshotCache};
 use crate::document::{EditorMode, ResourceReference};
+pub(crate) use checked_commit::PreparedMigration;
 
 /// 文档核心的注入预算集合；不声明发布性能阈值。
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -24,12 +24,23 @@ fn prepared_edit_leaves_real_buffer_untouched_until_publish() -> Result<(), Buff
         1,
         TEXT,
     )?;
+    let candidate = prepared.result_snapshot();
+    let candidate_range = candidate.src_range(0..candidate.len_bytes())?;
+    assert_eq!(candidate.slice(&candidate_range, TEXT)?, "甲乙\n尾");
+    assert_eq!(prepared.result_selection().anchor().byte_offset(), 0);
+    assert_eq!(prepared.result_selection().head().byte_offset(), 3);
+    let candidate_id = candidate.id().clone();
 
     assert_eq!(buffer.snapshot().id(), &id);
     assert_editor(&buffer, "甲x", SelectionSpec::new(4, 0), 0, 0)?;
     let ApplyOutcome::Changed(applied) = buffer.publish_prepared(prepared)? else {
         return Err(BufferError::HistoryContextMismatch);
     };
+    assert_eq!(
+        buffer.snapshot().id(),
+        &candidate_id,
+        "真正发布须消费准确候选文本"
+    );
     assert_eq!(applied.revision().value(), 1);
     assert_eq!(applied.line_count(), 2);
     assert_eq!(applied.inverse_patches(), &[(3..10, String::from("x"))]);

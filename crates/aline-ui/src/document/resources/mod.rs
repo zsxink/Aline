@@ -19,9 +19,11 @@ pub(crate) use cleanup::{CleanupOutcome, ResourceCleanupJob};
 /// 图片目录设置的失败分类只由只读会话测试入口消费。
 #[cfg(test)]
 pub(crate) use migration::ImageSettingsError;
+#[cfg(test)]
+use migration::ResourceMapping;
 pub(crate) use migration::{
     DiscoveredAsset, ImageDirectory, ImageSettings, MigrationCompletion, MigrationError,
-    ResourceMapping, ResourceMigration, ResourceMigrationJob, discover_relative_assets,
+    ResourceHistory, ResourceMigration, ResourceMigrationJob, discover_relative_assets,
     locator_spans, rewrite_locators,
 };
 pub(crate) use source::TempResourceSource;

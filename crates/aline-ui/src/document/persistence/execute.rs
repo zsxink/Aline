@@ -1,11 +1,11 @@
 //! 已冻结保存的后台执行包；按固定顺序观察、复核、编码并执行同目录受检替换。
 //! 本模块只构造完成项交回会话结算，不读取编辑历史或修改文档状态。
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use aline_buffer::TextBudget;
 use aline_source::fs::{
-    FsError, create_staging, discard_staging, file_identity, publish_staged_new,
+    FsError, StagedFile, create_staging, discard_staging, file_identity, publish_staged_new,
 };
 use aline_source::{
     AtomicFailureKind, BaselineError, DiskVersion, ExistingTarget, IoBudget, StorageBudget,
@@ -133,8 +133,18 @@ fn run_associate(
         },
     };
     let Some(observed) = observed else {
+        if frozen.association_expected.is_some() {
+            return completion(frozen, WriteOutcome::NotPublished(WriteStop::Conflict));
+        }
         return run_create(frozen, text_budget, storage_budget, staging);
     };
+    if frozen
+        .association_expected
+        .as_ref()
+        .is_some_and(|expected| expected.storage().bytes() != observed.storage().bytes())
+    {
+        return completion(frozen, WriteOutcome::NotPublished(WriteStop::Conflict));
+    }
     if !overwrite {
         return completion(frozen, WriteOutcome::NotPublished(WriteStop::Conflict));
     }
@@ -160,6 +170,18 @@ fn run_create(
     storage_budget: StorageBudget,
     _staging: PathBuf,
 ) -> WriteCompletion {
+    run_create_using(frozen, text_budget, storage_budget, |parent, bytes| {
+        create_staging(parent, ".aline-save", bytes)
+    })
+}
+
+/// 文件创建是唯一注入边界；生产与故障回归都使用真实 staging，取消在发布前复验。
+pub(super) fn run_create_using(
+    frozen: FrozenWrite,
+    text_budget: TextBudget,
+    storage_budget: StorageBudget,
+    create: impl FnOnce(&Path, &[u8]) -> Result<StagedFile, FsError>,
+) -> WriteCompletion {
     let encoded = match frozen.encode(text_budget, storage_budget) {
         Ok(encoded) => encoded,
         Err(error) => return frozen.stop_before_write(error),
@@ -167,12 +189,19 @@ fn run_create(
     let Some(parent) = frozen.path().parent() else {
         return completion(frozen, WriteOutcome::NotPublished(WriteStop::Create));
     };
-    let staged = match create_staging(parent, ".aline-save", encoded.bytes().bytes()) {
+    if frozen.cancellation().is_cancelled() {
+        return completion(frozen, WriteOutcome::NotPublished(WriteStop::Cancelled));
+    }
+    let staged = match create(parent, encoded.bytes().bytes()) {
         Ok(staged) => staged,
         Err(_) => {
             return completion(frozen, WriteOutcome::NotPublished(WriteStop::Create));
         }
     };
+    if frozen.cancellation().is_cancelled() {
+        let _ = discard_staging(staged);
+        return completion(frozen, WriteOutcome::NotPublished(WriteStop::Cancelled));
+    }
     let identity = staged.identity();
     let published = publish_staged_new(&staged, frozen.path());
     let _ = discard_staging(staged);

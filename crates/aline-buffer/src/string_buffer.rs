@@ -96,6 +96,24 @@ pub struct PreparedBufferEdit {
 }
 
 impl PreparedBufferEdit {
+    /// 返回实际准备结果的只读文本；无变化时返回冻结基线，不授予发布权限。
+    pub fn result_snapshot(&self) -> &TextSnapshot {
+        match self.change.as_ref() {
+            Some(PreparedChange::Single(batch)) => &batch.state.snapshot,
+            Some(PreparedChange::Staged { command, .. }) => &command.state.snapshot,
+            None => &self.base.snapshot,
+        }
+    }
+
+    /// 返回实际准备结果绑定的方向性选区；无变化时保留冻结选区。
+    pub fn result_selection(&self) -> &SrcSelection {
+        match self.change.as_ref() {
+            Some(PreparedChange::Single(batch)) => &batch.state.selection,
+            Some(PreparedChange::Staged { command, .. }) => &command.state.selection,
+            None => &self.base.selection,
+        }
+    }
+
     /// 返回候选有变化时的目标代次，供文档所有者在发布前预检工作版本。
     pub fn result_revision(&self) -> Option<DocumentRevision> {
         let batch = match self.change.as_ref()? {
@@ -578,6 +596,14 @@ impl StringBuffer {
     /// 返回指定历史节点的共享步骤句柄；句柄存活期间补丁文本不被释放。
     pub fn history_step(&self, index: usize) -> Option<HistoryStepHandle> {
         self.history.step_handle(index)
+    }
+
+    /// 返回节点内全部共享步骤，保持提交顺序；合并输入节点不会丢失中间步骤。
+    pub fn history_node_steps(
+        &self,
+        index: usize,
+    ) -> Option<impl DoubleEndedIterator<Item = HistoryStepHandle> + '_> {
+        self.history.node_steps(index)
     }
 
     /// 从最旧节点裁剪到目标节点数；保存点与当前节点所在前缀受保护。

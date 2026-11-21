@@ -12,6 +12,58 @@ use aline_buffer::{
 const TEXT_BUDGET: usize = 4096;
 const PATCH_BUDGET: usize = 32;
 
+#[test]
+fn history_node_steps_preserve_merged_input_and_survive_node_removal() -> Result<(), Box<dyn Error>>
+{
+    let mut buffer = make_buffer("a", 1, 1, 16)?;
+    apply_patch(
+        &mut buffer,
+        vec![(1..1, String::from("b"))],
+        (2, 2),
+        OperationSource::Typing,
+        0,
+    )?;
+    apply_patch(
+        &mut buffer,
+        vec![(2..2, String::from("c"))],
+        (3, 3),
+        OperationSource::Typing,
+        100,
+    )?;
+    assert_eq!(buffer.history_node_count(), 1);
+    let handles: Vec<HistoryStepHandle> = buffer
+        .history_node_steps(0)
+        .ok_or("缺少合并节点")?
+        .collect();
+    assert_eq!(handles.len(), 2, "不能只暴露合并节点的最后一步");
+    assert_eq!(
+        handles[0].get().forward_patches(),
+        &[(1..1, String::from("b"))]
+    );
+    assert_eq!(
+        handles[1].get().forward_patches(),
+        &[(2..2, String::from("c"))]
+    );
+    assert!(buffer.history_node_steps(1).is_none());
+    buffer.undo(TextBudget::new(TEXT_BUDGET))?;
+    assert_eq!(text(&buffer)?, "a");
+    apply_patch(
+        &mut buffer,
+        vec![(1..1, String::from("z"))],
+        (2, 2),
+        OperationSource::Replace,
+        101,
+    )?;
+    assert_eq!(buffer.history_node_count(), 1);
+    assert_eq!(
+        handles[0].get().inverse_patches(),
+        &[(1..2, String::new())],
+        "截断redo不释放冻结句柄"
+    );
+    assert_eq!(handles[1].get().inverse_patches(), &[(2..3, String::new())]);
+    Ok(())
+}
+
 #[derive(Debug)]
 struct State {
     text: String,

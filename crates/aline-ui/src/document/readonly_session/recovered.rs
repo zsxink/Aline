@@ -370,7 +370,6 @@ mod tests {
                 AssociationCommand::Run(job) => job.run(),
                 AssociationCommand::Wait(_) => return Err("无组合时不应等待".into()),
                 AssociationCommand::Save(_) => return Err("空资源应进入迁移".into()),
-                AssociationCommand::Cancelled => return Err("关联不应在开始前取消".into()),
                 AssociationCommand::Rejected(_) => return Err("关联不应被拒绝".into()),
             }
         };

@@ -304,22 +304,36 @@ fn marked_cancel_restores_selection_and_failed_confirmation_keeps_mark() -> Test
 fn input_recovery_rejects_stale_platform_coordinates_and_rebinds_commands() {
     // 携带平台 UTF-16 坐标的意图：旧帧不可消费时必须拒收，不能换投影解释。
     let platform = [
-        InputIntent::Replace(None, "x".to_owned()),
         InputIntent::Replace(Some(0..1), "x".to_owned()),
         InputIntent::Mark(None, "n".to_owned(), None),
         InputIntent::Mark(Some(0..1), "n".to_owned(), Some(1..1)),
         InputIntent::Select(0..1),
     ];
-    for intent in &platform {
+    for composing in [false, true] {
+        for intent in &platform {
+            assert_eq!(
+                input_recovery(true, composing, intent),
+                InputRecovery::Proceed,
+                "可消费帧上的平台意图应直接提交"
+            );
+            assert_eq!(
+                input_recovery(false, composing, intent),
+                InputRecovery::Reject,
+                "过期帧上的平台坐标意图必须静默拒收"
+            );
+        }
+        // 组合期无范围 Replace 目标是组合范围，同按平台坐标拒收。
+        let plain = InputIntent::Replace(None, "x".to_owned());
         assert_eq!(
-            input_recovery(true, intent),
-            InputRecovery::Proceed,
-            "可消费帧上的平台意图应直接提交"
-        );
-        assert_eq!(
-            input_recovery(false, intent),
+            input_recovery(false, true, &plain),
             InputRecovery::Reject,
-            "过期帧上的平台坐标意图必须静默拒收"
+            "组合期无范围替换必须保全组合目标"
+        );
+        // 非组合无范围 Replace 只表达当前选区键入：入口与排水同口径重绑。
+        assert_eq!(
+            input_recovery(false, false, &plain),
+            InputRecovery::Rebind,
+            "非组合普通键入与排水路径同口径按语义重绑"
         );
     }
     // 只携带语义的命令：过期后按最新状态重建，排队输入继续按序应用。
@@ -346,12 +360,12 @@ fn input_recovery_rejects_stale_platform_coordinates_and_rebinds_commands() {
     ];
     for intent in &commands {
         assert_eq!(
-            input_recovery(true, intent),
+            input_recovery(true, false, intent),
             InputRecovery::Proceed,
             "可消费帧上的命令应直接提交"
         );
         assert_eq!(
-            input_recovery(false, intent),
+            input_recovery(false, false, intent),
             InputRecovery::Rebind,
             "过期帧上的命令应重建后继续"
         );
@@ -873,7 +887,8 @@ fn queued_text_after_in_flight_backspace_publishes_delete_before_text() -> TestR
         return Err("空闲调度应立即执行删除".into());
     };
     scheduler.start_direct(delete);
-    let queued = ScheduledInput::new(InputIntent::Replace(None, "x".to_owned()), 2);
+    let queued =
+        ScheduledInput::capture(InputIntent::Replace(None, "x".to_owned()), 2, &initial, doc);
     assert!(matches!(
         scheduler.submit(&document, queued),
         InputSubmission::Queued
@@ -893,17 +908,350 @@ fn queued_text_after_in_flight_backspace_publishes_delete_before_text() -> TestR
     let Some(queued) = scheduler.take_pending() else {
         return Err("等待的文本输入缺失".into());
     };
-    let InputIntent::Replace(None, text) = queued.intent else {
+    let InputIntent::Replace(None, text) = &queued.intent else {
         return Err("等待意图不是文本替换".into());
     };
     assert_eq!(text, "x");
     let after = view(doc)?;
-    apply(doc, &after, InputIntent::Replace(None, text))?;
+    let identity = doc.input_identity()?;
+    let current = doc.current_snapshot()?;
+    assert!(matches!(
+        queued.step(&after, &identity, &current, doc),
+        InputStep::Applied { changed: true, .. }
+    ));
     assert_eq!(
         doc.current_snapshot()?.full_text(TEXT)?,
         "axcd",
         "文本必须在删除之后应用"
     );
+    Ok(())
+}
+
+#[test]
+fn queued_platform_selection_after_backspace_does_not_select_a_different_character() -> TestResult {
+    let mut state = session("abcd", HistoryBudget::new(8, 4096), EditorMode::Source)?;
+    let doc = state.document_mut().ok_or("没有文档")?;
+    let initial = view(doc)?;
+    apply(doc, &initial, InputIntent::Select(2..2))?;
+    let identity = doc.input_identity()?;
+    let current = doc.current_snapshot()?;
+    let delete = ScheduledInput::new(
+        InputIntent::Delete {
+            forward: false,
+            count: 1,
+        },
+        1,
+    );
+    let InputStep::Prepared(job) =
+        initial.step(&delete.intent, &identity, &current, doc, delete.now_millis)
+    else {
+        return Err("删除必须先冻结为在途 job".into());
+    };
+    let document = doc.core().document_id().clone();
+    let mut scheduler = InputScheduler::new();
+    let InputSubmission::Now(delete) = scheduler.submit(&document, delete) else {
+        return Err("首条删除必须直接执行".into());
+    };
+    scheduler.start_direct(delete);
+    // 接收时 2..3 选择 c；删除 b 后，同一数值却会选择 d。
+    let queued = ScheduledInput::capture(InputIntent::Select(2..3), 2, &initial, doc);
+    assert!(matches!(
+        scheduler.submit(&document, queued),
+        InputSubmission::Queued
+    ));
+    let following =
+        ScheduledInput::capture(InputIntent::Replace(None, "x".to_owned()), 3, &initial, doc);
+    assert!(matches!(
+        scheduler.submit(&document, following),
+        InputSubmission::Queued
+    ));
+    doc.edit_core()?.publish_native_input(job.run()?)?;
+    assert!(scheduler.take_active().is_some());
+    let queued = scheduler
+        .take_pending()
+        .ok_or("平台选择回调必须保持排队次序")?;
+    assert_eq!(doc.core().buffer_text()?, "acd");
+    assert_eq!(doc.core().current_selection(), SelectionSpec::new(1, 1));
+    let after = view(doc)?;
+    let identity = doc.input_identity()?;
+    let current = doc.current_snapshot()?;
+    let step = queued.step(&after, &identity, &current, doc);
+    assert!(matches!(step, InputStep::StalePlatformOrigin));
+    assert_eq!(doc.core().current_selection(), SelectionSpec::new(1, 1));
+    assert_eq!(doc.core().buffer_text()?, "acd");
+    assert_eq!(doc.core().undo_depth(), 1);
+    assert_eq!(doc.core().redo_depth(), 0);
+    assert!(doc.core().composition().is_none());
+    assert!(doc.core().open_block_draft().is_none());
+    assert_eq!(scheduler.pending_len(), 1, "过期选择不得清空后续语义输入");
+    let following = scheduler.take_pending().ok_or("后续语义按键缺失")?;
+    let current = doc.current_snapshot()?;
+    assert!(matches!(
+        following.step(&after, &identity, &current, doc),
+        InputStep::Applied { changed: true, .. }
+    ));
+    assert_eq!(
+        doc.current_snapshot()?.full_text(TEXT)?,
+        "axcd",
+        "不能因旧范围错选 d 而覆盖它"
+    );
+    assert!(scheduler.take_pending().is_none());
+    Ok(())
+}
+
+#[test]
+fn queued_platform_replace_and_mark_after_backspace_preserve_the_published_state() -> TestResult {
+    let callbacks = [
+        InputIntent::Replace(Some(2..2), "x".to_owned()),
+        InputIntent::Mark(Some(2..2), "n".to_owned(), Some(1..1)),
+        InputIntent::Mark(None, "n".to_owned(), Some(1..1)),
+    ];
+    for intent in callbacks {
+        let mut state = session("abcd", HistoryBudget::new(8, 4096), EditorMode::Source)?;
+        let doc = state.document_mut().ok_or("没有文档")?;
+        let initial = view(doc)?;
+        apply(doc, &initial, InputIntent::Select(2..2))?;
+        let queued = ScheduledInput::capture(intent, 2, &initial, doc);
+        let identity = doc.input_identity()?;
+        let current = doc.current_snapshot()?;
+        let InputStep::Prepared(job) = initial.step(
+            &InputIntent::Delete {
+                forward: false,
+                count: 1,
+            },
+            &identity,
+            &current,
+            doc,
+            1,
+        ) else {
+            return Err("删除应冻结为后台 job".into());
+        };
+        doc.edit_core()?.publish_native_input(job.run()?)?;
+        let version = doc.core().version();
+        let snapshot = doc.current_snapshot()?.snapshot_id().clone();
+        let after = view(doc)?;
+        let identity = doc.input_identity()?;
+        let current = doc.current_snapshot()?;
+        assert!(matches!(
+            queued.step(&after, &identity, &current, doc),
+            InputStep::StalePlatformOrigin
+        ));
+        assert!(
+            !queued.platform_is_current(doc),
+            "旧平台目标不得获得重试资格"
+        );
+        assert_eq!(doc.core().buffer_text()?, "acd");
+        assert_eq!(doc.current_snapshot()?.full_text(TEXT)?, "acd");
+        assert_eq!(doc.core().version(), version);
+        assert_eq!(doc.current_snapshot()?.snapshot_id(), &snapshot);
+        assert_eq!(doc.core().current_selection(), SelectionSpec::new(1, 1));
+        assert_eq!(doc.core().undo_depth(), 1);
+        assert_eq!(doc.core().redo_depth(), 0);
+        assert_eq!(doc.core().history_node_count(), 1);
+        assert!(doc.core().composition().is_none());
+        assert!(doc.core().open_block_draft().is_none());
+    }
+    Ok(())
+}
+
+#[test]
+fn platform_replacement_does_not_follow_a_changed_selection_in_the_same_snapshot() -> TestResult {
+    let mut state = session("abcd", HistoryBudget::new(8, 4096), EditorMode::Source)?;
+    let doc = state.document_mut().ok_or("没有文档")?;
+    let initial = view(doc)?;
+    apply(doc, &initial, InputIntent::Select(1..2))?;
+    let queued =
+        ScheduledInput::capture(InputIntent::Replace(None, "x".to_owned()), 2, &initial, doc);
+    // 无范围普通输入是语义键入，当前选区仍由调用顺序决定。
+    assert!(queued.platform.is_none());
+    let bound = ScheduledInput::capture(
+        InputIntent::Replace(Some(1..2), "x".to_owned()),
+        2,
+        &initial,
+        doc,
+    );
+    let before = doc.core().version();
+    apply(doc, &initial, InputIntent::Select(2..3))?;
+    assert_eq!(doc.core().version(), before, "选区移动不推进内容版本");
+    let after = view(doc)?;
+    let identity = doc.input_identity()?;
+    let current = doc.current_snapshot()?;
+    assert!(matches!(
+        bound.step(&after, &identity, &current, doc),
+        InputStep::StalePlatformOrigin
+    ));
+    assert!(!bound.platform_is_current(doc));
+    assert_eq!(doc.core().current_selection(), SelectionSpec::new(2, 3));
+    assert_eq!(doc.core().buffer_text()?, "abcd");
+    assert_eq!(doc.core().history_node_count(), 0);
+    Ok(())
+}
+
+#[test]
+fn platform_selection_uses_its_original_mapping_when_only_the_frame_was_rebuilt() -> TestResult {
+    let mut state = session("abcd", HistoryBudget::new(8, 4096), EditorMode::Source)?;
+    let doc = state.document_mut().ok_or("没有文档")?;
+    let version = doc.core().version();
+    let initial = view(doc)?;
+    let queued = ScheduledInput::capture(InputIntent::Select(2..3), 2, &initial, doc);
+    // 同一源码快照重新绘制会创建不同投影；平台数值仍由被捕获的原投影解释。
+    let after = view(doc)?;
+    assert_ne!(
+        initial.coordinates.projection_id(),
+        after.coordinates.projection_id()
+    );
+    let identity = doc.input_identity()?;
+    let current = doc.current_snapshot()?;
+    assert!(matches!(
+        queued.step(&after, &identity, &current, doc),
+        InputStep::Applied { .. }
+    ));
+    assert_eq!(doc.core().current_selection(), SelectionSpec::new(2, 3));
+    assert_eq!(doc.core().buffer_text()?, "abcd");
+    assert_eq!(doc.core().version(), version);
+    assert_eq!(doc.core().history_node_count(), 0);
+    Ok(())
+}
+
+#[test]
+fn composition_start_after_own_seal_continues_only_the_trigger_callback() -> TestResult {
+    for (mode, range) in [
+        (EditorMode::Source, None),
+        (EditorMode::Source, Some(2..2)),
+        (EditorMode::Visual, None),
+        (EditorMode::Visual, Some(2..2)),
+    ] {
+        let mut state = session("ab", HistoryBudget::new(8, 4096), mode)?;
+        let doc = state.document_mut().ok_or("没有文档")?;
+        let initial = view(doc)?;
+        apply(doc, &initial, InputIntent::Select(1..1))?;
+        apply(doc, &initial, InputIntent::Replace(None, "x".to_owned()))?;
+        let drafted = view(doc)?;
+        let mut trigger = ScheduledInput::capture(
+            InputIntent::Mark(range, "n".to_owned(), Some(1..1)),
+            2,
+            &drafted,
+            doc,
+        );
+        let queued = ScheduledInput::capture(InputIntent::Select(0..1), 3, &drafted, doc);
+        let identity = doc.input_identity()?;
+        let current = doc.current_snapshot()?;
+        let InputStep::Sealed(job) = trigger.step(&drafted, &identity, &current, doc) else {
+            return Err("组合起始必须先封口普通输入组".into());
+        };
+        doc.edit_core()?.publish_native_input(job.run()?)?;
+        assert_eq!(doc.core().buffer_text()?, "axb");
+        assert_eq!(doc.core().current_selection(), SelectionSpec::new(2, 2));
+        assert_eq!(doc.core().undo_depth(), 1);
+        assert!(!trigger.platform_is_current(doc));
+        assert!(!queued.platform_is_current(doc));
+        let frame = InputFrame(Rc::new(RefCell::new(Some(view(doc)?))));
+        assert!(trigger.after_own_seal(Some(&frame), doc));
+        assert!(trigger.platform_is_current(doc));
+        assert!(!queued.platform_is_current(doc), "封口只更新触发回调的资格");
+        let after = view(doc)?;
+        let identity = doc.input_identity()?;
+        let current = doc.current_snapshot()?;
+        assert!(matches!(
+            trigger.step(&after, &identity, &current, doc),
+            InputStep::Applied { changed: true, .. }
+        ));
+        let composition = doc.core().composition().ok_or("触发回调应开启组合")?;
+        assert_eq!(composition.range(), 2..2);
+        assert_eq!(composition.candidate(), "n");
+        let cancelled = view(doc)?;
+        apply(
+            doc,
+            &cancelled,
+            InputIntent::Mark(None, String::new(), Some(0..0)),
+        )?;
+        assert!(doc.core().composition().is_none());
+        assert_eq!(doc.core().buffer_text()?, "axb");
+        assert_eq!(doc.core().undo_depth(), 1);
+        assert_eq!(doc.core().redo_depth(), 0);
+    }
+    Ok(())
+}
+
+#[test]
+fn late_composition_callbacks_do_not_target_the_next_round_after_confirmation() -> TestResult {
+    let mut state = session("ab", HistoryBudget::new(8, 4096), EditorMode::Source)?;
+    let doc = state.document_mut().ok_or("没有文档")?;
+    let initial = view(doc)?;
+    apply(
+        doc,
+        &initial,
+        InputIntent::Mark(None, "n".to_owned(), Some(1..1)),
+    )?;
+    let composing = view(doc)?;
+    let confirm = ScheduledInput::capture(
+        InputIntent::Replace(None, "你".to_owned()),
+        2,
+        &composing,
+        doc,
+    );
+    let late = [
+        ScheduledInput::capture(
+            InputIntent::Replace(None, "好".to_owned()),
+            3,
+            &composing,
+            doc,
+        ),
+        ScheduledInput::capture(
+            InputIntent::Mark(None, "h".to_owned(), Some(1..1)),
+            3,
+            &composing,
+            doc,
+        ),
+    ];
+    let identity = doc.input_identity()?;
+    let current = doc.current_snapshot()?;
+    let InputStep::Prepared(job) = confirm.step(&composing, &identity, &current, doc) else {
+        return Err("组合确认必须准备后台 job".into());
+    };
+    doc.edit_core()?.publish_native_input(job.run()?)?;
+    let version = doc.core().version();
+    assert_eq!(doc.core().buffer_text()?, "你ab");
+    for input in late {
+        let after = view(doc)?;
+        let identity = doc.input_identity()?;
+        let current = doc.current_snapshot()?;
+        assert!(matches!(
+            input.step(&after, &identity, &current, doc),
+            InputStep::StalePlatformOrigin
+        ));
+        assert!(!input.platform_is_current(doc), "旧组合目标不允许后台重试");
+        assert_eq!(doc.core().buffer_text()?, "你ab");
+        assert_eq!(doc.core().version(), version);
+        assert_eq!(doc.core().current_selection(), SelectionSpec::new(3, 3));
+        assert_eq!(doc.core().undo_depth(), 1);
+        assert!(doc.core().composition().is_none());
+    }
+    // 发布后新捕获的一轮组合可以正常开始，不能被旧来源拒收清空。
+    let after = view(doc)?;
+    let next = ScheduledInput::capture(
+        InputIntent::Mark(None, "h".to_owned(), Some(1..1)),
+        4,
+        &after,
+        doc,
+    );
+    let identity = doc.input_identity()?;
+    let current = doc.current_snapshot()?;
+    assert!(matches!(
+        next.step(&after, &identity, &current, doc),
+        InputStep::Applied { changed: true, .. }
+    ));
+    let composition = doc.core().composition().ok_or("新一轮组合应仍有效")?;
+    assert_eq!(composition.range(), 3..3);
+    assert_eq!(composition.candidate(), "h");
+    let cancelled = view(doc)?;
+    apply(
+        doc,
+        &cancelled,
+        InputIntent::Mark(None, String::new(), Some(0..0)),
+    )?;
+    assert_eq!(doc.core().buffer_text()?, "你ab");
+    assert_eq!(doc.core().undo_depth(), 1);
     Ok(())
 }
 
@@ -1015,6 +1363,7 @@ fn scheduler_executes_idle_input_immediately_and_preserves_order() -> TestResult
         intent: InputIntent::Replace(_, text),
         now_millis: 2,
         retried: false,
+        ..
     }) = scheduler.take_pending()
     else {
         return Err("队首输入缺失或顺序错误".into());
@@ -1177,13 +1526,13 @@ fn failure_retries_once_then_seal_falls_back_with_the_queue_intact() -> TestResu
         return Err("封口 job 缺少在途记录".into());
     };
     assert!(matches!(
-        scheduler.on_failure(&mut active, InputFailure::OpenDocument),
+        scheduler.on_failure(&mut active, InputFailure::OpenDocument, true),
         Recovery::Retry
     ));
     assert!(active.input().retried, "首次失败必须先重试一次");
     assert_eq!(scheduler.pending_len(), 1, "重试期间等待队列不得丢弃");
     assert!(matches!(
-        scheduler.on_failure(&mut active, InputFailure::OpenDocument),
+        scheduler.on_failure(&mut active, InputFailure::OpenDocument, true),
         Recovery::SyncFallback
     ));
     assert_eq!(scheduler.pending_len(), 1, "同步退化必须保留队列");
@@ -1210,12 +1559,12 @@ fn failure_twice_clears_a_direct_input_and_the_queue() -> TestResult {
         return Err("独立 job 缺少在途记录".into());
     };
     assert!(matches!(
-        scheduler.on_failure(&mut active, InputFailure::OpenDocument),
+        scheduler.on_failure(&mut active, InputFailure::OpenDocument, true),
         Recovery::Retry
     ));
     assert_eq!(scheduler.pending_len(), 1);
     assert!(matches!(
-        scheduler.on_failure(&mut active, InputFailure::OpenDocument),
+        scheduler.on_failure(&mut active, InputFailure::OpenDocument, true),
         Recovery::Clear
     ));
     assert_eq!(scheduler.pending_len(), 0, "清空必须同时丢弃等待队列");
@@ -1302,7 +1651,7 @@ fn explicit_undo_during_in_flight_seal_rebinds_and_replays_input_in_order() -> T
     );
     assert!(
         matches!(
-            scheduler.on_failure(&mut active, InputFailure::OpenDocument),
+            scheduler.on_failure(&mut active, InputFailure::OpenDocument, true),
             Recovery::Retry
         ),
         "在途封口首次失败应先重试一次"
@@ -1470,4 +1819,162 @@ fn composition_end_classifies_platform_outcome() {
         None,
         "结算前无组合时不得产生结束结果"
     );
+}
+
+#[test]
+fn failure_recovery_drops_stale_platform_trigger_and_keeps_semantic_queue() -> TestResult {
+    let mut state = session("ab", HistoryBudget::new(8, 4096), EditorMode::Source)?;
+    let doc = state.document_mut().ok_or("没有文档")?;
+    let initial = view(doc)?;
+    apply(doc, &initial, InputIntent::Select(1..1))?;
+    apply(doc, &initial, InputIntent::Replace(None, "x".to_owned()))?;
+    let drafted = view(doc)?;
+    let trigger = ScheduledInput::capture(
+        InputIntent::Mark(None, "n".to_owned(), Some(1..1)),
+        2,
+        &drafted,
+        doc,
+    );
+    let queued_select = ScheduledInput::capture(InputIntent::Select(0..1), 3, &drafted, doc);
+    let identity = doc.input_identity()?;
+    let current = doc.current_snapshot()?;
+    let InputStep::Sealed(job) = trigger.step(&drafted, &identity, &current, doc) else {
+        return Err("组合起始必须先封口普通输入组".into());
+    };
+    doc.edit_core()?.publish_native_input(job.run()?)?;
+    assert!(!trigger.platform_is_current(doc), "封口后触发来源已失效");
+    assert!(!queued_select.platform_is_current(doc));
+
+    let mut scheduler = InputScheduler::new();
+    let document = doc.core().document_id().clone();
+    let InputSubmission::Now(seed) = scheduler.submit(&document, trigger) else {
+        return Err("空闲调度应立即可执行".into());
+    };
+    scheduler.start_seal(seed);
+    scheduler.submit(&document, queued_select);
+    scheduler.submit(
+        &document,
+        ScheduledInput::new(InputIntent::Replace(None, "y".to_owned()), 4),
+    );
+    let active = scheduler.take_active().ok_or("缺少在途封口")?;
+    let actions = scheduler.plan_failure_recovery(active, InputFailure::OpenDocument, |input| {
+        input.platform_is_current(doc)
+    });
+    // 触发与排队的平台 Select 都只丢弃自身；语义键入按重试→同步退化处置。
+    assert!(matches!(actions[0], FailureAction::DropStaleOrigin));
+    assert!(matches!(actions[1], FailureAction::DropStaleOrigin));
+    assert!(matches!(actions[2], FailureAction::Retry(_)));
+    assert_eq!(actions.len(), 3);
+    assert_eq!(scheduler.pending_len(), 0, "判定已消费全部等待输入");
+    assert!(!scheduler.is_active());
+    Ok(())
+}
+
+#[test]
+fn failure_recovery_retry_then_sync_fallback_and_clear_are_unchanged() -> TestResult {
+    let document = DocumentId::new();
+    let mut scheduler = InputScheduler::new();
+    let trigger = ScheduledInput::new(InputIntent::Replace(None, "触".to_owned()), 901);
+    let InputSubmission::Now(trigger) = scheduler.submit(&document, trigger) else {
+        return Err("空闲调度应立即可执行".into());
+    };
+    scheduler.start_seal(trigger);
+    scheduler.submit(&document, ScheduledInput::new(InputIntent::LineBreak, 902));
+    let active = scheduler.take_active().ok_or("缺少在途封口")?;
+    let actions = scheduler.plan_failure_recovery(active, InputFailure::OpenDocument, |_| true);
+    assert!(matches!(actions[0], FailureAction::Retry(_)));
+    assert_eq!(actions.len(), 1);
+    // 已重试的封口再失败 → 同步退化；已重试的直接输入再失败 → 清空。
+    let mut retried = ScheduledInput::new(InputIntent::LineBreak, 903);
+    retried.retried = true;
+    let mut seal = ActiveInput::Seal(retried.clone());
+    assert!(matches!(
+        scheduler.on_failure(&mut seal, InputFailure::OpenDocument, true),
+        Recovery::SyncFallback
+    ));
+    let mut direct = ActiveInput::Direct(retried.clone());
+    scheduler.submit(&document, ScheduledInput::new(InputIntent::LineBreak, 904));
+    assert!(matches!(
+        scheduler.on_failure(&mut direct, InputFailure::OpenDocument, true),
+        Recovery::Clear
+    ));
+    assert_eq!(scheduler.pending_len(), 0, "直接输入再失败清空等待队列");
+    // 文档已不存在：无论来源与否都清空且不重试。
+    let mut gone = ActiveInput::Direct(retried);
+    gone.mark_retried();
+    let mut fresh = ActiveInput::Seal(ScheduledInput::new(InputIntent::LineBreak, 905));
+    assert!(matches!(
+        scheduler.on_failure(&mut fresh, InputFailure::DocumentGone, true),
+        Recovery::Clear
+    ));
+    Ok(())
+}
+
+#[test]
+fn after_own_seal_refuses_when_selection_or_site_changed() -> TestResult {
+    let mut state = session("ab", HistoryBudget::new(8, 4096), EditorMode::Source)?;
+    let doc = state.document_mut().ok_or("没有文档")?;
+    let initial = view(doc)?;
+    apply(doc, &initial, InputIntent::Select(1..1))?;
+    apply(doc, &initial, InputIntent::Replace(None, "x".to_owned()))?;
+    let drafted = view(doc)?;
+    let mut trigger = ScheduledInput::capture(
+        InputIntent::Mark(None, "n".to_owned(), Some(1..1)),
+        2,
+        &drafted,
+        doc,
+    );
+    let identity = doc.input_identity()?;
+    let current = doc.current_snapshot()?;
+    let InputStep::Sealed(job) = trigger.step(&drafted, &identity, &current, doc) else {
+        return Err("组合起始必须先封口普通输入组".into());
+    };
+    doc.edit_core()?.publish_native_input(job.run()?)?;
+    // 封口发布后、重放前选区被移动：触发来源不得续用。
+    let moved = view(doc)?;
+    apply(doc, &moved, InputIntent::Select(0..0))?;
+    let frame = InputFrame(Rc::new(RefCell::new(Some(view(doc)?))));
+    assert!(
+        !trigger.after_own_seal(Some(&frame), doc),
+        "选区变化后不得续用触发回调"
+    );
+    assert!(!trigger.platform_is_current(doc));
+    // 帧缺失同样拒绝续用。
+    assert!(!trigger.after_own_seal(None, doc));
+    Ok(())
+}
+
+#[test]
+fn core_stale_result_rejection_keeps_edit_refused_feedback() -> TestResult {
+    // 来源复验通过但核心受检入口拒绝（StaleResult）时，不得被平台来源
+    // 静默分支吞掉：该错误仍映射为编辑拒绝反馈。
+    assert_eq!(
+        edit_error_key(DocError::StaleResult),
+        "document.edit_refused"
+    );
+    let mut state = session("ab", HistoryBudget::new(8, 4096), EditorMode::Source)?;
+    let doc = state.document_mut().ok_or("没有文档")?;
+    let initial = view(doc)?;
+    apply(doc, &initial, InputIntent::Select(1..1))?;
+    apply(doc, &initial, InputIntent::Replace(None, "x".to_owned()))?;
+    let drafted = view(doc)?;
+    let input = ScheduledInput::capture(InputIntent::Select(0..1), 2, &drafted, doc);
+    let identity = doc.input_identity()?;
+    let current = doc.current_snapshot()?;
+    // 来源有效：Select 正常应用，不产生 StalePlatformOrigin。
+    assert!(matches!(
+        input.step(&drafted, &identity, &current, doc),
+        InputStep::Applied { .. }
+    ));
+    // 来源失效（显式命令推进版本后选区移动）：只产生来源专用拒收。
+    doc.edit_core()?.type_text(1, "q", 5)?;
+    let stale = ScheduledInput::capture(InputIntent::Select(0..1), 3, &drafted, doc);
+    let rebuilt = view(doc)?;
+    let identity = doc.input_identity()?;
+    let current = doc.current_snapshot()?;
+    assert!(matches!(
+        stale.step(&rebuilt, &identity, &current, doc),
+        InputStep::StalePlatformOrigin
+    ));
+    Ok(())
 }

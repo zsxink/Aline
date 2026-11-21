@@ -3,7 +3,6 @@
 
 use super::{OperationId, PathGeneration, PersistenceCoordinator, SaveError, WriteKind};
 use aline_buffer::TextBudget;
-use std::path::PathBuf;
 
 use crate::document::{DocCore, DocError, PublicationKind, PublicationOutcome, WaitHandle};
 
@@ -37,7 +36,6 @@ pub(super) struct PendingSave {
     operation: OperationId,
     generation: PathGeneration,
     kind: WriteKind,
-    path: Option<PathBuf>,
 }
 
 impl PersistenceCoordinator {
@@ -62,44 +60,11 @@ impl PersistenceCoordinator {
                 operation,
                 generation: self.target.generation,
                 kind,
-                path: None,
             });
             return Ok(SaveRequest::Waiting(handle));
         }
         let snapshot = core.current_snapshot(text_budget)?;
         self.enqueue(operation, snapshot, kind, path);
-        Ok(SaveRequest::Queued(operation))
-    }
-
-    /// 另存为：选定的绝对路径入队；与当前目标相同时退化为普通保存。
-    /// `overwrite` 固定为 `true`（保存面板已让用户确认替换）。
-    pub(in crate::document) fn request_save_as(
-        &mut self,
-        core: &mut DocCore,
-        text_budget: TextBudget,
-        path: PathBuf,
-    ) -> Result<SaveRequest, SaveRequestError> {
-        self.validate_document(core)?;
-        if !path.is_absolute() {
-            return Err(SaveError::InvalidPath.into());
-        }
-        if path == self.target.path {
-            return self.request_save(core, text_budget);
-        }
-        let operation = self.next_operation()?;
-        if core.composition().is_some() {
-            let handle = core.begin_publication_wait(PublicationKind::Save)?;
-            self.waiting = Some(PendingSave {
-                handle,
-                operation,
-                generation: self.target.generation,
-                kind: WriteKind::SaveAs,
-                path: Some(path),
-            });
-            return Ok(SaveRequest::Waiting(handle));
-        }
-        let snapshot = core.current_snapshot(text_budget)?;
-        self.enqueue(operation, snapshot, WriteKind::SaveAs, path);
         Ok(SaveRequest::Queued(operation))
     }
 
@@ -118,10 +83,7 @@ impl PersistenceCoordinator {
             return Err(SaveError::StaleAssociation.into());
         }
         let publication = core.finish_publication(handle, outcome, now_millis)?;
-        let path = pending
-            .path
-            .clone()
-            .unwrap_or_else(|| self.target.path.clone());
+        let path = self.target.path.clone();
         self.enqueue(
             pending.operation,
             publication.snapshot().clone(),

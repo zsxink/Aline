@@ -568,6 +568,20 @@ impl History {
         Some(HistoryStepHandle(last.clone()))
     }
 
+    pub(crate) fn node_steps(
+        &self,
+        index: usize,
+    ) -> Option<impl DoubleEndedIterator<Item = HistoryStepHandle> + '_> {
+        Some(
+            self.nodes
+                .get(index)?
+                .steps
+                .iter()
+                .cloned()
+                .map(HistoryStepHandle),
+        )
+    }
+
     pub(crate) fn len(&self) -> usize {
         self.nodes.len()
     }
