@@ -3,9 +3,11 @@
 //!
 //! 磁盘 bytes、资源身份、保存等待结算与真实 macOS 中文链路不在本目标：可编辑
 //! 文档的可变入口（输入调度、保存协调器、资源迁移）不通过公开 API 暴露，由
-//! crate 内 `document/persistence/tests.rs`、`native_window/tests.rs` 覆盖；
-//! 真实磁盘/内存对照见 `logs/validation/m2-editable-core/2026-11-19-native-run/`
-//! 的采样证据。本目标不声称真实窗口、IME 或多平台行为已通过。
+//! crate 内 `document/persistence/tests.rs`、`native_window/tests.rs` 覆盖
+//! （保存等待 × 外改 × 重载的集成链见
+//! `session_composition_wait_conflict_preserves_input_then_reload_keeps_undo_boundary`）；
+//! 真实磁盘/内存对照见 `logs/validation/m2-editable-core/` 的采样证据。本目标
+//! 不声称真实窗口、IME 或多平台行为已通过。
 
 mod common;
 

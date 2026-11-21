@@ -1100,6 +1100,124 @@ fn persistence_session_external_change_conflict_preserves_memory_and_disk() -> T
     Ok(())
 }
 
+/// M2 4.3：组合期保存等待期间目标被同尺寸、同 mtime 改写，平台确认后必须
+/// 按内容结算为冲突（mtime/size 不是版本判据），保留已确认输入、当前快照与
+/// 共享历史；随后显式载入建立独立 Undo/Redo 边界，磁盘不被回写。
+#[cfg(target_os = "macos")]
+#[test]
+fn session_composition_wait_conflict_preserves_input_then_reload_keeps_undo_boundary() -> TestResult
+{
+    use std::fs;
+
+    let directory = TempSaveDir::create("aline-wait-external-conflict")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"x\n")?;
+    let mut session = editable_absolute_session(&target)?;
+    open_editing_block(&mut session)?;
+
+    let handle = {
+        let document = session.document_mut().ok_or("应存在可编辑文档")?;
+        let core = document.edit_core()?;
+        core.set_selection(SelectionSpec::new(1, 1))?;
+        core.composition_start("中", 0)?;
+        core.composition_update("中文", 1)?;
+        match document.request_save_command() {
+            SaveCommand::Wait(handle) => handle,
+            _ => return Err("组合期保存应等待平台结束".into()),
+        }
+    };
+    assert_eq!(
+        session
+            .document()
+            .ok_or("应存在可编辑文档")?
+            .persistence_status(),
+        Some(SaveStatus::WaitingForComposition),
+        "组合期保存只登记等待，不冻结或写盘"
+    );
+    // 等待期目标被外部同尺寸改写并把 mtime 恢复为原值。
+    assert_eq!(
+        fs::read(&target)?,
+        b"x\n",
+        "组合等待期不得提前写盘或改动目标"
+    );
+    rewrite_same_size_and_mtime(&target)?;
+
+    let (before_snapshot, before_history) = {
+        let document = session.document_mut().ok_or("应存在可编辑文档")?;
+        document.edit_core()?.composition_commit(2)?;
+        let snapshot = document.current_snapshot()?;
+        let history = (document.core().undo_depth(), document.core().redo_depth());
+        (snapshot, history)
+    };
+    let job = {
+        let document = session.document_mut().ok_or("应存在可编辑文档")?;
+        match document.finish_save_wait_command(handle, PublicationOutcome::PlatformConfirmed, 3) {
+            SaveCommand::Run(job) => job,
+            _ => return Err("平台确认后应生成后台保存".into()),
+        }
+    };
+    let settlement = session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .settle_save(job.run())
+        .map_err(save_request_error)?;
+    assert!(settlement.adopted, "冲突完成项仍须结算以记录状态");
+    assert!(matches!(settlement.outcome, WriteOutcome::NotPublished(_)));
+    assert_eq!(
+        settlement.published_target(),
+        None,
+        "冲突不得报告已发布目标"
+    );
+    {
+        let document = session.document_mut().ok_or("应存在可编辑文档")?;
+        assert_eq!(document.persistence_status(), Some(SaveStatus::Conflict));
+        assert_eq!(
+            document.core().buffer_text()?,
+            "x中文\n",
+            "冲突必须保留已确认输入"
+        );
+        assert_eq!(
+            (document.core().undo_depth(), document.core().redo_depth()),
+            before_history,
+            "冲突不得改变共享历史"
+        );
+        let snapshot = document.current_snapshot()?;
+        assert_eq!(
+            snapshot.snapshot_id(),
+            before_snapshot.snapshot_id(),
+            "冲突结算不得替换当前快照"
+        );
+        assert_eq!(snapshot.full_text(TEXT)?, "x中文\n");
+    }
+    assert_eq!(fs::read(&target)?, b"y\n", "冲突不得覆盖外部内容");
+    assert_eq!(
+        session.close_document(),
+        CloseDisposition::Refused,
+        "未处理冲突必须拒绝关闭"
+    );
+
+    // 显式载入磁盘：建立独立历史边界；撤销取回冲突期本地文本，重做回磁盘文本。
+    assert_eq!(
+        run_external_check(&mut session, ExternalCheckIntent::Reload, 10)?,
+        ExternalApplyResult::Reloaded
+    );
+    {
+        let document = session.document_mut().ok_or("应存在可编辑文档")?;
+        assert_eq!(document.core().buffer_text()?, "y\n");
+        assert_eq!(document.persistence_status(), Some(SaveStatus::Idle));
+        document.edit_core()?.undo()?;
+        assert!(document.note_history_move(), "撤销越过载入边界应新进入暂停");
+        assert_eq!(document.core().buffer_text()?, "x中文\n");
+        assert!(document.autosave_paused());
+        document.edit_core()?.redo()?;
+        assert!(!document.note_history_move());
+        assert_eq!(document.core().buffer_text()?, "y\n");
+        assert!(!document.autosave_paused());
+    }
+    assert_eq!(fs::read(&target)?, b"y\n", "载入与撤销/重做不得改写磁盘");
+    Ok(())
+}
+
 #[cfg(target_os = "macos")]
 #[test]
 fn persistence_conflict_resave_is_rejected_without_queue_residue() -> TestResult {
