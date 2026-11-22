@@ -1808,9 +1808,17 @@ impl NativeDocumentWindow {
             {
                 Some(SaveIntent::Save(job)) => self.start_save(job, window, cx),
                 Some(SaveIntent::Migrate(job)) => self.start_association(job, window, cx),
-                Some(SaveIntent::ChooseTarget(_)) => {
-                    // 等待必有目标；选择器不可达，按内部失败反馈且不改菜单。
-                    self.state.feedback = Some("document.save_failed");
+                Some(SaveIntent::ChooseTarget(kind)) => {
+                    if let Some(request) = self.state.ready_target() {
+                        let weak = cx.entity().downgrade();
+                        window.defer(cx, move |window, cx| {
+                            let _ = weak.update(cx, |this, cx| {
+                                if this.state.ready_target_matches(&request) {
+                                    this.begin_target_dialog(kind, window, cx);
+                                }
+                            });
+                        });
+                    }
                 }
                 // 等待已由协调器按拒绝/取消路径结算，保留其反馈。
                 None => {}

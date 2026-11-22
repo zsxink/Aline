@@ -1730,64 +1730,247 @@ fn non_composing_save_entries_keep_their_target_selection() -> Result<(), Box<dy
 }
 
 #[cfg(target_os = "macos")]
-#[test]
-fn composing_untitled_save_intent_rejects_target_selection_without_side_effects()
--> Result<(), Box<dyn Error>> {
+fn composing_target_state() -> Result<super::NativeOpenCoordinator, Box<dyn Error>> {
     let mut state = super::NativeOpenCoordinator::new(coordinator_limits(true));
     open_synthetic_recovered(&mut state, "x\n")?;
-    {
-        let document = state.session.document_mut().ok_or("应存在可编辑文档")?;
-        let len = document.baseline().source().len();
-        let core = document.edit_core()?;
-        core.open_block(0..len, SelectionSpec::new(0, 0))?;
-        core.composition_start("候", 0)?;
-    }
+    let document = state.session.document_mut().ok_or("应存在可编辑文档")?;
+    let len = document.baseline().source().len();
+    let core = document.edit_core()?;
+    core.open_block(0..len, SelectionSpec::new(0, 0))?;
+    core.composition_start("候", 0)?;
+    Ok(state)
+}
 
-    assert!(state.save_as_enabled(), "组合期菜单保持可用，点击后给反馈");
-    assert!(
-        state.request_save_intent().is_none(),
-        "无目标首次保存在组合期不得打开选择器"
-    );
-    assert_eq!(state.feedback_key(), Some("document.composition_pending"));
-    assert!(
-        matches!(state.save_host, super::SaveHost::Idle),
-        "拒绝不得建立等待句柄"
-    );
-    assert!(!state.save_waiting());
-    let document = state.session.document().ok_or("应存在文档")?;
-    assert!(document.core().composition().is_some(), "拒绝不得结束组合");
-    assert!(
-        !document.association_active(),
-        "拒绝不得产生关联或迁移副作用"
-    );
+#[cfg(target_os = "macos")]
+#[test]
+fn composing_target_entries_wait_then_choose_after_natural_end() -> Result<(), Box<dyn Error>> {
+    for kind in [WriteKind::Create, WriteKind::SaveAs] {
+        for cancelled in [false, true] {
+            let mut state = composing_target_state()?;
+            let before = state
+                .session
+                .document()
+                .ok_or("应存在文档")?
+                .core()
+                .version();
+            let intent = if kind == WriteKind::Create {
+                state.request_save_intent()
+            } else {
+                state.request_save_as_intent()
+            };
+            assert!(intent.is_none(), "组合期不得立即打开选择器");
+            assert_eq!(state.feedback_key(), Some("document.save_waiting"));
+            assert!(state.save_waiting() && state.save_cancel_enabled() && state.save_busy());
+            let document = state.session.document_mut().ok_or("应存在文档")?;
+            assert_eq!(document.core().version(), before);
+            assert!(!document.association_active());
+            document.edit_core()?.composition_update("候选", 1)?;
+            let outcome = if cancelled {
+                document.edit_core()?.composition_cancel(2)?;
+                crate::PublicationOutcome::PlatformCancelled
+            } else {
+                document.edit_core()?.composition_commit(2)?;
+                crate::PublicationOutcome::PlatformConfirmed
+            };
+            let version = document.core().version();
+            assert!(matches!(state.finish_save_wait_intent(outcome, 3),
+                Some(super::SaveIntent::ChooseTarget(actual)) if actual == kind));
+            assert!(!state.save_waiting());
+            assert!(state.save_cancel_enabled() && state.save_busy());
+            let request = state.ready_target().ok_or("应存在延后资格")?;
+            assert!(state.ready_target_matches(&request));
+            assert!(
+                state.finish_save_wait_intent(outcome, 4).is_none(),
+                "不得重复结算"
+            );
+            let selection = state
+                .begin_target_selection(kind)
+                .ok_or("应允许打开位置选择器")?;
+            assert!(!state.ready_target_matches(&request), "消费后不得重复打开");
+            assert!(
+                state
+                    .finish_target_selection(&selection, Ok(None), 5)
+                    .is_none()
+            );
+            assert!(!state.save_busy());
+            let document = state.session.document().ok_or("应存在文档")?;
+            assert_eq!(document.core().version(), version, "等待和选择取消不改版本");
+            assert_eq!(document.core().undo_depth(), usize::from(!cancelled));
+            assert_eq!(document.path(), Path::new("recovered.md"));
+        }
+    }
     Ok(())
 }
 
 #[cfg(target_os = "macos")]
 #[test]
-fn composing_save_as_intent_rejects_target_selection_without_side_effects()
--> Result<(), Box<dyn Error>> {
-    let mut state = super::NativeOpenCoordinator::new(coordinator_limits(true));
-    open_synthetic_recovered(&mut state, "x\n")?;
-    {
-        let document = state.session.document_mut().ok_or("应存在可编辑文档")?;
-        let len = document.baseline().source().len();
-        let core = document.edit_core()?;
-        core.open_block(0..len, SelectionSpec::new(0, 0))?;
-        core.composition_start("候", 0)?;
-    }
-
-    assert!(state.save_as_enabled(), "组合期另存为菜单仍可用");
-    assert!(
-        state.request_save_as_intent().is_none(),
-        "组合期另存为不得打开原生选择器"
-    );
-    assert_eq!(state.feedback_key(), Some("document.composition_pending"));
-    assert!(matches!(state.save_host, super::SaveHost::Idle));
-    assert!(!state.save_waiting());
+fn target_wait_selected_path_saves_latest_confirmed_text() -> Result<(), Box<dyn Error>> {
+    let directory = WindowSaveDir::create("aline-target-wait-save")?;
+    let target = directory.0.join("confirmed.md");
+    let mut state = composing_target_state()?;
+    assert!(state.request_save_intent().is_none());
+    state
+        .session
+        .document_mut()
+        .ok_or("应存在文档")?
+        .edit_core()?
+        .composition_update("确认", 1)?;
+    state
+        .session
+        .document_mut()
+        .ok_or("应存在文档")?
+        .edit_core()?
+        .composition_commit(2)?;
+    assert!(matches!(
+        state.finish_save_wait_intent(crate::PublicationOutcome::PlatformConfirmed, 3),
+        Some(super::SaveIntent::ChooseTarget(WriteKind::Create))
+    ));
+    let request = state
+        .begin_target_selection(WriteKind::Create)
+        .ok_or("应可打开位置选择器")?;
+    let Some(super::SaveIntent::Migrate(job)) =
+        state.finish_target_selection(&request, Ok(Some(target.clone())), 4)
+    else {
+        return Err("选择后应沿既有迁移入口继续".into());
+    };
+    let Some(super::SaveIntent::Save(job)) = state.association_finished(job.run(), 5) else {
+        return Err("迁移后应排入实际保存".into());
+    };
+    state.settle_save(job.run());
+    assert_eq!(std::fs::read(&target)?, "确认x\n".as_bytes());
     let document = state.session.document().ok_or("应存在文档")?;
+    assert_eq!(document.path(), target);
+    assert_eq!(
+        document.core().undo_depth(),
+        1,
+        "等待/选择/保存均不增加历史"
+    );
+    assert!(!state.save_busy());
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn target_wait_cancel_preserves_composition_and_blocks_late_picker() -> Result<(), Box<dyn Error>> {
+    let mut state = composing_target_state()?;
+    assert!(state.request_save_as_intent().is_none());
+    assert!(state.request_save_intent().is_none());
+    assert_eq!(state.feedback_key(), Some("document.save_busy"));
+    assert!(state.request_autosave().is_none());
+    assert!(state.cancel_save_wait());
+    let document = state.session.document_mut().ok_or("应存在文档")?;
     assert!(document.core().composition().is_some());
-    assert!(!document.association_active());
+    assert_eq!(document.core().undo_depth(), 0);
+    document.edit_core()?.composition_update("继续", 1)?;
+    document.edit_core()?.composition_commit(2)?;
+    assert!(
+        state
+            .finish_save_wait_intent(crate::PublicationOutcome::PlatformConfirmed, 3)
+            .is_none()
+    );
+    assert!(state.ready_target().is_none());
+    assert!(!state.save_busy());
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn target_ready_cancel_close_and_replacement_reject_deferred_picker() -> Result<(), Box<dyn Error>>
+{
+    for action in 0..3 {
+        let mut state = composing_target_state()?;
+        state.request_save_as_intent();
+        state
+            .session
+            .document_mut()
+            .ok_or("应存在文档")?
+            .edit_core()?
+            .composition_cancel(1)?;
+        state.finish_save_wait_intent(crate::PublicationOutcome::PlatformCancelled, 2);
+        let request = state.ready_target().ok_or("应存在延后资格")?;
+        match action {
+            0 => assert!(state.cancel_save_wait()),
+            1 => assert!(state.close_document()),
+            _ => {
+                state.request_open()?;
+            }
+        }
+        assert!(!state.ready_target_matches(&request));
+        assert!(!state.save_busy(), "失效资格不得永久阻塞保存");
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn target_ready_reenters_wait_when_new_composition_starts_before_defer()
+-> Result<(), Box<dyn Error>> {
+    let mut state = composing_target_state()?;
+    state.request_save_as_intent();
+    assert!(
+        state
+            .finish_save_wait_intent(crate::PublicationOutcome::PlatformConfirmed, 1)
+            .is_none()
+    );
+    assert!(state.save_waiting(), "提前的结束结果不能清除尚活动的等待");
+    state
+        .session
+        .document_mut()
+        .ok_or("应存在文档")?
+        .edit_core()?
+        .composition_cancel(2)?;
+    state.finish_save_wait_intent(crate::PublicationOutcome::PlatformCancelled, 3);
+    let old = state.ready_target().ok_or("应存在延后资格")?;
+    state
+        .session
+        .document_mut()
+        .ok_or("应存在文档")?
+        .edit_core()?
+        .composition_start("新", 4)?;
+    assert!(state.begin_target_selection(WriteKind::SaveAs).is_none());
+    assert!(state.save_waiting(), "新组合期间仍应保留发布意图");
+    assert!(!state.ready_target_matches(&old));
+    state
+        .session
+        .document_mut()
+        .ok_or("应存在文档")?
+        .edit_core()?
+        .composition_cancel(5)?;
+    assert!(matches!(
+        state.finish_save_wait_intent(crate::PublicationOutcome::PlatformCancelled, 6),
+        Some(super::SaveIntent::ChooseTarget(WriteKind::SaveAs))
+    ));
+    assert!(state.begin_target_selection(WriteKind::SaveAs).is_some());
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn target_dialog_completion_cannot_attach_to_replacement_document() -> Result<(), Box<dyn Error>> {
+    let mut state = composing_target_state()?;
+    state
+        .session
+        .document_mut()
+        .ok_or("应存在文档")?
+        .edit_core()?
+        .composition_cancel(1)?;
+    let old = state
+        .begin_target_selection(WriteKind::SaveAs)
+        .ok_or("应可选择目标")?;
+    state.request_open()?;
+    let new = state
+        .begin_target_selection(WriteKind::SaveAs)
+        .ok_or("应可选择新目标")?;
+    assert!(
+        state
+            .finish_target_selection(&old, Ok(Some(PathBuf::from("/stale.md"))), 2)
+            .is_none()
+    );
+    assert!(
+        matches!(&state.save_host, super::SaveHost::ChoosingTarget(current) if current.matches(&new))
+    );
+    assert!(state.finish_target_selection(&new, Ok(None), 3).is_none());
+    assert!(!state.save_busy());
     Ok(())
 }
 

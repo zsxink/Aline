@@ -447,7 +447,7 @@ impl ReadonlyDocument {
     /// 首次保存是否必须先选择目标：可编辑、无关联、无待迁移且未挂接持久化。
     ///
     /// 只读查询，不推进版本、选区、草稿或历史；调用方仅在 macOS 的
-    /// `native_window` 编译（窗口据此在组合期拒绝打开原生目标选择器）。
+    /// `native_window` 编译（窗口据此在组合期等待后再打开原生目标选择器）。
     #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     pub(crate) fn save_target_required(&self) -> bool {
         self.editable

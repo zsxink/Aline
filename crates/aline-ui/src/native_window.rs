@@ -67,8 +67,8 @@ use crate::document::{
 use crate::fonts::{FontEnvironment, FontStatus};
 use crate::{
     DocLimits, DocumentId, EditorMode, ModeSwitchOutcome, OpenDisposition, OpenError,
-    OpenRequestId, ParseRefreshJob, PublicationOutcome, ReadonlyDocument, ReadonlyOpenCompletion,
-    ReadonlyOpenJob, ReadonlyOpenLimits, ReadonlySession, WaitHandle,
+    OpenRequestId, ParseRefreshJob, PublicationKind, PublicationOutcome, ReadonlyDocument,
+    ReadonlyOpenCompletion, ReadonlyOpenJob, ReadonlyOpenLimits, ReadonlySession, WaitHandle,
 };
 
 gpui::actions!(
@@ -134,14 +134,37 @@ pub(super) fn open_limits() -> ReadonlyOpenLimits {
 }
 
 /// 窗口层保存宿主状态；只记录阶段与等待句柄，不复制文档队列。
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 enum SaveHost {
     /// 当前没有显式保存请求。
     Idle,
     /// 组合期内等待平台自然结束；句柄用于取消或结算。
     Waiting(WaitHandle),
+    /// 目标选择器尚未打开；组合自然结束前仅保存后续意图。
+    WaitingTarget {
+        handle: WaitHandle,
+        request: TargetRequest,
+    },
+    /// 平台已结束组合，等待窗口延后回调消费选择器资格。
+    ReadyTarget(TargetRequest),
+    /// 原生位置选择器在途，回执只能由同一请求消费。
+    ChoosingTarget(TargetRequest),
     /// 已完成冻结并交给后台执行，等待结算回执。
     Running { automatic: bool },
+}
+
+/// 位置选择请求只持实例身份与种类；不复制当前文本或组合状态。
+#[derive(Clone, Debug)]
+struct TargetRequest {
+    document: DocumentId,
+    kind: WriteKind,
+    token: Rc<()>,
+}
+
+impl TargetRequest {
+    fn matches(&self, other: &Self) -> bool {
+        self.document == other.document && Rc::ptr_eq(&self.token, &other.token)
+    }
 }
 
 /// 无 GPUI 的窗口协调规则；会话继续独占文档与请求资格。
@@ -235,10 +258,7 @@ impl NativeOpenCoordinator {
 
     /// 请求保存；返回 Some(job) 时窗口负责后台执行。反馈已在内部设置。
     pub(super) fn request_save(&mut self) -> Option<SaveJob> {
-        if matches!(
-            self.save_host,
-            SaveHost::Running { .. } | SaveHost::Waiting(_)
-        ) {
+        if !matches!(self.save_host, SaveHost::Idle) {
             self.feedback = Some("document.save_busy");
             return None;
         }
@@ -289,6 +309,27 @@ impl NativeOpenCoordinator {
 
     /// 取消保存等待或首次关联复制；返回是否确实取消了。反馈已设置。
     pub(super) fn cancel_save_wait(&mut self) -> bool {
+        if let SaveHost::WaitingTarget { handle, request } = &self.save_host {
+            let handle = *handle;
+            let document_id = request.document.clone();
+            self.save_host = SaveHost::Idle;
+            let result = self
+                .session
+                .document_mut()
+                .filter(|document| document.core().document_id() == &document_id)
+                .map(|document| document.edit_core()?.request_cancel_wait(handle));
+            self.feedback = Some(if matches!(result, Some(Ok(()))) {
+                "document.save_cancelled"
+            } else {
+                "document.save_failed"
+            });
+            return matches!(result, Some(Ok(())));
+        }
+        if matches!(self.save_host, SaveHost::ReadyTarget(_)) {
+            self.save_host = SaveHost::Idle;
+            self.feedback = Some("document.save_cancelled");
+            return true;
+        }
         if matches!(self.save_host, SaveHost::Running { .. }) {
             // 迁移/关联写盘复用 `Running` 表达忙态；只有关联活动时可取消，
             // 普通保存仍在后台执行，取消菜单不得声称已取消。
@@ -337,6 +378,34 @@ impl NativeOpenCoordinator {
         outcome: PublicationOutcome,
         now_millis: u64,
     ) -> Option<SaveIntent> {
+        if let SaveHost::WaitingTarget { handle, request } = &self.save_host {
+            let handle = *handle;
+            let request = request.clone();
+            if self.session.document().is_some_and(|document| {
+                document.core().document_id() == &request.document
+                    && document.core().composition().is_some()
+            }) {
+                return None;
+            }
+            let result = self
+                .session
+                .document_mut()
+                .filter(|document| document.core().document_id() == &request.document)
+                .map(|document| {
+                    document
+                        .edit_core()?
+                        .finish_publication(handle, outcome, now_millis)
+                });
+            if matches!(result, Some(Ok(_))) {
+                let kind = request.kind;
+                self.save_host = SaveHost::ReadyTarget(request);
+                self.feedback = None;
+                return Some(SaveIntent::ChooseTarget(kind));
+            }
+            self.save_host = SaveHost::Idle;
+            self.feedback = Some("document.save_failed");
+            return None;
+        }
         let SaveHost::Waiting(handle) = self.save_host else {
             return None;
         };
@@ -425,12 +494,16 @@ impl NativeOpenCoordinator {
 
     /// 是否存在组合期保存等待（菜单取消项可用性）。
     pub(super) fn save_waiting(&self) -> bool {
-        matches!(self.save_host, SaveHost::Waiting(_))
+        matches!(
+            self.save_host,
+            SaveHost::Waiting(_) | SaveHost::WaitingTarget { .. }
+        )
     }
 
     /// 取消菜单是否可用：组合期等待或首次保存/另存为关联（复制/写盘）活动。
     pub(super) fn save_cancel_enabled(&self) -> bool {
         self.save_waiting()
+            || matches!(self.save_host, SaveHost::ReadyTarget(_))
             || self
                 .session
                 .document()
@@ -543,9 +616,7 @@ impl NativeOpenCoordinator {
 
     /// 手工保存入口：无目标时请求选择器，待重试迁移优先重试。
     ///
-    /// 组合未结束时，无目标的首次保存会进入目标选择；原生面板可能夺取焦点并
-    /// 打断组合。按设计决定 3 保留上下文并拒绝目标动作：只设反馈，不建等待句柄、
-    /// 不开对话框，也不产生文档副作用。已有目标的保存仍走等待路径。
+    /// 无目标且组合未结束时等待平台自然结束，再打开目标选择器。
     pub(super) fn request_save_intent(&mut self) -> Option<SaveIntent> {
         if !matches!(self.save_host, SaveHost::Idle) {
             self.feedback = Some("document.save_busy");
@@ -556,8 +627,7 @@ impl NativeOpenCoordinator {
             return None;
         };
         if document.core().composition().is_some() && document.save_target_required() {
-            self.feedback = Some("document.composition_pending");
-            return None;
+            return self.wait_for_target(WriteKind::Create);
         }
         let command = document.request_save_or_target();
         self.apply_save_target_command(command)
@@ -565,8 +635,7 @@ impl NativeOpenCoordinator {
 
     /// 另存为入口：总是先请求新目标。
     ///
-    /// 组合未结束时直接拒绝：另存为必然打开原生目标选择器，理由同
-    /// `request_save_intent`；`save_as_enabled` 保持菜单可用，点击后给反馈。
+    /// 组合未结束时仅登记可取消等待，平台自然结束后才请求位置选择器。
     pub(super) fn request_save_as_intent(&mut self) -> Option<SaveIntent> {
         if !matches!(self.save_host, SaveHost::Idle) {
             self.feedback = Some("document.save_busy");
@@ -577,11 +646,117 @@ impl NativeOpenCoordinator {
             return None;
         };
         if document.core().composition().is_some() {
-            self.feedback = Some("document.composition_pending");
-            return None;
+            return self.wait_for_target(WriteKind::SaveAs);
         }
         let command = document.request_save_as_target();
         self.apply_save_target_command(command)
+    }
+
+    fn wait_for_target(&mut self, kind: WriteKind) -> Option<SaveIntent> {
+        let document = self.session.document_mut()?;
+        let publication = if kind == WriteKind::SaveAs {
+            PublicationKind::SaveAs
+        } else {
+            PublicationKind::Save
+        };
+        let request = TargetRequest {
+            document: document.core().document_id().clone(),
+            kind,
+            token: Rc::new(()),
+        };
+        match document
+            .edit_core()
+            .and_then(|core| core.begin_publication_wait(publication))
+        {
+            Ok(handle) => {
+                self.save_host = SaveHost::WaitingTarget { handle, request };
+                self.feedback = Some("document.save_waiting");
+            }
+            Err(_) => self.feedback = Some("document.save_failed"),
+        }
+        None
+    }
+
+    fn ready_target(&self) -> Option<TargetRequest> {
+        match &self.save_host {
+            SaveHost::ReadyTarget(request) => Some(request.clone()),
+            _ => None,
+        }
+    }
+
+    fn target_is_current(&self, request: &TargetRequest) -> bool {
+        self.session
+            .document()
+            .is_some_and(|document| document.core().document_id() == &request.document)
+    }
+
+    fn ready_target_matches(&self, request: &TargetRequest) -> bool {
+        matches!(&self.save_host, SaveHost::ReadyTarget(current) if current.matches(request))
+            && self.target_is_current(request)
+    }
+
+    /// 在窗口副作用边界消费资格；Ready 请求取消或文档替换后不能打开面板。
+    fn begin_target_selection(&mut self, kind: WriteKind) -> Option<TargetRequest> {
+        let request = match &self.save_host {
+            SaveHost::Idle => TargetRequest {
+                document: self.session.document()?.core().document_id().clone(),
+                kind,
+                token: Rc::new(()),
+            },
+            SaveHost::ReadyTarget(request)
+                if request.kind == kind && self.target_is_current(request) =>
+            {
+                request.clone()
+            }
+            _ => return None,
+        };
+        if let Some(document) = self.session.document_mut()
+            && document.core().composition().is_some()
+        {
+            let publication = if kind == WriteKind::SaveAs {
+                PublicationKind::SaveAs
+            } else {
+                PublicationKind::Save
+            };
+            match document
+                .edit_core()
+                .and_then(|core| core.begin_publication_wait(publication))
+            {
+                Ok(handle) => {
+                    self.save_host = SaveHost::WaitingTarget { handle, request };
+                    self.feedback = Some("document.save_waiting");
+                }
+                Err(_) => {
+                    self.save_host = SaveHost::Idle;
+                    self.feedback = Some("document.save_failed");
+                }
+            }
+            return None;
+        }
+        self.save_host = SaveHost::ChoosingTarget(request.clone());
+        Some(request)
+    }
+
+    fn target_selection_matches(&self, request: &TargetRequest) -> bool {
+        matches!(&self.save_host, SaveHost::ChoosingTarget(current) if current.matches(request))
+            && self.target_is_current(request)
+    }
+
+    fn finish_target_selection(
+        &mut self,
+        request: &TargetRequest,
+        selection: Result<Option<PathBuf>, ()>,
+        now_millis: u64,
+    ) -> Option<SaveIntent> {
+        if !matches!(&self.save_host, SaveHost::ChoosingTarget(current) if current.matches(request))
+        {
+            return None;
+        }
+        self.save_host = SaveHost::Idle;
+        if !self.target_is_current(request) {
+            return None;
+        }
+        self.accept_save_target(request.kind, selection, now_millis)
     }
 
     fn apply_save_target_command(&mut self, command: SaveTargetCommand) -> Option<SaveIntent> {
@@ -833,10 +1008,23 @@ impl NativeOpenCoordinator {
         // 用户开始打开/替换文档：在飞恢复立即失效，迟到完成不得接管新文档。
         self.panel.invalidate_restore();
         let request = self.session.request_open()?;
+        self.invalidate_target_selection();
         self.queued = None;
         self.feedback = None;
         self.return_focus = false;
         Ok(request)
+    }
+
+    fn invalidate_target_selection(&mut self) {
+        if matches!(self.save_host, SaveHost::WaitingTarget { .. }) {
+            let _ = self.cancel_save_wait();
+        }
+        if matches!(
+            self.save_host,
+            SaveHost::ReadyTarget(_) | SaveHost::ChoosingTarget(_)
+        ) {
+            self.save_host = SaveHost::Idle;
+        }
     }
 
     /// 配置下一次打开使用的恢复会话；仅转发，不复制状态。
@@ -1005,6 +1193,7 @@ impl NativeOpenCoordinator {
         self.panel.invalidate_restore();
         match self.session.close_document_with(before_close) {
             Ok(value) => {
+                self.invalidate_target_selection();
                 self.queued = None;
                 self.queued_refresh = None;
                 self.feedback = None;
@@ -1871,6 +2060,14 @@ impl NativeDocumentWindow {
         }
         let home = std::env::var_os("HOME").map(PathBuf::from);
         let Some((directory, suggested)) = self.state.save_target_plan(home.as_deref()) else {
+            if matches!(self.state.save_host, SaveHost::ReadyTarget(_)) {
+                self.state.save_host = SaveHost::Idle;
+            }
+            self.update_menu(cx);
+            cx.notify();
+            return;
+        };
+        let Some(request) = self.state.begin_target_selection(kind) else {
             self.update_menu(cx);
             cx.notify();
             return;
@@ -1885,8 +2082,14 @@ impl NativeDocumentWindow {
             };
             let _ = weak.update_in(cx, |this, window, cx| {
                 this.dialog_task = None;
+                if !this.state.target_selection_matches(&request) {
+                    // 同一旧请求在文档替换后也必须退出 Choosing；新请求不受影响。
+                    this.state.finish_target_selection(&request, Err(()), 0);
+                    this.dialog_return_focus = None;
+                    return;
+                }
                 let now = this.now_millis();
-                if let Some(intent) = this.state.accept_save_target(kind, selection, now) {
+                if let Some(intent) = this.state.finish_target_selection(&request, selection, now) {
                     this.run_save_intent(intent, window, cx);
                 }
                 if let Some(focus) = this.dialog_return_focus.take().or(return_focus.clone()) {
