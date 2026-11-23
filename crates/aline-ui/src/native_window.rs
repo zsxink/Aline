@@ -531,12 +531,14 @@ impl NativeOpenCoordinator {
     /// 恢复文档优先用展示原路径的父目录，未命名记录才回退 HOME。
     pub(super) fn save_target_plan(&mut self, home: Option<&Path>) -> Option<(PathBuf, String)> {
         let current = self.session.document().map(|document| {
-            document
-                .recovered_original_path()
-                .cloned()
-                .unwrap_or_else(|| document.path().to_path_buf())
+            if document.save_target_required()
+                && let Some(original) = document.recovered_original_path()
+            {
+                return original.as_path();
+            }
+            document.path()
         });
-        let plan = target_dialog_plan(current.as_deref(), home);
+        let plan = target_dialog_plan(current, home);
         if plan.is_none() {
             self.feedback = Some("document.save_target_failed");
         }
@@ -1134,10 +1136,15 @@ impl NativeOpenCoordinator {
     fn read_finished<T>(
         &mut self,
         completion: ReadonlyOpenCompletion,
+        unsettled_input: bool,
         prepare: impl FnOnce(&ReadonlyDocument) -> Result<T, LayoutError>,
     ) -> (Option<ReadonlyOpenJob>, Option<T>) {
         self.reading = false;
         let result = self.session.accept_open_with(completion, |document| {
+            // 输入 job 尚未发布时核心仍可能干净，替换资格须包含宿主已接收的输入。
+            if unsettled_input {
+                return Err("document.close_pending_changes");
+            }
             let parsed = document.parsed();
             let (mut mode, reason) = readonly_layout::initial_view(parsed.snapshot().len_bytes());
             if parse_fallback_key(parsed).is_some() {
@@ -1186,11 +1193,16 @@ impl NativeOpenCoordinator {
 
     fn close_document_with<T>(
         &mut self,
+        unsettled_input: bool,
         before_close: impl FnOnce(&ReadonlyDocument) -> T,
     ) -> Result<Option<T>, ()> {
         // 用户开始关闭/替换或窗口关闭：在飞恢复立即失效；即使关闭随后被拒绝，
         // 迟到完成也不得重开文档。
         self.panel.invalidate_restore();
+        if unsettled_input {
+            self.feedback = Some("document.close_pending_changes");
+            return Err(());
+        }
         match self.session.close_document_with(before_close) {
             Ok(value) => {
                 self.invalidate_target_selection();
@@ -1210,17 +1222,25 @@ impl NativeOpenCoordinator {
         }
     }
 
+    #[cfg(test)]
     fn close_document(&mut self) -> bool {
-        self.close_document_with(|_| ()).is_ok()
+        self.close_document_with(false, |_| ()).is_ok()
     }
 
-    pub(super) fn close_window(&mut self) -> bool {
-        if !self.close_document() {
+    #[cfg(test)]
+    pub(super) fn close_window(&mut self, unsettled_input: bool) -> bool {
+        if self.close_document_with(unsettled_input, |_| ()).is_err() {
             return false;
         }
+        self.mark_window_closed();
+        true
+    }
+
+    /// 文档已由关闭入口结算并释放后，只终止窗口会话资格。
+    fn mark_window_closed(&mut self) {
+        debug_assert!(self.session.document().is_none());
         self.session.close_window();
         self.closed = true;
-        true
     }
 }
 
@@ -1684,11 +1704,13 @@ pub(crate) fn open_initial_window(
             let weak = entity.downgrade();
             window.on_window_should_close(cx, move |_, cx| {
                 weak.update(cx, |this, cx| {
-                    let close = this.state.close_window();
-                    if !close {
+                    if this.close_with_evidence(cx) {
+                        this.state.mark_window_closed();
+                        true
+                    } else {
                         cx.notify();
+                        false
                     }
-                    close
                 })
                 .unwrap_or(true)
             });
@@ -1753,8 +1775,9 @@ impl NativeDocumentWindow {
         let focus = cx.focus_handle();
         focus.focus(window, cx);
         cx.on_release(|this, cx| {
-            this.close_with_evidence(cx);
-            this.state.close_window();
+            if !this.state.closed && this.close_with_evidence(cx) {
+                this.state.mark_window_closed();
+            }
         })
         .detach();
         let mut fonts = FontEnvironment::new();
@@ -1946,20 +1969,24 @@ impl NativeDocumentWindow {
                 let generation = this.next_reader_generation.checked_add(1);
                 let mut layout_timing = StageTiming::default();
                 let mut adopt_started = None;
-                let (next, prepared) = this.state.read_finished(completion, |document| {
-                    let generation = generation.ok_or(LayoutError::GenerationExhausted)?;
-                    let viewport_width = f32::from(window.viewport_size().width);
-                    let metrics = content_metrics(viewport_width, viewport_width);
-                    let layout_started = StageTimer::start();
-                    let result = ReaderSurface::new(document, generation, this.evidence.clone())
-                        .and_then(|mut reader| {
-                            reader.prepare(document, window, metrics, &this.fonts)?;
-                            Ok((reader, generation))
+                let unsettled_input = this.has_unsettled_input();
+                let (next, prepared) =
+                    this.state
+                        .read_finished(completion, unsettled_input, |document| {
+                            let generation = generation.ok_or(LayoutError::GenerationExhausted)?;
+                            let viewport_width = f32::from(window.viewport_size().width);
+                            let metrics = content_metrics(viewport_width, viewport_width);
+                            let layout_started = StageTimer::start();
+                            let result =
+                                ReaderSurface::new(document, generation, this.evidence.clone())
+                                    .and_then(|mut reader| {
+                                        reader.prepare(document, window, metrics, &this.fonts)?;
+                                        Ok((reader, generation))
+                                    });
+                            layout_timing = layout_started.finish();
+                            adopt_started = Some(StageTimer::start());
+                            result
                         });
-                    layout_timing = layout_started.finish();
-                    adopt_started = Some(StageTimer::start());
-                    result
-                });
                 let applied = prepared.is_some();
                 if applied {
                     // 新文档接管窗口：旧文档的未完成输入、恢复计时与在途结果全部作废。
@@ -2421,28 +2448,54 @@ impl NativeDocumentWindow {
     /// 后台执行真实写盘；完成后回到窗口结算并显示本地化反馈。
     fn start_save(&mut self, job: SaveJob, window: &Window, cx: &mut Context<Self>) {
         let work = cx.background_executor().spawn(async move { job.run() });
-        self.save_task = Some(cx.spawn_in(window, async move |weak, cx| {
-            let completion = work.await;
-            let _ = weak.update_in(cx, |this, window, cx| {
-                this.save_task = None;
-                let settlement = this.state.settle_save(completion);
-                if let Some(key) = settlement.feedback {
-                    this.state.feedback = Some(key);
-                }
-                // 首次关联成功后才创建恢复会话：宿主在此消费一次布防。
-                if this.state.take_recovery_pending_arm() {
-                    this.reset_recovery_tasks();
-                    this.arm_recovery(window, cx);
-                }
-                if this.state.take_external_refresh() {
-                    this.check_external(ExternalCheckIntent::Focus, window, cx);
-                }
-                // 保存期间到期但被 Busy 挡下的自动保存，或保存期间的新输入，在结算后立即重查。
-                this.autosave_tick(window, cx);
-                this.update_menu(cx);
-                cx.notify();
-            });
-        }));
+        self.save_task =
+            Some(cx.spawn_in(window, async move |weak, cx| {
+                let completion = work.await;
+                let _ =
+                    weak.update_in(cx, |this, window, cx| {
+                        this.save_task = None;
+                        let version_before = this
+                            .state
+                            .session()
+                            .document()
+                            .map(|document| document.core().version());
+                        let settlement = this.state.settle_save(completion);
+                        // 图片迁移发布的引用补丁会使阅读投影和查找结果失效。
+                        if this.state.session().document().is_some_and(|document| {
+                            Some(document.core().version()) != version_before
+                        }) {
+                            this.refresh_after_edit(window, cx);
+                            this.refresh_find(cx);
+                        }
+                        let name = this
+                            .state
+                            .session()
+                            .document()
+                            .and_then(|document| document.path().file_name())
+                            .map(|name| SharedString::from(name.to_string_lossy().into_owned()));
+                        if let Some(name) = name
+                            && this.loaded_name.as_ref() != Some(&name)
+                        {
+                            window.set_window_title(name.as_ref());
+                            this.loaded_name = Some(name);
+                        }
+                        if let Some(key) = settlement.feedback {
+                            this.state.feedback = Some(key);
+                        }
+                        // 首次关联成功后才创建恢复会话：宿主在此消费一次布防。
+                        if this.state.take_recovery_pending_arm() {
+                            this.reset_recovery_tasks();
+                            this.arm_recovery(window, cx);
+                        }
+                        if this.state.take_external_refresh() {
+                            this.check_external(ExternalCheckIntent::Focus, window, cx);
+                        }
+                        // 保存期间到期但被 Busy 挡下的自动保存，或保存期间的新输入，在结算后立即重查。
+                        this.autosave_tick(window, cx);
+                        this.update_menu(cx);
+                        cx.notify();
+                    });
+            }));
     }
 
     /// 取消组合期保存等待；不触碰焦点、组合或输入状态。
@@ -2662,9 +2715,10 @@ impl NativeDocumentWindow {
         {
             evidence.sample(document);
         }
+        let unsettled_input = self.has_unsettled_input();
         let evidence = self.evidence.clone();
         let m2_evidence = self.m2_evidence.as_mut();
-        let packets = match self.state.close_document_with(|document| {
+        let packets = match self.state.close_document_with(unsettled_input, |document| {
             (
                 evidence
                     .as_ref()

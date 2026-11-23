@@ -1113,8 +1113,7 @@ enum Recovery {
     Clear,
 }
 
-/// 一次失败处置的动作；`Retry` 携带已标记重试的同一输入，`SyncApply` 携带
-/// 待同步应用的输入。动作序列由 `plan_failure_recovery` 给出，可无头断言。
+/// 单条失败输入的处置；失效的平台输入只丢弃自身，等待队列继续正常排水。
 enum FailureAction {
     Retry(ActiveInput),
     SyncApply(ActiveInput),
@@ -1242,11 +1241,6 @@ impl InputScheduler {
         self.pending.push_front(input);
     }
 
-    /// 丢弃活动输入但保留等待队列；仅供来源失效的拒收路径使用。
-    fn drop_active(&mut self) {
-        self.active = None;
-    }
-
     pub(super) fn clear(&mut self) {
         self.active = None;
         self.pending.clear();
@@ -1269,47 +1263,21 @@ impl InputScheduler {
         self.pending.len()
     }
 
-    /// 把下一条等待输入临时置为活动项；同步退化按真实失败序列逐条判定。
-    /// 队列为空时返回 None，调用方以无活动状态收尾。
-    fn promote_pending(&mut self) -> Option<ActiveInput> {
-        let input = self.pending.pop_front()?;
-        self.active = Some(ActiveInput::Direct(input));
-        self.take_active()
-    }
-
-    /// 后台失败后的纯判定动作序列；窗口薄壳逐条执行，判定本身不依赖 GPUI。
-    ///
-    /// 首个动作针对失败的触发输入；`DropStaleOrigin` 之后对等待队列逐条继续判定
-    /// （语义输入重试一次后同步退化，平台来源失效只丢弃该条），任一终止动作结束。
+    /// 判定失败输入的处置。来源失效时保留队列，由窗口用最新输入帧逐条排水。
     fn plan_failure_recovery(
         &mut self,
-        active: ActiveInput,
+        mut active: ActiveInput,
         scene: InputFailure,
-        mut platform_current: impl FnMut(&ScheduledInput) -> bool,
-    ) -> Vec<FailureAction> {
-        let mut actions = Vec::new();
-        let mut next = Some(active);
-        while let Some(mut item) = next.take() {
-            let current = platform_current(item.input());
-            let action = match self.on_failure(&mut item, scene, current) {
-                Recovery::Retry => FailureAction::Retry(item),
-                Recovery::SyncFallback => FailureAction::SyncApply(item),
-                Recovery::DropStaleOrigin => {
-                    self.drop_active();
-                    FailureAction::DropStaleOrigin
-                }
-                Recovery::Clear => FailureAction::Clear {
-                    document_gone: matches!(scene, InputFailure::DocumentGone),
-                },
-            };
-            let terminal = !matches!(action, FailureAction::DropStaleOrigin);
-            actions.push(action);
-            if terminal {
-                return actions;
-            }
-            next = self.promote_pending();
+        platform_current: bool,
+    ) -> FailureAction {
+        match self.on_failure(&mut active, scene, platform_current) {
+            Recovery::Retry => FailureAction::Retry(active),
+            Recovery::SyncFallback => FailureAction::SyncApply(active),
+            Recovery::DropStaleOrigin => FailureAction::DropStaleOrigin,
+            Recovery::Clear => FailureAction::Clear {
+                document_gone: matches!(scene, InputFailure::DocumentGone),
+            },
         }
-        actions
     }
 }
 
@@ -1463,6 +1431,11 @@ impl DocumentInput {
 }
 
 impl NativeDocumentWindow {
+    /// 已接收但尚未结算的正文输入须先发布，再允许关闭或替换。
+    pub(super) fn has_unsettled_input(&self) -> bool {
+        self.input_scheduler.is_active() || self.input_scheduler.has_pending()
+    }
+
     pub(super) fn document_key(
         &mut self,
         event: &gpui::KeyDownEvent,
@@ -1919,18 +1892,14 @@ impl NativeDocumentWindow {
         let mut next = Some(active);
         while let Some(item) = next.take() {
             let had_pending = self.input_scheduler.has_pending();
-            let actions = self
+            let platform_current = self
+                .state
+                .session
+                .document_mut()
+                .is_some_and(|document| item.input().platform_is_current(document));
+            let action = self
                 .input_scheduler
-                .plan_failure_recovery(item, scene, |input| {
-                    self.state
-                        .session
-                        .document_mut()
-                        .is_some_and(|document| input.platform_is_current(document))
-                });
-            // 纯判定保证 Retry 只可能出现在首位，其后不跟其它动作。
-            let Some(action) = actions.into_iter().next() else {
-                return;
-            };
+                .plan_failure_recovery(item, scene, platform_current);
             match action {
                 FailureAction::Retry(retry) => {
                     let escape = matches!(retry.input().intent, InputIntent::Escape);

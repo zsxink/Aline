@@ -96,9 +96,9 @@ fn one_running_read_and_one_latest_queued_read_keep_replacements_bounded()
             .accept_dialog(&c, Ok(Some(vec![PathBuf::from("c.md")])))
             .is_none()
     );
-    let (next, _) = state.read_finished(running.read_with(&Files(b"A")), |_| Ok(()));
+    let (next, _) = state.read_finished(running.read_with(&Files(b"A")), false, |_| Ok(()));
     let latest = next.ok_or("missing latest queued read")?;
-    let (next, _) = state.read_finished(latest.read_with(&Files(b"C")), |_| Ok(()));
+    let (next, _) = state.read_finished(latest.read_with(&Files(b"C")), false, |_| Ok(()));
     assert!(next.is_none());
     let document = state.session().document().ok_or("missing C")?;
     assert_eq!(document.core().buffer_text()?, "C");
@@ -120,8 +120,8 @@ fn close_and_stale_dialog_never_restore_focus_or_revive_ready_state() -> Result<
         .accept_dialog(&latest, Ok(Some(vec![PathBuf::from("a.md")])))
         .ok_or("missing A")?;
     state.take_focus_return();
-    state.close_window();
-    let (next, _) = state.read_finished(job.read_with(&Files(b"A")), |_| Ok(()));
+    state.close_window(false);
+    let (next, _) = state.read_finished(job.read_with(&Files(b"A")), false, |_| Ok(()));
     assert!(next.is_none());
     assert!(state.session().document().is_none());
     assert!(!state.take_focus_return());
@@ -149,7 +149,7 @@ fn newly_opened_large_document_defaults_source_with_specific_reason() -> Result<
     let job = state
         .accept_dialog(&request, Ok(Some(vec![PathBuf::from("large.md")])))
         .ok_or("job")?;
-    state.read_finished(job.read_with(&Files(&bytes)), |_| Ok(()));
+    state.read_finished(job.read_with(&Files(&bytes)), false, |_| Ok(()));
     let document = state.session().document().ok_or("document")?;
     assert_eq!(document.core().mode(), EditorMode::Source);
     assert_eq!(state.feedback_key(), Some("reading.large_source"));
@@ -212,7 +212,7 @@ fn failed_reader_preparation_keeps_the_published_document_and_mode() -> Result<(
     let job = state
         .accept_dialog(&first, Ok(Some(vec![PathBuf::from("a.md")])))
         .ok_or("job A")?;
-    let (next, prepared) = state.read_finished(job.read_with(&Files(b"a\n\nb")), |_| Ok(()));
+    let (next, prepared) = state.read_finished(job.read_with(&Files(b"a\n\nb")), false, |_| Ok(()));
     assert!(next.is_none());
     assert_eq!(prepared, Some(()));
     let stable_id = state
@@ -232,7 +232,7 @@ fn failed_reader_preparation_keeps_the_published_document_and_mode() -> Result<(
     let job = state
         .accept_dialog(&second, Ok(Some(vec![PathBuf::from("b.md")])))
         .ok_or("job B")?;
-    let (next, prepared) = state.read_finished(job.read_with(&Files(b"c\nd")), |_| {
+    let (next, prepared) = state.read_finished(job.read_with(&Files(b"c\nd")), false, |_| {
         Err::<(), LayoutError>(LayoutError::Budget)
     });
     assert!(next.is_none());
@@ -257,7 +257,7 @@ fn first_open_preparation_failure_reports_without_publishing_a_document()
     let job = state
         .accept_dialog(&request, Ok(Some(vec![PathBuf::from("a.md")])))
         .ok_or("job")?;
-    let (next, prepared) = state.read_finished(job.read_with(&Files(b"# t")), |_| {
+    let (next, prepared) = state.read_finished(job.read_with(&Files(b"# t")), false, |_| {
         Err::<(), LayoutError>(LayoutError::ItemBytes {
             needed: 2,
             limit: 1,
@@ -282,7 +282,7 @@ fn stale_completion_never_runs_reader_preparation() -> Result<(), Box<dyn Error>
         .ok_or("job")?;
     let _ = state.request_open()?;
     let mut prepared = false;
-    let (next, result) = state.read_finished(job.read_with(&Files(b"a")), |_| {
+    let (next, result) = state.read_finished(job.read_with(&Files(b"a")), false, |_| {
         prepared = true;
         Ok::<(), LayoutError>(())
     });
@@ -302,7 +302,9 @@ fn parse_budget_fallback_opens_source_with_a_localized_reason() -> Result<(), Bo
         .accept_dialog(&request, Ok(Some(vec![PathBuf::from("fallback.md")])))
         .ok_or("job")?;
     let (next, prepared) =
-        state.read_finished(job.read_with(&Files(b"# heading\n\nbody\n")), |_| Ok(()));
+        state.read_finished(job.read_with(&Files(b"# heading\n\nbody\n")), false, |_| {
+            Ok(())
+        });
     assert!(next.is_none());
     assert_eq!(prepared, Some(()));
     let document = state.session().document().ok_or("document")?;
@@ -582,7 +584,7 @@ fn open_window_document(
     let job = state
         .accept_dialog(&request, Ok(Some(vec![path.to_path_buf()])))
         .ok_or("应生成打开工作")?;
-    let (next, prepared) = state.read_finished(job.read_with(&Files(bytes)), |_| Ok(()));
+    let (next, prepared) = state.read_finished(job.read_with(&Files(bytes)), false, |_| Ok(()));
     assert!(next.is_none());
     assert_eq!(prepared, Some(()));
     // 打开成功本身会请求回焦；先消费，保存用例只验证保存处理器不新增。
@@ -1075,7 +1077,7 @@ fn window_save_without_absolute_target_reports_unavailable() -> Result<(), Box<d
     let job = state
         .accept_dialog(&request, Ok(Some(vec![PathBuf::from("fixture.md")])))
         .ok_or("应生成打开工作")?;
-    state.read_finished(job.read_with(&Files(b"x\n")), |_| Ok(()));
+    state.read_finished(job.read_with(&Files(b"x\n")), false, |_| Ok(()));
     assert!(
         state
             .session
@@ -1103,7 +1105,7 @@ fn window_without_recovery_configuration_never_arms_recovery() -> Result<(), Box
     let job = state
         .accept_dialog(&request, Ok(Some(vec![PathBuf::from("fixture.md")])))
         .ok_or("应生成打开工作")?;
-    let (next, prepared) = state.read_finished(job.read_with(&Files(b"x\n")), |_| Ok(()));
+    let (next, prepared) = state.read_finished(job.read_with(&Files(b"x\n")), false, |_| Ok(()));
     assert!(next.is_none());
     assert_eq!(prepared, Some(()));
     // 未配置恢复：无会话、无计时、无法开始，且无退役任务。
@@ -1164,7 +1166,7 @@ fn window_close_cancels_recovery_and_queues_retire() -> Result<(), Box<dyn Error
         .ok_or("应存在可编辑文档")?
         .edit_core()?
         .undo()?;
-    assert!(state.close_window(), "关闭应获准");
+    assert!(state.close_window(false), "关闭应获准");
     let retired = state.take_retired_recoveries();
     assert!(!retired.is_empty(), "关闭应排队退役");
     for job in retired {
@@ -1510,10 +1512,113 @@ fn open_memory_document(
     let job = state
         .accept_dialog(&request, Ok(Some(vec![path.to_path_buf()])))
         .ok_or("应生成打开工作")?;
-    let (next, prepared) = state.read_finished(job.read_with(&Files(bytes)), |_| Ok(()));
+    let (next, prepared) = state.read_finished(job.read_with(&Files(bytes)), false, |_| Ok(()));
     assert!(next.is_none());
     assert_eq!(prepared, Some(()));
     assert!(state.take_focus_return());
+    Ok(())
+}
+
+#[test]
+fn unsettled_native_delete_blocks_document_and_window_close() -> Result<(), Box<dyn Error>> {
+    let mut state = super::NativeOpenCoordinator::new(coordinator_limits(true));
+    open_memory_document(&mut state, Path::new("fixture.md"), b"ab")?;
+    let document = state.session.document_mut().ok_or("应存在文档")?;
+    document
+        .edit_core()?
+        .open_block(0..2, SelectionSpec::new(0, 0))?;
+    let identity = document.input_identity()?;
+    let snapshot = document.current_snapshot()?;
+    let range = snapshot.text().src_range(0..1)?;
+    let job = document
+        .edit_core()?
+        .prepare_native_delete(&identity, &range, 1)?
+        .ok_or("应冻结删除任务")?;
+    assert_eq!(document.core().buffer_text()?, "ab", "发布前核心仍干净");
+    let document_id = document.core().document_id().clone();
+    let closed = std::cell::Cell::new(false);
+    assert!(
+        state
+            .close_document_with(true, |_| closed.set(true))
+            .is_err()
+    );
+    assert!(!closed.get(), "未结算输入不得进入关闭退役回调");
+    assert!(!state.close_window(true));
+    assert!(!state.closed);
+    assert_eq!(state.feedback_key(), Some("document.close_pending_changes"));
+    let document = state.session.document_mut().ok_or("拒绝后应保留文档")?;
+    assert_eq!(document.core().document_id(), &document_id);
+    document.edit_core()?.publish_native_input(job.run()?)?;
+    assert_eq!(
+        document.core().buffer_text()?,
+        "b",
+        "拒绝关闭后输入仍可发布"
+    );
+    assert!(
+        state.close_document_with(false, |_| ()).is_err(),
+        "已发布的脏编辑继续阻止关闭"
+    );
+    let document = state.session.document_mut().ok_or("脏文档应保留")?;
+    document.checked_undo()?;
+    assert_eq!(document.core().buffer_text()?, "ab");
+    assert!(
+        state.close_window(false),
+        "输入结算且撤销回基线后可正常关闭"
+    );
+    assert!(state.closed);
+    assert!(state.session.document().is_none());
+    Ok(())
+}
+
+#[test]
+fn unsettled_native_delete_rejects_replacement_without_consuming_input()
+-> Result<(), Box<dyn Error>> {
+    let mut state = super::NativeOpenCoordinator::new(coordinator_limits(true));
+    open_memory_document(&mut state, Path::new("fixture.md"), b"ab")?;
+    // 打开候选读取期间，旧文档仍允许接收正文输入。
+    let request = state.request_open()?;
+    let replacement = state
+        .accept_dialog(&request, Ok(Some(vec![PathBuf::from("replacement.md")])))
+        .ok_or("应生成替换读取任务")?;
+    let document = state.session.document_mut().ok_or("应存在文档")?;
+    document
+        .edit_core()?
+        .open_block(0..2, SelectionSpec::new(0, 0))?;
+    let identity = document.input_identity()?;
+    let snapshot = document.current_snapshot()?;
+    let range = snapshot.text().src_range(0..1)?;
+    let job = document
+        .edit_core()?
+        .prepare_native_delete(&identity, &range, 1)?
+        .ok_or("应冻结删除任务")?;
+    let document_id = document.core().document_id().clone();
+    let prepared = std::cell::Cell::new(false);
+    let (next, candidate) =
+        state.read_finished(replacement.read_with(&Files(b"replacement")), true, |_| {
+            prepared.set(true);
+            Ok(())
+        });
+    assert!(next.is_none());
+    assert!(candidate.is_none());
+    assert!(!prepared.get(), "未结算输入不得准备替换视图");
+    assert!(!state.session.is_loading(), "拒绝须结算已完成的打开请求");
+    assert!(!state.reading);
+    assert_eq!(state.feedback_key(), Some("document.close_pending_changes"));
+    let document = state.session.document_mut().ok_or("拒绝后应保留文档")?;
+    assert_eq!(document.core().document_id(), &document_id);
+    document.edit_core()?.publish_native_input(job.run()?)?;
+    assert_eq!(document.core().buffer_text()?, "b");
+    document.checked_undo()?;
+    open_memory_document(&mut state, Path::new("replacement.md"), b"replacement")?;
+    assert_eq!(
+        state
+            .session
+            .document()
+            .ok_or("应成功重试替换")?
+            .core()
+            .buffer_text()?,
+        "replacement"
+    );
     Ok(())
 }
 
@@ -1807,7 +1912,28 @@ fn composing_target_entries_wait_then_choose_after_natural_end() -> Result<(), B
 fn target_wait_selected_path_saves_latest_confirmed_text() -> Result<(), Box<dyn Error>> {
     let directory = WindowSaveDir::create("aline-target-wait-save")?;
     let target = directory.0.join("confirmed.md");
-    let mut state = composing_target_state()?;
+    let original = directory.0.join("original.md");
+    let restored = synthetic_restored(
+        "x\n",
+        1,
+        RecoveredPath::Unix(original.as_os_str().as_encoded_bytes().to_vec()),
+    )?;
+    let mut state = super::NativeOpenCoordinator::new(coordinator_limits(true));
+    state
+        .session_mut()
+        .open_recovered(restored)
+        .map_err(|error| format!("{error:?}"))?;
+    assert_eq!(
+        state.save_target_plan(None),
+        super::target_dialog_plan(Some(&original), None)
+    );
+    open_window_block(&mut state, SelectionSpec::new(0, 0))?;
+    state
+        .session
+        .document_mut()
+        .ok_or("应存在文档")?
+        .edit_core()?
+        .composition_start("候", 0)?;
     assert!(state.request_save_intent().is_none());
     state
         .session
@@ -1846,6 +1972,11 @@ fn target_wait_selected_path_saves_latest_confirmed_text() -> Result<(), Box<dyn
         "等待/选择/保存均不增加历史"
     );
     assert!(!state.save_busy());
+    assert_eq!(
+        state.save_target_plan(None),
+        super::target_dialog_plan(Some(&target), None),
+        "后续另存为从已关联目标推导位置与文件名"
+    );
     Ok(())
 }
 
@@ -2184,7 +2315,7 @@ fn close_cancels_autosave_and_recovery_before_release() -> Result<(), Box<dyn Er
     }
 
     let observed = state
-        .close_document_with(|document| {
+        .close_document_with(false, |document| {
             (document.autosave_deadline(), document.association_active())
         })
         .map_err(|()| "关闭应获准")?;
@@ -2222,7 +2353,7 @@ fn close_refusal_does_not_cancel_recovery_or_cleanup() -> Result<(), Box<dyn Err
         .ok_or("应存在可编辑文档")?
         .note_document_activity(0);
 
-    assert!(state.close_document_with(|_| ()).is_err());
+    assert!(state.close_document_with(false, |_| ()).is_err());
     assert_eq!(state.feedback_key(), Some("document.close_pending_changes"));
     assert!(state.session().document().is_some(), "拒绝关闭必须保留文档");
     let (recoveries, cleanups) = state.take_retired();
@@ -2307,7 +2438,7 @@ fn close_after_failed_save_reports_retry_guidance_and_keeps_document() -> Result
     assert_eq!(settlement.feedback, Some("document.save_failed"));
 
     assert!(
-        state.close_document_with(|_| ()).is_err(),
+        state.close_document_with(false, |_| ()).is_err(),
         "保存失败后必须拒绝关闭"
     );
     assert_eq!(
@@ -2353,7 +2484,10 @@ fn close_success_spawns_cleanup_only_after_retirement() -> Result<(), Box<dyn Er
     let resource_path = locator_path(&root, &locator).ok_or("locator 应可解析")?;
     assert!(resource_path.is_file());
 
-    assert!(state.close_document_with(|_| ()).is_ok(), "关闭应获准");
+    assert!(
+        state.close_document_with(false, |_| ()).is_ok(),
+        "关闭应获准"
+    );
     let (recoveries, cleanups) = state.take_retired();
     assert!(!recoveries.is_empty());
     assert!(!cleanups.is_empty(), "暂存资源应生成清理任务");
@@ -2689,7 +2823,7 @@ fn starting_open_invalidates_in_flight_restore_and_cleans_materialized_resources
     // 用户开始打开（随后关闭）：在飞恢复作废，迟到完成不得接管文档。
     let _request = state.request_open()?;
     assert!(!state.panel.is_busy(), "开始打开必须作废在途恢复");
-    assert!(state.close_document_with(|_| ()).is_ok());
+    assert!(state.close_document_with(false, |_| ()).is_ok());
 
     let completion = job.run();
     assert!(completion.result.is_ok(), "后台任务仍会完成并物化材料");

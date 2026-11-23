@@ -413,7 +413,7 @@ mod tests {
         };
         let mut state = NativeOpenCoordinator::new(limits);
         let job = open_job(&mut state)?;
-        let (_, applied) = state.read_finished(job.read_with(&Files(bytes)), |_| Ok(()));
+        let (_, applied) = state.read_finished(job.read_with(&Files(bytes)), false, |_| Ok(()));
         assert_eq!(applied, Some(()));
         state
             .session
@@ -484,7 +484,7 @@ mod tests {
         assert!(state.close_document());
         let job = open_job(&mut state)?;
         let (_, applied) =
-            state.read_finished(job.read_with(&Files(b"alpha\n\nbeta\n")), |_| Ok(()));
+            state.read_finished(job.read_with(&Files(b"alpha\n\nbeta\n")), false, |_| Ok(()));
         assert_eq!(applied, Some(()));
         let document = state.session.document_mut().ok_or("missing document")?;
         assert!(matches!(
@@ -652,7 +652,9 @@ mod tests {
         assert!(!state.close_document());
         let replacement = open_job(&mut state)?;
         let (_, applied) =
-            state.read_finished(replacement.read_with(&Files(b"replacement")), |_| Ok(()));
+            state.read_finished(replacement.read_with(&Files(b"replacement")), false, |_| {
+                Ok(())
+            });
         assert_eq!(applied, None);
         assert!(state.edit(EditAction::Undo, |_| Ok(None), 4)?.refresh);
         let doc = state.session.document().ok_or("missing doc")?;

@@ -1,6 +1,6 @@
 # Aline 文档入口
 
-当前已有八成员 Cargo workspace、无头引擎与工程守卫，以及 M1 的原生单窗口只读界面；2026-11-02 用户验收裁决将 M0 出口记为通过（验收豁免，非证据性验证；逐包人工复核、E2/E4/E5/E7 整项、E3 全量、E6 未测项未执行，V-01～V-09 均未整项通过，已执行与未测的分项见[验证计划](./v1-validation-plan.md)）。M1 实现任务已按 2026-11-03 apply 授权完成并于 2026-11-13 归档，阶段出口已于同日按[决定 §43](./decisions.md#43-2026-11-13-m1-阶段出口裁决macos-arm64-范围)在 macOS arm64 范围裁决收口；M2 正在执行[`m2-editable-core`](../openspec/changes/m2-editable-core/tasks.md)（10/18），V-08 身份/事务方案独立审查已通过，W4（12/14）与 W5（6/13）已进入实现。2026-11-19 真实窗口已取得组合期拒绝、平台自然提交与查找面板逐项/替换分项证据，但保存→重开→冲突→恢复真实 UI 操作链、完整中文 IME 矩阵、代码块真实水平滚动与三平台仍未取证；W4/W5 生产行为仍受各自验收条件约束，不把任务勾选或方案审查写成 V-07/V-08 整项通过。各 V 项整项状态、未测平台与保留缺口仍以[验证计划](./v1-validation-plan.md)和已归档的[M1 OpenSpec tasks](../openspec/changes/archive/2026-11-13-m1-single-window-readonly/tasks.md)为准。实现任务另见已归档的[M0 OpenSpec tasks](../openspec/changes/archive/2026-11-02-m0-engine-foundation/tasks.md)。
+八成员 Cargo workspace、无头引擎与工程守卫已接线。M0 于 2026-11-02 按用户验收豁免通过出口，未执行项见[验证计划](./v1-validation-plan.md)。M1 于 2026-11-13 在 macOS arm64 范围收口。M2 于 2026-11-23 按[决定 §46](./decisions.md#46-2026-11-23-m2-阶段出口验收macos-arm64-范围)在当前 macOS arm64、中文界面、已测 scale 2 范围通过最小出口；[M2 任务](../openspec/changes/archive/2026-11-23-m2-editable-core/tasks.md) 18/18、W4 14/14、W5 13/13 已完成并归档，M3 入口解锁。真实窗口已补混合行尾双模式编辑保存重开、Unicode 相邻组合与跨 900ms 逐组撤销。V-01～V-09 整项、完整生产插图/AC-10、其他平台及不同缩放保留后续，正式三平台同发不变。
 
 PRD定义产品结果，AGENTS铁律及已确认架构/专项约束实现，验证计划负责证据状态，decisions负责决定追踪。OpenSpec承载工程基线和拟议变更，不能覆盖已确认决定；资料无法按职责解释的冲突列入待确认，不按日期或目录自行裁决。
 

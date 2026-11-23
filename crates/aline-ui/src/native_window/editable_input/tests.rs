@@ -1857,16 +1857,28 @@ fn failure_recovery_drops_stale_platform_trigger_and_keeps_semantic_queue() -> T
         ScheduledInput::new(InputIntent::Replace(None, "y".to_owned()), 4),
     );
     let active = scheduler.take_active().ok_or("缺少在途封口")?;
-    let actions = scheduler.plan_failure_recovery(active, InputFailure::OpenDocument, |input| {
-        input.platform_is_current(doc)
-    });
-    // 触发与排队的平台 Select 都只丢弃自身；语义键入按重试→同步退化处置。
-    assert!(matches!(actions[0], FailureAction::DropStaleOrigin));
-    assert!(matches!(actions[1], FailureAction::DropStaleOrigin));
-    assert!(matches!(actions[2], FailureAction::Retry(_)));
-    assert_eq!(actions.len(), 3);
-    assert_eq!(scheduler.pending_len(), 0, "判定已消费全部等待输入");
+    let platform_current = active.input().platform_is_current(doc);
+    let action =
+        scheduler.plan_failure_recovery(active, InputFailure::OpenDocument, platform_current);
+    assert!(matches!(action, FailureAction::DropStaleOrigin));
+    assert_eq!(scheduler.pending_len(), 2, "普通排水仍须收到两条等待输入");
     assert!(!scheduler.is_active());
+
+    let current_view = view(doc)?;
+    let identity = doc.input_identity()?;
+    let current = doc.current_snapshot()?;
+    let stale = scheduler.take_pending().ok_or("排水缺少平台选区动作")?;
+    assert!(matches!(
+        stale.step(&current_view, &identity, &current, doc),
+        InputStep::StalePlatformOrigin
+    ));
+    let queued = scheduler.take_pending().ok_or("排水缺少后续语义输入")?;
+    assert!(matches!(
+        queued.step(&current_view, &identity, &current, doc),
+        InputStep::Applied { changed: true, .. }
+    ));
+    assert_eq!(doc.current_snapshot()?.full_text(TEXT)?, "axyb");
+    assert_eq!(scheduler.pending_len(), 0);
     Ok(())
 }
 
@@ -1881,9 +1893,8 @@ fn failure_recovery_retry_then_sync_fallback_and_clear_are_unchanged() -> TestRe
     scheduler.start_seal(trigger);
     scheduler.submit(&document, ScheduledInput::new(InputIntent::LineBreak, 902));
     let active = scheduler.take_active().ok_or("缺少在途封口")?;
-    let actions = scheduler.plan_failure_recovery(active, InputFailure::OpenDocument, |_| true);
-    assert!(matches!(actions[0], FailureAction::Retry(_)));
-    assert_eq!(actions.len(), 1);
+    let action = scheduler.plan_failure_recovery(active, InputFailure::OpenDocument, true);
+    assert!(matches!(action, FailureAction::Retry(_)));
     // 已重试的封口再失败 → 同步退化；已重试的直接输入再失败 → 清空。
     let mut retried = ScheduledInput::new(InputIntent::LineBreak, 903);
     retried.retried = true;
