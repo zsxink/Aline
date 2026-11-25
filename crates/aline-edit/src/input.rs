@@ -2,7 +2,7 @@
 //! 此处校验块、源码与权限，再以受检计划返回一次单区间修改。
 
 use aline_buffer::{SrcRange, SrcSelection};
-use aline_markdown::Parsed;
+use aline_markdown::{BlockKind, Parsed};
 
 use crate::budget::EditBudget;
 use crate::command::{EditContext, EditMode, SourceEdit};
@@ -30,8 +30,9 @@ impl<'a> RawBlockEdit<'a> {
 
 /// 为单个已打开的可视化顶层块准备一次源码补丁。
 ///
-/// 块和补丁必须绑定当前解析与快照，补丁端点须处于块源码内。普通 Markdown
-/// 标记及实体可以改变呈现，MD-11 和 HTML 边界仍经同一套保护规则拒绝。
+/// 输入目标为当前快照中的顶层块或空行插入点。补丁端点须处于该源码范围内。普通 Markdown
+/// 标记及实体可以改变呈现。含在引用和列表内的表格也须保持逐格边界。真实 HTML
+/// 块允许原文输入；MD-11 与行内 HTML 边界仍拒绝。
 /// 文档核心使用常规 `validate_change` 复验后才可发布。
 pub fn plan_raw_block_input(
     parsed: &Parsed,
@@ -57,11 +58,12 @@ pub fn plan_raw_block_input(
     let range = snapshot
         .validate_range(edit.range)
         .map_err(map_buffer_error)?;
-    if !parsed
+    let block_kind = parsed
         .blocks()
         .iter()
-        .any(|candidate| candidate.range() == block)
-    {
+        .find(|candidate| candidate.range() == block)
+        .map(|candidate| candidate.kind());
+    if block_kind.is_none() && !is_blank_input_anchor(parsed, block, budget.text()) {
         return Err(EditRefusal::InvalidRawBlock);
     }
     if range.start < extent.start || range.end > extent.end {
@@ -89,6 +91,11 @@ pub fn plan_raw_block_input(
         copy_fragment(edit.expected)?,
         copy_fragment(edit.replacement)?,
     );
+    if let Some(table) = crate::table::table_touched_by_input(parsed.presentation(), edit.range) {
+        return crate::table::plan_table_raw_input(
+            parsed, selection, context, table, patch, budget,
+        );
+    }
     plan_replace(
         snapshot,
         parsed,
@@ -96,8 +103,52 @@ pub fn plan_raw_block_input(
         context,
         &[patch],
         budget,
-        ReplaceKind::RawBlock,
+        if block_kind == Some(BlockKind::HtmlBlock) {
+            ReplaceKind::RawHtml { block: extent }
+        } else {
+            ReplaceKind::RawBlock
+        },
     )
+}
+
+/// 检查空选区是否锚定在真实块外的一条空白行首；空文档的起点也是合法入口。
+/// 此检查不授予写入权限，调用方仍须检查保护区并复读输入补丁。
+pub fn is_blank_input_anchor(
+    parsed: &Parsed,
+    anchor: &SrcRange,
+    budget: aline_buffer::TextBudget,
+) -> bool {
+    let snapshot = parsed.snapshot();
+    let Ok(bytes) = snapshot.validate_range(anchor) else {
+        return false;
+    };
+    if !bytes.is_empty() {
+        return false;
+    }
+    if snapshot.len_bytes() == 0 {
+        return true;
+    }
+    let start = bytes.start;
+    let Some(gap) = parsed.gaps().iter().find(|gap| {
+        let bytes = gap.range().byte_range();
+        bytes.start <= start
+            && (start < bytes.end || start == bytes.end && start == snapshot.len_bytes())
+    }) else {
+        return false;
+    };
+    let fragment = |range| {
+        let range = snapshot.src_range(range).ok()?;
+        snapshot.slice(&range, budget).ok()
+    };
+    if start != 0 && fragment(start - 1..start).as_deref() != Some("\n") {
+        return false;
+    }
+    fragment(start..gap.range().byte_range().end).is_some_and(|tail| {
+        tail.split('\n').next().is_some_and(|line| {
+            line.bytes()
+                .all(|byte| matches!(byte, b' ' | b'\t' | b'\r'))
+        })
+    })
 }
 
 fn copy_fragment(fragment: &str) -> Result<String, EditRefusal> {

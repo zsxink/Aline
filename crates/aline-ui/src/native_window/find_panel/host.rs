@@ -245,6 +245,9 @@ impl NativeDocumentWindow {
                     }
                     Ok(CommitOutcome::Unchanged) => this.state.feedback = None,
                     Err(DocError::StaleResult | DocError::ClosedTarget) => return,
+                    Err(error @ DocError::Edit(EditRefusal::ProtectedRange { .. })) => {
+                        this.show_edit_refusal(error)
+                    }
                     Err(error) => this.state.feedback = Some(find_error_key(error)),
                 }
                 cx.notify();
@@ -502,8 +505,10 @@ impl FindReplaceWork {
 fn source_fallback(error: &EditRefusal) -> bool {
     matches!(
         error,
-        EditRefusal::ProtectedRange { .. }
-            | EditRefusal::HtmlBoundary { .. }
+        EditRefusal::ProtectedRange {
+            kind: aline_markdown::ProtectionKind::RawFallback,
+            ..
+        } | EditRefusal::HtmlBoundary { .. }
             | EditRefusal::RereadFailed {
                 reason: RereadFailure::Projection,
                 ..

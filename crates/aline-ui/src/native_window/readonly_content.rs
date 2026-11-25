@@ -255,6 +255,28 @@ impl ContentIndex {
         Ok(Self { rows: builder.rows })
     }
 
+    /// 容器事件可能消费分隔符；只为当前恢复的空行创建缺失的输入行。
+    pub(super) fn ensure_blank_input_row(
+        &mut self,
+        start: usize,
+        max_rows: usize,
+    ) -> Result<(), ContentError> {
+        let insertion = self.rows.partition_point(|row| row.source.start <= start);
+        if insertion
+            .checked_sub(1)
+            .and_then(|prior| self.rows.get(prior))
+            .is_some_and(|row| row.drawn.is_none() && start <= row.source.end)
+        {
+            return Ok(());
+        }
+        if self.rows.len() >= max_rows {
+            return Err(ContentError::Budget);
+        }
+        self.rows.try_reserve(1).map_err(|_| ContentError::Budget)?;
+        self.rows.insert(insertion, gap_row(start..start));
+        Ok(())
+    }
+
     pub(super) fn rows(&self) -> &[ContentRow] {
         &self.rows
     }
@@ -265,6 +287,24 @@ impl ContentIndex {
 
     pub(super) fn len(&self) -> usize {
         self.rows.len()
+    }
+}
+
+fn gap_row(source: Range<usize>) -> ContentRow {
+    ContentRow {
+        source,
+        drawn: None,
+        block: Block::Text { leaves: Vec::new() },
+        heading: None,
+        quote_depth: 0,
+        list_depth: 0,
+        marker: None,
+        alert: None,
+        alert_badge: false,
+        gray: None,
+        label: None,
+        nodes: 1,
+        columns: 0,
     }
 }
 
@@ -500,21 +540,7 @@ impl Builder {
     }
 
     fn push_gap(&mut self, source: Range<usize>) -> Result<(), ContentError> {
-        self.push(ContentRow {
-            source,
-            drawn: None,
-            block: Block::Text { leaves: Vec::new() },
-            heading: None,
-            quote_depth: 0,
-            list_depth: 0,
-            marker: None,
-            alert: None,
-            alert_badge: false,
-            gray: None,
-            label: None,
-            nodes: 1,
-            columns: 0,
-        })
+        self.push(gap_row(source))
     }
 
     fn walk(&mut self, node: &PresentationNode, context: &mut Context) -> Result<(), ContentError> {

@@ -1,14 +1,17 @@
 //! 原生编辑动作和剪贴板入口。文档核心负责语义与历史，窗口负责平台副作用及派生视图。
 
-use aline_buffer::{BufferError, SelectionSpec, TextBudget};
+use aline_buffer::{BufferError, SelectionSpec, SrcOffset, SrcRange, SrcSelection, TextBudget};
 use aline_markdown::Parsed;
 use gpui::{App, ClipboardEntry, ClipboardItem, Context, Window};
 
 use super::readonly_layout::{LayoutError, ReaderIndex};
-use super::{NativeDocumentWindow, NativeOpenCoordinator, ReaderSurface, layout_error_key};
+use super::{
+    NativeDocumentWindow, NativeOpenCoordinator, ReaderSurface, content_metrics, layout_error_key,
+};
 use crate::{
-    DocError, DocumentId, EditorMode, ParseConfigGeneration, ParseRefreshCompletion,
-    ParseRefreshDisposition, ParseRefreshJob, ReadonlyDocument, WorkingVersion,
+    DocError, DocumentId, EditorMode, InputIdentity, ModeSwitchOutcome, ParseConfigGeneration,
+    ParseRefreshCompletion, ParseRefreshDisposition, ParseRefreshJob, ReadonlyDocument,
+    WorkingVersion,
 };
 
 const MAX_READER_ROWS: usize = 1_000_000;
@@ -24,7 +27,7 @@ pub(super) struct VisualInputRestore {
 }
 
 impl VisualInputRestore {
-    fn new(document: &ReadonlyDocument) -> Self {
+    pub(super) fn new(document: &ReadonlyDocument) -> Self {
         let core = document.core();
         Self {
             document: core.document_id().clone(),
@@ -56,9 +59,155 @@ impl VisualInputRestore {
         document.open_visual_at(&identity, current.selection())?;
         Ok(())
     }
+
+    fn prepare_reader(
+        &self,
+        document: &ReadonlyDocument,
+        parsed: &Parsed,
+        index: &mut ReaderIndex,
+    ) -> Result<(), LayoutError> {
+        if self.matches(document) {
+            let range = parsed
+                .snapshot()
+                .src_range(self.selection.range())
+                .map_err(|_| LayoutError::InvalidRange)?;
+            index.ensure_blank_input_row(
+                parsed,
+                &range,
+                document.text_budget(),
+                MAX_READER_ROWS,
+            )?;
+        }
+        Ok(())
+    }
+}
+
+/// 受保护写入被拒时冻结的源码定位意图，只有用户另行触发时才移动选区。
+pub(super) struct ProtectedSourceLocation {
+    identity: InputIdentity,
+    range: SrcRange,
+}
+
+impl ProtectedSourceLocation {
+    fn capture(document: &mut ReadonlyDocument, error: &DocError) -> Option<Self> {
+        let DocError::Edit(
+            aline_edit::EditRefusal::ProtectedRange { range, .. }
+            | aline_edit::EditRefusal::HtmlBoundary { range },
+        ) = error
+        else {
+            return None;
+        };
+        if document.core().mode() != EditorMode::Visual || !document.is_editable() {
+            return None;
+        }
+        let identity = document.input_identity().ok()?;
+        let current = document.current_snapshot().ok()?;
+        let range = current.text().src_range(range.clone()).ok()?;
+        Some(Self { identity, range })
+    }
+
+    pub(super) fn matches(&self, document: &ReadonlyDocument) -> bool {
+        let core = document.core();
+        document.is_editable()
+            && core.is_document_alive()
+            && core.mode() == EditorMode::Visual
+            && core.document_id() == self.identity.document_id()
+            && core.version() == self.identity.working_version()
+            && core.parse_config_generation() == self.identity.parse_config_generation()
+    }
+
+    fn apply(self, document: &mut ReadonlyDocument) -> Result<SrcOffset, DocError> {
+        if !self.matches(document) {
+            return Err(DocError::StaleResult);
+        }
+        let identity = document.input_identity()?;
+        self.identity
+            .validate(&identity)
+            .map_err(DocError::Identity)?;
+        let current = document.current_snapshot()?;
+        let target = current.text().validate_range(&self.range)?;
+        if document.switch_mode(EditorMode::Source)? == ModeSwitchOutcome::Deferred {
+            return Err(DocError::CompositionActive);
+        }
+        // 模式切换可能封口普通草稿。关闭草稿前后的逻辑源码相同，重新绑定目标。
+        let identity = document.input_identity()?;
+        let current = document.current_snapshot()?;
+        let anchor = current.text().src_offset(target.start)?;
+        let head = current.text().src_offset(target.end)?;
+        document
+            .edit_core()?
+            .select(&identity, &SrcSelection::new(anchor.clone(), head)?)?;
+        Ok(anchor)
+    }
 }
 
 impl NativeDocumentWindow {
+    pub(super) fn show_edit_refusal(&mut self, error: DocError) {
+        self.protected_source_location = self
+            .state
+            .session
+            .document_mut()
+            .and_then(|document| ProtectedSourceLocation::capture(document, &error));
+        self.state.feedback = Some(edit_error_key(error));
+    }
+
+    pub(super) fn locate_protected_source(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.has_unsettled_input() {
+            return;
+        }
+        let Some(location) = self.protected_source_location.take() else {
+            return;
+        };
+        let result = self
+            .state
+            .session
+            .document_mut()
+            .ok_or(DocError::ClosedTarget)
+            .and_then(|document| location.apply(document));
+        match result {
+            Ok(anchor) => {
+                self.state.feedback = None;
+                self.input_frame = None;
+                self.source_input_site = None;
+                self.visual_input_restore = None;
+                self.update_menu(cx);
+                if let Some(document) = self.state.session.document() {
+                    if let Some(evidence) = &self.evidence {
+                        evidence
+                            .borrow_mut()
+                            .switching(EditorMode::Visual, EditorMode::Source);
+                    }
+                    if !document.is_parse_current() {
+                        self.refresh_after_edit(window, cx);
+                    } else if let Some(reader) = &mut self.reader {
+                        let width = f32::from(window.viewport_size().width);
+                        match reader.prepare(
+                            document,
+                            window,
+                            content_metrics(width, width),
+                            &self.fonts,
+                        ) {
+                            Ok(reset) => {
+                                if reset {
+                                    reader.schedule_height_hint(window, cx);
+                                }
+                                if let Err(error) =
+                                    reader.scroll_to_source(document, anchor.byte_offset())
+                                {
+                                    self.state.feedback = Some(layout_error_key(error));
+                                }
+                            }
+                            Err(error) => self.state.feedback = Some(layout_error_key(error)),
+                        }
+                    }
+                }
+                self.refresh_find(cx);
+            }
+            Err(error) => self.state.feedback = Some(edit_error_key(error)),
+        }
+        cx.notify();
+    }
+
     pub(super) fn request_view(
         &mut self,
         mode: EditorMode,
@@ -130,7 +279,7 @@ impl NativeDocumentWindow {
                 }
             }
             Err(DocError::ClosedTarget | DocError::ReadOnly) => return,
-            Err(error) => self.state.feedback = Some(edit_error_key(error)),
+            Err(error) => self.show_edit_refusal(error),
         }
         cx.notify();
     }
@@ -153,11 +302,14 @@ impl NativeDocumentWindow {
                 let (next, prepared) =
                     this.state.refresh_finished(completion, |document, parsed| {
                         let generation = generation.ok_or(LayoutError::GenerationExhausted)?;
-                        let index = ReaderIndex::from_parsed(
+                        let mut index = ReaderIndex::from_parsed(
                             parsed,
                             MAX_READER_ROWS,
                             document.text_budget(),
                         )?;
+                        if let Some(restore) = &this.visual_input_restore {
+                            restore.prepare_reader(document, parsed, &mut index)?;
+                        }
                         Ok((
                             ReaderSurface::from_index(
                                 index,
@@ -181,6 +333,7 @@ impl NativeDocumentWindow {
                     reader.schedule_height_hint(window, cx);
                     this.reader = Some(reader);
                     this.next_reader_generation = generation;
+                    this.update_menu(cx);
                     this.refresh_statistics(window, cx);
                 }
                 if let Some(job) = next {
@@ -340,6 +493,10 @@ fn clipboard_text(cx: &App, budget: TextBudget) -> Result<Option<String>, DocErr
 pub(super) fn edit_error_key(error: DocError) -> &'static str {
     match error {
         DocError::CompositionActive => "document.composition_pending",
+        DocError::Edit(
+            aline_edit::EditRefusal::ProtectedRange { .. }
+            | aline_edit::EditRefusal::HtmlBoundary { .. },
+        ) => "document.edit_protected",
         _ => "document.edit_refused",
     }
 }
@@ -424,6 +581,112 @@ mod tests {
     }
 
     #[test]
+    fn protected_edit_offers_explicit_source_location_without_changing_history()
+    -> Result<(), Box<dyn Error>> {
+        const RAW: &str = "前\n\n[toc]\n\n尾";
+        let mut state = open(RAW.as_bytes(), true)?;
+        let document = state.session.document_mut().ok_or("应存在文档")?;
+        document.switch_mode(EditorMode::Visual)?;
+        let identity = document.input_identity()?;
+        document.edit_core()?.select_all(&identity)?;
+        let selection = document.core().current_selection();
+
+        let error = state
+            .edit(EditAction::Paste, |_| Ok(Some("替换".to_owned())), 1)
+            .err()
+            .ok_or("跨块粘贴应受保护")?;
+        let document = state.session.document_mut().ok_or("应存在文档")?;
+        let target = ProtectedSourceLocation::capture(document, &error).ok_or("应提供定位")?;
+        assert_eq!(document.core().mode(), EditorMode::Visual);
+        assert_eq!(document.core().current_selection(), selection);
+        assert_eq!(document.core().history_node_count(), 0);
+        assert_eq!(document.core().buffer_text()?, RAW);
+
+        let offset = target.apply(document)?;
+        let start = RAW.find("[toc]").ok_or("应存在目录")?;
+        assert_eq!(offset.byte_offset(), start);
+        assert_eq!(document.core().mode(), EditorMode::Source);
+        assert_eq!(
+            document.core().current_selection(),
+            SelectionSpec::new(start, start + 5)
+        );
+        assert_eq!(document.core().history_node_count(), 0);
+        assert_eq!(document.core().buffer_text()?, RAW);
+        Ok(())
+    }
+
+    #[test]
+    fn explicit_protected_source_location_rebinds_after_settling_existing_draft()
+    -> Result<(), Box<dyn Error>> {
+        const RAW: &str = "前\n\n[toc]\n\n尾";
+        let mut state = open(RAW.as_bytes(), true)?;
+        let document = state.session.document_mut().ok_or("应存在文档")?;
+        document.switch_mode(EditorMode::Visual)?;
+        let identity = document.input_identity()?;
+        let current = document.current_snapshot()?;
+        assert!(document.open_visual_at(&identity, current.selection())?);
+        let identity = document.input_identity()?;
+        let core = document.edit_core()?;
+        core.type_selection(&identity, "草稿", 0)?;
+        let identity = core.current_input_identity()?;
+        core.select_all(&identity)?;
+        let selection = core.current_selection();
+
+        let error = state
+            .edit(EditAction::Paste, |_| Ok(Some("替换".to_owned())), 1)
+            .err()
+            .ok_or("跨块粘贴应受保护")?;
+        let document = state.session.document_mut().ok_or("应存在文档")?;
+        let target = ProtectedSourceLocation::capture(document, &error).ok_or("应提供定位")?;
+        assert_eq!(document.core().current_selection(), selection);
+        assert_eq!(document.core().buffer_text()?, RAW);
+        assert_eq!(document.core().open_block_draft(), Some("草稿"));
+        assert_eq!(document.core().history_node_count(), 0);
+
+        let anchor = target.apply(document)?;
+        let expected = format!("草稿{RAW}");
+        let start = expected.find("[toc]").ok_or("应存在目录")?;
+        assert_eq!(anchor.byte_offset(), start);
+        assert_eq!(document.core().mode(), EditorMode::Source);
+        assert_eq!(
+            document.core().current_selection(),
+            SelectionSpec::new(start, start + 5)
+        );
+        assert_eq!(document.core().buffer_text()?, expected);
+        assert_eq!(document.core().history_node_count(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn protected_source_location_rejects_foreign_or_changed_document() -> Result<(), Box<dyn Error>>
+    {
+        let mut original = open(b"[toc]\n\nword", true)?;
+        let mut foreign = open(b"[toc]\n\nword", true)?;
+        let first = original.session.document_mut().ok_or("应存在文档")?;
+        let second = foreign.session.document_mut().ok_or("应存在另一文档")?;
+        first.switch_mode(EditorMode::Visual)?;
+        second.switch_mode(EditorMode::Visual)?;
+        let error = DocError::Edit(aline_edit::EditRefusal::ProtectedRange {
+            kind: aline_markdown::ProtectionKind::Toc,
+            range: 0..5,
+        });
+        let target = ProtectedSourceLocation::capture(first, &error).ok_or("应提供定位")?;
+        assert!(matches!(target.apply(second), Err(DocError::StaleResult)));
+        assert_eq!(second.core().mode(), EditorMode::Visual);
+        assert_eq!(second.core().history_node_count(), 0);
+
+        let target = ProtectedSourceLocation::capture(first, &error).ok_or("应提供定位")?;
+        let selection = first.core().current_selection();
+        first.switch_mode(EditorMode::Source)?;
+        first.switch_mode(EditorMode::Visual)?;
+        assert!(matches!(target.apply(first), Err(DocError::Identity(_))));
+        assert_eq!(first.core().mode(), EditorMode::Visual);
+        assert_eq!(first.core().current_selection(), selection);
+        assert_eq!(first.core().history_node_count(), 0);
+        Ok(())
+    }
+
+    #[test]
     fn visual_mode_restore_waits_for_current_parse_then_reopens_without_editing()
     -> Result<(), Box<dyn Error>> {
         let mut state = open(b"alpha\n\nbeta\n", true)?;
@@ -451,6 +714,101 @@ mod tests {
         assert_eq!(document.core().version(), version);
         assert_eq!(document.core().current_selection(), selection);
         assert_eq!(document.core().history_node_count(), history);
+        Ok(())
+    }
+
+    #[test]
+    fn list_exit_restores_blank_input_site_and_starts_a_new_paragraph() -> Result<(), Box<dyn Error>>
+    {
+        use aline_edit::{BlockCommand, plan_block_command};
+
+        for (source, baseline, typed) in [
+            ("- 父\n- ", "- 父\n", "- 父\n\n正文"),
+            ("- 父\r\n- ", "- 父\r\n", "- 父\r\n\r\n正文"),
+            ("- ", "", "正文"),
+        ] {
+            for ime in [false, true] {
+                let mut state = open(source.as_bytes(), true)?;
+                let document = state.session.document_mut().ok_or("missing document")?;
+                document.switch_mode(EditorMode::Visual)?;
+                let identity = document.input_identity()?;
+                let current = document.current_snapshot()?;
+                let caret = current.text().src_offset(source.len())?;
+                let selection = aline_buffer::SrcSelection::new(caret.clone(), caret)?;
+                let core = document.edit_core()?;
+                core.select(&identity, &selection)?;
+                let prepared = core
+                    .prepare_command(|parsed, selection, context, budget| {
+                        plan_block_command(
+                            parsed,
+                            selection,
+                            context,
+                            BlockCommand::ListEnter,
+                            budget,
+                        )
+                    })?
+                    .ok_or("missing list exit plan")?;
+                core.publish_command(&prepared, 1)?;
+                assert_eq!(core.buffer_text()?, baseline);
+                assert_eq!(core.history_node_count(), 1);
+                let restore = VisualInputRestore::new(document);
+                let job = state.queue_refresh()?.ok_or("missing parse job")?;
+                let (_, reader) = state.refresh_finished(job.run(), |document, parsed| {
+                    let mut index = ReaderIndex::from_parsed(parsed, 100, document.text_budget())?;
+                    restore.prepare_reader(document, parsed, &mut index)?;
+                    Ok(index)
+                });
+                let reader = reader.ok_or("missing visual reader")?;
+                let document = state.session.document_mut().ok_or("missing document")?;
+                restore.apply(document)?;
+                let current = document.current_snapshot()?;
+                let open = document
+                    .core()
+                    .visual_block_range(&current)?
+                    .ok_or("missing visual site")?;
+                assert_eq!(open.byte_range(), baseline.len()..baseline.len());
+                let row = reader.row_count(EditorMode::Visual) - 1;
+                let range = reader.source_range(document.parsed(), EditorMode::Visual, row)?;
+                assert!(
+                    super::super::editable_input::InputSite::for_row(document, range.clone(), None)
+                        .is_some(),
+                    "source={source:?} baseline={baseline:?} row={range:?} rows={}",
+                    reader.row_count(EditorMode::Visual)
+                );
+                let identity = document.input_identity()?;
+                let core = document.edit_core()?;
+                if ime {
+                    core.update_native_candidate(&identity, "候选", None, 2)?;
+                    let mark = core.composition().ok_or("missing composition")?;
+                    assert_eq!(
+                        mark.marked_range(),
+                        Some(typed.len() - "正文".len()..typed.len())
+                    );
+                    core.composition_cancel(3)?;
+                    assert_eq!(core.buffer_text()?, baseline);
+                    let identity = core.current_input_identity()?;
+                    core.update_native_candidate(&identity, "候选", None, 4)?;
+                    let identity = core.current_input_identity()?;
+                    let commit = core.prepare_native_confirmation(&identity, Some("正文"), 5)?;
+                    core.publish_native_input(commit.run()?)?;
+                } else {
+                    core.type_selection(&identity, "正", 2)?;
+                    let identity = core.current_input_identity()?;
+                    core.type_selection(&identity, "文", 3)?;
+                    core.commit_open_block(4)?;
+                }
+                assert_eq!(core.buffer_text()?, typed);
+                assert_eq!(core.history_node_count(), 2);
+                assert_eq!(
+                    core.current_selection(),
+                    SelectionSpec::new(typed.len(), typed.len())
+                );
+                core.undo()?;
+                assert_eq!(core.buffer_text()?, baseline);
+                core.undo()?;
+                assert_eq!(core.buffer_text()?, source);
+            }
+        }
         Ok(())
     }
 

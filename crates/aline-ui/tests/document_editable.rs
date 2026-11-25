@@ -805,3 +805,130 @@ fn editable_staged_visual_command_refuses_source_plan_for_protected_range() -> T
     assert_eq!(capture(&mut doc)?, before);
     Ok(())
 }
+
+#[test]
+fn html_raw_block_typing_undo_and_reopen_preserve_comment_and_neighbor_bytes() -> TestResult {
+    let source = "<div>甲 &amp; <!--保留-->乙</div>\r\n\r\n尾";
+    let mut doc = DocCore::new_editable(source, collapsed(0), limits())?;
+    let current = doc.current_snapshot(TEXT)?;
+    let parsed = parse(current.text(), ParseConfig::m0(), ParseBudget::m0())?;
+    let block = parsed.blocks().first().ok_or("应有 HTML 块")?;
+    let start = source.find("乙").ok_or("应有待修改文本")?;
+    let selection = SrcSelection::new(
+        current.text().src_offset(start)?,
+        current.text().src_offset(start + 3)?,
+    )?;
+    let identity = doc.current_input_identity()?;
+    doc.open_visual_block(&identity, &parsed, block.range(), &selection)?;
+    let identity = doc.current_input_identity()?;
+    doc.type_selection(&identity, "丙", 1)?;
+    doc.escape(2)?;
+    let expected = "<div>甲 &amp; <!--保留-->丙</div>\r\n\r\n尾";
+    assert_eq!(doc.buffer_text()?, expected);
+    assert_eq!(doc.undo_depth(), 1);
+    doc.undo()?;
+    assert_eq!(doc.buffer_text()?, source);
+    assert_eq!(
+        doc.current_selection(),
+        SelectionSpec::new(start, start + 3)
+    );
+    doc.redo()?;
+    assert_eq!(doc.buffer_text()?, expected);
+    let storage_budget = aline_source::StorageBudget::new(4096);
+    let mut original_bytes = vec![0xef, 0xbb, 0xbf];
+    original_bytes.extend_from_slice(source.as_bytes());
+    let original_storage = aline_source::StorageSnapshot::new(
+        original_bytes,
+        aline_source::DiskVersion::initial(),
+        storage_budget,
+    )?;
+    let baseline = aline_source::decode(&original_storage, storage_budget)?;
+    let encoded = aline_source::encode(&doc.buffer_text()?, baseline.baseline(), storage_budget)?;
+    let mut expected_bytes = vec![0xef, 0xbb, 0xbf];
+    expected_bytes.extend_from_slice(expected.as_bytes());
+    assert_eq!(encoded.bytes(), expected_bytes);
+    let reopened_storage = aline_source::StorageSnapshot::new(
+        encoded.bytes().to_vec(),
+        aline_source::DiskVersion::initial(),
+        storage_budget,
+    )?;
+    let reopened = aline_source::decode(&reopened_storage, storage_budget)?;
+    assert_eq!(reopened.source(), expected);
+    let current = doc.current_snapshot(TEXT)?;
+    let parsed = parse(current.text(), ParseConfig::m0(), ParseBudget::m0())?;
+    assert!(parsed.projection().drawn_text().contains("甲 & 丙"));
+    assert!(!parsed.projection().drawn_text().contains("保留"));
+    let selection = SrcSelection::new(
+        current.text().src_offset(start)?,
+        current.text().src_offset(start)?,
+    )?;
+    let identity = doc.current_input_identity()?;
+    doc.open_visual_block(
+        &identity,
+        &parsed,
+        parsed.blocks().first().ok_or("应有 HTML 块")?.range(),
+        &selection,
+    )?;
+    assert!(doc.has_open_block());
+    assert_snapshot(&mut doc, expected)?;
+    Ok(())
+}
+
+#[test]
+fn html_raw_block_composition_commits_one_group_and_keeps_hidden_comment() -> TestResult {
+    let source = "<div><!--keep-->a &amp; b</div>";
+    let mut doc = DocCore::new_editable(source, collapsed(17), limits())?;
+    let current = doc.current_snapshot(TEXT)?;
+    let parsed = parse(current.text(), ParseConfig::m0(), ParseBudget::m0())?;
+    let selection = SrcSelection::new(
+        current.text().src_offset(17)?,
+        current.text().src_offset(17)?,
+    )?;
+    let identity = doc.current_input_identity()?;
+    doc.open_visual_block(
+        &identity,
+        &parsed,
+        parsed.blocks().first().ok_or("应有 HTML 块")?.range(),
+        &selection,
+    )?;
+    doc.composition_start("中", 0)?;
+    doc.composition_update("中文", 1)?;
+    doc.composition_commit(2)?;
+    doc.escape(3)?;
+    assert_eq!(doc.buffer_text()?, "<div><!--keep-->a中文 &amp; b</div>");
+    assert_eq!(doc.undo_depth(), 1);
+    doc.undo()?;
+    assert_eq!(doc.buffer_text()?, source);
+    assert_eq!(doc.current_selection(), collapsed(17));
+    Ok(())
+}
+
+#[test]
+fn html_raw_capability_is_rechecked_after_commit_changes_block_kind() -> TestResult {
+    let mut doc = DocCore::new_editable("<div>a</div>", SelectionSpec::new(0, 12), limits())?;
+    let current = doc.current_snapshot(TEXT)?;
+    let parsed = parse(current.text(), ParseConfig::m0(), ParseBudget::m0())?;
+    let selection = SrcSelection::new(
+        current.text().src_offset(0)?,
+        current.text().src_offset(12)?,
+    )?;
+    let identity = doc.current_input_identity()?;
+    doc.open_visual_block(
+        &identity,
+        &parsed,
+        parsed.blocks().first().ok_or("应有 HTML 块")?.range(),
+        &selection,
+    )?;
+    let identity = doc.current_input_identity()?;
+    doc.type_selection(&identity, "before <b>text</b> after", 0)?;
+    doc.commit_open_block(1)?;
+    select_bytes(&mut doc, 11, 11)?;
+    let identity = doc.current_input_identity()?;
+    let before = capture(&mut doc)?;
+    assert!(matches!(
+        doc.type_selection(&identity, "x", 2),
+        Err(DocError::Edit(aline_edit::EditRefusal::HtmlBoundary { .. }))
+    ));
+    assert_eq!(capture(&mut doc)?, before);
+    Ok(())
+}

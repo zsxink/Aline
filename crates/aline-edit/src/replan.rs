@@ -54,8 +54,22 @@ impl ChangePlan {
                 EditCommand::toggle_inline_format(candidate_selection.range().byte_range(), format)
             }
             GroupReason::RawBlockInput => return Err(EditRefusal::UnsupportedReplan),
+            GroupReason::BlockCommand | GroupReason::TableCommand | GroupReason::MarkdownFormat => {
+                return crate::plan::plan_structural(
+                    candidate,
+                    candidate_selection,
+                    context,
+                    crate::plan::StructuralChange {
+                        edits: self.direct_replace_edits()?,
+                        target: self.target_selection(),
+                        reason: self.group_reason(),
+                        contract: self.contract.clone(),
+                    },
+                    self.budget,
+                );
+            }
             GroupReason::SourceReplace | GroupReason::VisibleReplace | GroupReason::BulkReplace => {
-                self.direct_replace_intent()?
+                EditCommand::replace(self.direct_replace_edits()?)
             }
         };
         plan_change(
@@ -97,7 +111,7 @@ impl ChangePlan {
         Ok(())
     }
 
-    fn direct_replace_intent(&self) -> Result<EditCommand, EditRefusal> {
+    fn direct_replace_edits(&self) -> Result<Vec<SourceEdit>, EditRefusal> {
         let patches = self.batch().patches();
         if patches.len() != self.expectations.len() {
             return Err(EditRefusal::InvalidPlan);
@@ -118,7 +132,7 @@ impl ChangePlan {
                 copy_fragment(replacement)?,
             ));
         }
-        Ok(EditCommand::replace(edits))
+        Ok(edits)
     }
 }
 

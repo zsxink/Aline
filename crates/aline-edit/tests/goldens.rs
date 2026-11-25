@@ -446,6 +446,14 @@ fn golden_plan_cases() -> TestResult {
         if field(fields, "scenario")? != "plan" {
             continue;
         }
+        // M3 EDIT-08 已用 inline_m3 的取消格式和空配对金样替代这两项 M0 行为。
+        // 历史 TSV 保持原字节，避免把旧预期改写为实现输出。
+        if matches!(
+            name.as_str(),
+            "format_strong_already" | "refuse_empty_selection"
+        ) {
+            continue;
+        }
         let input = plan_input(fields)?;
         let outcome = plan(&input);
         match field(fields, "outcome")? {
@@ -456,7 +464,7 @@ fn golden_plan_cases() -> TestResult {
         }
         count += 1;
     }
-    assert_eq!(count, 26);
+    assert_eq!(count, 24);
     Ok(())
 }
 

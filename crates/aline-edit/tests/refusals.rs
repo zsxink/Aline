@@ -663,7 +663,7 @@ fn html_boundary_refusal_keeps_buffer_state() -> TestResult {
 }
 
 #[test]
-fn already_formatted_creates_no_history_step() -> TestResult {
+fn planning_format_removal_keeps_existing_history_untouched() -> TestResult {
     // alpha 0..5，空格 5，** 6..8，beta 8..12，** 12..14，空格 14，gamma 15..20，\n 20。
     let mut buffer = make_buffer("alpha **beta** gamma\n", 8, 12)?;
     seed_redo_branch(&mut buffer, SelectionSpec::new(8, 12))?;
@@ -683,8 +683,14 @@ fn already_formatted_creates_no_history_step() -> TestResult {
         budget(),
     )?;
     match outcome {
-        PlanOutcome::Unchanged(reason) => assert_eq!(reason, NoChangeReason::AlreadyFormatted),
-        PlanOutcome::Changed(_) => return Err(invalid("already formatted must not plan")),
+        PlanOutcome::Changed(plan) => {
+            assert_eq!(
+                plan.batch().patches(),
+                &[(6..8, String::new()), (12..14, String::new())]
+            );
+            assert_eq!(plan.target_selection(), SelectionSpec::new(6, 10));
+        }
+        PlanOutcome::Unchanged(_) => return Err(invalid("existing format must plan removal")),
     }
     assert_eq!(capture(&buffer)?, before);
     assert_eq!(buffer.history_node_count(), 1);

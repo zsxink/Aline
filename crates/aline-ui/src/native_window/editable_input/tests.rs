@@ -34,7 +34,7 @@ impl ReadonlyFileAccess for File {
     }
 }
 
-fn session(
+pub(in crate::native_window) fn session(
     raw: &'static str,
     history: HistoryBudget,
     mode: EditorMode,
@@ -72,6 +72,8 @@ fn view(doc: &mut ReadonlyDocument) -> Result<InputView, Box<dyn Error>> {
         source: 0..len,
         document_len: len,
         reader_row: current.text().src_range(0..len)?,
+        cell: None,
+        blank: false,
     };
     InputView::new(doc, site).ok_or_else(|| "没有正文输入投影".into())
 }
@@ -79,6 +81,156 @@ fn view(doc: &mut ReadonlyDocument) -> Result<InputView, Box<dyn Error>> {
 fn apply(doc: &mut ReadonlyDocument, site: &InputView, edit: InputIntent) -> Result<(), DocError> {
     let current = doc.current_snapshot()?;
     edit.apply(site, &current, doc, 1)
+}
+
+#[test]
+fn blank_line_input_rebinds_after_commit_before_reader_refresh() -> TestResult {
+    let mut state = session("- 父\r\n", HistoryBudget::new(8, 4096), EditorMode::Visual)?;
+    let document = state.document_mut().ok_or("没有文档")?;
+    let current = document.current_snapshot()?;
+    let caret = current.text().src_offset(current.len_bytes())?;
+    let selection = SrcSelection::new(caret.clone(), caret)?;
+    let identity = document.input_identity()?;
+    assert!(document.open_visual_at(&identity, &selection)?);
+    let reader_row = selection.range();
+    let site = InputSite::for_row(document, reader_row.clone(), None).ok_or("没有空行输入")?;
+    let view = InputView::new(document, site).ok_or("没有空行投影")?;
+    let frame = InputFrame(Rc::new(RefCell::new(Some(view.clone()))));
+    apply(document, &view, InputIntent::Replace(None, "正".to_owned()))?;
+    assert!(frame.rebind(document));
+    document.edit_core()?.commit_open_block(2)?;
+    assert!(!document.is_parse_current());
+    assert!(frame.rebind(document));
+    let retained = frame.source_site().ok_or("没有保留的空行投影")?;
+    let site = InputSite::for_row(document, reader_row, Some(&retained)).ok_or("未重绑空行")?;
+    let view = InputView::new(document, site).ok_or("没有重绑后的投影")?;
+    apply(document, &view, InputIntent::Replace(None, "文".to_owned()))?;
+    document.edit_core()?.commit_open_block(3)?;
+    assert_eq!(document.core().buffer_text()?, "- 父\r\n\r\n正文");
+    assert_eq!(document.core().history_node_count(), 2);
+    Ok(())
+}
+
+const SHORT_TABLE: &str = "| A | B | C |\n| --- | --- | --- |\n| a |";
+
+fn short_table_site(
+    document: &mut ReadonlyDocument,
+    column: usize,
+) -> Result<InputSite, Box<dyn Error>> {
+    let current = document.current_snapshot()?;
+    let table = document
+        .parsed()
+        .presentation()
+        .first()
+        .ok_or("没有表格")?
+        .source_range()
+        .clone();
+    let target = aline_edit::TableTarget::new(table.clone(), 1, column);
+    InputSite::for_table(document.parsed(), &current, &target, table, TEXT)
+        .ok_or_else(|| "没有单元格输入投影".into())
+}
+
+fn select_site(document: &mut ReadonlyDocument, site: &InputSite) -> Result<(), DocError> {
+    let current = document.current_snapshot()?;
+    let identity = document.input_identity()?;
+    let offset = current.text().src_offset(site.source.start)?;
+    let selection = SrcSelection::new(offset.clone(), offset)?;
+    document.edit_core()?.select(&identity, &selection)
+}
+
+#[test]
+fn table_input_keeps_distinct_missing_cells_at_shared_anchor() -> TestResult {
+    let mut state = session(SHORT_TABLE, HistoryBudget::new(8, 4096), EditorMode::Visual)?;
+    let document = state.document_mut().ok_or("没有文档")?;
+    let first = short_table_site(document, 1)?;
+    let second = short_table_site(document, 2)?;
+    assert_eq!(first.source, second.source);
+    select_site(document, &second)?;
+    let version = document.core().version();
+    let view = InputView::new(document, second.clone()).ok_or("缺失格投影为空")?;
+    let binding = SourceInputSite {
+        identity: view.identity.clone(),
+        site: second.clone(),
+    };
+    let row = second.reader_row.clone();
+    let rendered = InputSite::for_row(document, row, Some(&binding)).ok_or("缺失格未渲染")?;
+    assert_eq!(rendered.cell(), Some((1, 2)));
+    assert_eq!(document.core().version(), version);
+    assert_eq!(document.core().history_node_count(), 0);
+    apply(document, &view, InputIntent::Replace(None, "中".to_owned()))?;
+    assert_eq!(
+        document.current_snapshot()?.full_text(TEXT)?,
+        format!("{SHORT_TABLE}  | 中 |")
+    );
+    assert_eq!(document.core().history_node_count(), 1);
+    document.checked_undo()?;
+    assert_eq!(document.current_snapshot()?.full_text(TEXT)?, SHORT_TABLE);
+    Ok(())
+}
+
+#[test]
+fn table_input_materializes_missing_cell_only_on_ime_confirmation() -> TestResult {
+    let mut state = session(SHORT_TABLE, HistoryBudget::new(8, 4096), EditorMode::Visual)?;
+    let document = state.document_mut().ok_or("没有文档")?;
+    let site = short_table_site(document, 2)?;
+    select_site(document, &site)?;
+    let view = InputView::new(document, site).ok_or("缺失格投影为空")?;
+    apply(
+        document,
+        &view,
+        InputIntent::Mark(None, "ni".to_owned(), Some(2..2)),
+    )?;
+    assert_eq!(document.core().buffer_text()?, SHORT_TABLE);
+    assert_eq!(document.core().history_node_count(), 0);
+    let site = view.site.rebound(document).ok_or("组合后单元格丢失")?;
+    let view = InputView::new(document, site).ok_or("组合投影为空")?;
+    let current = document.current_snapshot()?;
+    let intent = InputIntent::Replace(Some(0..2), "你".to_owned());
+    let InputStep::Prepared(job) = view.step(&intent, &view.identity, &current, document, 2) else {
+        return Err("组合确认未冻结".into());
+    };
+    document.edit_core()?.publish_native_input(job.run()?)?;
+    assert_eq!(
+        document.current_snapshot()?.full_text(TEXT)?,
+        format!("{SHORT_TABLE}  | 你 |")
+    );
+    assert_eq!(document.core().history_node_count(), 1);
+    assert!(document.core().composition().is_none());
+    assert!(document.core().has_open_block());
+    let rebound = view.site.rebound(document).ok_or("提交后单元格丢失")?;
+    assert_eq!(rebound.cell(), Some((1, 2)));
+    assert!(rebound.missing_cell().is_none());
+    Ok(())
+}
+
+#[test]
+fn table_input_nested_projection_mounts_only_its_cell() -> TestResult {
+    const RAW: &str = "> | A | B |\n> | --- | --- |\n> | x | y |";
+    let mut state = session(RAW, HistoryBudget::new(8, 4096), EditorMode::Visual)?;
+    let document = state.document_mut().ok_or("没有文档")?;
+    let current = document.current_snapshot()?;
+    let offset = current
+        .text()
+        .src_offset(RAW.find('x').ok_or("没有目标格")?)?;
+    let target =
+        crate::native_window::table_commands::table_target_at(document.parsed(), &offset, TEXT)
+            .ok_or("引用内表格未定位")?;
+    let row = target.table_range().clone();
+    let identity = document.input_identity()?;
+    let selection = SrcSelection::new(offset.clone(), offset)?;
+    document.edit_core()?.select(&identity, &selection)?;
+    assert_ne!(row.byte_range().start, 0);
+    let site = InputSite::for_row(document, row, None).ok_or("引用内单元格没有输入帧")?;
+    let view = InputView::new(document, site).ok_or("引用内单元格投影为空")?;
+    assert_eq!(
+        view.bound(&view.identity).ok_or("投影失效")?.drawn_text(),
+        " x "
+    );
+    apply(document, &view, InputIntent::Replace(None, "中".to_owned()))?;
+    document.edit_core()?.escape(2)?;
+    assert_eq!(document.core().buffer_text()?, RAW.replace(" x ", " 中x "));
+    assert_eq!(document.core().history_node_count(), 1);
+    Ok(())
 }
 
 #[test]

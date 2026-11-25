@@ -10,7 +10,7 @@ use std::collections::VecDeque;
 use std::ops::Range;
 use std::rc::Rc;
 
-use aline_buffer::{Affinity, SrcOffset};
+use aline_buffer::{Affinity, SrcOffset, SrcRange};
 use aline_markdown::{
     AlertKind, CodeLine, MappingBudget, Parsed, Projection, ProjectionId, TableAlignment,
 };
@@ -423,6 +423,12 @@ impl RowGeometry {
     }
 }
 
+pub(super) struct TableCellInput {
+    pub(super) row: usize,
+    pub(super) column: usize,
+    pub(super) element: AnyElement,
+}
+
 /// 行级命中回调；参数与 `ReaderSurface::render_row` 的调用方约定一致。
 type HitCallback = dyn Fn(
     &HitTarget,
@@ -764,12 +770,14 @@ impl ReaderSurface {
         .into_any_element()
     }
 
+    #[expect(clippy::too_many_arguments, reason = "行渲染共享文档、文案和窗口回调")]
     pub(super) fn render_row(
         &self,
         document: &mut ReadonlyDocument,
         row: usize,
         failure: SharedString,
         copy: &ContentCopy,
+        table_input: Option<TableCellInput>,
         on_hit: impl Fn(
             &HitTarget,
             Result<Result<usize, usize>, HitError>,
@@ -788,6 +796,7 @@ impl ReaderSurface {
             row,
             failure,
             copy,
+            table_input,
             Rc::new(on_hit),
             Rc::new(on_navigate),
         )
@@ -920,12 +929,14 @@ impl ReaderSurface {
             .into_any_element()
     }
 
+    #[expect(clippy::too_many_arguments, reason = "表格输入和命中由窗口持有")]
     fn render_visual_row(
         &self,
         document: &mut ReadonlyDocument,
         row: usize,
         failure: SharedString,
         copy: &ContentCopy,
+        mut table_input: Option<TableCellInput>,
         on_hit: Rc<HitCallback>,
         on_navigate: Rc<NavigateCallback>,
     ) -> AnyElement {
@@ -1125,6 +1136,22 @@ impl ReaderSurface {
                     bounded_notice(failure.clone())
                 } else {
                     let last_row = rows.len().saturating_sub(1);
+                    let source = document
+                        .parsed()
+                        .snapshot()
+                        .src_range(content.source.clone())
+                        .ok();
+                    let table_source = source.as_ref().and_then(|source| {
+                        if !document.is_editable() || !document.is_parse_current() {
+                            return None;
+                        }
+                        aline_markdown::table_source(
+                            document.parsed(),
+                            source,
+                            document.text_budget(),
+                        )
+                        .ok()
+                    });
                     let mut table = div()
                         .w_full()
                         .flex()
@@ -1137,6 +1164,21 @@ impl ReaderSurface {
                         let last_cell = table_row.cells.len().saturating_sub(1);
                         let mut line = div().flex().w_full();
                         for (cell_index, cell) in table_row.cells.iter().enumerate() {
+                            if table_input.as_ref().is_some_and(|input| {
+                                input.row == index && input.column == cell_index
+                            }) && let Some(input) = table_input.take()
+                            {
+                                line = line.child(
+                                    div()
+                                        .flex_1()
+                                        .min_w_0()
+                                        .px(px(CELL_PADDING_X))
+                                        .py(px(CELL_PADDING_Y))
+                                        .bg(rgb(tokens::CODE_SURFACE))
+                                        .child(input.element),
+                                );
+                                continue;
+                            }
                             line = line.child(self.table_cell(
                                 document,
                                 token,
@@ -1147,6 +1189,18 @@ impl ReaderSurface {
                                 index == last_row,
                                 &failure,
                                 on_hit.clone(),
+                                table_source.as_ref().and_then(|table| {
+                                    let source_cell =
+                                        table.rows().get(index)?.cells().get(cell_index)?;
+                                    Some((
+                                        aline_edit::TableTarget::new(
+                                            table.source_range().clone(),
+                                            index,
+                                            cell_index,
+                                        ),
+                                        source_cell.source_range(),
+                                    ))
+                                }),
                             ));
                         }
                         table = table.child(line);
@@ -1343,6 +1397,7 @@ impl ReaderSurface {
         last_row: bool,
         failure: &SharedString,
         on_hit: Rc<HitCallback>,
+        table_target: Option<(aline_edit::TableTarget, &SrcRange)>,
     ) -> AnyElement {
         let projection = cell_projection(document.parsed(), cell);
         let text = table_cell_text(projection.as_ref(), &cell.drawn, failure);
@@ -1363,9 +1418,25 @@ impl ReaderSurface {
         let click_prepared = prepared.clone();
         let cache = self.heights.clone();
         let hit = token.and_then(|token| {
-            projection
-                .clone()
-                .and_then(|projection| HitTarget::new(document, token, projection).ok())
+            let projection = projection.or_else(|| {
+                if !cell.drawn.is_empty() {
+                    return None;
+                }
+                let (_, source) = table_target.as_ref()?;
+                let snapshot = document.parsed().snapshot();
+                let start = source.byte_range().start;
+                Projection::identity(
+                    snapshot.clone(),
+                    snapshot.src_range(start..start).ok()?,
+                    MappingBudget::new(0, 1),
+                )
+                .ok()
+            })?;
+            let hit = HitTarget::new(document, token, projection).ok()?;
+            Some(match &table_target {
+                Some((target, _)) => hit.for_table_cell(target.clone()),
+                None => hit,
+            })
         });
         let mut element = div()
             .flex_1()
@@ -1382,10 +1453,25 @@ impl ReaderSurface {
             .child(styled)
             .on_children_prepainted(move |_, _, _| mark_prepared.mark_prepainted());
         if let Some(target) = hit {
+            if let Some((cell, _)) = table_target {
+                let target = target.clone();
+                let menu_callback = on_hit.clone();
+                let prepared = click_prepared.clone();
+                element = element.on_mouse_down(MouseButton::Right, move |event, window, cx| {
+                    let target = target.clone().for_table_menu(cell.clone(), event.position);
+                    menu_callback(&target, Ok(Ok(0)), &prepared, window, cx);
+                    cx.stop_propagation();
+                });
+            }
+            let empty = cell.drawn.is_empty();
             element = element.on_mouse_down(MouseButton::Left, move |event, window, cx| {
-                let candidate = target
-                    .ensure_layout(cache.borrow().token())
-                    .and_then(|()| click_prepared.index_for_position(event.position));
+                let candidate = target.ensure_layout(cache.borrow().token()).and_then(|()| {
+                    if empty {
+                        Ok(Ok(0))
+                    } else {
+                        click_prepared.index_for_position(event.position)
+                    }
+                });
                 on_hit(&target, candidate, &click_prepared, window, cx);
             });
         }

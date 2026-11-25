@@ -53,7 +53,9 @@ use crate::{
     ReadonlyDocument,
 };
 
-use super::{NativeDocumentWindow, PreparedLayout, SaveIntent, edit_error_key, tokens};
+#[cfg(test)]
+use super::edit_error_key;
+use super::{NativeDocumentWindow, PreparedLayout, SaveIntent, tokens};
 
 const MAX_INPUT_BYTES: usize = 64 * 1024;
 const MAPPING: MappingBudget = MappingBudget::new(MAX_INPUT_BYTES, MAX_INPUT_BYTES + 1);
@@ -66,6 +68,14 @@ pub(super) struct InputSite {
     source: Range<usize>,
     document_len: usize,
     reader_row: SrcRange,
+    cell: Option<TableInputSite>,
+    blank: bool,
+}
+
+#[derive(Clone)]
+struct TableInputSite {
+    target: aline_edit::TableTarget,
+    missing: bool,
 }
 
 impl InputSite {
@@ -80,13 +90,61 @@ impl InputSite {
         let mode = document.core().mode();
         let current = document.current_snapshot().ok()?;
         let bytes = row.byte_range();
+        let mut blank = false;
         let source = if mode == EditorMode::Visual {
             let range = document
                 .core()
                 .visual_block_range(&current)
                 .ok()??
                 .byte_range();
-            (range.start == bytes.start).then_some(range)?
+            if let Some(active) = active.filter(|active| active.site.cell.is_some())
+                && let Ok(identity) = document.input_identity()
+                && active.active_table_target(&identity, &current).is_some()
+            {
+                let start = active.site.reader_row.byte_range().start;
+                return (start == bytes.start).then(|| {
+                    let mut site = active.site.clone();
+                    site.reader_row = row;
+                    site
+                });
+            }
+            if !document.is_parse_current()
+                && let Some(active) = active.filter(|active| active.site.blank)
+                && active.site.source == range
+                && active
+                    .identity
+                    .validate(&document.input_identity().ok()?)
+                    .is_ok()
+            {
+                return (active.site.reader_row == row).then(|| active.site.clone());
+            }
+            let parsed = document.parsed();
+            if document.is_parse_current()
+                && let Some(target) = super::table_commands::table_target_at(
+                    parsed,
+                    current.selection().head(),
+                    document.text_budget(),
+                )
+            {
+                return Self::for_table(parsed, &current, &target, row, document.text_budget());
+            }
+            blank = bytes.start <= range.start
+                && range.start <= bytes.end
+                && (range.start == bytes.start
+                    || parsed.gaps().iter().any(|gap| {
+                        let gap = gap.range().byte_range();
+                        gap.start <= bytes.start && bytes.end <= gap.end
+                    }))
+                && parsed
+                    .snapshot()
+                    .src_range(range.start..range.start)
+                    .is_ok_and(|anchor| {
+                        aline_edit::is_blank_input_anchor(parsed, &anchor, document.text_budget())
+                    });
+            if range.start != bytes.start && !blank {
+                return None;
+            }
+            range
         } else if row.snapshot_id() == current.snapshot_id() {
             let head = document.core().current_selection().head();
             let snapshot = current.text();
@@ -117,7 +175,50 @@ impl InputSite {
             source,
             document_len: current.len_bytes(),
             reader_row: row,
+            cell: None,
+            blank,
         })
+    }
+
+    fn for_table(
+        parsed: &aline_markdown::Parsed,
+        current: &CurrentSnapshot,
+        target: &aline_edit::TableTarget,
+        reader_row: SrcRange,
+        budget: TextBudget,
+    ) -> Option<Self> {
+        if reader_row.byte_range().start != target.table_range().byte_range().start {
+            return None;
+        }
+        let table = aline_markdown::table_source(parsed, target.table_range(), budget).ok()?;
+        let cell = table
+            .rows()
+            .get(target.row())?
+            .cells()
+            .get(target.column())?;
+        Some(Self {
+            mode: EditorMode::Visual,
+            source: cell.source_range().byte_range(),
+            document_len: current.len_bytes(),
+            reader_row,
+            cell: Some(TableInputSite {
+                target: target.clone(),
+                missing: !cell.is_present(),
+            }),
+            blank: false,
+        })
+    }
+
+    pub(super) fn cell(&self) -> Option<(usize, usize)> {
+        let target = &self.cell.as_ref()?.target;
+        Some((target.row(), target.column()))
+    }
+
+    fn missing_cell(&self) -> Option<&aline_edit::TableTarget> {
+        self.cell
+            .as_ref()
+            .filter(|cell| cell.missing)
+            .map(|cell| &cell.target)
     }
 
     /// 按最新快照重建输入站点；无法证明同一逻辑行时返回 None 并由调用方清空帧。
@@ -131,14 +232,58 @@ impl InputSite {
             return None;
         }
         let current = document.current_snapshot().ok()?;
+        if let Some(cell) = self.cell.as_ref().filter(|cell| cell.missing)
+            && current.len_bytes() != self.document_len
+            && document.core().open_block_draft().is_none()
+        {
+            let budget = document.text_budget();
+            return document
+                .with_working_parse(|parsed, current, _| {
+                    let target =
+                        super::table_commands::rebind_table_target(parsed, &cell.target, budget)
+                            .ok_or(DocError::StaleResult)?;
+                    Ok(Self::for_table(
+                        parsed,
+                        current,
+                        &target,
+                        self.reader_row.clone(),
+                        budget,
+                    ))
+                })
+                .ok()
+                .flatten();
+        }
         let source = match self.mode {
+            EditorMode::Visual if self.cell.is_some() => {
+                let block = document
+                    .core()
+                    .visual_block_range(&current)
+                    .ok()??
+                    .byte_range();
+                let cell = resized(self.source.clone(), self.document_len, current.len_bytes())?;
+                (block.start <= cell.start && cell.end <= block.end).then_some(cell)?
+            }
             EditorMode::Visual => {
                 let source = document
                     .core()
                     .visual_block_range(&current)
                     .ok()??
                     .byte_range();
-                (self.source.start == source.start).then_some(source)?
+                let separator_inserted = self.blank
+                    && source.start > self.source.start
+                    && source.start - self.source.start <= 2
+                    && current
+                        .text()
+                        .src_range(self.source.start..source.start)
+                        .ok()
+                        .and_then(|separator| {
+                            current
+                                .text()
+                                .slice(&separator, document.text_budget())
+                                .ok()
+                        })
+                        .is_some_and(|separator| matches!(separator.as_ref(), "\n" | "\r\n"));
+                (self.source.start == source.start || separator_inserted).then_some(source)?
             }
             EditorMode::Source => {
                 let candidate =
@@ -167,6 +312,8 @@ impl InputSite {
             source,
             document_len: current.len_bytes(),
             reader_row: self.reader_row.clone(),
+            cell: self.cell.clone(),
+            blank: self.blank,
         })
     }
 }
@@ -262,6 +409,77 @@ pub(super) struct SourceInputSite {
     site: InputSite,
 }
 
+impl SourceInputSite {
+    pub(super) fn for_table(
+        parsed: &aline_markdown::Parsed,
+        current: &CurrentSnapshot,
+        identity: &InputIdentity,
+        target: &aline_edit::TableTarget,
+        reader_row: SrcRange,
+        budget: TextBudget,
+    ) -> Option<Self> {
+        let site = InputSite::for_table(parsed, current, target, reader_row, budget)?;
+        Some(Self {
+            identity: identity.clone(),
+            site,
+        })
+    }
+
+    pub(super) fn for_table_navigation(
+        document: &ReadonlyDocument,
+        current: &CurrentSnapshot,
+        identity: &InputIdentity,
+        target: &aline_edit::TableTarget,
+        reader_row: SrcRange,
+    ) -> Result<(SrcSelection, Self), DocError> {
+        let parsed = document.parsed();
+        let budget = document.text_budget();
+        let mut site = InputSite::for_table(parsed, current, target, reader_row, budget)
+            .ok_or(DocError::StaleResult)?;
+        let affinity = if site.missing_cell().is_some() {
+            aline_buffer::Affinity::After
+        } else {
+            aline_buffer::Affinity::Before
+        };
+        let range = parsed.snapshot().src_range(site.source)?;
+        let range = document
+            .core()
+            .project_visual_source_range(current, &range, affinity)?;
+        let text = current.text().slice(&range, budget)?;
+        site.source = range.byte_range();
+        let offset = site.source.end - text.trim_start_matches([' ', '\t']).len();
+        let caret = current.text().src_offset(offset)?;
+        let selection = SrcSelection::new(caret.clone(), caret)?;
+        Ok((
+            selection,
+            Self {
+                identity: identity.clone(),
+                site,
+            },
+        ))
+    }
+
+    pub(super) fn active_table_target(
+        &self,
+        identity: &InputIdentity,
+        current: &CurrentSnapshot,
+    ) -> Option<&aline_edit::TableTarget> {
+        let cell = self.site.cell.as_ref()?;
+        self.identity.validate(identity).ok()?;
+        let selected = current.selection().range().byte_range();
+        (self.site.source.start <= selected.start && selected.end <= self.site.source.end)
+            .then_some(&cell.target)
+    }
+
+    pub(super) fn reader_row(&self) -> &SrcRange {
+        &self.site.reader_row
+    }
+
+    pub(super) fn is_table(&self) -> bool {
+        self.site.cell.is_some()
+    }
+}
+
 fn resized(range: Range<usize>, before: usize, after: usize) -> Option<Range<usize>> {
     let end = if after >= before {
         range.end.checked_add(after.checked_sub(before)?)?
@@ -337,11 +555,10 @@ impl InputView {
 
     fn marked(document: &ReadonlyDocument, current: &CurrentSnapshot) -> Option<SrcSelection> {
         let mark = document.core().composition()?;
-        let start = mark.range().start;
-        let end = start.checked_add(mark.candidate().len())?;
+        let range = mark.marked_range()?;
         SrcSelection::new(
-            current.text().src_offset(start).ok()?,
-            current.text().src_offset(end).ok()?,
+            current.text().src_offset(range.start).ok()?,
+            current.text().src_offset(range.end).ok()?,
         )
         .ok()
     }
@@ -351,7 +568,7 @@ impl InputView {
         current: &CurrentSnapshot,
         document: &ReadonlyDocument,
         range: Option<Range<usize>>,
-        replacement_bytes: usize,
+        replacement: &str,
     ) -> Result<(), DocError> {
         let bound = self.bound(&self.identity).ok_or(DocError::StaleResult)?;
         let marked = Self::marked(document, current);
@@ -374,17 +591,85 @@ impl InputView {
                 .flatten()
                 .ok_or(DocError::OutsideOpenBlock)?;
         }
+        if self.site.cell.is_some() {
+            let drawn = bound
+                .drawn_from_utf16(&target_units)
+                .map_err(|_| DocError::OutsideOpenBlock)?;
+            self.check_cell_replacement(
+                current,
+                document.text_budget(),
+                &bound,
+                drawn.byte_range(),
+                replacement,
+            )?;
+        }
         let candidate_bytes = bound
             .drawn_text()
             .len()
             .checked_sub(target.range().byte_range().len())
-            .and_then(|remaining| remaining.checked_add(replacement_bytes))
+            .and_then(|remaining| remaining.checked_add(replacement.len()))
             .ok_or(DocError::Buffer(BufferError::LengthOverflow))?;
         if candidate_bytes > MAX_INPUT_BYTES {
             return Err(DocError::Buffer(BufferError::BudgetExceeded {
                 needed: candidate_bytes,
                 limit: MAX_INPUT_BYTES,
             }));
+        }
+        Ok(())
+    }
+
+    fn check_cell_replacement(
+        &self,
+        current: &CurrentSnapshot,
+        budget: TextBudget,
+        bound: &BoundInputCoordinates<'_>,
+        range: Range<usize>,
+        replacement: &str,
+    ) -> Result<(), DocError> {
+        let original = bound.drawn_text();
+        let before = original
+            .get(..range.start)
+            .ok_or(DocError::OutsideOpenBlock)?;
+        let after = original
+            .get(range.end..)
+            .ok_or(DocError::OutsideOpenBlock)?;
+        let mut previous = before.as_bytes().last().copied();
+        // 锁定的 pulldown-cmark 在表格行内允许紧邻反斜线的竖线。
+        // 这里只筛掉会改变分隔符的局部输入，发布时仍使用完整语义复读。
+        for byte in replacement.bytes() {
+            if matches!(byte, b'\n' | b'\r') || byte == b'|' && previous != Some(b'\\') {
+                return Err(DocError::OutsideOpenBlock);
+            }
+            previous = Some(byte);
+        }
+        if after.starts_with('|') && previous != Some(b'\\') {
+            return Err(DocError::OutsideOpenBlock);
+        }
+        if after.is_empty()
+            && previous == Some(b'\\')
+            && text_byte(current.text(), self.site.source.end, budget) == Some(b'|')
+        {
+            return Err(DocError::OutsideOpenBlock);
+        }
+        Ok(())
+    }
+
+    fn materialize_cell(
+        &self,
+        document: &mut ReadonlyDocument,
+        text: &str,
+        now_millis: u64,
+    ) -> Result<(), DocError> {
+        let cell = self.site.cell.as_ref().ok_or(DocError::StaleResult)?;
+        let core = document.edit_core()?;
+        let prepared = core.prepare_command(|parsed, selection, context, budget| {
+            let target =
+                super::table_commands::rebind_table_target(parsed, &cell.target, budget.text())
+                    .ok_or(aline_edit::EditRefusal::InvalidPlan)?;
+            aline_edit::plan_table_missing_input(parsed, selection, context, &target, text, budget)
+        })?;
+        if let Some(prepared) = prepared {
+            core.publish_command(&prepared, now_millis)?;
         }
         Ok(())
     }
@@ -408,10 +693,13 @@ impl InputView {
             // Escape 由窗口关闭路径处理，不经过视图投影。
             InputIntent::Escape => InputStep::Rejected(DocError::NoOpenBlock),
             InputIntent::LineBreak => {
+                if self.site.cell.is_some() {
+                    return InputStep::Rejected(DocError::OutsideOpenBlock);
+                }
                 if document.core().composition().is_some() {
                     return InputStep::Rejected(DocError::CompositionActive);
                 }
-                if let Err(error) = self.replacement(current, document, None, 1) {
+                if let Err(error) = self.replacement(current, document, None, "\n") {
                     return InputStep::Rejected(error);
                 }
                 self.step_text(identity, current, document, "\n", now_millis)
@@ -420,7 +708,13 @@ impl InputView {
                 if document.core().composition().is_some() {
                     return InputStep::Rejected(DocError::CompositionActive);
                 }
-                let range = match self.delete_range(identity, current, *forward, *count) {
+                let range = match self.delete_range(
+                    identity,
+                    current,
+                    *forward,
+                    *count,
+                    document.text_budget(),
+                ) {
                     Ok(Some(range)) => range,
                     // 组合活动时删除已拒绝；到达边界不会改变组合状态。
                     Ok(None) => {
@@ -449,33 +743,38 @@ impl InputView {
                 self.apply_checked(intent, current, document, now_millis)
             }
             InputIntent::Paste(text) => {
-                if let Err(error) = self.replacement(current, document, None, text.len()) {
+                if let Err(error) = self.replacement(current, document, None, text) {
                     return InputStep::Rejected(error);
                 }
                 self.apply_checked(intent, current, document, now_millis)
             }
             InputIntent::Replace(range, text) => {
-                if let Err(error) = self.replacement(current, document, range.clone(), text.len()) {
+                if let Err(error) = self.replacement(current, document, range.clone(), text) {
                     return InputStep::Rejected(error);
                 }
                 if document.core().composition().is_some() {
                     // 组合确认统一走后台冻结；发布段不重做候选拼接。
                     let prepared = document.edit_core().and_then(|core| {
-                        core.prepare_native_confirmation(identity, Some(text), now_millis)
+                        core.prepare_native_confirmation_at(
+                            identity,
+                            Some(text),
+                            now_millis,
+                            self.site.missing_cell(),
+                        )
                     });
                     return match prepared {
                         Ok(job) => InputStep::Prepared(job),
                         Err(error) => InputStep::Rejected(error),
                     };
                 }
-                if text.is_empty() {
+                if text.is_empty() || self.site.cell.as_ref().is_some_and(|cell| cell.missing) {
                     self.apply_checked(intent, current, document, now_millis)
                 } else {
                     self.step_text(identity, current, document, text, now_millis)
                 }
             }
             InputIntent::Mark(range, text, _) => {
-                if let Err(error) = self.replacement(current, document, range.clone(), text.len()) {
+                if let Err(error) = self.replacement(current, document, range.clone(), text) {
                     return InputStep::Rejected(error);
                 }
                 if starts_composition(document, text) {
@@ -547,6 +846,7 @@ impl InputView {
         current: &CurrentSnapshot,
         forward: bool,
         count: usize,
+        budget: TextBudget,
     ) -> Result<Option<SrcRange>, DocError> {
         let bound = self.bound(identity).ok_or(DocError::StaleResult)?;
         let units = bound
@@ -580,6 +880,15 @@ impl InputView {
         } else {
             SrcSelection::new(edge, end)
         }?;
+        if self.site.cell.is_some() {
+            let units = bound
+                .utf16_from_source_selection(&selected)
+                .map_err(|_| DocError::OutsideOpenBlock)?;
+            let drawn = bound
+                .drawn_from_utf16(&units)
+                .map_err(|_| DocError::OutsideOpenBlock)?;
+            self.check_cell_replacement(current, budget, &bound, drawn.byte_range(), "")?;
+        }
         Ok(Some(selected.range()))
     }
 
@@ -812,10 +1121,13 @@ impl InputIntent {
         }
         match self {
             Self::LineBreak => {
+                if view.site.cell.is_some() {
+                    return Err(DocError::OutsideOpenBlock);
+                }
                 if composing {
                     return Err(DocError::CompositionActive);
                 }
-                view.replacement(current, document, None, 1)?;
+                view.replacement(current, document, None, "\n")?;
                 document
                     .edit_core()?
                     .type_selection(identity, "\n", now_millis)
@@ -824,7 +1136,9 @@ impl InputIntent {
                 if composing {
                     return Err(DocError::CompositionActive);
                 }
-                let Some(range) = view.delete_range(identity, current, *forward, *count)? else {
+                let Some(range) =
+                    view.delete_range(identity, current, *forward, *count, document.text_budget())?
+                else {
                     return Ok(());
                 };
                 document
@@ -867,18 +1181,37 @@ impl InputIntent {
                 document.edit_core()?.select(identity, &selection)
             }
             Self::Paste(text) => {
-                view.replacement(current, document, None, text.len())?;
+                view.replacement(current, document, None, text)?;
+                if !text.is_empty() && view.site.cell.as_ref().is_some_and(|cell| cell.missing) {
+                    return view.materialize_cell(document, text, now_millis);
+                }
                 document
                     .edit_core()?
                     .replace_selection(identity, text, now_millis)
                     .map(|_| ())
             }
             Self::Replace(range, text) => {
-                view.replacement(current, document, range.clone(), text.len())?;
+                view.replacement(current, document, range.clone(), text)?;
+                if !composing
+                    && !text.is_empty()
+                    && view.site.cell.as_ref().is_some_and(|cell| cell.missing)
+                {
+                    return view.materialize_cell(document, text, now_millis);
+                }
                 let core = document.edit_core()?;
                 if composing {
-                    core.commit_native_candidate(identity, text, now_millis)
-                        .map(|_| ())
+                    if let Some(cell) = view.site.missing_cell() {
+                        let job = core.prepare_native_confirmation_at(
+                            identity,
+                            Some(text),
+                            now_millis,
+                            Some(cell),
+                        )?;
+                        core.publish_native_input(job.run()?).map(|_| ())
+                    } else {
+                        core.commit_native_candidate(identity, text, now_millis)
+                            .map(|_| ())
+                    }
                 } else if text.is_empty() {
                     core.replace_selection(identity, text, now_millis)
                         .map(|_| ())
@@ -887,7 +1220,7 @@ impl InputIntent {
                 }
             }
             Self::Mark(range, text, selection) => {
-                view.replacement(current, document, range.clone(), text.len())?;
+                view.replacement(current, document, range.clone(), text)?;
                 if text.is_empty() {
                     if selection.clone().is_some_and(|range| range != (0..0)) {
                         return Err(DocError::OutsideOpenBlock);
@@ -1346,20 +1679,26 @@ impl InputFrame {
     }
 
     /// 清空帧内视图；之后只能由重新渲染或显式重建恢复。
-    fn clear(&self) {
+    pub(super) fn clear(&self) {
         if let Ok(mut active) = self.0.try_borrow_mut() {
             *active = None;
         }
     }
 
+    pub(super) fn is_same(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+
     /// 当前 Source 绑定；供列表延迟重建与输入行命中复用。
-    fn source_site(&self) -> Option<SourceInputSite> {
+    pub(super) fn source_site(&self) -> Option<SourceInputSite> {
         let active = self.0.try_borrow().ok()?;
         let view = active.as_ref()?;
-        (view.site.mode == EditorMode::Source).then(|| SourceInputSite {
-            identity: view.identity.clone(),
-            site: view.site.clone(),
-        })
+        (view.site.mode == EditorMode::Source || view.site.cell.is_some() || view.site.blank).then(
+            || SourceInputSite {
+                identity: view.identity.clone(),
+                site: view.site.clone(),
+            },
+        )
     }
 
     /// 帧内视图是否仍能消费当前文档状态；显式命令推进版本或移动选区后为 false。
@@ -1449,6 +1788,11 @@ impl NativeDocumentWindow {
             || modifiers.function
             || !self.focus.is_focused(window)
         {
+            return;
+        }
+        if self.markdown_key(&event.keystroke.key, modifiers.shift, window, cx) {
+            cx.stop_propagation();
+            window.prevent_default();
             return;
         }
         let intent = match event.keystroke.key.as_str() {
@@ -1603,7 +1947,7 @@ impl NativeDocumentWindow {
             // 核心受检入口的 StaleResult 不在此列，仍按编辑拒绝反馈。
             InputStep::StalePlatformOrigin => InputExecution::Rejected,
             InputStep::Rejected(error) => {
-                self.state.feedback = Some(edit_error_key(error));
+                self.show_edit_refusal(error);
                 cx.notify();
                 InputExecution::Rejected
             }
@@ -1637,7 +1981,7 @@ impl NativeDocumentWindow {
                 InputExecution::Started
             }
             Err(error) => {
-                self.state.feedback = Some(edit_error_key(error));
+                self.show_edit_refusal(error);
                 cx.notify();
                 InputExecution::Rejected
             }
@@ -1760,6 +2104,20 @@ impl NativeDocumentWindow {
                 .document()
                 .is_some_and(|document| document.core().open_block_draft().is_some());
             if !has_draft {
+                if frame
+                    .and_then(InputFrame::source_site)
+                    .is_some_and(|site| site.site.missing_cell().is_some())
+                {
+                    self.visual_input_restore = self
+                        .state
+                        .session
+                        .document()
+                        .filter(|document| {
+                            document.core().mode() == EditorMode::Visual
+                                && !document.core().has_open_block()
+                        })
+                        .map(super::edit_actions::VisualInputRestore::new);
+                }
                 self.refresh_after_edit(window, cx);
             }
             if let Some(frame) = frame {
@@ -1949,11 +2307,11 @@ impl NativeDocumentWindow {
                 }
                 FailureAction::Clear { document_gone } => {
                     if !document_gone {
-                        self.state.feedback = Some(if had_pending {
-                            "document.input_dropped"
+                        if had_pending {
+                            self.state.feedback = Some("document.input_dropped");
                         } else {
-                            edit_error_key(error)
-                        });
+                            self.show_edit_refusal(error);
+                        }
                         cx.notify();
                     }
                     return;
@@ -2368,8 +2726,11 @@ pub(super) fn render(
     let click_identity = view.identity.clone();
     let click_coordinates = view.coordinates.clone();
     let projection = view.coordinates.projection_id().clone();
+    let table_cell = view.site.cell.is_some();
     let frame = InputFrame(Rc::new(RefCell::new(Some(view))));
     let handler_frame = frame.clone();
+    let menu_frame = frame.clone();
+    let menu_host = host.clone();
     Some((
         div()
             .relative()
@@ -2380,6 +2741,14 @@ pub(super) fn render(
             .on_children_prepainted(move |bounds, _, _| {
                 prepainted.mark_prepainted();
                 layout_bounds.set(bounds.first().copied());
+            })
+            .when(table_cell, |editor| {
+                editor.on_mouse_down(MouseButton::Right, move |event, window, cx| {
+                    let _ = menu_host.update(cx, |host, cx| {
+                        host.open_active_table_menu(&menu_frame, event.position, window, cx);
+                    });
+                    cx.stop_propagation();
+                })
             })
             .on_mouse_down(MouseButton::Left, move |event, window, cx| {
                 let Some(byte) = click_layout
@@ -2476,4 +2845,4 @@ pub(super) fn render(
 }
 
 #[cfg(test)]
-mod tests;
+pub(super) mod tests;

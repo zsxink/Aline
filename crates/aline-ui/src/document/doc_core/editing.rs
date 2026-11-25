@@ -3,12 +3,16 @@
 
 use std::{borrow::Cow, ops::Range};
 
+#[cfg(target_os = "macos")]
+use aline_buffer::Affinity;
 use aline_buffer::{
     BufferError, CheckedBatch, OperationSource, SelectionSpec, SrcRange, SrcSelection, TextBudget,
     TextSnapshot,
 };
-use aline_edit::EditRefusal;
-use aline_markdown::{ParseConfig, Parsed, ProtectedRange, ProtectionKind, StyledRange};
+use aline_edit::{EditRefusal, is_blank_input_anchor};
+use aline_markdown::{
+    Block, BlockKind, ParseConfig, Parsed, ProtectedRange, ProtectionKind, StyledRange,
+};
 
 use super::checked_commit::transform_extent;
 use super::{
@@ -21,7 +25,7 @@ use crate::document::{CurrentSnapshot, EditorMode, InputIdentity};
 
 impl DocCore {
     /// 从当前解析打开可视化块。调用方传入布局命中已转换得到的源码选区。
-    /// 区间须对应真实顶层块，选区须位于块内且没有触及受保护语法。
+    /// 区间须对应真实顶层块或合法空行锚点；MD-11 和行内 HTML 仍受保护。
     pub fn open_visual_block(
         &mut self,
         identity: &InputIdentity,
@@ -39,7 +43,7 @@ impl DocCore {
         let snapshot = self.checked_visual_snapshot(identity, parsed)?;
         snapshot.validate_selection(selection)?;
         let selection = selection_of(selection);
-        let target = checked_visual_target(snapshot, parsed, block, selection)?;
+        let target = checked_visual_target(snapshot, parsed, block, selection, self.limits.text)?;
         // 草稿范围从选区起步，边界单独记录以防写入分隔换行。
         self.open_input_target(InputTarget::Visual(target), selection.range(), selection)
     }
@@ -64,7 +68,8 @@ impl DocCore {
         let selection = selection_of(selection);
         let target = target_block
             .map(|block| {
-                let target = checked_visual_target(snapshot, parsed, block, selection)?;
+                let target =
+                    checked_visual_target(snapshot, parsed, block, selection, self.limits.text)?;
                 let range = snapshot.src_range(selection.range())?;
                 let fragment = match snapshot.slice(&range, self.limits.text)? {
                     Cow::Borrowed(text) => copy_bounded(text, self.limits.text)?,
@@ -191,9 +196,13 @@ impl DocCore {
         {
             self.publish_staged_replacement(text, now_millis)?
         } else {
-            let after_src_off = range.start.checked_add(text.len()).ok_or_else(overflow)?;
+            let separator = self.open.as_ref().map_or("", OpenBlock::leading_separator);
+            let replacement = self.copy_input_with_separator(separator, text)?;
+            let after_src_off = range
+                .start
+                .checked_add(replacement.len())
+                .ok_or_else(overflow)?;
             let after = SelectionSpec::new(after_src_off, after_src_off);
-            let replacement = copy_bounded(text, self.limits.text)?;
             self.publish_input(
                 range,
                 replacement,
@@ -274,6 +283,49 @@ impl DocCore {
             .transpose()
     }
 
+    /// 将已提交快照中的局部源码范围绑定到当前普通输入草稿。
+    /// 部分相交的范围没有可证明的边界；缺失单元格等空锚点可跟随插入末端。
+    #[cfg(target_os = "macos")]
+    pub(crate) fn project_visual_source_range(
+        &self,
+        current: &CurrentSnapshot,
+        base: &SrcRange,
+        empty_affinity: Affinity,
+    ) -> Result<SrcRange, DocError> {
+        if current.document_id() != &self.document
+            || current.version() != self.version
+            || current.snapshot_id() != self.cached_current_text()?.id()
+        {
+            return Err(DocError::StaleResult);
+        }
+        let mut range = self.buffer.snapshot().validate_range(base)?;
+        if self.is_composition_active() {
+            return Err(DocError::CompositionActive);
+        }
+        if let Some(group) = self.open.as_ref().and_then(OpenBlock::typing) {
+            let shift = |src_off: usize| {
+                src_off
+                    .checked_sub(group.range.len())
+                    .and_then(|src_off| src_off.checked_add(group.draft.len()))
+                    .ok_or_else(overflow)
+            };
+            let after_empty_insertion = range.is_empty()
+                && group.range.is_empty()
+                && range.start == group.range.start
+                && empty_affinity == Affinity::After;
+            if after_empty_insertion
+                || range.start >= group.range.end && range.start > group.range.start
+            {
+                range = shift(range.start)?..shift(range.end)?;
+            } else if range.start <= group.range.start && group.range.end <= range.end {
+                range.end = shift(range.end)?;
+            } else if group.range.start < range.end {
+                return Err(DocError::OutsideOpenBlock);
+            }
+        }
+        current.text().src_range(range).map_err(DocError::Buffer)
+    }
+
     fn logical_visual_extent(&self) -> Result<Option<Range<usize>>, DocError> {
         let Some(block) = &self.open else {
             return Ok(None);
@@ -329,9 +381,13 @@ impl DocCore {
 impl VisualInput {
     pub(super) fn from_parse(
         extent: Range<usize>,
+        blocks: &[Block],
         protected: &[ProtectedRange],
         styled: &[StyledRange],
     ) -> Result<Self, DocError> {
+        let raw_html = blocks.iter().any(|block| {
+            block.kind() == BlockKind::HtmlBlock && block.range().byte_range() == extent
+        });
         let mut protections = Vec::new();
         let ranges = protected
             .iter()
@@ -343,6 +399,9 @@ impl VisualInput {
             );
         for (range, kind) in ranges {
             let range = range.byte_range();
+            if raw_html && kind == ProtectionKind::Html && contains(&extent, &range) {
+                continue;
+            }
             if touches(&extent, &range) {
                 protections
                     .try_reserve(1)
@@ -353,6 +412,7 @@ impl VisualInput {
         Ok(Self {
             extent,
             protections,
+            leading_separator: "",
         })
     }
 
@@ -379,12 +439,14 @@ fn checked_visual_target(
     parsed: &Parsed,
     block: &SrcRange,
     selection: SelectionSpec,
+    budget: TextBudget,
 ) -> Result<VisualInput, DocError> {
     let extent = snapshot.validate_range(block)?;
     if !parsed
         .blocks()
         .iter()
         .any(|candidate| candidate.range() == block)
+        && !is_blank_input_anchor(parsed, block, budget)
     {
         return Err(DocError::InvalidVisualBlock);
     }
@@ -392,9 +454,28 @@ fn checked_visual_target(
     if !contains(&extent, &selected) {
         return Err(DocError::OutsideOpenBlock);
     }
-    let target =
-        VisualInput::from_parse(extent, parsed.protected_ranges(), parsed.styled_ranges())?;
+    let mut target = VisualInput::from_parse(
+        extent,
+        parsed.blocks(),
+        parsed.protected_ranges(),
+        parsed.styled_ranges(),
+    )?;
     target.check_permissions(&selected, |range| Ok(range.clone()))?;
+    if block.is_empty()
+        && let Some(previous) = parsed
+            .blocks()
+            .iter()
+            .rev()
+            .find(|block| block.range().byte_range().end <= selected.start)
+        && previous.kind() == BlockKind::List
+    {
+        let between = snapshot.src_range(previous.range().byte_range().end..selected.start)?;
+        target.leading_separator = match snapshot.slice(&between, budget)?.as_ref() {
+            "\r\n" => "\r\n",
+            "\n" => "\n",
+            _ => "",
+        };
+    }
     Ok(target)
 }
 

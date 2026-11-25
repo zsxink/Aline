@@ -5,7 +5,7 @@ use aline_markdown::{Block, Parsed, ProtectedRange, StyledRange};
 
 use crate::command::{EditContext, GroupReason};
 use crate::errors::{map_batch_error, map_buffer_error};
-use crate::permissions::check_visual_permissions;
+use crate::permissions::{check_raw_html_permissions, check_visual_permissions};
 use crate::plan::{ChangePlan, Preview, ensure_target_selection};
 use crate::refusal::EditRefusal;
 use crate::reread::{build_candidate, verify};
@@ -94,15 +94,25 @@ pub fn validate_change<'a>(
             });
         }
     }
-    if plan.mode() == crate::command::EditMode::Visual {
+    if plan.mode() == crate::command::EditMode::Visual
+        || matches!(
+            plan.group_reason(),
+            GroupReason::BlockCommand | GroupReason::TableCommand | GroupReason::MarkdownFormat
+        )
+    {
         for expectation in &plan.expectations {
-            check_visual_permissions(parsed, &expectation.range)?;
+            match &plan.contract {
+                crate::reread::RereadContract::RawHtml { block } => {
+                    check_raw_html_permissions(parsed, block, &expectation.range)?;
+                }
+                _ => check_visual_permissions(parsed, &expectation.range)?,
+            }
         }
     }
 
     let candidate = build_candidate(snapshot, plan.parse_config, plan.batch(), plan.budget)?;
     verify(
-        plan.contract,
+        &plan.contract,
         parsed,
         &candidate,
         plan.batch().patches(),

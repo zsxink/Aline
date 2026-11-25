@@ -10,18 +10,32 @@ use crate::errors::{map_buffer_error, map_candidate_error, map_mapping_error, ma
 use crate::refusal::{BudgetKind, EditRefusal, RereadFailure};
 
 /// 计划在写前必须复验的语义契约。
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum RereadContract {
+    /// 手动格式化保留绘制语义、块结构和受保护原片段。
+    MarkdownFormat,
+    /// 段落和列表的目标种类及邻接块范围。
+    Block {
+        start: usize,
+        expected: Option<aline_markdown::BlockKind>,
+        count: usize,
+    },
+    /// 列表层级变化只改变被移动项的父项，其余归属保持。
+    ListMove(crate::list_commands::ListMove),
     /// 源码编辑：候选解析成功即可，允许改变隐藏语义。
     Source,
+    /// 表格结构复读须保持操作声明的网格与对齐。
+    Table(crate::table::TableExpectation),
     /// 所见替换：可见文本按替换拼接，隐藏语义必须保持。
     Visible,
     /// 可视化查找以源码范围为准，仍须保留隐藏语义。
     FindVisual,
     /// 已打开的可视化块编辑其原始源码，允许普通 Markdown 呈现变化。
     RawBlock,
+    /// 已核对为顶层 HTML 块的源码输入，仍需复验原块身份和 MD-11。
+    RawHtml { block: Range<usize> },
     /// 行内格式：可见文本和块结构保持，仅允许成对标记变化。
-    Format { marker: &'static str },
+    Inline(crate::inline::InlineContract),
 }
 
 /// 已构造并重新解析的候选文本；仍只是不可变预览。
@@ -79,15 +93,31 @@ pub(crate) fn build_candidate(
 
 /// 按契约比较 before 与候选解析结果；失败只返回拒绝。
 pub(crate) fn verify(
-    contract: RereadContract,
+    contract: &RereadContract,
     before: &Parsed,
     candidate: &Candidate,
     patches: &[(Range<usize>, String)],
     budget: EditBudget,
 ) -> Result<(), EditRefusal> {
     match contract {
+        RereadContract::Block {
+            start,
+            expected,
+            count,
+        } => crate::block_commands::verify(before, candidate, patches, *start, *expected, *count),
+        RereadContract::ListMove(expected) => {
+            crate::list_commands::verify_move(expected, before, candidate, patches, budget)
+        }
+        RereadContract::MarkdownFormat => crate::markdown_format::verify(before, candidate, budget),
         RereadContract::Source => Ok(()),
+        RereadContract::Table(expected) => crate::table::verify_table(expected, candidate, budget),
         RereadContract::RawBlock => reject_raw_fallback(candidate),
+        RereadContract::RawHtml { block } => {
+            for (range, _) in patches {
+                crate::permissions::check_raw_html_permissions(before, block, range)?;
+            }
+            reject_raw_fallback(candidate)
+        }
         RereadContract::FindVisual => {
             reject_raw_fallback(candidate)?;
             if semantic_hidden(before, budget.text())?
@@ -113,20 +143,9 @@ pub(crate) fn verify(
             }
             Ok(())
         }
-        RereadContract::Format { marker } => {
-            if candidate.parsed.projection().drawn_text() != before.projection().drawn_text() {
-                return Err(reread_failure(RereadFailure::VisibleTextChanged));
-            }
-            if !same_block_kinds(before, &candidate.parsed) {
-                return Err(reread_failure(RereadFailure::BlockStructureChanged));
-            }
-            let before_hidden = strip_marker(&semantic_hidden(before, budget.text())?, marker)?;
-            let after_hidden =
-                strip_marker(&semantic_hidden(&candidate.parsed, budget.text())?, marker)?;
-            if before_hidden != after_hidden {
-                return Err(reread_failure(RereadFailure::HiddenSourceChanged));
-            }
-            Ok(())
+        RereadContract::Inline(contract) => {
+            reject_raw_fallback(candidate)?;
+            crate::inline::verify(contract, before, &candidate.parsed, budget.text())
         }
     }
 }
@@ -148,17 +167,6 @@ fn reread_failure(reason: RereadFailure) -> EditRefusal {
         reason,
         cause: None,
     }
-}
-
-fn same_block_kinds(before: &Parsed, after: &Parsed) -> bool {
-    if before.blocks().len() != after.blocks().len() {
-        return false;
-    }
-    before
-        .blocks()
-        .iter()
-        .zip(after.blocks())
-        .all(|(left, right)| left.kind() == right.kind())
 }
 
 /// 提取隐藏片段用于比较的原文：保留片段内部空白，只跳过纯空白片段。
@@ -197,37 +205,6 @@ fn semantic_hidden(parsed: &Parsed, budget: TextBudget) -> Result<Vec<String>, E
         fragments.push(fragment);
     }
     Ok(fragments)
-}
-
-/// 去掉行内标记后比较隐藏语义；成对标记本身允许变化。
-///
-/// 标记可能与相邻空白落入同一隐藏片段，因此去标记后仅剩空白的片段
-/// 与“纯空白隐藏片段”同样不参与比较；其余文本（含内部空白）原样保留。
-fn strip_marker(fragments: &[String], marker: &str) -> Result<Vec<String>, EditRefusal> {
-    let mut stripped_fragments = Vec::new();
-    stripped_fragments
-        .try_reserve(fragments.len())
-        .map_err(|_| EditRefusal::Allocation)?;
-    for fragment in fragments {
-        let mut stripped = String::new();
-        stripped
-            .try_reserve_exact(fragment.len())
-            .map_err(|_| EditRefusal::Allocation)?;
-        let mut rest = fragment.as_str();
-        while let Some(index) = rest.find(marker) {
-            let prefix = rest.get(..index).ok_or(EditRefusal::InvalidPlan)?;
-            stripped.push_str(prefix);
-            let next = index
-                .checked_add(marker.len())
-                .ok_or(EditRefusal::LengthOverflow)?;
-            rest = rest.get(next..).ok_or(EditRefusal::InvalidPlan)?;
-        }
-        stripped.push_str(rest);
-        if !stripped.chars().all(char::is_whitespace) {
-            stripped_fragments.push(stripped);
-        }
-    }
-    Ok(stripped_fragments)
 }
 
 /// 按“before 绘制文本中被替换范围 + 字面替换文本”计算命令预期可见文本。

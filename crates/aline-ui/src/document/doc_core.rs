@@ -278,6 +278,12 @@ impl DocCore {
         self.open.as_ref().map(|block| block.range.clone())
     }
 
+    /// 打开块在已提交快照中的完整可视化范围。
+    #[cfg(target_os = "macos")]
+    pub(crate) fn visual_baseline_extent(&self) -> Option<&Range<usize>> {
+        self.open.as_ref()?.visual_extent()
+    }
+
     /// 返回打开块当前逻辑选区（含草稿坐标）。
     pub fn open_block_selection(&self) -> Option<SelectionSpec> {
         self.open.as_ref().map(|block| block.selection)
@@ -310,6 +316,8 @@ impl DocCore {
         Some(CompositionView {
             range: state.range.clone(),
             candidate: &state.candidate,
+            #[cfg(target_os = "macos")]
+            separator: block.leading_separator(),
         })
     }
 
@@ -561,27 +569,28 @@ impl DocCore {
     ) -> Result<CommitOutcome, DocError> {
         self.ensure_ready()?;
         let next_version = self.version.next_draft().map_err(DocError::Identity)?;
-        let (range, candidate, before_selection, after_selection) = {
-            let state = self
-                .open
-                .as_ref()
-                .and_then(OpenBlock::composition)
-                .ok_or(DocError::NoComposition)?;
+        let (range, before_selection, after_selection, candidate) = {
+            let block = self.open.as_ref().ok_or(DocError::NoOpenBlock)?;
+            let state = block.composition().ok_or(DocError::NoComposition)?;
+            let replacement = match confirmed {
+                Some(text) => self.copy_input_with_separator(block.leading_separator(), text)?,
+                None => copy_bounded(&state.candidate, self.limits.text)?,
+            };
             (
                 state.range.clone(),
-                copy_bounded(confirmed.unwrap_or(&state.candidate), self.limits.text)?,
                 state.before_selection,
                 match confirmed {
-                    Some(text) => {
+                    Some(_) => {
                         let end = state
                             .range
                             .start
-                            .checked_add(text.len())
+                            .checked_add(replacement.len())
                             .ok_or_else(overflow)?;
                         SelectionSpec::new(end, end)
                     }
                     None => state.selection,
                 },
+                replacement,
             )
         };
         let outcome = self.publish_input(
@@ -1066,6 +1075,21 @@ impl DocCore {
         Ok(())
     }
 
+    fn copy_input_with_separator(&self, separator: &str, input: &str) -> Result<String, DocError> {
+        if separator.is_empty() || input.is_empty() {
+            return copy_bounded(input, self.limits.text);
+        }
+        let len = separator
+            .len()
+            .checked_add(input.len())
+            .ok_or_else(overflow)?;
+        check_len(len, self.limits.text)?;
+        let mut replacement = try_string(len)?;
+        replacement.push_str(separator);
+        replacement.push_str(input);
+        Ok(replacement)
+    }
+
     fn start_group(
         &mut self,
         before_selection: SelectionSpec,
@@ -1074,6 +1098,12 @@ impl DocCore {
     ) -> Result<(), DocError> {
         let range = before_selection.range();
         let has_group = self.open.as_ref().and_then(OpenBlock::typing).is_some();
+        let separator = self
+            .open
+            .as_ref()
+            .filter(|block| block.typing().is_none() && !text.starts_with(['\r', '\n']))
+            .map_or("", OpenBlock::leading_separator);
+        let draft = self.copy_input_with_separator(separator, text)?;
         let committed_len = {
             let block = self.open.as_ref().ok_or(DocError::NoOpenBlock)?;
             match block.typing() {
@@ -1088,15 +1118,14 @@ impl DocCore {
         };
         let total = committed_len
             .checked_sub(range.len())
-            .and_then(|value| value.checked_add(text.len()))
+            .and_then(|value| value.checked_add(draft.len()))
             .ok_or_else(overflow)?;
         check_len(total, self.limits.text)?;
         let next_version = self.version.next_draft().map_err(DocError::Identity)?;
         if has_group {
             next_version.next_draft().map_err(DocError::Identity)?;
         }
-        let draft = copy_bounded(text, self.limits.text)?;
-        let end = range.start.checked_add(text.len()).ok_or_else(overflow)?;
+        let end = range.start.checked_add(draft.len()).ok_or_else(overflow)?;
         let selection = SelectionSpec::new(end, end);
         if has_group {
             self.commit_typing_group_for(now_millis, Some(range.clone()))?;
@@ -1237,7 +1266,7 @@ impl DocCore {
         now_millis: u64,
     ) -> Result<(), DocError> {
         let has_group = self.open.as_ref().and_then(OpenBlock::typing).is_some();
-        let (logical_base, selection) = {
+        let (logical_base, selection, separator) = {
             let block = self.open.as_ref().ok_or(DocError::NoOpenBlock)?;
             let base = match block.typing() {
                 Some(group) => self
@@ -1248,18 +1277,28 @@ impl DocCore {
                     .ok_or_else(overflow)?,
                 None => self.buffer.len_bytes(),
             };
-            (base, block.selection)
+            let separator = if has_group {
+                ""
+            } else {
+                block.leading_separator()
+            };
+            (base, block.selection, separator)
         };
         let range = selection.range();
         self.check_open_edit_range(&range)?;
         let range_len = range.end.checked_sub(range.start).ok_or_else(overflow)?;
         let without_range = logical_base.checked_sub(range_len).ok_or_else(overflow)?;
+        let replacement = self.copy_input_with_separator(separator, candidate)?;
         let total = without_range
-            .checked_add(candidate.len())
+            .checked_add(replacement.len())
             .ok_or_else(overflow)?;
         check_len(total, self.limits.text)?;
-        let candidate = copy_bounded(candidate, self.limits.text)?;
-        let after_selection = candidate_selection(range.start, &candidate, selected_in_candidate)?;
+        let candidate_start = range
+            .start
+            .checked_add(replacement.len() - candidate.len())
+            .ok_or_else(overflow)?;
+        let after_selection =
+            candidate_selection(candidate_start, candidate, selected_in_candidate)?;
         let current = self.build_current_snapshot(self.limits.text)?;
         let src_range = current
             .text()
@@ -1288,7 +1327,7 @@ impl DocCore {
         block.selection = after_selection;
         block.draft = DraftSlot::Composition(CompositionState {
             range,
-            candidate,
+            candidate: replacement,
             before_selection: selection,
             selection: after_selection,
         });
@@ -1304,14 +1343,10 @@ impl DocCore {
         selected_in_candidate: Option<SelectionSpec>,
     ) -> Result<(), DocError> {
         let next_version = self.version.next_draft().map_err(DocError::Identity)?;
-        let range = {
-            let state = self
-                .open
-                .as_ref()
-                .and_then(OpenBlock::composition)
-                .ok_or(DocError::NoComposition)?;
-            state.range.clone()
-        };
+        let block = self.open.as_ref().ok_or(DocError::NoOpenBlock)?;
+        let state = block.composition().ok_or(DocError::NoComposition)?;
+        let range = state.range.clone();
+        let replacement = self.copy_input_with_separator(block.leading_separator(), candidate)?;
         if let Some(target) = self.open.as_ref().and_then(OpenBlock::visual_input) {
             target.check_permissions(&range, |protected| Ok(protected.clone()))?;
         }
@@ -1321,14 +1356,18 @@ impl DocCore {
             .checked_sub(range.len())
             .ok_or_else(overflow)?;
         let total = without_range
-            .checked_add(candidate.len())
+            .checked_add(replacement.len())
             .ok_or_else(overflow)?;
         check_len(total, self.limits.text)?;
-        let after_selection = candidate_selection(range.start, candidate, selected_in_candidate)?;
-        let candidate = copy_bounded(candidate, self.limits.text)?;
+        let candidate_start = range
+            .start
+            .checked_add(replacement.len() - candidate.len())
+            .ok_or_else(overflow)?;
+        let after_selection =
+            candidate_selection(candidate_start, candidate, selected_in_candidate)?;
         let block = self.open.as_mut().ok_or(DocError::NoOpenBlock)?;
         let state = block.composition_mut().ok_or(DocError::NoComposition)?;
-        state.candidate = candidate;
+        state.candidate = replacement;
         state.selection = after_selection;
         block.selection = after_selection;
         self.version = next_version;
@@ -1532,6 +1571,7 @@ fn selection_of(selection: &aline_buffer::SrcSelection) -> SelectionSpec {
 }
 
 mod checked_commit;
+pub(crate) use checked_commit::PreparedCommand;
 mod editing;
 // 本模块是平台无关的 DocCore 输入协议；仅其中原生窗口适配器按 macOS 编译。
 mod native_input;

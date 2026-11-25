@@ -11,7 +11,7 @@ use crate::budget::EditBudget;
 use crate::command::{EditCommand, EditContext, EditMode, GroupReason, InlineFormat, SourceEdit};
 use crate::errors::{map_batch_error, map_buffer_error};
 use crate::find::FindIntent;
-use crate::permissions::check_visual_permissions;
+use crate::permissions::{check_raw_html_permissions, check_visual_permissions};
 use crate::refusal::{EditRefusal, RereadFailure};
 use crate::reread::{Candidate, RereadContract, build_candidate, verify};
 
@@ -201,11 +201,54 @@ pub(crate) fn bind_parsed(snapshot: &TextSnapshot, parsed: &Parsed) -> Result<()
 }
 
 /// 同一批次规划入口应用的替换语义。
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub(crate) enum ReplaceKind {
     Direct,
     Find,
     RawBlock,
+    RawHtml {
+        block: Range<usize>,
+    },
+    Structural {
+        target: SelectionSpec,
+        reason: GroupReason,
+        contract: RereadContract,
+    },
+}
+
+pub(crate) struct StructuralChange {
+    pub(crate) edits: Vec<SourceEdit>,
+    pub(crate) target: SelectionSpec,
+    pub(crate) reason: GroupReason,
+    pub(crate) contract: RereadContract,
+}
+
+pub(crate) fn plan_structural(
+    parsed: &Parsed,
+    selection: &SrcSelection,
+    context: &EditContext,
+    change: StructuralChange,
+    budget: EditBudget,
+) -> Result<PlanOutcome, EditRefusal> {
+    let snapshot = parsed.snapshot();
+    precheck(context)?;
+    bind_parsed(snapshot, parsed)?;
+    snapshot
+        .validate_selection(selection)
+        .map_err(map_buffer_error)?;
+    plan_replace(
+        snapshot,
+        parsed,
+        selection,
+        context,
+        &change.edits,
+        budget,
+        ReplaceKind::Structural {
+            target: change.target,
+            reason: change.reason,
+            contract: change.contract,
+        },
+    )
 }
 
 pub(crate) fn plan_replace(
@@ -242,7 +285,7 @@ pub(crate) fn plan_replace(
     if effective.is_empty() {
         return Ok(PlanOutcome::Unchanged(NoChangeReason::ReplacementIdentical));
     }
-    if mode == EditMode::Visual {
+    if mode == EditMode::Visual || matches!(kind, ReplaceKind::Structural { .. }) {
         // F2-1 协议：Visual Replace 的“权威范围”是命令给出的编辑范围。
         // 补丁范围只来自 `edits`，计划既不会把它扩到选区，也不要求它与选区相等；
         // 计划把调用方传入的 `selection` 绑定为 `before_selection`，
@@ -250,11 +293,16 @@ pub(crate) fn plan_replace(
         // 不校验命令范围与选区一致。M1 消费者必须由选区派生命令范围，
         // 不得把光标当选区、把命令当范围；`ToggleInlineFormat` 是例外，
         // 额外要求范围等于选区（见 `plan_toggle_format`）。
-        if kind != ReplaceKind::Find && effective.len() != 1 {
+        if matches!(kind, ReplaceKind::Direct | ReplaceKind::RawBlock) && effective.len() != 1 {
             return Err(EditRefusal::UnsupportedVisualBatch);
         }
         for edit in &effective {
-            check_visual_permissions(parsed, &edit.range)?;
+            match &kind {
+                ReplaceKind::RawHtml { block } => {
+                    check_raw_html_permissions(parsed, block, &edit.range)?
+                }
+                _ => check_visual_permissions(parsed, &edit.range)?,
+            }
         }
     }
     effective.sort_by(|left, right| {
@@ -269,20 +317,45 @@ pub(crate) fn plan_replace(
         .map(|edit| (edit.range.clone(), edit.replacement.clone()))
         .collect();
     let batch = CheckedBatch::new(snapshot, patches, budget.patch()).map_err(map_batch_error)?;
-    let reason = match (mode, effective.len(), kind) {
-        (EditMode::Source, 1, _) => GroupReason::SourceReplace,
-        (EditMode::Source, _, _) => GroupReason::BulkReplace,
-        (EditMode::Visual, _, ReplaceKind::RawBlock) => GroupReason::RawBlockInput,
-        (EditMode::Visual, 1, _) => GroupReason::VisibleReplace,
-        (EditMode::Visual, _, _) => GroupReason::BulkReplace,
+    let (reason, contract, target_selection) = match kind {
+        ReplaceKind::Structural {
+            target,
+            reason,
+            contract,
+        } => (reason, contract, target),
+        kind => {
+            let (reason, contract) = match (mode, effective.len(), kind) {
+                (EditMode::Source, 1, _) => (GroupReason::SourceReplace, RereadContract::Source),
+                (EditMode::Source, _, _) => (GroupReason::BulkReplace, RereadContract::Source),
+                (EditMode::Visual, _, ReplaceKind::RawBlock) => {
+                    (GroupReason::RawBlockInput, RereadContract::RawBlock)
+                }
+                (EditMode::Visual, _, ReplaceKind::RawHtml { block }) => (
+                    GroupReason::RawBlockInput,
+                    RereadContract::RawHtml { block },
+                ),
+                (EditMode::Visual, count, ReplaceKind::Find) => {
+                    let reason = if count == 1 {
+                        GroupReason::VisibleReplace
+                    } else {
+                        GroupReason::BulkReplace
+                    };
+                    (reason, RereadContract::FindVisual)
+                }
+                (EditMode::Visual, _, ReplaceKind::Direct) => {
+                    (GroupReason::VisibleReplace, RereadContract::Visible)
+                }
+                (EditMode::Visual, _, ReplaceKind::Structural { .. }) => {
+                    return Err(EditRefusal::InvalidPlan);
+                }
+            };
+            (
+                reason,
+                contract,
+                after_selection_for_last_patch(batch.patches())?,
+            )
+        }
     };
-    let contract = match (mode, kind) {
-        (EditMode::Source, _) => RereadContract::Source,
-        (EditMode::Visual, ReplaceKind::Direct) => RereadContract::Visible,
-        (EditMode::Visual, ReplaceKind::Find) => RereadContract::FindVisual,
-        (EditMode::Visual, ReplaceKind::RawBlock) => RereadContract::RawBlock,
-    };
-    let target_selection = after_selection_for_last_patch(batch.patches())?;
     let expectations = effective
         .iter()
         .map(|edit| ExpectedFragment {
@@ -292,7 +365,7 @@ pub(crate) fn plan_replace(
         .collect();
 
     let candidate = build_candidate(snapshot, parsed.config(), &batch, budget)?;
-    verify(contract, parsed, &candidate, batch.patches(), budget)?;
+    verify(&contract, parsed, &candidate, batch.patches(), budget)?;
     ensure_target_selection(&candidate.snapshot, target_selection)?;
     let preview = preview_from(&candidate);
     if preview.after_len() != batch.output_len() {
@@ -332,9 +405,6 @@ fn plan_format(
             actual: context.mode(),
         });
     }
-    if range.is_empty() {
-        return Err(EditRefusal::EmptySelection);
-    }
     let selected_range = snapshot
         .src_range(range.clone())
         .map_err(map_buffer_error)?;
@@ -347,40 +417,21 @@ fn plan_format(
     let source = snapshot
         .slice(&document_range, budget.text())
         .map_err(map_buffer_error)?;
-    let marker = format.marker();
-    if surrounded_by_marker(&source, range, marker) {
-        return Ok(PlanOutcome::Unchanged(NoChangeReason::AlreadyFormatted));
-    }
-    check_visual_permissions(parsed, range)?;
-
+    let edit = crate::inline::plan(&source, parsed, selection, format)?;
     let expected = source
-        .get(range.clone())
+        .get(edit.checked_range.clone())
         .ok_or(EditRefusal::InvalidPlan)?
         .to_owned();
-    let patches = vec![
-        (range.start..range.start, marker.to_owned()),
-        (range.end..range.end, marker.to_owned()),
-    ];
-    let batch = CheckedBatch::new(snapshot, patches, budget.patch()).map_err(map_batch_error)?;
-    let target_selection = SelectionSpec::new(
-        selection
-            .anchor()
-            .byte_offset()
-            .checked_add(marker.len())
-            .ok_or(EditRefusal::LengthOverflow)?,
-        selection
-            .head()
-            .byte_offset()
-            .checked_add(marker.len())
-            .ok_or(EditRefusal::LengthOverflow)?,
-    );
     let expectations = vec![ExpectedFragment {
-        range: range.clone(),
+        range: edit.checked_range,
         expected,
     }];
-    let contract = RereadContract::Format { marker };
+    let batch =
+        CheckedBatch::new(snapshot, edit.patches, budget.patch()).map_err(map_batch_error)?;
+    let target_selection = edit.selection;
+    let contract = RereadContract::Inline(edit.contract);
     let candidate = build_candidate(snapshot, parsed.config(), &batch, budget)?;
-    verify(contract, parsed, &candidate, batch.patches(), budget)?;
+    verify(&contract, parsed, &candidate, batch.patches(), budget)?;
     ensure_target_selection(&candidate.snapshot, target_selection)?;
     let preview = preview_from(&candidate);
     if preview.after_len() != batch.output_len() {
@@ -403,18 +454,6 @@ fn plan_format(
         budget,
         find_intent: None,
     })))
-}
-
-fn surrounded_by_marker(source: &str, range: &Range<usize>, marker: &str) -> bool {
-    let left = range
-        .start
-        .checked_sub(marker.len())
-        .and_then(|start| source.get(start..range.start));
-    let right = range
-        .end
-        .checked_add(marker.len())
-        .and_then(|end| source.get(range.end..end));
-    left.is_some_and(|slice| slice == marker) && right.is_some_and(|slice| slice == marker)
 }
 
 fn after_selection_for_last_patch(

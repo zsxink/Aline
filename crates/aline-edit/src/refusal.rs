@@ -160,6 +160,10 @@ pub enum EditRefusal {
     EmptySelection,
     /// 当前最小协议只允许单条所见替换。
     UnsupportedVisualBatch,
+    /// 当前结构无法安全执行所见命令。
+    UnsupportedVisualStructure,
+    /// 当前位置没有适用的列表键命令，交回普通输入。
+    ListCommandOutsideItem,
     /// 原文输入对应的打开范围已不是当前解析的顶层块。
     InvalidRawBlock,
     /// 原文输入的补丁超出了打开块的实际范围。
@@ -204,6 +208,8 @@ impl EditRefusal {
             Self::HtmlBoundary { .. } => "HtmlBoundary",
             Self::EmptySelection => "EmptySelection",
             Self::UnsupportedVisualBatch => "UnsupportedVisualBatch",
+            Self::UnsupportedVisualStructure => "UnsupportedVisualStructure",
+            Self::ListCommandOutsideItem => "ListCommandOutsideItem",
             Self::InvalidRawBlock => "InvalidRawBlock",
             Self::RawInputOutsideBlock => "RawInputOutsideBlock",
             Self::InvalidPlan => "InvalidPlan",

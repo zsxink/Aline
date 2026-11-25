@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use aline_markdown::{CancelToken, ParseBudget, ParseConfig, Parsed};
+use aline_markdown::{BlockKind, CancelToken, ParseBudget, ParseConfig, Parsed, ProtectionKind};
 use aline_source::{AtomicFailureKind, IoBudget, SourceBaseline, StorageBudget};
 
 use super::doc_core::PreparedMigration;
@@ -356,9 +356,26 @@ impl ReadonlyDocument {
         &self,
         ranges: Option<Vec<std::ops::Range<usize>>>,
     ) -> Option<aline_edit::EditRefusal> {
-        for range in ranges? {
+        let ranges = ranges?;
+        let html = self.parsed.blocks().iter().find_map(|block| {
+            let extent = block.range().byte_range();
+            (block.kind() == BlockKind::HtmlBlock
+                && ranges
+                    .iter()
+                    .all(|range| extent.start <= range.start && range.end <= extent.end))
+            .then_some(extent)
+        });
+        for range in ranges {
             for protected in self.parsed.protected_ranges() {
                 let protected_range = protected.range().byte_range();
+                // 历史可重放完全位于同一可编辑 HTML 块的原文修改。
+                if protected.kind() == ProtectionKind::Html
+                    && html.as_ref().is_some_and(|extent| {
+                        extent.start <= protected_range.start && protected_range.end <= extent.end
+                    })
+                {
+                    continue;
+                }
                 if range.start <= protected_range.end && protected_range.start <= range.end {
                     return Some(aline_edit::EditRefusal::ProtectedRange {
                         kind: protected.kind(),
@@ -1937,6 +1954,27 @@ impl ReadonlyDocument {
     pub(crate) fn text_budget(&self) -> aline_buffer::TextBudget {
         self.limits.text()
     }
+
+    /// 显式交互需要草稿坐标时读取工作快照，仍保留现有阅读布局与待定输入组。
+    #[cfg(target_os = "macos")]
+    pub(crate) fn with_working_parse<T>(
+        &mut self,
+        read: impl FnOnce(&Parsed, &super::CurrentSnapshot, &InputIdentity) -> Result<T, DocError>,
+    ) -> Result<T, DocError> {
+        let current = self.current_snapshot()?;
+        let identity = self.input_identity()?;
+        if self.is_parse_current() && self.parsed.snapshot().id() == current.snapshot_id() {
+            return read(&self.parsed, &current, &identity);
+        }
+        let parsed = parse_with_cancel(
+            current.text(),
+            self.parsed.config(),
+            self.parse_budget,
+            &CancelToken::new(),
+        )
+        .map_err(|_| DocError::StaleResult)?;
+        read(&parsed, &current, &identity)
+    }
     /// 以当前布局/解析身份导航；文档生命周期仍由 ReadonlySession 唯一持有。
     pub fn navigate(
         &mut self,
@@ -1986,29 +2024,42 @@ impl ReadonlyDocument {
             extent.start <= selected.start && selected.end <= extent.end
         });
         let first = matching.next();
-        let Some(block) = first.filter(|_| matching.next().is_none()) else {
+        if matching.next().is_some() {
             return Ok(false);
+        }
+        let blank = selection.range();
+        let (target, raw_html) = match first {
+            Some(block) => (block.range(), block.kind() == BlockKind::HtmlBlock),
+            None if aline_edit::is_blank_input_anchor(&self.parsed, &blank, self.limits.text()) => {
+                (&blank, false)
+            }
+            None => return Ok(false),
         };
         let protected = self.parsed.protected_ranges().iter().any(|range| {
             let protected = range.range().byte_range();
-            selected.start <= protected.end && protected.start <= selected.end
+            let extent = target.byte_range();
+            let html_source = raw_html
+                && range.kind() == ProtectionKind::Html
+                && extent.start <= protected.start
+                && protected.end <= extent.end;
+            !html_source && selected.start <= protected.end && protected.start <= selected.end
         });
         if protected {
             return Ok(false);
         }
 
         if let Some(open) = self.core.visual_block_range(&current)?
-            && open == *block.range()
+            && open == *target
         {
             self.core.select(identity, selection)?;
             return Ok(true);
         }
         if self.core.has_open_block() {
             self.core
-                .retarget_visual(identity, &self.parsed, Some(block.range()), selection)?;
+                .retarget_visual(identity, &self.parsed, Some(target), selection)?;
         } else {
             self.core
-                .open_visual_block(identity, &self.parsed, block.range(), selection)?;
+                .open_visual_block(identity, &self.parsed, target, selection)?;
         }
         Ok(true)
     }
@@ -2611,6 +2662,42 @@ mod tests {
         document.switch_mode(EditorMode::Source)?;
         document.checked_redo()?;
         assert_eq!(document.core().buffer_text()?, "---\nt: Yx\n---\n\nbody");
+        Ok(())
+    }
+
+    #[test]
+    fn visual_undo_and_redo_accept_top_level_html_raw_input_after_refresh()
+    -> Result<(), Box<dyn Error>> {
+        let before = "<div><!--keep-->a &amp; b</div>\n\ntail";
+        let after = "<div><!--keep-->az &amp; b</div>\n\ntail";
+        let mut session = editable_session(before.as_bytes())?;
+        let document = session.document_mut().ok_or("document")?;
+        let snapshot = document.current_snapshot()?;
+        let caret = snapshot.text().src_offset(17)?;
+        let selection = SrcSelection::new(caret.clone(), caret)?;
+        let identity = document.input_identity()?;
+        assert!(document.open_visual_at(&identity, &selection)?);
+        document.core.type_text(17, "z", 1)?;
+        document.core.commit_open_block(2)?;
+        assert_eq!(document.core.buffer_text()?, after);
+
+        let updated = session.begin_parse_refresh()?.run();
+        assert!(matches!(
+            session.accept_parse_refresh(updated),
+            ParseRefreshDisposition::Applied
+        ));
+        let document = session.document_mut().ok_or("document")?;
+        document.checked_undo()?;
+        assert_eq!(document.core.buffer_text()?, before);
+
+        let updated = session.begin_parse_refresh()?.run();
+        assert!(matches!(
+            session.accept_parse_refresh(updated),
+            ParseRefreshDisposition::Applied
+        ));
+        let document = session.document_mut().ok_or("document")?;
+        document.checked_redo()?;
+        assert_eq!(document.core.buffer_text()?, after);
         Ok(())
     }
 
