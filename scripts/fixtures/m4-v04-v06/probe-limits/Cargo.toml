@@ -1,0 +1,19 @@
+[package]
+name = "m4-v04-limits"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# 独立 workspace：探针不属于 Aline 八成员，也不继承根 lint/依赖策略。
+# 必须显式声明，否则 Cargo 会向上并入仓库根 workspace。
+[workspace]
+
+# 与 m4-v03 探针同样锁定版本，使量到的解码/字体/渲染行为就是生产闭包的行为。
+[dependencies]
+gpui = { package = "gpui-pre", version = "=0.3.9", default-features = false }
+gpui_macos = { package = "gpui-pre-macos", version = "=0.3.9", default-features = false, features = ["font-kit"] }
+serde_json = "1"
+
+# 与仓库根 [patch.crates-io] 同源，理由同 m4-v03/probe-gpui。
+[patch.crates-io]
+gpui-pre = { path = "../../../../vendor/gpui-pre-0.3.9" }
