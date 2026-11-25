@@ -1,6 +1,6 @@
 # Aline 文档入口
 
-八成员 Cargo workspace、无头引擎与工程守卫已接线。M0 于 2026-11-02 按用户验收豁免通过出口，未执行项见[验证计划](./v1-validation-plan.md)。M1 于 2026-11-13 在 macOS arm64 范围收口。M2 于 2026-11-23 按[决定 §46](./decisions.md#46-2026-11-23-m2-阶段出口验收macos-arm64-范围)在当前 macOS arm64、中文界面、已测 scale 2 范围通过最小出口；[M2 任务](../openspec/changes/archive/2026-11-23-m2-editable-core/tasks.md) 18/18、W4 14/14、W5 13/13 已完成并归档，M3 入口解锁。真实窗口已补混合行尾双模式编辑保存重开、Unicode 相邻组合与跨 900ms 逐组撤销。V-01～V-09 整项、完整生产插图/AC-10、其他平台及不同缩放保留后续，正式三平台同发不变。
+八成员 Cargo workspace、无头引擎与工程守卫已接线。M0 于 2026-11-02 按用户验收豁免通过出口，未执行项见[验证计划](./v1-validation-plan.md)。M1 于 2026-11-13 在 macOS arm64 范围收口。M2 于 2026-11-23 按[决定 §46](./decisions.md#46-2026-11-23-m2-阶段出口验收macos-arm64-范围)在当前 macOS arm64、中文界面、已测 scale 2 范围通过最小出口；[M2 任务](../openspec/changes/archive/2026-11-23-m2-editable-core/tasks.md) 18/18、W4 14/14、W5 13/13 已完成并归档。M3 于 2026-11-24 完成 19/19 出口核对并归档，[M3 变更](../openspec/changes/archive/2026-11-24-m3-commands-and-tables/tasks.md) 已同步主规格；M4 入口解锁，变更见 [m4-plugins-and-themes](../openspec/changes/m4-plugins-and-themes/proposal.md)。真实窗口已补混合行尾双模式编辑保存重开、Unicode 相邻组合与跨 900ms 逐组撤销。V-01～V-09 整项、完整生产插图/AC-10、其他平台及不同缩放保留后续，正式三平台同发不变。
 
 PRD定义产品结果，AGENTS铁律及已确认架构/专项约束实现，验证计划负责证据状态，decisions负责决定追踪。OpenSpec承载工程基线和拟议变更，不能覆盖已确认决定；资料无法按职责解释的冲突列入待确认，不按日期或目录自行裁决。
 
