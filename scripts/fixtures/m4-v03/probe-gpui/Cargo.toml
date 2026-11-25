@@ -1,0 +1,25 @@
+[package]
+name = "m4-v03-gpui"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# 独立 workspace：探针不属于 Aline 八成员，也不继承根 lint/依赖策略。
+# 必须显式声明，否则 Cargo 会向上并入仓库根 workspace。
+[workspace]
+
+# 与仓库根 workspace.dependencies 的同名依赖保持完全一致的版本与 features，
+# 使本探针的闭包是生产闭包的子集：这里量到的行为就是应用里会得到的行为。
+[dependencies]
+gpui = { package = "gpui-pre", version = "=0.3.9", default-features = false }
+gpui_macos = { package = "gpui-pre-macos", version = "=0.3.9", default-features = false, features = ["font-kit"] }
+# 与 gpui-pre 依赖的 usvg 同版本（0.46），不引入第二棵 SVG 解析树。
+# 仅用于验证“自定义 href resolver 能否阻断本地文件读取”这一契约。
+usvg = { version = "=0.46.0", default-features = false }
+serde_json = "1"
+
+# 与仓库根 [patch.crates-io] 同源：让 gpui 与 gpui_macos 共用同一份
+# Platform trait 定义，否则两个 gpui-pre 副本会让 MacPlatform 不满足约束。
+# 相对路径让夹具在原地可构建；探针驱动复制到临时目录时改写为绝对路径。
+[patch.crates-io]
+gpui-pre = { path = "../../../../vendor/gpui-pre-0.3.9" }

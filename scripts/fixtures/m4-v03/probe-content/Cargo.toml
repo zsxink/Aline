@@ -1,0 +1,16 @@
+[package]
+name = "m4-v03-content"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# 独立 workspace：同 probe-gpui 的理由。
+[workspace]
+
+# 这两个是**候选**内容后端，不是已准入依赖。它们的闭包含仓库禁库
+# （mermaid-rs-renderer → regex）与 rustc 版本门槛，准入裁决在任务 1.5。
+# 本探针只回答“支持到什么程度”，不构成准入。
+[dependencies]
+mermaid-rs-renderer = { version = "=0.3.1", default-features = false, features = ["png"] }
+latex-rust = { version = "=2.1.1", default-features = false, features = ["std"] }
+serde_json = "1"

@@ -144,6 +144,32 @@ Mermaid 护眼模式使用亮色映射；固定主题不跟随应用，主题是
 
 时点：M1 建基本夹具，M4 前固化格式与支持契约。对应 MD-05、IMAGE-01～06、PLUGIN-01/04/07/09、PREVIEW-01～04。
 
+**2026-11-26 macOS arm64 生产支持矩阵取证（任务 1.3；V-03 未通过）：** 在 macOS 27.2.1（26B131）、rustc 1.98.1、Python 3.9.6、锁定 `gpui-pre@0.3.9` 上把格式/协议/复制契约整理为可复跑探针 `scripts/probe_m4_v03.py`（契约规则在 `scripts/m4_v03_rules.py`，探针与样本在 `scripts/fixtures/m4-v03/`：`probe-gpui` 起真实 `Application` 量解码/SVG/剪贴板，`probe-content` 量公式/Mermaid/主题）。`--self-test` 55 例不依赖 Rust 即可运行；真实运行契约与实测不符即失败关闭（本轮 `PROBE_OK images=11 svg=11 math=10 mermaid=23 themes=7`）。探针 crate 不是工作区成员，本结果不构成准入。
+
+*已实测（本轮可复跑）：*
+- **图片格式 × 路径**：文档路径（`ImageAssetLoader::load`，即 `<img>` 走的入口）对 PNG/JPG/GIF/WebP/BMP/SVG 全部原生解码（大小写不敏感），静态样本均为 1 帧；`anim.gif` 与 `anim.webp` 均为 3 帧且动画生效；`anim.png`（APNG）只解出 1 帧。像素序为 BGRA（`0000ffff`、JPEG `0000feff`）。SVG 按 `SMOOTH_SVG_SCALE_FACTOR=2.0` 放大，2×2 输入渲染为 4×4。
+- **剪贴板读取优先级**：`NSFilenamesPboardType` 文件列表 → `public.utf8-plain-text` 纯文本 → 按 `ImageFormat` 顺序（png→jpeg→webp→gif→svg→bmp→tiff→ico→pnm）解码图片。9 个 flavor 用例全部符合契约：HTML+纯文本取纯文本，**仅 HTML 时无任何路由**（不引入富文本导入），RTF 同理；`public.file-url` 被系统合成为 `NSFilenamesPboardType`，命中文件分支并附带纯文本路径；同时有 GIF 与 WebP 时按枚举顺序取 WebP 而非声明顺序。
+- **剪贴板写入**：单条纯文本直写、单张图片按原格式读回；多项写入（文本+图片）只拼接 String 项，Image/ExternalPaths 被丢弃。
+- **SVG 安全边界**：默认 resolver 会读取**相对当前工作目录、`../` 与绝对路径**的本地文件（绿块 64 px 证明读到），`file:` URI 不被读取，`data:` 被接受；改用只放行 `data:` 的自定义 `ImageHrefResolver`（`resolve_string → None`）后，全部字符串 href 被阻断（`image_nodes=0`），`data:` 仍接受；`<script>`、`<foreignObject>`、实体引用不增加像素，`http(s)` href 不取回任何内容。
+- **公式语法**：分数、希腊字母、根式/积分、矩阵、分段、求和、颜色 7 类语法全部产出 SVG；CJK 文本因缺字形失败、括号不配平与未知命令按诊断失败——失败输入**保留源码**、不静默替换。
+- **Mermaid 图类型**：23 类（flowchart、sequenceDiagram、classDiagram…treemap）全部渲染出含 `<text>` 的 SVG；护眼到亮色的映射为 eye-care→light、dark→dark。
+- **静态主题导入**：本例契约层对未知字段、颜色含脚本/引号属性注入/`url()`、缺字段、数组长度不符全部拒绝；候选后端的 `Theme` 反序列化**不封闭**，接受未知字段且不做语义校验，并把注入串原样写进 SVG 属性（`svg_has_script`/`svg_has_onload`/`svg_has_url` 为真），因此生产必须在导入前用本层契约校验。
+- **链接协议 allowlist**：`https://`、`http://`、`mailto:`、`#` 锚点、`/` 根相对放行；`javascript:`、`file:`、裸相对路径、空 href 拒绝。
+- **依赖事实**：候选闭包 gpui 侧 409 包（最高 `rust-version` 1.89.0）、content 侧 87 包（1.87.0）；禁库入边为 `gpui-pre@0.3.9 → regex@1.13.2`、`mermaid-rs-renderer@0.3.1 → regex@1.13.2`，以及 `getrandom` 的 target-gated `wasi`/`wasip2`；无许可证拒绝。探针独立解析到 `regex@1.13.2`，工作区为 `regex@1.13.1`（按登记的精确版本例外放行），版本差异不等于新增禁库。
+
+*本轮实测发现、须在生产中修正的事实：*
+- **SVG 默认 resolver 可读任意本地文件**：锁定 GPUI 的默认 `usvg::Options` 字符串解析器按进程 cwd 解析，恶意 SVG 能读取进程可读文件。生产渲染必须改用以 `data:` 为界的自定义 resolver，不能依赖默认值。
+- **WebP 动画存在路径分裂**：同一 `anim.webp` 在文档路径解出 3 帧、在剪贴板路径（`Image::to_image_data`）只解出 1 帧——两条解码路径能力不同，不能用其中一条的结果代表另一条。
+- **候选 Mermaid 后端主题反序列化不封闭**：接受未知字段、无颜色语义校验、注入串直入 SVG；导入校验必须由契约层承担。
+
+*本轮未测：* 链接点击打开与拒绝提示的生产路径（IMAGE-03 未实现，本轮只冻结 allowlist）；Mermaid 与公式候选后端的**准入**（`mermaid-rs-renderer` 依赖禁库 `regex` 并带入 resvg/usvg 0.47，与工作区 0.46 重复；`latex-rust` 带入 RUSTSEC-2026-0192，ttf-parser 0.25.1 unmaintained）由任务 1.5 裁决；图片预览 tab 的适应/1:1/缩放/平移（PL-03，任务 3.3）；Mermaid 独立图像复制与 SVG/PNG 导出（任务 4.3）；公式/Mermaid 的 300ms 防抖与当前资产反馈（任务 4.2）；主题导入的重名/删除/事务式安装（任务 5.2）；护眼模式到亮色的实际渲染外观（只冻结映射契约）；APNG 之外的动图边界；Windows/Linux/Intel Mac 的剪贴板与解码差异。
+
+*入口环境缺陷（非本变更引入，须披露）：* `scripts/fixtures/isolation.json` 登记的隔离 Cargo 缓存 `<tmp>/aline-m0-admission-k4_p5j6a/cargo-home` 在本机不存在，本轮以宿主缓存 + `CARGO_NET_OFFLINE=true --locked --offline` 构建；`summary.json` 已如实记录 `registered_cargo_home_exists=false`，证据不能反推实际缓存。
+
+*契约状态：* 图片格式清单、动画帧数、SVG 安全边界、剪贴板读取/写入优先级、链接 allowlist、公式语法与 Mermaid 图类型、主题导入校验与护眼映射已按本轮实测冻结为规则层常量。支持清单按**实际覆盖**确定，公式/Mermaid/主题结果依赖候选后端，不因“能渲染出文件”即声明为产品能力，后端准入仍待任务 1.5。
+
+*状态：* **V-03 仍未整项通过。** 解码/协议/复制/语法/图类型矩阵已取证，但链接打开与拒绝提示的生产路径、图片预览交互、插件门控下的图像复制/导出、主题安装事务与真实视觉外观仍未取证，跨平台差异未覆盖。证据 `logs/validation/m4-plugins-and-themes/2026-11-26-v03/`（`summary.json`、`matrix.md`、`dependencies.json`、各 `*.log`、`artifacts/`）。
+
 ## V-04 · 主题包与原生字体能力
 
 先验证锁定环境的动态静态字体加载、中文回退、主题切换后缓存/布局刷新，以及三平台背景透明度。透明背景不支持可回退到同色不透明；字体无法激活不能静默忽略，须解决能力阻塞或记录新的产品决定。
