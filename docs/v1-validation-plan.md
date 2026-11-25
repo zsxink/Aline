@@ -100,6 +100,36 @@ M0 兼容目标登记（2026-10-30，目标候选，不代表支持或验证通�
 
 **2026-11-25 macOS arm64 后端预筛（未完成 V-02）：** 在 macOS 27.2.1（26B131）使用含中英文标题、有序列表、表格、代码和内联 PNG 引用的本地 HTML 样本。系统 `textutil` 生成了可解包的 DOCX，XML 未检测到表格、列表编号、图片或段落样式标记；`cupsfilter` 缺少 HTML 到 PDF 的滤镜；本机 Chrome Headless 生成一页 PDF。Chrome 结果仅用于证明打印候选可生成文件，尚无实际阅读器、纸型、字体、多页或插件矩阵证据。未选定生产后端。原始材料位于 `logs/validation/m4-plugins-and-themes/2026-11-25-export-probe/`。
 
+**2026-11-26 macOS arm64 候选后端实验（任务 1.2；V-02 未通过）：** 在 macOS 27.2.1（26B131）、rustc 1.98.1、Python 3.9.6 上把上段探针整理为可复跑脚本 `scripts/probe_m4_export.py`（契约规则在 `scripts/m4_export_rules.py`，探针 crate 与样本在 `scripts/fixtures/m4-export/`，回读器为 `scripts/m4_export_pdf_probe.swift` 与 `scripts/m4_export_docx_render.swift`）。`--self-test` 82 例不依赖 Rust/Swift 即可运行；真实运行失败关闭。本轮覆盖 PDF/DOCX/HTML 资源策略与语法×格式矩阵，未接生产。
+
+*已实测（本轮可复跑）：*
+- **PDF 后端候选 krilla 0.8.2**：8 格纸型×方向矩阵的 MediaBox 与契约值偏差均为 0.000pt（A4 595.28×841.89、A3 841.89×1190.55、Letter 612×792、Legal 612×1008，横向互换长短边）。每格使用**互不相同的四边边距**（10～49mm 递增），用光栅化墨迹包围盒回读四边，全部落在 1pt 容差内，证明四边可独立设置而非统一内缩。CJK 文本经 PDFKit 可提取；字体子集化后 8 页仅 23,407 bytes；内嵌 PNG 正常。
+- **DOCX 后端候选 docx-rs 0.4.22**：标题/正文三档 × 代码四档（`theme` 另按浅/深外观各一份）共 15 个组合全部生成并通过结构回读——样式 `Normal/Heading1/Heading2/Heading3/Code/Quote/Rule` 齐全，标题字号 32/28/24（半磅）随档位变化、正文 22/20/24，有序列表 3 项由 OOXML 编号生成（无手写序号），无序列表走独立 bullet 编号定义，表格 2 行 4 格 2 列网格、图片嵌入 `word/media/`、脚注部件含正文且正文有引用标记、超链接关系落在 rels、引用样式带左边框、分隔线样式带下边框，文本顺序与源一致；全部经 Quick Look 渲染成功。
+- **HTML 资源策略**：`copy-to-dir` 把图片复制进 `assets/`，`keep-reference` 保留源写法；两策略 × 样式开关四组合均无远程引用、图片可解析。远程链接目标（`<a href>`）不算远程资源，单独取证；远程图片与远程脚本分别被拒绝。此处为**策略夹具**，非生产渲染器。
+- **语法 × 格式矩阵**：13 个语法块（标题、正文与行内标记、链接、有序/无序列表、引用块、表格、代码、图片、分隔线、行内公式、块级公式、Mermaid、脚注）按四层词汇 `native`/`flattened`/`source-text`/`absent` 冻结落地层级，`scripts/fixtures/m4-export/sample.md` 由矩阵生成（磁盘副本与规则逐字节比对）。PDF 3 页语法样本逐项核对文本在场、负标记缺席与墨迹不越界；DOCX 核对原生结构计数、文本在场与**文档顺序**；HTML 核对标签齐全、文本在场与负标记缺席。脚注在 PDF/HTML 只落源标记 `[^note]`，脚注正文列为负断言——写成“未测”会随时间漂移成“大概支持”。
+- **依赖事实**：探针闭包 99 包，逐包经仓库自己的 `dependency_admission.license_review` 与 `engineering_dependencies.forbidden_name` 核对，无禁库命中、无许可证拒绝。
+
+*本轮实测发现的缺陷（已在本轮修正，非生产代码）：*
+- 初版 `dark` 代码样式只调亮文字而底色仍为浅色，Quick Look 渲染几乎不可读；已改为底色/文字色成对定义，并加 WCAG 对比度下限 4.5（实测 13.37）与回读断言。
+- 初版 8 格共用同一组边距，无法区分“四边独立”与“统一内缩”；已改为每格四边各不相同。
+- 代码块底色原落在 run 属性（`w:rPr/w:shd`），只覆盖字形墨迹，行内空白与行尾不着色，Word 里是断带而非代码块；已改为段落属性（`w:pPr/w:shd`），回读断言底色必须落在段落级。**该缺陷只有看渲染产物才能发现，断言当时全绿。**
+
+*本轮实测发现、但未修的后端缺陷：* docx-rs 0.4.22 把 `w:rPr` 写在 `w:pStyle` 之前，违反 ECMA-376 `CT_PPr` 的 sequence（每份产物 19～20 段）。探针**如实计量并记入证据，不替后端重排**——重排会让“后端有这个缺陷”从证据里消失。Word 是否容忍本机无 Word 可证，列为未测项；按候选后端缺陷对待，任务 4.4 接线前须确认上游修复或自行规避。
+
+*渲染器覆盖（本轮新增可复跑事实）：* Quick Look 的 `Office.qlgenerator` 只渲染 run 级底色与下边框，**不渲染**段落级 `w:shd` 与左/上/右边框。用不经 docx-rs 的最小 DOCX 逐对比较像素取证（`summary.json` 的 `docx.renderer_coverage`）。因此产物图里“引用块没有竖条、代码块没有灰底”是渲染器覆盖问题，不是后端没写；同一份产物在 PDF 侧（krilla）引用条与整段灰底都正常，可作对照。
+
+*本机不可测：* Microsoft Word 真实打开与兼容性（本机无 Word；Quick Look 与 WPS/Pages 只作次要渲染器，**不能**据此声明 Word 兼容）；WPS/Pages 的 DOCX 呈现未作为判据。
+
+*本轮未测：* PDF 长表格/代码跨页、页眉页脚、目录与脚注；krilla 字距调整、复杂脚本整形与两端对齐；公式与 Mermaid 的静态图像边界；HTML 生产渲染器；插件开关矩阵（PL-01/PL-02 依赖生产实现，见任务 4.x）；Windows/Linux/Intel Mac。
+
+*后端结论（候选，待任务 1.5 准入）：* 推荐 **krilla 0.8.2 + docx-rs 0.4.22**。排除 **printpdf 0.12.14**：`text_layout`/`html` 拉入 `azul-simplecss`（MPL-2.0，策略拒绝），其 `images` 分支经 `wasm-bindgen-futures` 引入 `tokio`（禁库），且未子集化时产物 15～24 MB。排除 **printpdf 0.7.0**：`font_subsetting` 在离线环境无法解析。**Chrome Headless 不作生产后端**：`@page` 生效但墨迹边距漂移约 1.5～2.5mm，且需浏览器进程，与架构 §3.2“不借浏览器/WebView 补齐”冲突。
+
+*入口环境缺陷（非本变更引入，须披露）：* `scripts/fixtures/isolation.json` 登记的隔离 Cargo 缓存 `<tmp>/aline-m0-admission-k4_p5j6a/cargo-home` 在本机不存在，本轮以宿主缓存 + `CARGO_NET_OFFLINE=true --locked --offline` 构建；`summary.json` 已如实记录 `registered_cargo_home_exists=false`，证据不能反推实际缓存。
+
+*契约状态：* 纸型、方向、四边边距、DOCX 标题/正文档位、代码配色与**底色落点（段落级）**、HTML 资源策略、语法×格式矩阵已按本轮实测冻结为规则层常量。**旧 UI 的 20mm 四边默认值仍不采用**（`docs/ui-spec.md` §9 已登记），导出默认仍是 A4 纵向、四边默认值待 4.4 接线时按实测确定。krilla 只提供字形绘制与坐标，**不提供换行/段落排版**，生产实现须在 `aline-plugin`/`aline-ui` 侧提供断行与段落服务并在整形后应用中英文断行规则。
+
+*状态：* **V-02 仍未整项通过。** 语法×格式矩阵已取证，但**插件状态矩阵**（PL-01/PL-02）依赖生产实现、真实 Word 检查与跨页行为仍未取证，目录/Front matter 样本未覆盖。证据 `logs/validation/m4-plugins-and-themes/2026-11-26-v02/`（`summary.json`、`matrix.md`、`dependencies.json`、`artifacts/`）。
+
 ## V-03 · 图片、公式、Mermaid 与协议支持矩阵
 
 图片格式目标：PNG、JPG/JPEG、GIF、WebP、BMP、SVG，大小写不敏感；Markdown 为 `.md`（含 `.MD`）。图片只读 tab 的适配、1:1、缩放和平移语义已写入 PRD。需验证原生解码、GIF/WebP 动画能力和 SVG 安全处理，分别报告，不用“可打开文件”掩盖未支持的显示能力。

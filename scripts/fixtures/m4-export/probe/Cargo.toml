@@ -1,0 +1,13 @@
+[package]
+name = "m4-export-probe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# 独立 workspace：探针不属于 Aline 八成员，也不继承根 lint/依赖策略。
+# 必须显式声明，否则 Cargo 会向上并入仓库根 workspace。
+[workspace]
+
+[dependencies]
+krilla = { version = "=0.8.2", default-features = false, features = ["raster-images", "simple-text"] }
+docx-rs = { version = "=0.4.22", default-features = false, features = ["image"] }
