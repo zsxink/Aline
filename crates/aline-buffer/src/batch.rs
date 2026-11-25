@@ -25,6 +25,17 @@ impl PatchBudget {
             max_output_bytes,
         }
     }
+
+    /// 在物化补丁前预检累积数量及替换字节，最终批次仍校验区间和结果长度。
+    pub fn check_input_totals(self, count: usize, inserted: usize) -> Result<(), BufferError> {
+        if count > self.max_patches {
+            return Err(BufferError::PatchCountExceeded {
+                count,
+                limit: self.max_patches,
+            });
+        }
+        TextBudget::new(self.max_inserted_bytes).check(inserted)
+    }
 }
 
 /// 同一 before 源码上的受检批次；底层保持 Vec<(Range<usize>, String)>。
@@ -43,12 +54,7 @@ impl CheckedBatch {
         patches: Vec<(Range<usize>, String)>,
         budget: PatchBudget,
     ) -> Result<Self, BufferError> {
-        if patches.len() > budget.max_patches {
-            return Err(BufferError::PatchCountExceeded {
-                count: patches.len(),
-                limit: budget.max_patches,
-            });
-        }
+        budget.check_input_totals(patches.len(), 0)?;
         let mut removed = 0usize;
         let mut inserted = 0usize;
         let mut previous: Option<&Range<usize>> = None;
@@ -71,7 +77,7 @@ impl CheckedBatch {
             inserted = inserted
                 .checked_add(replacement.len())
                 .ok_or(BufferError::LengthOverflow)?;
-            TextBudget::new(budget.max_inserted_bytes).check(inserted)?;
+            budget.check_input_totals(patches.len(), inserted)?;
             previous = Some(range);
         }
         let output_len = checked_output_len(before.len_bytes(), removed, inserted)?;

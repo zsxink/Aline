@@ -63,7 +63,79 @@ impl PreparedMigration {
     }
 }
 
+/// 只读命令候选。其身份及选区在真正发布前由 DocCore 复验。
+pub(crate) struct PreparedCommand {
+    identity: InputIdentity,
+    parsed: Parsed,
+    plan: Box<ChangePlan>,
+}
+
+impl PreparedCommand {
+    pub(crate) fn document_id(&self) -> &crate::DocumentId {
+        self.identity.document_id()
+    }
+
+    pub(crate) fn plan(&self) -> &ChangePlan {
+        &self.plan
+    }
+
+    pub(crate) fn parsed(&self) -> &Parsed {
+        &self.parsed
+    }
+}
+
 impl DocCore {
+    pub(crate) fn prepare_command(
+        &mut self,
+        planner: impl FnOnce(
+            &Parsed,
+            &SrcSelection,
+            &EditContext,
+            EditBudget,
+        ) -> Result<PlanOutcome, EditRefusal>,
+    ) -> Result<Option<PreparedCommand>, DocError> {
+        self.ensure_writable()?;
+        if self.is_composition_active() {
+            return Err(DocError::CompositionActive);
+        }
+        let budget = self.edit_budget();
+        let current = self.current_snapshot(budget.text())?;
+        let identity = self.current_input_identity()?;
+        let parsed = parse_for_edit(current.text(), budget)?;
+        // 只读逻辑源码已经包含草稿。成功发布时再原子封口和提交命令。
+        let context = self.command_context().with_pending_input(false);
+        // 结构命令允许多区间，普通输入仍沿用单区间预算。
+        let bytes = budget.text().max_bytes();
+        let command_budget = EditBudget::new(
+            aline_buffer::PatchBudget::new(budget.parse().max_nodes(), bytes, bytes),
+            budget.text(),
+            budget.parse(),
+        );
+        match planner(&parsed, current.selection(), &context, command_budget)
+            .map_err(DocError::Edit)?
+        {
+            PlanOutcome::Changed(plan) => Ok(Some(PreparedCommand {
+                identity,
+                parsed,
+                plan,
+            })),
+            PlanOutcome::Unchanged(_) => Ok(None),
+        }
+    }
+
+    pub(crate) fn publish_command(
+        &mut self,
+        command: &PreparedCommand,
+        now_millis: u64,
+    ) -> Result<CommitOutcome, DocError> {
+        self.apply_change(
+            &command.identity,
+            &command.parsed,
+            &command.plan,
+            now_millis,
+        )
+    }
+
     pub(super) fn publish_typing_redo_in_current_mode(
         &mut self,
         redo: &TypingRedo,
@@ -691,7 +763,7 @@ impl InputPatch {
             &selection,
             &context,
             raw_block,
-            self.range,
+            self.range.clone(),
             &self.replacement,
             budget,
         )?;
@@ -703,6 +775,67 @@ impl InputPatch {
         };
         let change = validate_change(&plan, snapshot, &parsed, &selection, &context)
             .map_err(DocError::Edit)?;
+        self.prepare_validated(base, &change, raw_block, budget)
+    }
+
+    #[cfg(any(test, target_os = "macos"))]
+    pub(super) fn prepare_missing_cell(
+        mut self,
+        base: BufferEditBase,
+        mode: EditMode,
+        extent: Option<&Range<usize>>,
+        budget: EditBudget,
+        cell: &aline_edit::TableTarget,
+    ) -> Result<(PreparedInputPatch, SelectionSpec), DocError> {
+        let extent = extent.ok_or(DocError::InvalidVisualBlock)?;
+        let snapshot = base.snapshot();
+        let selection = bind_selection(snapshot, self.selections.0)?;
+        let parsed = parse_for_edit(snapshot, budget)?;
+        let context = EditContext::new(mode);
+        // 输入帧验证了工作身份；这里只将冻结的表格范围绑定到组合开始前的基线。
+        let table = snapshot.src_range(cell.table_range().byte_range())?;
+        let target = aline_edit::TableTarget::new(table, cell.row(), cell.column());
+        let plan = aline_edit::plan_table_missing_input(
+            &parsed,
+            &selection,
+            &context,
+            &target,
+            &self.replacement,
+            budget,
+        )
+        .map_err(DocError::Edit)?;
+        let PlanOutcome::Changed(plan) = plan else {
+            let selected = self.selections.0;
+            return Ok((
+                PreparedInputPatch {
+                    buffer: None,
+                    target: InputTargetUpdate::Preserve,
+                },
+                selected,
+            ));
+        };
+        let [(range, _)] = plan.batch().patches() else {
+            return Err(DocError::StaleResult);
+        };
+        if range != &self.range {
+            return Err(DocError::StaleResult);
+        }
+        let selected = plan.target_selection();
+        self.selections.1 = selected;
+        let change = validate_change(&plan, snapshot, &parsed, &selection, &context)
+            .map_err(DocError::Edit)?;
+        let prepared = self.prepare_validated(base, &change, Some(extent), budget)?;
+        Ok((prepared, selected))
+    }
+
+    fn prepare_validated(
+        self,
+        base: BufferEditBase,
+        change: &aline_edit::ValidatedChange,
+        raw_block: Option<&Range<usize>>,
+        budget: EditBudget,
+    ) -> Result<PreparedInputPatch, DocError> {
+        let snapshot = base.snapshot();
         let target = match raw_block {
             Some(extent) => {
                 let transformed = transform_extent(snapshot, change.batch(), extent)?;
@@ -719,6 +852,7 @@ impl InputPatch {
                 if let Some(rebound) = rebound {
                     let visual = VisualInput::from_parse(
                         rebound,
+                        change.candidate_blocks(),
                         change.candidate_protected_ranges(),
                         change.candidate_styled_ranges(),
                     )?;
@@ -909,7 +1043,7 @@ fn rebind_visual_target(
     let head = after.head();
     Ok(match rebound_extent(blocks, transformed, &(head..head)) {
         Some(extent) => {
-            InputTargetUpdate::Rebind(VisualInput::from_parse(extent, protected, styled)?)
+            InputTargetUpdate::Rebind(VisualInput::from_parse(extent, blocks, protected, styled)?)
         }
         None => InputTargetUpdate::Close,
     })

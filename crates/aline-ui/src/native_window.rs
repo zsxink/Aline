@@ -9,6 +9,7 @@ mod find_panel;
 mod font_invalidate;
 mod geometry;
 mod m2_evidence;
+mod markdown_commands;
 mod probe;
 mod readonly_content;
 mod readonly_evidence;
@@ -19,6 +20,7 @@ mod recovery_panel;
 mod recovery_runtime;
 mod recovery_slot;
 mod shell;
+mod table_commands;
 mod tokens;
 
 /// 原生窗口同源协调器的无窗口回归；真实 chooser/菜单/焦点另作 macOS 实验。
@@ -1432,12 +1434,14 @@ pub(super) struct NativeWindowCopy {
     edit_menu: SharedString,
     find_action: SharedString,
     edit_actions: [SharedString; 7],
+    markdown_commands: markdown_commands::MarkdownCommandCopy,
     selecting: SharedString,
     loading: SharedString,
     readonly: SharedString,
     visual_view: SharedString,
     source_view: SharedString,
     cancel_navigation: SharedString,
+    locate_protected_source: SharedString,
     statistics_pending: SharedString,
     recovery_title: SharedString,
     recovery_restore: SharedString,
@@ -1465,6 +1469,9 @@ impl NativeWindowCopy {
             "document.close_save_conflict",
             "document.close_save_uncertain",
             "document.edit_refused",
+            "document.edit_protected",
+            "document.format_unchanged",
+            "document.format_preview_expired",
             "document.input_dropped",
             "document.input_applied_after_failure",
             "document.composition_pending",
@@ -1532,6 +1539,7 @@ impl NativeWindowCopy {
             close: text("action.close_document")?,
             file_menu: text("menu.file")?,
             edit_menu: text("menu.edit")?,
+            markdown_commands: markdown_commands::MarkdownCommandCopy::new(&translator)?,
             find_action: text("action.find")?,
             edit_actions: [
                 text("action.undo")?,
@@ -1548,6 +1556,7 @@ impl NativeWindowCopy {
             visual_view: text("action.visual_view")?,
             source_view: text("action.source_view")?,
             cancel_navigation: text("action.cancel_navigation")?,
+            locate_protected_source: text("action.locate_protected_source")?,
             statistics_pending: text("status.pending")?,
             recovery_title: text("document.recovery_panel_title")?,
             recovery_restore: text("document.recovery_restore")?,
@@ -1614,7 +1623,7 @@ impl NativeWindowCopy {
         &self,
         cx: &App,
         can_close: bool,
-        can_edit: bool,
+        (can_edit, can_edit_table): (bool, bool),
         can_save_as: bool,
         can_cancel_save: bool,
         exits: ConflictExits,
@@ -1649,7 +1658,18 @@ impl NativeWindowCopy {
                 MenuItem::action(select_all.clone(), SelectAll).disabled(!can_edit),
                 MenuItem::separator(),
                 MenuItem::action(self.find_action.clone(), OpenFind),
+                MenuItem::separator(),
+                MenuItem::action(
+                    self.markdown_commands.format.clone(),
+                    markdown_commands::FormatMarkdown,
+                )
+                .disabled(!can_edit),
             ]),
+            Menu::new(self.markdown_commands.menu.clone()).items(markdown_commands::menu_items(
+                &self.markdown_commands,
+                can_edit,
+                can_edit_table,
+            )),
         ]);
     }
 }
@@ -1680,6 +1700,33 @@ pub(crate) fn open_initial_window(
         KeyBinding::new("cmd-z", Undo, Some("M2Editor")),
         KeyBinding::new("cmd-shift-z", Redo, Some("M2Editor")),
         KeyBinding::new("cmd-f", OpenFind, Some("M1Window")),
+        KeyBinding::new(
+            if cfg!(target_os = "macos") {
+                "cmd-b"
+            } else {
+                "ctrl-b"
+            },
+            markdown_commands::Bold,
+            Some("M2Editor"),
+        ),
+        KeyBinding::new(
+            if cfg!(target_os = "macos") {
+                "cmd-i"
+            } else {
+                "ctrl-i"
+            },
+            markdown_commands::Italic,
+            Some("M2Editor"),
+        ),
+        KeyBinding::new(
+            if cfg!(target_os = "macos") {
+                "cmd-k"
+            } else {
+                "ctrl-k"
+            },
+            markdown_commands::Link,
+            Some("M2Editor"),
+        ),
     ]);
     #[cfg(debug_assertions)]
     cx.bind_keys([KeyBinding::new("cmd-alt-l", ReportLayout, Some("M1Window"))]);
@@ -1691,7 +1738,14 @@ pub(crate) fn open_initial_window(
             Some("M1Window"),
         )]);
     }
-    copy.install_menu(cx, false, false, false, false, ConflictExits::default());
+    copy.install_menu(
+        cx,
+        false,
+        (false, false),
+        false,
+        false,
+        ConflictExits::default(),
+    );
     let bounds = Bounds::centered(None, size(px(960.0), px(640.0)), cx);
     cx.open_window(
         WindowOptions {
@@ -1750,6 +1804,9 @@ struct NativeDocumentWindow {
     reader: Option<ReaderSurface>,
     source_input_site: Option<editable_input::SourceInputSite>,
     visual_input_restore: Option<edit_actions::VisualInputRestore>,
+    protected_source_location: Option<edit_actions::ProtectedSourceLocation>,
+    format_preview: Option<markdown_commands::FormatPreview>,
+    table_menu: Option<table_commands::TableMenu>,
     input_frame: Option<editable_input::InputFrame>,
     composing_input_frame: Option<editable_input::InputFrame>,
     input_task: Option<Task<()>>,
@@ -1814,6 +1871,9 @@ impl NativeDocumentWindow {
             reader: None,
             source_input_site: None,
             visual_input_restore: None,
+            protected_source_location: None,
+            format_preview: None,
+            table_menu: None,
             input_frame: None,
             composing_input_frame: None,
             input_task: None,
@@ -2916,16 +2976,25 @@ impl NativeDocumentWindow {
         // 组合活动时解析身份必然失效，行级 `HitTarget` 创建失败，reader 不会挂
         // 命中回调；因此反馈必须在本层行容器上给出。
         let composing = document.core().composition().is_some();
+        let mut table_input = None;
         if document.is_editable()
             && let Some(range) = reader.input_row(document, row)
             && let Some(site) =
                 editable_input::InputSite::for_row(document, range, self.source_input_site.as_ref())
             && let Some((input, frame, geometry)) =
-                editable_input::render(document, site, self.focus.clone(), cx)
+                editable_input::render(document, site.clone(), self.focus.clone(), cx)
         {
+            self.source_input_site = frame.source_site();
             self.input_frame = Some(frame);
-            // 输入行由编辑框自行处理组合与点击，不套阅读行守卫。
-            return reader.wrap_input_row(document, row, input, geometry);
+            if let Some((row, column)) = site.cell() {
+                table_input = Some(readonly_reader::TableCellInput {
+                    row,
+                    column,
+                    element: input,
+                });
+            } else {
+                return reader.wrap_input_row(document, row, input, geometry);
+            }
         }
         let failure = self
             .copy
@@ -2943,9 +3012,10 @@ impl NativeDocumentWindow {
                 row,
                 failure,
                 &self.copy.content,
-                move |target, candidate, prepared, _, cx| {
+                table_input,
+                move |target, candidate, prepared, window, cx| {
                     let _ = weak.update(cx, |this, cx| {
-                        this.accept_reading_hit(target, candidate, prepared, cx)
+                        this.accept_reading_hit(target, candidate, prepared, window, cx)
                     });
                 },
                 move |target, _, cx| {
@@ -3020,6 +3090,7 @@ impl NativeDocumentWindow {
         target: &HitTarget,
         candidate: Result<Result<usize, usize>, HitError>,
         prepared: &PreparedLayout,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) {
         let Some(reader) = &self.reader else {
@@ -3036,6 +3107,33 @@ impl NativeDocumentWindow {
             cx.notify();
             return;
         }
+        if let Some((cell, point)) = target.table_menu() {
+            if target.validate(document, reader.layout_token()).is_ok() {
+                self.open_table_menu(cell.clone(), *point, window, cx);
+            }
+            return;
+        }
+        self.table_menu = None;
+        if document.is_editable()
+            && document.core().mode() == EditorMode::Visual
+            && let Ok(Ok(index)) = candidate
+            && target.validate(document, reader.layout_token()).is_ok()
+            && let Ok((_, hit)) = target.resolve(Ok(index), aline_buffer::Affinity::Before)
+            && hit.precision() == aline_markdown::MappingPrecision::Synthetic
+            && markdown_commands::is_task_marker(
+                document.parsed().presentation(),
+                hit.source_range(),
+            )
+        {
+            self.execute_markdown_command(
+                markdown_commands::MarkdownCommand::TaskMarker(
+                    hit.source_range().byte_range().start,
+                ),
+                window,
+                cx,
+            );
+            return;
+        }
         let expected_edge = candidate
             .as_ref()
             .ok()
@@ -3043,6 +3141,7 @@ impl NativeDocumentWindow {
         let outcome = candidate.and_then(|candidate| {
             target.navigate_candidate(document, reader.layout_token(), candidate)
         });
+        let mut table_site = None;
         if let Ok(hit) = &outcome {
             if let Some(evidence) = &self.evidence {
                 evidence.borrow_mut().event("hit");
@@ -3070,8 +3169,21 @@ impl NativeDocumentWindow {
                         && let Ok(identity) = document.input_identity()
                         // 进入本分支时前面的组合守卫已确认无组合，同步执行期间
                         // 组合状态不会变化，因此这里不会返回 `CompositionActive`。
-                        && document.open_visual_at(&identity, &selection).is_ok()
+                        && let Ok(opened) = document.open_visual_at(&identity, &selection)
                     {
+                        if opened
+                            && let Some(cell) = target.table_cell()
+                            && let Ok(snapshot) = document.current_snapshot()
+                        {
+                            table_site = editable_input::SourceInputSite::for_table(
+                                document.parsed(),
+                                &snapshot,
+                                &identity,
+                                cell,
+                                cell.table_range().clone(),
+                                document.text_budget(),
+                            );
+                        }
                         cx.notify();
                     }
                 }
@@ -3102,7 +3214,20 @@ impl NativeDocumentWindow {
         }
         #[cfg(not(debug_assertions))]
         let _ = (outcome, prepared);
+        if let Some(site) = table_site {
+            self.replace_table_site(site);
+        }
+        self.update_menu(cx);
         cx.notify();
+    }
+
+    fn route_tab(&mut self, backward: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if self.move_table_menu_focus(backward, window, cx)
+            || (self.focus.is_focused(window) && self.markdown_key("tab", backward, window, cx))
+        {
+            return;
+        }
+        self.move_window_focus(!backward, window, cx);
     }
 
     /// 工具栏编辑模式按钮：文字标签、可聚焦、当前模式用强调色弱背景表达。
@@ -3168,7 +3293,7 @@ impl NativeDocumentWindow {
             .into_any_element()
     }
 
-    fn update_menu(&self, cx: &App) {
+    fn update_menu(&mut self, cx: &App) {
         let editable = self
             .state
             .session()
@@ -3181,10 +3306,11 @@ impl NativeDocumentWindow {
                 .document()
                 .and_then(ReadonlyDocument::external_view),
         );
+        let table = editable && self.has_table_menu_target();
         self.copy.install_menu(
             cx,
             self.state.session().document().is_some() || self.state.session().is_loading(),
-            editable,
+            (editable, table),
             self.state.save_as_enabled(),
             self.state.save_cancel_enabled(),
             exits,
@@ -3554,6 +3680,16 @@ impl Render for NativeDocumentWindow {
             .reader
             .as_ref()
             .is_some_and(|reader| reader.has_pending_restore());
+        let source_location = self.state.feedback_key() == Some("document.edit_protected")
+            && self
+                .protected_source_location
+                .as_ref()
+                .is_some_and(|target| {
+                    self.state
+                        .session()
+                        .document()
+                        .is_some_and(|document| target.matches(document))
+                });
         let notice = (!notices.is_empty() || cancel_pending).then(|| {
             div()
                 .w_full()
@@ -3569,6 +3705,21 @@ impl Render for NativeDocumentWindow {
                 .text_xs()
                 .text_color(rgb(tokens::SECONDARY))
                 .children(notices)
+                .when(source_location, |banner| {
+                    let enabled = !self.has_unsettled_input()
+                        && self
+                            .state
+                            .session()
+                            .document()
+                            .is_some_and(|document| document.core().composition().is_none());
+                    banner.child(self.conflict_button(
+                        "locate-protected-source",
+                        self.copy.locate_protected_source.clone(),
+                        enabled,
+                        Self::locate_protected_source,
+                        cx,
+                    ))
+                })
                 .when(cancel_pending, |banner| {
                     banner.child(
                         div()
@@ -3621,6 +3772,7 @@ impl Render for NativeDocumentWindow {
             )
         });
         let conflict_panel = self.render_conflict_panel(conflict, conflict_exits_now, cx);
+        let format_preview = self.render_format_preview(cx);
         let recovery_panel =
             if recovery_panel::recovery_panel_visible(document_open, self.state.panel.is_visible())
             {
@@ -3743,6 +3895,7 @@ impl Render for NativeDocumentWindow {
                 .flex_col()
                 .children(notice)
                 .children(conflict_panel)
+                .children(format_preview)
                 .children(self.find_panel.as_ref().map(|(panel, _)| panel.clone()))
                 .child(content_body),
         );
@@ -3767,6 +3920,27 @@ impl Render for NativeDocumentWindow {
             .on_action(cx.listener(Self::cancel_save_wait_action))
             .on_action(cx.listener(Self::close_document))
             .on_action(cx.listener(Self::open_find))
+            .on_action(cx.listener(Self::format_markdown))
+            .on_action(cx.listener(Self::show_table_operations))
+            .on_action(cx.listener(Self::on_bold))
+            .on_action(cx.listener(Self::on_italic))
+            .on_action(cx.listener(Self::on_strike))
+            .on_action(cx.listener(Self::on_inline_code))
+            .on_action(cx.listener(Self::on_link))
+            .on_action(cx.listener(Self::on_paragraph))
+            .on_action(cx.listener(Self::on_heading_one))
+            .on_action(cx.listener(Self::on_heading_two))
+            .on_action(cx.listener(Self::on_heading_three))
+            .on_action(cx.listener(Self::on_heading_four))
+            .on_action(cx.listener(Self::on_heading_five))
+            .on_action(cx.listener(Self::on_heading_six))
+            .on_action(cx.listener(Self::on_quote))
+            .on_action(cx.listener(Self::on_ordered_list))
+            .on_action(cx.listener(Self::on_unordered_list))
+            .on_action(cx.listener(Self::on_task_list))
+            .on_action(cx.listener(Self::on_code_block))
+            .on_action(cx.listener(Self::on_math_block))
+            .on_action(cx.listener(Self::on_thematic_break))
             .on_action(cx.listener(|this, _: &Cut, window, cx| {
                 this.dispatch_edit(EditAction::Cut, window, cx)
             }))
@@ -3789,6 +3963,12 @@ impl Render for NativeDocumentWindow {
                 this.dispatch_edit(EditAction::Redo, window, cx)
             }))
             .on_action(cx.listener(|this, _: &CancelNavigation, window, cx| {
+                if this.dismiss_table_menu(window, cx) {
+                    return;
+                }
+                if this.dismiss_format_preview(window, cx) {
+                    return;
+                }
                 if this.close_focused_find(window, cx) || this.escape_document_input(window, cx) {
                     return;
                 }
@@ -3843,12 +4023,12 @@ impl Render for NativeDocumentWindow {
                     cx.notify();
                 }
             }))
-            .on_action(cx.listener(|this, _: &FocusNext, window, cx| {
-                this.move_window_focus(true, window, cx)
-            }))
-            .on_action(cx.listener(|this, _: &FocusPrevious, window, cx| {
-                this.move_window_focus(false, window, cx)
-            }))
+            .on_action(
+                cx.listener(|this, _: &FocusNext, window, cx| this.route_tab(false, window, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &FocusPrevious, window, cx| this.route_tab(true, window, cx)),
+            )
             .on_action(cx.listener(Self::invalidate_font))
             .flex()
             .flex_col()
@@ -3856,7 +4036,8 @@ impl Render for NativeDocumentWindow {
             // GPUI 0.3.9 采用最后注册的 handler，正文绘制时覆盖此组合借位。
             .children(self.offscreen_input(cx))
             .child(content)
-            .child(status);
+            .child(status)
+            .children(self.render_table_menu(window, cx));
         #[cfg(debug_assertions)]
         let root = root.on_action(cx.listener(|this, _: &ReportLayout, _, _| {
             if let Some(reader) = &this.reader {

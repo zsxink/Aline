@@ -151,6 +151,22 @@ impl ReaderIndex {
     pub(super) fn snapshot_id(&self) -> &SnapshotId {
         &self.snapshot
     }
+
+    pub(super) fn ensure_blank_input_row(
+        &mut self,
+        parsed: &Parsed,
+        range: &SrcRange,
+        budget: TextBudget,
+        max_rows: usize,
+    ) -> Result<(), LayoutError> {
+        self.check(parsed)?;
+        if aline_edit::is_blank_input_anchor(parsed, range, budget) {
+            self.visual
+                .ensure_blank_input_row(range.byte_range().start, max_rows)
+                .map_err(content_error)?;
+        }
+        Ok(())
+    }
     pub(super) fn row_count(&self, mode: EditorMode) -> usize {
         match mode {
             EditorMode::Visual => self.visual.len(),

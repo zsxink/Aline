@@ -16,6 +16,35 @@ const VISUAL: EditContext = EditContext::new(EditMode::Visual);
 type TestResult = Result<(), Box<dyn Error>>;
 
 #[test]
+fn raw_input_accepts_blank_line_anchor_but_rejects_block_and_crlf_interior() -> TestResult {
+    let snapshot = TextSnapshot::new("- a\r\n".into(), TEXT)?;
+    let parsed = parse(&snapshot, ParseConfig::m0(), ParseBudget::m0())?;
+    for (start, expected) in [(1, false), (3, false), (4, false), (5, true)] {
+        let anchor = snapshot.src_range(start..start)?;
+        let source = snapshot.src_offset(start)?;
+        let selection = SrcSelection::new(source.clone(), source)?;
+        let result = plan_raw_block_input(
+            &parsed,
+            &selection,
+            &VISUAL,
+            &anchor,
+            RawBlockEdit::new(&anchor, "", "\r\ntext"),
+            EDIT,
+        );
+        if expected {
+            let PlanOutcome::Changed(plan) = result? else {
+                return Err("空行应接受受检插入".into());
+            };
+            let change = validate_change(&plan, &snapshot, &parsed, &selection, &VISUAL)?;
+            assert_eq!(change.candidate_blocks().len(), 2);
+        } else {
+            assert!(matches!(result, Err(EditRefusal::InvalidRawBlock)));
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn raw_input_changes_markdown_markers_and_entities_inside_open_block() -> TestResult {
     for (source, range, from, to, drawn) in [
         ("**字**", 0..2, "**", "", "字**"),

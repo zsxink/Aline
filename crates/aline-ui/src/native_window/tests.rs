@@ -482,6 +482,37 @@ fn find_hidden_protected_and_visible_targets_choose_correct_reveal_mode()
 }
 
 #[test]
+fn md11_find_targets_reveal_in_source_and_reject_visual_replacement() -> Result<(), Box<dyn Error>>
+{
+    use super::find_panel::{replace_all_for_test, reveal_in_source};
+
+    let raw = "---\ntitle: protected\n---\n\n[toc]\n\n字[^n]\n\n[^n]: definition";
+    let mut session = find_fixture(raw.as_bytes(), true)?;
+    let document = session.document_mut().ok_or("应存在文档")?;
+    for query in ["protected", "[toc]", "definition"] {
+        let start = raw.find(query).ok_or("应有灰区命中")?;
+        let range = document
+            .parsed()
+            .snapshot()
+            .src_range(start..start + query.len())?;
+        assert!(reveal_in_source(document.parsed(), &range), "{query}");
+        let identity = document.input_identity()?;
+        let before = document.core().current_selection();
+        assert!(matches!(
+            replace_all_for_test(document, query.into(), "替换".into(), 0),
+            Err(crate::DocError::Edit(
+                aline_edit::EditRefusal::ProtectedRange { .. }
+            ))
+        ));
+        assert_eq!(document.input_identity()?, identity);
+        assert_eq!(document.core().current_selection(), before);
+        assert_eq!(document.core().history_node_count(), 0);
+        assert_eq!(document.core().buffer_text()?, raw);
+    }
+    Ok(())
+}
+
+#[test]
 fn find_replace_all_rejects_stale_query_and_keeps_one_undo_step() -> Result<(), Box<dyn Error>> {
     use super::find_panel::replace_all_for_test;
     use crate::{CommitOutcome, DocError};
@@ -693,6 +724,54 @@ fn window_save_publishes_and_reports_saved() -> Result<(), Box<dyn Error>> {
         Some("document.save_saved")
     );
     assert_eq!(fs::read(&target)?, b"xab\n");
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn window_html_raw_edit_saves_and_reopens_exact_disk_bytes() -> Result<(), Box<dyn Error>> {
+    use std::fs;
+
+    let original = "\u{feff}<div>甲 &amp; <!--保留-->乙</div>\r\n\r\n尾";
+    let expected = "\u{feff}<div>甲 &amp; <!--保留-->丙</div>\r\n\r\n尾";
+    let directory = WindowSaveDir::create("aline-html-roundtrip")?;
+    let target = directory.0.join("html.md");
+    fs::write(&target, original.as_bytes())?;
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    open_window_document(&mut state, &target, &fs::read(&target)?)?;
+    let document = state.session.document_mut().ok_or("应存在文档")?;
+    let snapshot = document.current_snapshot()?;
+    let start = document
+        .baseline()
+        .source()
+        .find('乙')
+        .ok_or("应有替换位置")?;
+    let selection = aline_buffer::SrcSelection::new(
+        snapshot.text().src_offset(start)?,
+        snapshot.text().src_offset(start + '乙'.len_utf8())?,
+    )?;
+    let identity = document.input_identity()?;
+    assert!(document.open_visual_at(&identity, &selection)?);
+    let identity = document.input_identity()?;
+    document.edit_core()?.type_selection(&identity, "丙", 1)?;
+    let save = state.request_save().ok_or("应生成保存操作")?;
+    assert_eq!(
+        state.settle_save(save.run()).feedback,
+        Some("document.save_saved")
+    );
+    let bytes = fs::read(&target)?;
+    assert_eq!(bytes, expected.as_bytes());
+    assert_eq!(
+        state.session.close_document(),
+        crate::CloseDisposition::Closed
+    );
+
+    open_window_document(&mut state, &target, &bytes)?;
+    let document = state.session.document().ok_or("应存在重开的文档")?;
+    let drawn = document.parsed().projection().drawn_text();
+    assert!(drawn.contains("甲 & 丙"));
+    assert!(!drawn.contains("保留"));
+    assert_eq!(document.core().history_node_count(), 0);
     Ok(())
 }
 
@@ -1067,6 +1146,64 @@ fn window_autosave_success_is_silent_but_manual_save_reports() -> Result<(), Box
         },
         "手工保存成功仍须提示"
     );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn formatting_preview_leaves_autosave_and_replacement_document_untouched()
+-> Result<(), Box<dyn Error>> {
+    use std::fs;
+
+    let directory = WindowSaveDir::create("aline-format-autosave")?;
+    let target = directory.0.join("notes.md");
+    fs::write(&target, b"##  title  ##\n")?;
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    open_window_document(&mut state, &target, &fs::read(&target)?)?;
+    open_window_block(&mut state, SelectionSpec::new(0, 0))?;
+    window_type(&mut state, 5, "X")?;
+    let before = window_save_view(&mut state)?;
+    let document = state.session.document_mut().ok_or("应存在文档")?;
+    let plan = |parsed: &aline_markdown::Parsed,
+                selection: &aline_buffer::SrcSelection,
+                context: &aline_edit::EditContext,
+                budget| {
+        aline_edit::plan_markdown_format(parsed.snapshot(), parsed, selection, context, budget)
+    };
+    let preview = document
+        .edit_core()?
+        .prepare_command(plan)?
+        .ok_or("应有预览")?;
+    assert_eq!(window_save_view(&mut state)?, before);
+    drop(preview);
+    assert_eq!(window_save_view(&mut state)?, before);
+
+    let document = state.session.document_mut().ok_or("应存在文档")?;
+    let preview = document
+        .edit_core()?
+        .prepare_command(plan)?
+        .ok_or("应有预览")?;
+    let job = state.request_autosave().ok_or("应生成自动保存")?;
+    assert_eq!(state.settle_save(job.run()).feedback, None);
+    assert_eq!(fs::read(&target)?, b"##  tXitle  ##\n");
+    assert_eq!(
+        state.session.close_document(),
+        crate::CloseDisposition::Closed
+    );
+
+    let next = directory.0.join("next.md");
+    fs::write(&next, b"# clean\n")?;
+    open_window_document(&mut state, &next, b"# clean\n")?;
+    let document = state.session.document_mut().ok_or("应存在新文档")?;
+    let core = document.edit_core()?;
+    assert!(core.prepare_command(plan)?.is_none());
+    assert!(matches!(
+        core.publish_command(&preview, 2),
+        Err(crate::DocError::StaleResult | crate::DocError::WrongDocument)
+    ));
+    assert_eq!(core.buffer_text()?, "# clean\n");
+    assert_eq!(core.history_node_count(), 0);
+    assert_eq!(fs::read(&next)?, b"# clean\n");
     Ok(())
 }
 

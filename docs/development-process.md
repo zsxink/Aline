@@ -4,7 +4,7 @@
 
 ## 1. 开发阶段
 
-按架构指引 §13 的 `M0 → M1 → M2 → M3 → M4 → M5 → M6` 顺序推进。M1 于 2026-11-13 按决定 §43 在 macOS arm64 范围收口；M2 于 2026-11-23 按[决定 §46](./decisions.md#46-2026-11-23-m2-阶段出口验收macos-arm64-范围)在当前 macOS arm64 范围通过最小出口，[`m2-editable-core`](../openspec/changes/archive/2026-11-23-m2-editable-core/tasks.md)、W4/W5 已完成验证、同步主规格并归档，M3 入口解锁。V-08 身份/事务方案的独立审查前置已通过，不再处于等待状态。阶段出口仍按架构指引 §13 与验证计划逐项核对；OpenSpec 任务完成或归档不使 V 项、完整 AC、其他平台或发布门禁自动通过。
+按架构指引 §13 的 `M0 → M1 → M2 → M3 → M4 → M5 → M6` 顺序推进。M1 于 2026-11-13 按决定 §43 在 macOS arm64 范围收口；M2 于 2026-11-23 按[决定 §46](./decisions.md#46-2026-11-23-m2-阶段出口验收macos-arm64-范围)在当前 macOS arm64 范围通过最小出口，[`m2-editable-core`](../openspec/changes/archive/2026-11-23-m2-editable-core/tasks.md)、W4/W5 已完成验证、同步主规格并归档，M3 随后于 2026-11-24 完成当前 macOS arm64、中文 2× 范围的出口核对，[变更](../openspec/changes/archive/2026-11-24-m3-commands-and-tables/tasks.md) 已同步并归档。V-08 身份/事务方案的独立审查前置已通过，不再处于等待状态。阶段出口仍按架构指引 §13 与验证计划逐项核对；OpenSpec 任务完成或归档不使 V 项、完整 AC、其他平台或发布门禁自动通过。
 
 | 阶段 | 范围 | 交接要求 |
 |---|---|---|

@@ -84,11 +84,14 @@ impl PreparedLayout {
     }
 }
 
+#[derive(Clone)]
 pub(super) struct HitTarget {
     identity: InputIdentity,
     layout: LayoutToken,
     parsed_projection: ProjectionId,
     projection: Projection,
+    cell: Option<aline_edit::TableTarget>,
+    table_menu: Option<(aline_edit::TableTarget, Point<Pixels>)>,
 }
 impl HitTarget {
     pub(super) fn new(
@@ -112,8 +115,51 @@ impl HitTarget {
             layout,
             parsed_projection: document.parsed().projection().id().clone(),
             projection,
+            cell: None,
+            table_menu: None,
         })
     }
+
+    pub(super) fn for_table_cell(mut self, target: aline_edit::TableTarget) -> Self {
+        self.cell = Some(target);
+        self
+    }
+
+    pub(super) fn table_cell(&self) -> Option<&aline_edit::TableTarget> {
+        self.cell.as_ref()
+    }
+    pub(super) fn for_table_menu(
+        mut self,
+        target: aline_edit::TableTarget,
+        point: Point<Pixels>,
+    ) -> Self {
+        self.table_menu = Some((target, point));
+        self
+    }
+
+    pub(super) fn table_menu(&self) -> Option<&(aline_edit::TableTarget, Point<Pixels>)> {
+        self.table_menu.as_ref()
+    }
+
+    pub(super) fn validate(
+        &self,
+        document: &mut ReadonlyDocument,
+        current_layout: Option<LayoutToken>,
+    ) -> Result<(), HitError> {
+        self.ensure_layout(current_layout)?;
+        if !document.is_parse_current()
+            || &self.parsed_projection != document.parsed().projection().id()
+        {
+            return Err(HitError::StaleInput);
+        }
+        let current = document
+            .input_identity()
+            .map_err(|_| HitError::StaleInput)?;
+        self.identity
+            .validate(&current)
+            .map_err(|_| HitError::StaleInput)
+    }
+
     pub(super) fn ensure_layout(&self, current: Option<LayoutToken>) -> Result<(), HitError> {
         if current == Some(self.layout) {
             Ok(())
@@ -150,18 +196,19 @@ impl HitTarget {
         candidate: Result<usize, usize>,
         affinity: Affinity,
     ) -> Result<HitOutcome, HitError> {
-        self.ensure_layout(current_layout)?;
-        if !document.is_parse_current()
-            || &self.parsed_projection != document.parsed().projection().id()
-        {
-            return Err(HitError::StaleInput);
-        }
-        let current = document
-            .input_identity()
-            .map_err(|_| HitError::StaleInput)?;
-        self.identity
-            .validate(&current)
-            .map_err(|_| HitError::StaleInput)?;
+        self.validate(document, current_layout)?;
+        let (selection, outcome) = self.resolve(candidate, affinity)?;
+        document
+            .navigate(&self.identity, &selection)
+            .map_err(|_| HitError::Navigation)?;
+        Ok(outcome)
+    }
+
+    pub(super) fn resolve(
+        &self,
+        candidate: Result<usize, usize>,
+        affinity: Affinity,
+    ) -> Result<(SrcSelection, HitOutcome), HitError> {
         let (local_drawn, edge) = match candidate {
             Ok(local_drawn) => (local_drawn, false),
             Err(local_drawn) => (local_drawn, true),
@@ -176,14 +223,14 @@ impl HitTarget {
             .map_err(|_| HitError::InvalidOffset)?;
         let selection = SrcSelection::new(mapped.value().clone(), mapped.value().clone())
             .map_err(|_| HitError::InvalidOffset)?;
-        document
-            .navigate(&self.identity, &selection)
-            .map_err(|_| HitError::Navigation)?;
-        Ok(HitOutcome {
-            source: mapped.source_range().clone(),
-            precision: mapped.precision(),
-            edge,
-        })
+        Ok((
+            selection,
+            HitOutcome {
+                source: mapped.source_range().clone(),
+                precision: mapped.precision(),
+                edge,
+            },
+        ))
     }
 }
 
@@ -554,6 +601,8 @@ mod tests {
             layout: token,
             parsed_projection: old_parsed_projection,
             projection: old_projection,
+            cell: None,
+            table_menu: None,
         };
         assert!(matches!(
             delayed.navigate(document, Some(token), Ok(2), Affinity::After),

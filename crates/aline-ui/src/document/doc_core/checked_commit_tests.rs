@@ -97,7 +97,7 @@ fn visual_ime_protection_rejection_preserves_complete_state() -> Result<(), DocE
     Ok(())
 }
 
-use aline_buffer::{Affinity, PatchBudget};
+use aline_buffer::{Affinity, PatchBudget, SrcSelection};
 use aline_edit::{
     ChangePlan, EditBudget, EditCommand, EditContext, EditMode, EditRefusal, FindBudget, FindCase,
     FindReplacement, FindVersion, PlanOutcome, SourceEdit, find_matches, plan_change,
@@ -713,5 +713,205 @@ fn command_wrong_mode_rejects_before_publish_and_preserves_redo() -> TestResult 
         Err(DocError::Edit(EditRefusal::WrongMode { .. }))
     ));
     assert_eq!(state(&doc), before);
+    Ok(())
+}
+
+#[test]
+fn html_raw_open_keeps_cross_block_delete_and_paste_rejections_atomic() -> TestResult {
+    let source = "<div>a &amp; <!--keep-->b</div>\n\ntail[^n]\n\n[^n]: note";
+    for replacement in ["", "pasted"] {
+        let mut doc = DocCore::new_editable(source, SelectionSpec::new(5, 5), limits())?;
+        let current = doc.current_snapshot(limits().text())?;
+        let parsed = parse(current.text(), ParseConfig::m0(), ParseBudget::m0())?;
+        let identity = doc.current_input_identity()?;
+        let selection = bind_selection(current.text(), doc.current_selection())?;
+        doc.open_visual_block(
+            &identity,
+            &parsed,
+            parsed.blocks().first().ok_or("缺少 HTML 块")?.range(),
+            &selection,
+        )?;
+        let identity = doc.current_input_identity()?;
+        doc.type_selection(&identity, "draft", 0)?;
+        let identity = doc.current_input_identity()?;
+        doc.select_all(&identity)?;
+        doc.current_snapshot(limits().text())?;
+        let identity = doc.current_input_identity()?;
+        let before = state(&doc);
+        assert!(doc.replace_selection(&identity, replacement, 1).is_err());
+        assert_eq!(state(&doc), before);
+    }
+    Ok(())
+}
+
+#[test]
+fn gray_zones_reject_cross_block_writes_and_formatting_without_publishing_draft() -> TestResult {
+    for source in [
+        "---\ntitle: x\n---\n\n尾",
+        "[toc]\n\n尾",
+        "[^n]: note\n\n尾",
+        "<div>&amp; <!--keep--></div>\n\n尾",
+    ] {
+        let mut doc = DocCore::new(
+            source,
+            SelectionSpec::new(source.len(), source.len()),
+            limits(),
+        )?;
+        doc.type_text(source.len(), "草稿", 0)?;
+        let identity = doc.current_input_identity()?;
+        doc.select_all(&identity)?;
+        doc.current_snapshot(limits().text())?;
+        let identity = doc.current_input_identity()?;
+        let before = state(&doc);
+        for replacement in ["", "粘贴"] {
+            assert!(
+                doc.replace_selection(&identity, replacement, 1).is_err(),
+                "{source}"
+            );
+            assert_eq!(state(&doc), before);
+        }
+        let command = doc.prepare_command(|parsed, selection, context, budget| {
+            plan_change(
+                parsed.snapshot(),
+                parsed,
+                selection,
+                context,
+                &EditCommand::toggle_inline_format(
+                    selection.range().byte_range(),
+                    aline_edit::InlineFormat::Strong,
+                ),
+                budget,
+            )
+        });
+        assert!(command.is_err(), "{source}");
+        assert_eq!(state(&doc), before);
+    }
+    Ok(())
+}
+
+#[test]
+fn prepared_format_does_not_publish_draft_and_rejects_a_stale_preview() -> TestResult {
+    let mut doc = DocCore::new("##  标题  ##", SelectionSpec::new(4, 4), limits())?;
+    let plan = |parsed: &Parsed, selection: &SrcSelection, context: &EditContext, budget| {
+        aline_edit::plan_markdown_format(parsed.snapshot(), parsed, selection, context, budget)
+    };
+
+    let preview = doc
+        .prepare_command(plan)?
+        .ok_or_else(|| std::io::Error::other("应生成格式化差异"))?;
+    doc.type_text(4, "新", 1)?;
+    doc.current_snapshot(limits().text())?;
+    let before = state(&doc);
+    assert!(matches!(
+        doc.publish_command(&preview, 2),
+        Err(DocError::StaleResult | DocError::PendingInput)
+    ));
+    assert_eq!(state(&doc), before);
+
+    let preview = doc
+        .prepare_command(plan)?
+        .ok_or_else(|| std::io::Error::other("应按草稿生成新差异"))?;
+    assert_eq!(state(&doc), before);
+    doc.publish_command(&preview, 3)?;
+    assert_eq!(doc.buffer_text()?, "## 新标题");
+    assert_eq!(doc.undo_depth(), 2);
+    doc.undo()?;
+    assert_eq!(doc.buffer_text()?, "##  新标题  ##");
+    doc.undo()?;
+    assert_eq!(doc.buffer_text()?, "##  标题  ##");
+    Ok(())
+}
+
+#[test]
+fn prepared_empty_inline_pair_places_caret_between_markers() -> TestResult {
+    let mut doc = DocCore::new("甲乙", SelectionSpec::new(3, 3), limits())?;
+    let plan = |parsed: &Parsed, selection: &SrcSelection, context: &EditContext, budget| {
+        plan_change(
+            parsed.snapshot(),
+            parsed,
+            selection,
+            context,
+            &EditCommand::toggle_inline_format(
+                selection.range().byte_range(),
+                aline_edit::InlineFormat::Strong,
+            ),
+            budget,
+        )
+    };
+    let command = doc
+        .prepare_command(plan)?
+        .ok_or_else(|| std::io::Error::other("空选区应生成成对标记"))?;
+    doc.publish_command(&command, 1)?;
+    assert_eq!(doc.buffer_text()?, "甲****乙");
+    assert_eq!(doc.current_selection(), SelectionSpec::new(5, 5));
+    assert_eq!(doc.undo_depth(), 1);
+    Ok(())
+}
+
+#[test]
+fn list_commands_restore_source_and_selection_through_history() -> TestResult {
+    use aline_edit::{BlockCommand, plan_block_command};
+
+    for (source, command, expected, caret_after) in [
+        ("7) 甲", BlockCommand::ListEnter, "7) 甲\n8) ", 10),
+        ("7) 甲\n8) ", BlockCommand::ListEnter, "7) 甲\n", 7),
+        (
+            "7) 甲\n8) 乙",
+            BlockCommand::IndentList,
+            "7) 甲\n\n   8) 乙",
+            17,
+        ),
+        ("- 父\n  - 子", BlockCommand::OutdentList, "- 父\n- 子", 11),
+        ("- [ ] 甲", BlockCommand::ToggleTask, "- [x] 甲", 9),
+    ] {
+        let before = SelectionSpec::new(source.len(), source.len());
+        let after = SelectionSpec::new(caret_after, caret_after);
+        let mut doc = DocCore::new(source, before, limits())?;
+        let prepared = doc
+            .prepare_command(|parsed, selection, context, budget| {
+                plan_block_command(parsed, selection, context, command, budget)
+            })?
+            .ok_or_else(|| std::io::Error::other("列表命令应生成独立补丁"))?;
+        doc.publish_command(&prepared, 1)?;
+        assert_eq!(doc.undo_depth(), 1, "{command:?}");
+        assert_eq!(doc.buffer_text()?, expected, "{command:?}");
+        assert_eq!(doc.current_selection(), after, "{command:?}");
+        doc.undo()?;
+        assert_eq!(doc.buffer_text()?, source, "{command:?}");
+        assert_eq!(doc.current_selection(), before, "{command:?}");
+        doc.redo()?;
+        assert_eq!(doc.buffer_text()?, expected, "{command:?}");
+        assert_eq!(doc.current_selection(), after, "{command:?}");
+    }
+    Ok(())
+}
+
+#[test]
+fn prepared_markdown_commands_preserve_rejected_draft_and_active_composition() -> TestResult {
+    use aline_edit::{BlockCommand, plan_block_command};
+
+    for composing in [false, true] {
+        let mut doc = with_redo()?;
+        if composing {
+            doc.composition_start("中", 5)?;
+        } else {
+            doc.type_text(2, "草稿", 5)?;
+        }
+        doc.current_snapshot(limits().text())?;
+        let before = state(&doc);
+        let result = doc.prepare_command(|parsed, selection, context, budget| {
+            assert!(!composing, "组合期间不得调用命令规划");
+            plan_block_command(parsed, selection, context, BlockCommand::IndentList, budget)
+        });
+        assert!(if composing {
+            matches!(result, Err(DocError::CompositionActive))
+        } else {
+            matches!(
+                result,
+                Err(DocError::Edit(EditRefusal::ListCommandOutsideItem))
+            )
+        });
+        assert_eq!(state(&doc), before);
+    }
     Ok(())
 }

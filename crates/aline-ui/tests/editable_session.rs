@@ -229,3 +229,39 @@ fn visual_navigation_opens_and_reopens_only_current_parsed_blocks() -> Result<()
     );
     Ok(())
 }
+
+#[test]
+fn html_block_click_opens_raw_source_while_inline_html_and_md11_stay_protected()
+-> Result<(), Box<dyn Error>> {
+    for (bytes, anchor, expected) in [
+        (&b"<div>a &amp; <!--keep-->b</div>\n\ntail"[..], 5, true),
+        (&b"<!--hidden-->\n\nword"[..], 0, true),
+        (&b"before <b>text</b> after"[..], 11, false),
+        (&b"---\ntitle: x\n---\n\ntext"[..], 6, false),
+        (&b"[toc]\n\n# heading"[..], 2, false),
+        (&b"word[^n]\n\n[^n]: note"[..], 6, false),
+    ] {
+        let mut session = open(true, bytes)?;
+        let document = session.document_mut().ok_or("missing document")?;
+        let current = document.current_snapshot()?;
+        let selection = SrcSelection::new(
+            current.text().src_offset(anchor)?,
+            current.text().src_offset(anchor)?,
+        )?;
+        let identity = document.input_identity()?;
+        let before_text = document.core().buffer_text()?;
+        let opened = document.open_visual_at(&identity, &selection);
+        if expected {
+            assert!(opened?);
+        } else {
+            assert!(matches!(
+                opened,
+                Ok(false) | Err(DocError::Edit(aline_edit::EditRefusal::HtmlBoundary { .. }))
+            ));
+        }
+        assert_eq!(document.core().has_open_block(), expected);
+        assert_eq!(document.core().buffer_text()?, before_text);
+        assert_eq!(document.core().history_node_count(), 0);
+    }
+    Ok(())
+}

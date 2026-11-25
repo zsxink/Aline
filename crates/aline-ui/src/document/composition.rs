@@ -12,6 +12,8 @@ use aline_buffer::SelectionSpec;
 pub struct CompositionView<'a> {
     pub(crate) range: Range<usize>,
     pub(crate) candidate: &'a str,
+    #[cfg(target_os = "macos")]
+    pub(crate) separator: &'static str,
 }
 
 impl<'a> CompositionView<'a> {
@@ -23,6 +25,19 @@ impl<'a> CompositionView<'a> {
     /// 返回当前候选文本；它尚未写入已提交 Buffer。
     pub fn candidate(&self) -> &'a str {
         self.candidate
+    }
+
+    #[cfg(target_os = "macos")]
+    pub(crate) fn marked_range(&self) -> Option<Range<usize>> {
+        let marker = self
+            .candidate
+            .strip_prefix(self.separator)
+            .unwrap_or(self.candidate);
+        let start = self
+            .range
+            .start
+            .checked_add(self.candidate.len() - marker.len())?;
+        Some(start..start.checked_add(marker.len())?)
     }
 }
 

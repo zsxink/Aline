@@ -50,6 +50,8 @@ pub(crate) enum InputTarget {
 pub(crate) struct VisualInput {
     pub(crate) extent: Range<usize>,
     pub(crate) protections: Vec<VisualProtection>,
+    /// 列表后的空行第一次输入时，与正文同一补丁写入的分隔符。
+    pub(crate) leading_separator: &'static str,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -70,6 +72,11 @@ pub(crate) struct OpenBlock {
 }
 
 impl OpenBlock {
+    pub(super) fn leading_separator(&self) -> &'static str {
+        self.visual_input()
+            .map_or("", |input| input.leading_separator)
+    }
+
     pub(crate) fn visual_extent(&self) -> Option<&Range<usize>> {
         self.visual_input().map(|target| &target.extent)
     }

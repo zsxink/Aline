@@ -82,11 +82,17 @@ impl EditContext {
     }
 }
 
-/// 可切换的最小行内格式集合；标记均为 ASCII，便于按字节手算。
+/// 可添加和取消的行内格式；源码标记由计划器按实际语法选择。
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InlineFormat {
     /// 强强调，标记 `**`。
     Strong,
+    /// 强调，新增标记 `*`，取消时保留实际定界符。
+    Emphasis,
+    /// 行内代码，围栏长度按内容中的反引号选择。
+    Code,
+    /// 链接，新增时目标留空，原文标签保留。
+    Link,
     /// 删除线，标记 `~~`。
     Strike,
 }
@@ -96,6 +102,9 @@ impl InlineFormat {
     pub const fn marker(self) -> &'static str {
         match self {
             Self::Strong => "**",
+            Self::Emphasis => "*",
+            Self::Code => "`",
+            Self::Link => "[",
             Self::Strike => "~~",
         }
     }
@@ -104,6 +113,9 @@ impl InlineFormat {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Strong => "Strong",
+            Self::Emphasis => "Emphasis",
+            Self::Code => "Code",
+            Self::Link => "Link",
             Self::Strike => "Strike",
         }
     }
@@ -122,6 +134,12 @@ pub enum GroupReason {
     RawBlockInput,
     /// 行内格式切换。
     InlineFormat(InlineFormat),
+    /// 段落、列表或任务框命令。
+    BlockCommand,
+    /// 表格结构命令。
+    TableCommand,
+    /// 经显式确认的全文格式化。
+    MarkdownFormat,
 }
 
 impl GroupReason {
@@ -132,7 +150,13 @@ impl GroupReason {
             Self::VisibleReplace => "VisibleReplace",
             Self::BulkReplace => "BulkReplace",
             Self::RawBlockInput => "RawBlockInput",
+            Self::BlockCommand => "BlockCommand",
+            Self::TableCommand => "TableCommand",
+            Self::MarkdownFormat => "MarkdownFormat",
             Self::InlineFormat(InlineFormat::Strong) => "InlineFormatStrong",
+            Self::InlineFormat(InlineFormat::Emphasis) => "InlineFormatEmphasis",
+            Self::InlineFormat(InlineFormat::Code) => "InlineFormatCode",
+            Self::InlineFormat(InlineFormat::Link) => "InlineFormatLink",
             Self::InlineFormat(InlineFormat::Strike) => "InlineFormatStrike",
         }
     }

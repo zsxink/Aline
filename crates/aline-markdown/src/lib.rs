@@ -13,6 +13,7 @@ mod presentation;
 mod protection;
 mod reuse;
 mod style;
+mod table;
 mod tree;
 
 pub use budget::{CancelCheck, CancelToken, ParseBudget, ParseStats};
@@ -33,3 +34,5 @@ pub use presentation::{AlertKind, CodeLine, PresentationKind, PresentationNode, 
 pub use protection::{ProtectedRange, ProtectionKind};
 pub use reuse::{ReuseOutcome, ReuseRefusal, ReuseTranslateError, ReusedBlock, reuse};
 pub use style::{StyledRange, TextStyle};
+
+pub use table::{SourceCell, SourceRow, SourceTable, TableSourceError, table_source};

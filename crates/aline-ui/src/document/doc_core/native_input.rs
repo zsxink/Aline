@@ -48,6 +48,8 @@ pub(crate) struct NativeInputJob {
 
 enum FrozenInput {
     Single(InputPatch, InputSettlement),
+    #[cfg(any(test, target_os = "macos"))]
+    MissingTableCell(InputPatch, aline_edit::TableTarget),
     /// 原生窗口删除适配器专用；无头协议不依赖该意图。
     #[cfg(any(test, target_os = "macos"))]
     DeleteAfterTyping {
@@ -186,6 +188,12 @@ impl NativeInputJob {
                     patch.prepare(self.base, mode, extent, self.budget, raw_on_replace)?,
                     settlement,
                 )
+            }
+            #[cfg(any(test, target_os = "macos"))]
+            FrozenInput::MissingTableCell(patch, cell) => {
+                let (patch, selection) =
+                    patch.prepare_missing_cell(self.base, mode, extent, self.budget, &cell)?;
+                (patch, InputSettlement::Composition(selection))
             }
             #[cfg(any(test, target_os = "macos"))]
             FrozenInput::DeleteAfterTyping {
@@ -391,19 +399,31 @@ impl DocCore {
         confirmed: Option<&str>,
         now_millis: u64,
     ) -> Result<NativeInputJob, DocError> {
+        self.prepare_native_confirmation_at(identity, confirmed, now_millis, None)
+    }
+
+    #[cfg(any(test, target_os = "macos"))]
+    pub(crate) fn prepare_native_confirmation_at(
+        &mut self,
+        identity: &InputIdentity,
+        confirmed: Option<&str>,
+        now_millis: u64,
+        missing_cell: Option<&aline_edit::TableTarget>,
+    ) -> Result<NativeInputJob, DocError> {
         self.ensure_ready()?;
         self.accept_document_result(identity)?;
-        let state = self
-            .open
-            .as_ref()
-            .and_then(OpenBlock::composition)
-            .ok_or(DocError::NoComposition)?;
+        let block = self.open.as_ref().ok_or(DocError::NoComposition)?;
+        let state = block.composition().ok_or(DocError::NoComposition)?;
+        let replacement = match confirmed {
+            Some(text) => self.copy_input_with_separator(block.leading_separator(), text)?,
+            None => copy_bounded(&state.candidate, self.limits.text)?,
+        };
         let selection = match confirmed {
-            Some(text) => {
+            Some(_) => {
                 let end = state
                     .range
                     .start
-                    .checked_add(text.len())
+                    .checked_add(replacement.len())
                     .ok_or_else(overflow)?;
                 SelectionSpec::new(end, end)
             }
@@ -411,16 +431,17 @@ impl DocCore {
         };
         let patch = InputPatch {
             range: state.range.clone(),
-            replacement: copy_bounded(confirmed.unwrap_or(&state.candidate), self.limits.text)?,
+            replacement,
             selections: (state.before_selection, selection),
             source: OperationSource::ImeCommit,
             now_millis,
             next_target: None,
         };
-        Ok(self.freeze_native_input(
-            identity,
-            FrozenInput::Single(patch, InputSettlement::Composition(selection)),
-        ))
+        let intent = match missing_cell {
+            Some(cell) => FrozenInput::MissingTableCell(patch, cell.clone()),
+            None => FrozenInput::Single(patch, InputSettlement::Composition(selection)),
+        };
+        Ok(self.freeze_native_input(identity, intent))
     }
 
     /// 在局部草稿内删除，或冻结需后台准备的独立删除意图。
