@@ -119,6 +119,9 @@ dependencies = [
 [[package]]
 name = "aline-plugin"
 version = "0.1.0"
+dependencies = [
+ "aline-markdown",
+]
 
 [[package]]
 name = "aline-source"

@@ -7,6 +7,8 @@ use pulldown_cmark::Options;
 pub struct ParseFeatures(u32);
 
 impl ParseFeatures {
+    /// 无附加语法位；插件声明不改变解析语义时使用。
+    pub const EMPTY: Self = Self(0);
     /// GFM 表格。
     pub const TABLES: Self = Self(1 << 1);
     /// GitHub 脚注。
