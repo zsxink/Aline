@@ -12,6 +12,12 @@ use aline_buffer::TextBudget;
 impl DocCore {
     /// 宿主在资源引用生效前登记；只接受当前身份及同一文档的引用。
     ///
+    /// 登记一条宿主拥有的资源引用；按文档级身份复验，不要求打开块。
+    ///
+    /// 生产插图（粘贴/拖放）先落资源再提交引用，登记可能发生在没有打开块的
+    /// 文档级编辑之后；复用 `accept_derived_result` 会把这种合法顺序误拒为
+    /// `ClosedTarget`。登记失败不改变资源集合、版本或快照。
+    ///
     /// M0 保守持有所有登记引用至文档结束，以免草稿、Undo/Redo 或恢复材料仍需
     /// 资源时提前释放；快照只冻结取用时的集合。不自动扫描文本或删除资源。
     pub fn retain_resource(
@@ -21,7 +27,7 @@ impl DocCore {
         max_references: usize,
     ) -> Result<(), DocError> {
         self.ensure_writable()?;
-        self.accept_derived_result(identity)?;
+        self.accept_document_result(identity)?;
         if resource.document_id() != &self.document {
             return Err(DocError::WrongDocument);
         }

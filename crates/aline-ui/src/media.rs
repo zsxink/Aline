@@ -76,6 +76,20 @@ pub enum MediaFormat {
     Svg,
 }
 
+impl MediaFormat {
+    /// 保存与引用使用的扩展名；由字节签名决定，不采信目标声明。
+    pub const fn extension(self) -> &'static str {
+        match self {
+            Self::Png => "png",
+            Self::Jpeg => "jpg",
+            Self::Gif => "gif",
+            Self::Webp => "webp",
+            Self::Bmp => "bmp",
+            Self::Svg => "svg",
+        }
+    }
+}
+
 /// 剪贴板图片格式，顺序即读取优先级。
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ClipboardImageFormat {
@@ -133,6 +147,21 @@ impl ClipboardImageFormat {
             "ico" => Some(Self::Ico),
             "pnm" => Some(Self::Pnm),
             _ => None,
+        }
+    }
+
+    /// 规范扩展名；用于粘贴显示名与资产文件名。
+    pub fn extension(self) -> &'static str {
+        match self {
+            Self::Png => "png",
+            Self::Jpeg => "jpg",
+            Self::Webp => "webp",
+            Self::Gif => "gif",
+            Self::Svg => "svg",
+            Self::Bmp => "bmp",
+            Self::Tiff => "tiff",
+            Self::Ico => "ico",
+            Self::Pnm => "pnm",
         }
     }
 }

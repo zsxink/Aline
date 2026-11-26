@@ -64,6 +64,23 @@ fn document_resource_snapshot_freezes_nonempty_owned_references()
     Ok(())
 }
 
+/// 生产插图（粘贴/拖放）可在没有打开块时提交：资源登记按文档级身份复验，
+/// 不要求存在打开块，否则空文档或用块外选区插入时会被误拒为 ClosedTarget。
+#[test]
+fn document_resource_registration_works_without_an_open_block()
+-> Result<(), Box<dyn std::error::Error>> {
+    let mut doc = new_doc("x\n", 1)?;
+    doc.leave_block(2)?;
+    assert_eq!(doc.open_block_range(), None);
+    let resource = ResourceReference::new(doc.document_id().clone(), "temp:no-block");
+    let identity = current_identity(&mut doc)?;
+    doc.retain_resource(&identity, resource.clone(), 1)?;
+    let frozen = snapshot(&mut doc)?;
+    assert_eq!(frozen.resources(), std::slice::from_ref(&resource));
+    assert_eq!(frozen.full_text(TEXT)?, "x\n");
+    Ok(())
+}
+
 #[test]
 fn document_resource_registration_rejects_wrong_document_and_budget()
 -> Result<(), Box<dyn std::error::Error>> {

@@ -39,11 +39,13 @@ use aline_source::Cancellation;
 #[cfg(test)]
 use super::ImageSettingsError;
 use super::persistence::WriteKind;
-use super::recovery::MAX_RESOURCE_COUNT;
+use super::recovery::{MAX_RESOURCE_BYTES, MAX_RESOURCE_COUNT};
+use super::resources::place_body_image;
 use super::{
     ImageSettings, MigrationCompletion, MigrationError, ResourceCatalog, ResourceCleanupJob,
-    ResourceError, ResourceMigration, ResourceMigrationJob, TempRoot, locator_spans,
+    ResourceError, ResourceMigration, ResourceMigrationJob, TempResource, TempRoot, locator_spans,
 };
+use crate::media::sniff_format;
 mod autosave;
 mod read;
 mod recovered;
@@ -250,6 +252,51 @@ struct PendingMigration {
     prepared: Option<PreparedMigration>,
 }
 
+/// 生产图片插入失败分类；失败保证文档文本未提交悬空引用。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ImageInsertError {
+    /// 文档只读，未写入任何资源。
+    NotEditable,
+    /// 字节签名不在正文支持矩阵内（含 TIFF/ICO/PNM）。
+    UnsupportedFormat,
+    /// 源字节超过插入上限。
+    TooLarge,
+    /// 资产或临时资源写入失败；本次新建材料已撤回。
+    Write,
+    /// 引用提交被编辑协议拒绝；已写入材料已撤回。
+    Reference,
+}
+
+/// 从用户可见名称提取不含目录与扩展名的资产主名；空名回退为 `image`。
+fn image_stem(display_name: &str) -> String {
+    let name = display_name
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or(display_name);
+    let stem = name.rsplit_once('.').map_or(name, |(stem, _)| stem);
+    if stem.is_empty() {
+        "image".to_owned()
+    } else {
+        stem.to_owned()
+    }
+}
+
+/// 生成单行替代文字：转义方括号与反斜杠，控制字符替换为空格。
+fn image_alt_text(stem: &str) -> String {
+    let mut escaped = String::with_capacity(stem.len());
+    for character in stem.chars() {
+        match character {
+            '\\' | '[' | ']' => {
+                escaped.push('\\');
+                escaped.push(character);
+            }
+            control if control.is_control() => escaped.push(' '),
+            other => escaped.push(other),
+        }
+    }
+    escaped.trim().to_owned()
+}
+
 /// 已完整构造且可阅读的单文档；存储基线与 DocCore 共同保留读取事实。
 pub struct ReadonlyDocument {
     path: PathBuf,
@@ -416,6 +463,160 @@ impl ReadonlyDocument {
         coordinator.request_save(&mut self.core, self.limits.text())
     }
 
+    /// 生产图片插入：先落资源，再提交一条可撤销的 Markdown 引用。
+    ///
+    /// 命名文档把资产写入配置目录（相对以文档目录为基准，绝对按设置）并提交
+    /// 对应引用；未命名文档写入文档私有临时目录并提交 `aline-temp:` 引用，由
+    /// 首次保存/另存为迁移到资产目录。格式与扩展名由字节签名决定，不采信
+    /// 剪贴板声明或文件名。失败保证不插入悬空引用：临时文件按身份撤回，已
+    /// 发布资产只在本次新建且身份未变时删除。
+    pub(crate) fn insert_image(
+        &mut self,
+        display_name: &str,
+        bytes: &[u8],
+        max_bytes: u64,
+        now_millis: u64,
+    ) -> Result<(), ImageInsertError> {
+        if !self.editable {
+            return Err(ImageInsertError::NotEditable);
+        }
+        let Some(format) = sniff_format(bytes) else {
+            return Err(ImageInsertError::UnsupportedFormat);
+        };
+        if bytes.len() > MAX_RESOURCE_BYTES
+            || u64::try_from(bytes.len()).unwrap_or(u64::MAX) > max_bytes
+        {
+            return Err(ImageInsertError::TooLarge);
+        }
+        let identity = self
+            .input_identity()
+            .map_err(|_| ImageInsertError::Reference)?;
+        let extension = format.extension();
+        let stem = image_stem(display_name);
+        let alt = image_alt_text(&stem);
+        let name = format!("{stem}.{extension}");
+        let text = |reference: &str| format!("![{alt}]({reference})");
+
+        if self.persistence.is_some() {
+            let parent = self.path.parent().ok_or(ImageInsertError::Write)?;
+            let placed = place_body_image(
+                &self.image_settings,
+                parent,
+                &name,
+                extension,
+                bytes,
+                max_bytes,
+            )
+            .map_err(|_| ImageInsertError::Write)?;
+            if self
+                .commit_source_replacement(&identity, &text(placed.reference()), now_millis)
+                .is_err()
+            {
+                placed.rollback();
+                return Err(ImageInsertError::Reference);
+            }
+            return Ok(());
+        }
+
+        // 未命名文档：先写入受检临时目录，再提交临时引用，最后按文档级身份登记。
+        if self.core.resources().len() >= MAX_RESOURCE_COUNT {
+            return Err(ImageInsertError::Write);
+        }
+        let entry = self
+            .stage_temp_resource(&name, bytes, max_bytes)
+            .map_err(|_| ImageInsertError::Write)?;
+        if self
+            .commit_source_replacement(&identity, &text(&entry.locator), now_millis)
+            .is_err()
+        {
+            self.discard_temp_resource(&entry);
+            return Err(ImageInsertError::Reference);
+        }
+        self.register_temp_resource(&entry)
+            .map_err(|_| ImageInsertError::Write)
+    }
+
+    /// 以 Source 权限把当前选区替换为给定文本，立即发布为一次可撤销的命令步。
+    ///
+    /// 图片引用含被折叠的目标文本；普通 Visual 输入会把目标当隐藏源码而变化
+    /// 被拒（`HiddenSourceChanged`）。系统迁移重写同一引用时已使用 Source 规划，
+    /// 插入复用该路径，成功后仍保持用户当前模式。
+    fn commit_source_replacement(
+        &mut self,
+        identity: &InputIdentity,
+        replacement: &str,
+        now_millis: u64,
+    ) -> Result<(), ImageInsertError> {
+        let snapshot = self
+            .current_snapshot()
+            .map_err(|_| ImageInsertError::Reference)?;
+        let selection = snapshot.selection().clone();
+        let range = selection.range();
+        let expected = snapshot
+            .text()
+            .slice(&range, self.limits.text())
+            .map_err(|_| ImageInsertError::Reference)?;
+        let source = snapshot
+            .full_text(self.limits.text())
+            .map_err(|_| ImageInsertError::Reference)?;
+        let parsed_local;
+        let parsed =
+            if self.is_parse_current() && self.parsed.snapshot().id() == snapshot.text().id() {
+                &self.parsed
+            } else {
+                let cancel = CancelToken::new();
+                match parse_with_cancel(
+                    snapshot.text(),
+                    self.parsed.config(),
+                    self.parse_budget,
+                    &cancel,
+                ) {
+                    Ok(parsed) => {
+                        parsed_local = parsed;
+                        &parsed_local
+                    }
+                    Err(_) => return Err(ImageInsertError::Reference),
+                }
+            };
+        // 结果长度按替换后的实际字节估算：先减被替换的选区，再加引用文本。
+        let output = source
+            .len()
+            .saturating_sub(expected.len())
+            .saturating_add(replacement.len());
+        let budget = EditBudget::new(
+            PatchBudget::new(1, replacement.len(), output),
+            self.limits.text(),
+            self.parse_budget,
+        );
+        let command = EditCommand::replace(vec![SourceEdit::new(
+            range.byte_range(),
+            expected.into_owned(),
+            replacement.to_owned(),
+        )]);
+        // 与首次保存/另存为的引用重写一致：Source 上下文、不改变用户视图。
+        let context = EditContext::new(EditMode::Source);
+        match plan_change(
+            snapshot.text(),
+            parsed,
+            &selection,
+            &context,
+            &command,
+            budget,
+        ) {
+            Ok(PlanOutcome::Changed(plan)) => {
+                let prepared = self
+                    .core
+                    .prepare_migration_change(identity, parsed, &plan, now_millis)
+                    .map_err(|_| ImageInsertError::Reference)?;
+                self.core
+                    .publish_migration_change(prepared)
+                    .map_err(|_| ImageInsertError::Reference)
+            }
+            Ok(PlanOutcome::Unchanged(_)) => Ok(()),
+            Err(_) => Err(ImageInsertError::Reference),
+        }
+    }
+
     /// 写入一条临时图片并登记到 `DocCore`，不插入 Markdown、不改选区与历史。
     #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn stage_temp_image(
@@ -424,10 +625,28 @@ impl ReadonlyDocument {
         bytes: &[u8],
         max_bytes: u64,
     ) -> Result<super::ResourceReference, ResourceError> {
+        let identity = self.input_identity().map_err(ResourceError::Doc)?;
+        let entry = self.stage_temp_resource(display_name, bytes, max_bytes)?;
+        if let Err(error) =
+            self.core
+                .retain_resource(&identity, entry.reference.clone(), MAX_RESOURCE_COUNT)
+        {
+            self.discard_temp_resource(&entry);
+            return Err(ResourceError::Doc(error));
+        }
+        Ok(entry.reference)
+    }
+
+    /// 写入临时资源并建立目录条目；不登记 `DocCore`、不修改文本。
+    fn stage_temp_resource(
+        &mut self,
+        display_name: &str,
+        bytes: &[u8],
+        max_bytes: u64,
+    ) -> Result<TempResource, ResourceError> {
         if !self.editable {
             return Err(ResourceError::NotEditable);
         }
-        let identity = self.input_identity().map_err(ResourceError::Doc)?;
         if self.resources.is_none() {
             let root = self
                 .temp_root
@@ -447,18 +666,35 @@ impl ReadonlyDocument {
         let Some(catalog) = self.resources.as_mut() else {
             return Err(ResourceError::Io);
         };
-        let entry = catalog.stage(display_name, bytes, max_bytes)?;
+        catalog.stage(display_name, bytes, max_bytes)
+    }
+
+    /// 引用提交后按文档级身份登记临时资源；失败时撤回刚提交的引用与文件。
+    ///
+    /// 调用方已预检资源数量，因此登记在正常路径上不会失败；若身份或预算仍
+    /// 拒绝，撤销本次插入后删除临时文件，保证不发布悬空引用。
+    fn register_temp_resource(&mut self, entry: &TempResource) -> Result<(), ResourceError> {
+        let identity = self.input_identity().map_err(ResourceError::Doc)?;
         if let Err(error) =
             self.core
                 .retain_resource(&identity, entry.reference.clone(), MAX_RESOURCE_COUNT)
         {
+            if self.core.undo().is_ok() {
+                self.discard_temp_resource(entry);
+            }
+            return Err(ResourceError::Doc(error));
+        }
+        Ok(())
+    }
+
+    /// 移除一条临时资源条目并按身份删除其临时文件；目录保留。
+    fn discard_temp_resource(&mut self, entry: &TempResource) {
+        if let Some(catalog) = self.resources.as_mut() {
             let removed = catalog.remove(entry.id);
             if let Some(removed) = removed {
                 let _ = catalog.discard_file(&removed);
             }
-            return Err(ResourceError::Doc(error));
         }
-        Ok(entry.reference)
     }
 
     /// 首次保存是否必须先选择目标：可编辑、无关联、无待迁移且未挂接持久化。

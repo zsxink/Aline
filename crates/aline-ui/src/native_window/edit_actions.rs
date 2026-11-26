@@ -1,5 +1,7 @@
 //! 原生编辑动作和剪贴板入口。文档核心负责语义与历史，窗口负责平台副作用及派生视图。
 
+use std::path::{Path, PathBuf};
+
 use aline_buffer::{BufferError, SelectionSpec, SrcOffset, SrcRange, SrcSelection, TextBudget};
 use aline_markdown::Parsed;
 use gpui::{App, ClipboardEntry, ClipboardItem, Context, ImageFormat, Window};
@@ -8,6 +10,7 @@ use super::readonly_layout::{LayoutError, ReaderIndex};
 use super::{
     NativeDocumentWindow, NativeOpenCoordinator, ReaderSurface, content_metrics, layout_error_key,
 };
+use crate::document::{ImageInsertError, MAX_RESOURCE_BYTES};
 use crate::media::{
     ClipboardImageFormat, ClipboardRoute, ClipboardWriteItem, ClipboardWritePlan,
     plan_clipboard_write,
@@ -265,10 +268,12 @@ impl NativeDocumentWindow {
         cx: &mut Context<Self>,
     ) {
         let now_millis = u64::try_from(self.started.elapsed().as_millis()).unwrap_or(u64::MAX);
-        match self
-            .state
-            .edit(action, |budget| clipboard_text(cx, budget), now_millis)
-        {
+        let allow_image = !matches!(action, EditAction::PastePlain);
+        match self.state.edit(
+            action,
+            |budget| clipboard_paste(cx, budget, allow_image),
+            now_millis,
+        ) {
             Ok(effect) => {
                 self.state.feedback = None;
                 if let Some(key) = effect.notice {
@@ -287,6 +292,30 @@ impl NativeDocumentWindow {
             }
             Err(DocError::ClosedTarget | DocError::ReadOnly) => return,
             Err(error) => self.show_edit_refusal(error),
+        }
+        cx.notify();
+    }
+
+    /// 拖入文件的窗口适配：逐张走生产插入路径，成功后刷新派生视图。
+    pub(super) fn drop_images(
+        &mut self,
+        paths: &[PathBuf],
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) {
+        if paths.is_empty() {
+            return;
+        }
+        let now_millis = u64::try_from(self.started.elapsed().as_millis()).unwrap_or(u64::MAX);
+        let Some(document) = self.state.session.document_mut() else {
+            return;
+        };
+        let (inserted, notice) =
+            insert_dropped_images(document, paths, image_max_bytes(), now_millis);
+        self.state.feedback = notice;
+        if inserted {
+            self.refresh_after_edit(window, cx);
+            self.note_document_activity(window, cx);
         }
         cx.notify();
     }
@@ -358,6 +387,8 @@ pub(super) enum EditAction {
     Cut,
     Copy,
     Paste,
+    /// 纯文本粘贴：沿用文本路由，图片剪贴板不插入图片。
+    PastePlain,
     SelectAll,
     Undo,
     Redo,
@@ -369,16 +400,33 @@ struct EditEffect {
     notice: Option<&'static str>,
 }
 
+/// 一次剪贴板粘贴的内容；图片不再回退为文本或静默丢弃。
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) enum ClipboardPaste {
+    /// 无可用内容。
+    None,
+    /// 纯文本。
+    Text(String),
+    /// 单张图片字节；显示名只用于替代文字与资产词干。
+    Image {
+        /// 建议显示名（含扩展名）。
+        display_name: String,
+        /// 原始图片字节；格式由插入时按签名判定。
+        bytes: Vec<u8>,
+    },
+}
+
 impl NativeOpenCoordinator {
     fn edit(
         &mut self,
         action: EditAction,
-        read_clipboard: impl FnOnce(TextBudget) -> Result<Option<String>, DocError>,
+        read_clipboard: impl FnOnce(TextBudget) -> Result<ClipboardPaste, DocError>,
         now_millis: u64,
     ) -> Result<EditEffect, DocError> {
         let document = self.session.document_mut().ok_or(DocError::ClosedTarget)?;
         let budget = document.text_budget();
         let mut clipboard = None;
+        let mut image_notice = None;
         let (before, changed) = if matches!(action, EditAction::Undo | EditAction::Redo) {
             // 撤销/重做走文档受检入口：Visual 下触及保护区间时零副作用拒绝。
             let before = {
@@ -394,40 +442,66 @@ impl NativeOpenCoordinator {
             }
             (before, document.edit_core()?.version())
         } else {
-            let core = document.edit_core()?;
-            if core.composition().is_some() {
-                return Err(DocError::CompositionActive);
-            }
-            let before = core.version();
+            // 组合与只读先于剪贴板读取判定：拒绝路径不得产生平台读取。
+            let before = {
+                let core = document.edit_core()?;
+                if core.composition().is_some() {
+                    return Err(DocError::CompositionActive);
+                }
+                core.version()
+            };
             match action {
                 EditAction::Cut => {
+                    let core = document.edit_core()?;
                     let identity = core.current_input_identity()?;
                     let text = core.cut_selection(&identity, budget, now_millis)?;
                     clipboard = (!text.is_empty()).then_some(text);
                 }
                 EditAction::Copy => {
+                    let core = document.edit_core()?;
                     let text = core.copy_selection(budget)?;
                     clipboard = (!text.is_empty()).then_some(text);
                 }
-                EditAction::Paste => {
-                    if let Some(text) = read_clipboard(budget)?.filter(|text| !text.is_empty()) {
+                EditAction::Paste | EditAction::PastePlain => match read_clipboard(budget)? {
+                    ClipboardPaste::Text(text) if !text.is_empty() => {
+                        let core = document.edit_core()?;
                         let identity = core.current_input_identity()?;
                         core.replace_selection(&identity, &text, now_millis)?;
                     }
-                }
+                    // 纯文本粘贴即使收到图片也按无内容处理：命令语义不插入图片。
+                    ClipboardPaste::Image {
+                        display_name,
+                        bytes,
+                    } if matches!(action, EditAction::Paste) => {
+                        if let Err(error) = document.insert_image(
+                            &display_name,
+                            &bytes,
+                            image_max_bytes(),
+                            now_millis,
+                        ) {
+                            image_notice = Some(image_insert_error_key(error));
+                        }
+                    }
+                    ClipboardPaste::None
+                    | ClipboardPaste::Text(_)
+                    | ClipboardPaste::Image { .. } => {}
+                },
                 EditAction::SelectAll => {
+                    let core = document.edit_core()?;
                     let identity = core.current_input_identity()?;
                     core.select_all(&identity)?;
                 }
                 EditAction::Undo | EditAction::Redo => {}
             }
-            (before, core.version())
+            (before, document.edit_core()?.version())
         };
         let refresh = before != changed;
-        let notice = (refresh
-            && matches!(action, EditAction::Undo | EditAction::Redo)
-            && document.note_history_move())
-        .then_some("document.reload_undo_paused");
+        let notice = image_notice.or_else(|| {
+            (refresh
+                && matches!(action, EditAction::Undo | EditAction::Redo)
+                && document.note_history_move())
+            .then_some("document.reload_undo_paused")
+        });
         Ok(EditEffect {
             clipboard,
             refresh,
@@ -471,24 +545,46 @@ impl NativeOpenCoordinator {
     }
 }
 
-fn clipboard_text(cx: &App, budget: TextBudget) -> Result<Option<String>, DocError> {
+fn clipboard_paste(
+    cx: &App,
+    budget: TextBudget,
+    allow_image: bool,
+) -> Result<ClipboardPaste, DocError> {
     let Some(item) = cx.read_from_clipboard() else {
-        return Ok(None);
+        return Ok(ClipboardPaste::None);
     };
-    clipboard_text_from_item(&item, budget)
+    clipboard_paste_from_item(&item, budget, allow_image)
 }
 
-/// 按 V-03 冻结路由从剪贴板条目提取可粘贴文本。
+/// 按 V-03 冻结路由从剪贴板条目提取一次粘贴内容。
 ///
 /// 文件与文本路由都取字符串项：macOS 文件分支会附带纯文本路径，宿主因此
-/// 可以把路径当文本粘贴。图片与无路由不进入文本粘贴，图片粘贴归 IMAGE-02。
-fn clipboard_text_from_item(
+/// 可以把路径当文本粘贴。图片路由只取与冻结优先级一致的那一项图片字节，
+/// 保留原始编码；显示名只影响替代文字与资产词干。`allow_image` 为 false
+/// 时（纯文本粘贴）不复制图片字节，直接按无内容处理。
+fn clipboard_paste_from_item(
     item: &ClipboardItem,
     budget: TextBudget,
-) -> Result<Option<String>, DocError> {
+    allow_image: bool,
+) -> Result<ClipboardPaste, DocError> {
     match clipboard_route(item) {
-        ClipboardRoute::Files | ClipboardRoute::Text => collect_clipboard_text(item, budget),
-        ClipboardRoute::Image(_) | ClipboardRoute::None => Ok(None),
+        ClipboardRoute::Files | ClipboardRoute::Text => Ok(collect_clipboard_text(item, budget)?
+            .map_or(ClipboardPaste::None, ClipboardPaste::Text)),
+        ClipboardRoute::Image(format) if allow_image => {
+            let bytes = item.entries().iter().find_map(|entry| {
+                let ClipboardEntry::Image(image) = entry else {
+                    return None;
+                };
+                (clipboard_image_format(image.format) == format).then(|| image.bytes.clone())
+            });
+            Ok(
+                bytes.map_or(ClipboardPaste::None, |bytes| ClipboardPaste::Image {
+                    display_name: format!("pasted.{}", format.extension()),
+                    bytes,
+                }),
+            )
+        }
+        ClipboardRoute::Image(_) | ClipboardRoute::None => Ok(ClipboardPaste::None),
     }
 }
 
@@ -565,6 +661,78 @@ pub(super) fn edit_error_key(error: DocError) -> &'static str {
         ) => "document.edit_protected",
         _ => "document.edit_refused",
     }
+}
+
+/// 图片插入失败分类到本地化反馈键；成功路径不产生反馈。
+pub(super) fn image_insert_error_key(error: ImageInsertError) -> &'static str {
+    match error {
+        ImageInsertError::NotEditable => "document.edit_refused",
+        ImageInsertError::UnsupportedFormat => "document.image_unsupported",
+        ImageInsertError::TooLarge => "document.image_too_large",
+        ImageInsertError::Write => "document.resource_insert_failed",
+        ImageInsertError::Reference => "document.image_insert_failed",
+    }
+}
+
+/// 生产粘贴/拖入的单张图片上限；与文档资源预算同源。
+fn image_max_bytes() -> u64 {
+    u64::try_from(MAX_RESOURCE_BYTES).unwrap_or(u64::MAX)
+}
+
+/// 把拖入的文件路径逐张插入为正文图片；组合进行中零副作用拒绝。
+///
+/// 返回（是否有提交，首个失败反馈键）。单张失败不影响其它可插入文件；
+/// 读盘前先按元数据拒绝目录、特殊文件与超限文件，避免无谓读取。
+pub(super) fn insert_dropped_images(
+    document: &mut ReadonlyDocument,
+    paths: &[PathBuf],
+    max_bytes: u64,
+    now_millis: u64,
+) -> (bool, Option<&'static str>) {
+    if !document.is_editable() {
+        return (false, Some("document.edit_refused"));
+    }
+    if document
+        .edit_core()
+        .is_ok_and(|core| core.composition().is_some())
+    {
+        return (false, Some("document.composition_pending"));
+    }
+    let limit = max_bytes.min(image_max_bytes());
+    let mut inserted = false;
+    let mut first_error = None;
+    for path in paths {
+        match insert_dropped_image(document, path, limit, now_millis) {
+            Ok(()) => inserted = true,
+            Err(key) => {
+                first_error.get_or_insert(key);
+            }
+        }
+    }
+    (inserted, first_error)
+}
+
+fn insert_dropped_image(
+    document: &mut ReadonlyDocument,
+    path: &Path,
+    limit: u64,
+    now_millis: u64,
+) -> Result<(), &'static str> {
+    let metadata = std::fs::metadata(path).map_err(|_| "document.image_insert_failed")?;
+    if !metadata.is_file() {
+        return Err("document.image_insert_failed");
+    }
+    if metadata.len() > limit {
+        return Err("document.image_too_large");
+    }
+    let bytes = std::fs::read(path).map_err(|_| "document.image_insert_failed")?;
+    let display_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("image");
+    document
+        .insert_image(display_name, &bytes, limit, now_millis)
+        .map_err(image_insert_error_key)
 }
 
 #[cfg(test)]
@@ -646,6 +814,88 @@ mod tests {
         Ok(state)
     }
 
+    /// 系统临时目录下独占创建的测试目录；Drop 时递归清理。
+    #[cfg(target_os = "macos")]
+    struct ScratchHome(PathBuf);
+
+    #[cfg(target_os = "macos")]
+    impl ScratchHome {
+        fn create(prefix: &str) -> Result<Self, Box<dyn Error>> {
+            use std::time::{SystemTime, UNIX_EPOCH};
+
+            let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+            for attempt in 0..100u32 {
+                let candidate = std::env::temp_dir().join(format!(
+                    "{prefix}-{}-{nonce:x}-{attempt}",
+                    std::process::id()
+                ));
+                match std::fs::create_dir(&candidate) {
+                    Ok(()) => return Ok(Self(candidate)),
+                    Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                    Err(error) => return Err(error.into()),
+                }
+            }
+            Err("无法创建编辑动作测试目录".into())
+        }
+
+        fn temp_root(&self) -> Result<crate::document::TempRoot, Box<dyn Error>> {
+            std::fs::create_dir_all(self.0.join("Library/Application Support"))?;
+            Ok(crate::document::TempRoot::open_or_create(&self.0)
+                .map_err(|error| format!("{error:?}"))?)
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    impl Drop for ScratchHome {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    /// 打开一份注入临时根的未命名可编辑文档（相对路径不建立写关联）。
+    #[cfg(target_os = "macos")]
+    fn open_untitled(
+        temp_root: crate::document::TempRoot,
+    ) -> Result<NativeOpenCoordinator, Box<dyn Error>> {
+        let mut state = NativeOpenCoordinator::new(open_limits());
+        state.session.configure_temp_root(Some(temp_root));
+        let job = open_job(&mut state)?;
+        let (_, applied) = state.read_finished(job.read_with(&Files(b"x\n")), false, |_| Ok(()));
+        assert_eq!(applied, Some(()));
+        state
+            .session
+            .document_mut()
+            .ok_or("missing document")?
+            .switch_mode(EditorMode::Source)?;
+        Ok(state)
+    }
+
+    #[cfg(target_os = "macos")]
+    fn sample_png() -> Result<Vec<u8>, Box<dyn Error>> {
+        Ok(std::fs::read(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../scripts/fixtures/m4-v03/samples/plain.png"),
+        )?)
+    }
+
+    #[cfg(target_os = "macos")]
+    fn resource_file_count(root: &Path) -> Result<usize, Box<dyn Error>> {
+        fn walk(path: &Path) -> Result<usize, Box<dyn Error>> {
+            let mut count = 0;
+            for entry in std::fs::read_dir(path)? {
+                let entry = entry?;
+                let metadata = entry.metadata()?;
+                if metadata.is_dir() {
+                    count += walk(&entry.path())?;
+                } else if metadata.is_file() {
+                    count += 1;
+                }
+            }
+            Ok(count)
+        }
+        walk(root)
+    }
+
     #[test]
     fn protected_edit_offers_explicit_source_location_without_changing_history()
     -> Result<(), Box<dyn Error>> {
@@ -658,7 +908,11 @@ mod tests {
         let selection = document.core().current_selection();
 
         let error = state
-            .edit(EditAction::Paste, |_| Ok(Some("替换".to_owned())), 1)
+            .edit(
+                EditAction::Paste,
+                |_| Ok(ClipboardPaste::Text("替换".to_owned())),
+                1,
+            )
             .err()
             .ok_or("跨块粘贴应受保护")?;
         let document = state.session.document_mut().ok_or("应存在文档")?;
@@ -699,7 +953,11 @@ mod tests {
         let selection = core.current_selection();
 
         let error = state
-            .edit(EditAction::Paste, |_| Ok(Some("替换".to_owned())), 1)
+            .edit(
+                EditAction::Paste,
+                |_| Ok(ClipboardPaste::Text("替换".to_owned())),
+                1,
+            )
             .err()
             .ok_or("跨块粘贴应受保护")?;
         let document = state.session.document_mut().ok_or("应存在文档")?;
@@ -756,7 +1014,11 @@ mod tests {
     fn visual_mode_restore_waits_for_current_parse_then_reopens_without_editing()
     -> Result<(), Box<dyn Error>> {
         let mut state = open(b"alpha\n\nbeta\n", true)?;
-        state.edit(EditAction::Paste, |_| Ok(Some("X".to_owned())), 1)?;
+        state.edit(
+            EditAction::Paste,
+            |_| Ok(ClipboardPaste::Text("X".to_owned())),
+            1,
+        )?;
         let document = state.session.document_mut().ok_or("missing document")?;
         document.switch_mode(EditorMode::Visual)?;
         let version = document.core().version();
@@ -974,7 +1236,11 @@ mod tests {
             let restore = VisualInputRestore::new(document);
             match scenario {
                 "input" => {
-                    state.edit(EditAction::Paste, |_| Ok(Some("Q".to_owned())), 1)?;
+                    state.edit(
+                        EditAction::Paste,
+                        |_| Ok(ClipboardPaste::Text("Q".to_owned())),
+                        1,
+                    )?;
                 }
                 "config" => document.edit_core()?.advance_parse_config()?,
                 "new-block" => {
@@ -1014,37 +1280,53 @@ mod tests {
     }
 
     #[test]
-    fn clipboard_text_uses_the_frozen_route_and_stays_bounded() -> Result<(), Box<dyn Error>> {
+    fn clipboard_paste_uses_the_frozen_route_and_preserves_image_bytes()
+    -> Result<(), Box<dyn Error>> {
         use gpui::{Image, ImageFormat};
 
         use crate::media::{ClipboardImageFormat, ClipboardWritePlan};
 
         let text = ClipboardItem::new_string("甲".to_owned());
         assert_eq!(
-            clipboard_text_from_item(&text, TextBudget::new(64))?,
-            Some("甲".to_owned())
+            clipboard_paste_from_item(&text, TextBudget::new(64), true)?,
+            ClipboardPaste::Text("甲".to_owned())
         );
 
+        let png = vec![0x89, b'P', b'N', b'G'];
         let image = ClipboardItem {
-            entries: vec![ClipboardEntry::Image(Image::from_bytes(
-                ImageFormat::Png,
-                vec![1, 2, 3],
-            ))],
+            entries: vec![
+                ClipboardEntry::Image(Image::from_bytes(ImageFormat::Jpeg, vec![0xFF, 0xD8])),
+                ClipboardEntry::Image(Image::from_bytes(ImageFormat::Png, png.clone())),
+            ],
         };
-        assert_eq!(clipboard_text_from_item(&image, TextBudget::new(64))?, None);
         assert_eq!(
-            clipboard_text_from_item(
+            clipboard_paste_from_item(&image, TextBudget::new(64), true)?,
+            ClipboardPaste::Image {
+                display_name: "pasted.png".to_owned(),
+                bytes: png,
+            },
+            "图片路由按冻结优先级取 PNG，而不是条目里先出现的 JPEG"
+        );
+        assert_eq!(
+            clipboard_paste_from_item(&image, TextBudget::new(64), false)?,
+            ClipboardPaste::None,
+            "纯文本粘贴不得复制图片字节"
+        );
+
+        assert_eq!(
+            clipboard_paste_from_item(
                 &ClipboardItem {
                     entries: Vec::new()
                 },
-                TextBudget::new(64)
+                TextBudget::new(64),
+                true
             )?,
-            None
+            ClipboardPaste::None
         );
 
         let oversized = ClipboardItem::new_string("abcdef".to_owned());
         assert!(matches!(
-            clipboard_text_from_item(&oversized, TextBudget::new(3)),
+            clipboard_paste_from_item(&oversized, TextBudget::new(3), true),
             Err(DocError::Buffer(BufferError::BudgetExceeded { .. }))
         ));
 
@@ -1055,6 +1337,203 @@ mod tests {
             "图片写入不属于文本复制路径"
         );
         assert!(clipboard_item(ClipboardWritePlan::None).is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn image_insert_errors_map_to_distinct_feedback_keys() {
+        assert_eq!(
+            image_insert_error_key(ImageInsertError::UnsupportedFormat),
+            "document.image_unsupported"
+        );
+        assert_eq!(
+            image_insert_error_key(ImageInsertError::TooLarge),
+            "document.image_too_large"
+        );
+        assert_eq!(
+            image_insert_error_key(ImageInsertError::Write),
+            "document.resource_insert_failed"
+        );
+        assert_eq!(
+            image_insert_error_key(ImageInsertError::Reference),
+            "document.image_insert_failed"
+        );
+        assert_eq!(
+            image_insert_error_key(ImageInsertError::NotEditable),
+            "document.edit_refused"
+        );
+    }
+
+    /// 图片粘贴走生产插入路径：提交临时引用、触发刷新且不回写剪贴板。
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn paste_image_commits_reference_and_reports_no_notice() -> Result<(), Box<dyn Error>> {
+        let scratch = ScratchHome::create("aline-edit-image-paste")?;
+        let root = scratch.temp_root()?;
+        let mut state = open_untitled(root.clone())?;
+        let png = sample_png()?;
+
+        let effect = state.edit(
+            EditAction::Paste,
+            |_| {
+                Ok(ClipboardPaste::Image {
+                    display_name: "pasted.png".to_owned(),
+                    bytes: png.clone(),
+                })
+            },
+            1,
+        )?;
+        assert!(effect.refresh, "插入必须触发派生视图刷新");
+        assert_eq!(effect.notice, None);
+        assert!(effect.clipboard.is_none(), "图片粘贴不回写剪贴板");
+
+        let document = state.session.document().ok_or("missing document")?;
+        let text = document.core().buffer_text()?;
+        assert!(
+            text.starts_with("![pasted](aline-temp:"),
+            "未命名文档应提交受检临时引用，实际: {text:?}"
+        );
+        assert_eq!(resource_file_count(root.path())?, 1, "临时图片必须落盘");
+        Ok(())
+    }
+
+    /// 纯文本粘贴即使收到图片内容也零副作用：不插入引用、不落盘、不刷新。
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn paste_plain_ignores_image_content() -> Result<(), Box<dyn Error>> {
+        let scratch = ScratchHome::create("aline-edit-image-plain")?;
+        let root = scratch.temp_root()?;
+        let mut state = open_untitled(root.clone())?;
+        let png = sample_png()?;
+
+        let effect = state.edit(
+            EditAction::PastePlain,
+            |_| {
+                Ok(ClipboardPaste::Image {
+                    display_name: "pasted.png".to_owned(),
+                    bytes: png,
+                })
+            },
+            1,
+        )?;
+        assert!(!effect.refresh);
+        assert_eq!(effect.notice, None);
+        let document = state.session.document().ok_or("missing document")?;
+        assert_eq!(document.core().buffer_text()?, "x\n");
+        assert_eq!(document.core().history_node_count(), 0);
+        assert_eq!(resource_file_count(root.path())?, 0, "纯文本粘贴不得落盘");
+        Ok(())
+    }
+
+    /// 不支持的图片内容给出专用反馈，且不改文本、不产生临时文件。
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn paste_image_unsupported_reports_notice_without_side_effects() -> Result<(), Box<dyn Error>> {
+        let scratch = ScratchHome::create("aline-edit-image-reject")?;
+        let root = scratch.temp_root()?;
+        let mut state = open_untitled(root.clone())?;
+
+        let effect = state.edit(
+            EditAction::Paste,
+            |_| {
+                Ok(ClipboardPaste::Image {
+                    display_name: "pasted.png".to_owned(),
+                    bytes: b"not an image".to_vec(),
+                })
+            },
+            1,
+        )?;
+        assert_eq!(effect.notice, Some("document.image_unsupported"));
+        assert!(!effect.refresh, "拒绝路径不得触发刷新");
+        let document = state.session.document().ok_or("missing document")?;
+        assert_eq!(document.core().buffer_text()?, "x\n");
+        assert_eq!(document.core().history_node_count(), 0);
+        assert_eq!(resource_file_count(root.path())?, 0, "拒绝路径不得落盘");
+        Ok(())
+    }
+
+    /// 拖入多个文件：可插入的逐张插入，首个错误保留为反馈；缺失路径与目录被拒。
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn dropped_images_insert_supported_files_and_report_first_error() -> Result<(), Box<dyn Error>>
+    {
+        let scratch = ScratchHome::create("aline-edit-image-drop")?;
+        let root = scratch.temp_root()?;
+        let mut state = open_untitled(root.clone())?;
+        let png_path = scratch.0.join("dropped.png");
+        std::fs::write(&png_path, sample_png()?)?;
+        let text_path = scratch.0.join("notes.txt");
+        std::fs::write(&text_path, b"plain text")?;
+        let missing = scratch.0.join("missing.png");
+
+        let document = state.session.document_mut().ok_or("missing document")?;
+        let (inserted, notice) = insert_dropped_images(
+            document,
+            &[png_path.clone(), text_path, missing, scratch.0.clone()],
+            u64::MAX,
+            1,
+        );
+        assert!(inserted, "受支持图片应插入");
+        assert_eq!(
+            notice,
+            Some("document.image_unsupported"),
+            "首个失败必须是文本文件，之后的缺失/目录不覆盖"
+        );
+        let document = state.session.document().ok_or("missing document")?;
+        let text = document.core().buffer_text()?;
+        assert!(
+            text.starts_with("![dropped](aline-temp:"),
+            "拖入图片必须提交受检临时引用，实际: {text:?}"
+        );
+        assert_eq!(resource_file_count(root.path())?, 1, "只应写一张临时图片");
+
+        // 只含失败项的批次：不插入、给出写入失败反馈。
+        let mut state = open_untitled(scratch.temp_root()?)?;
+        let document = state.session.document_mut().ok_or("missing document")?;
+        let (inserted, notice) =
+            insert_dropped_images(document, &[scratch.0.join("missing.png")], u64::MAX, 2);
+        assert!(!inserted);
+        assert_eq!(notice, Some("document.image_insert_failed"));
+
+        // 超出调用方上限的文件在读入前被拒。
+        let document = state.session.document_mut().ok_or("missing document")?;
+        let (inserted, notice) = insert_dropped_images(document, &[png_path], 1, 3);
+        assert!(!inserted);
+        assert_eq!(notice, Some("document.image_too_large"));
+        assert_eq!(
+            state
+                .session
+                .document()
+                .ok_or("missing document")?
+                .core()
+                .buffer_text()?,
+            "x\n"
+        );
+        Ok(())
+    }
+
+    /// 组合进行中拖入文件零副作用拒绝，且不读取磁盘。
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn dropped_images_are_rejected_while_composition_is_active() -> Result<(), Box<dyn Error>> {
+        let scratch = ScratchHome::create("aline-edit-image-compose")?;
+        let root = scratch.temp_root()?;
+        let mut state = open_untitled(root.clone())?;
+        let png_path = scratch.0.join("dropped.png");
+        std::fs::write(&png_path, sample_png()?)?;
+        let document = state.session.document_mut().ok_or("missing document")?;
+        let core = document.edit_core()?;
+        let identity = core.current_input_identity()?;
+        core.type_selection(&identity, "x", 1)?;
+        core.composition_start("候选", 2)?;
+
+        let (inserted, notice) = insert_dropped_images(document, &[png_path], u64::MAX, 3);
+        assert!(!inserted);
+        assert_eq!(notice, Some("document.composition_pending"));
+        let document = state.session.document().ok_or("missing document")?;
+        assert_eq!(document.core().buffer_text()?, "xx\n");
+        assert!(document.core().composition().is_some());
+        assert_eq!(resource_file_count(root.path())?, 0, "拒绝路径不得落盘");
         Ok(())
     }
 
@@ -1072,7 +1551,7 @@ mod tests {
                     EditAction::Paste,
                     |_| {
                         reads += 1;
-                        Ok(Some(String::from("new")))
+                        Ok(ClipboardPaste::Text(String::from("new")))
                     },
                     0,
                 )
@@ -1093,7 +1572,7 @@ mod tests {
     #[test]
     fn clipboard_cut_only_returns_frozen_text_after_a_commit() -> Result<(), Box<dyn Error>> {
         let mut state = open("甲🙂乙".as_bytes(), true)?;
-        let collapsed = state.edit(EditAction::Cut, |_| Ok(None), 0)?;
+        let collapsed = state.edit(EditAction::Cut, |_| Ok(ClipboardPaste::None), 0)?;
         assert!(collapsed.clipboard.is_none());
         assert!(!collapsed.refresh);
         let core = state
@@ -1106,13 +1585,17 @@ mod tests {
         let selection = aline_buffer::SrcSelection::new(text.src_offset(7)?, text.src_offset(3)?)?;
         let identity = core.current_input_identity()?;
         core.select(&identity, &selection)?;
-        let copied = state.edit(EditAction::Copy, |_| Ok(None), 1)?;
+        let copied = state.edit(EditAction::Copy, |_| Ok(ClipboardPaste::None), 1)?;
         assert_eq!(copied.clipboard.as_deref(), Some("🙂"));
         assert!(!copied.refresh);
-        let unchanged = state.edit(EditAction::Paste, |_| Ok(Some(String::from("🙂"))), 2)?;
+        let unchanged = state.edit(
+            EditAction::Paste,
+            |_| Ok(ClipboardPaste::Text(String::from("🙂"))),
+            2,
+        )?;
         assert!(unchanged.clipboard.is_none());
         assert!(!unchanged.refresh);
-        let cut = state.edit(EditAction::Cut, |_| Ok(None), 3)?;
+        let cut = state.edit(EditAction::Cut, |_| Ok(ClipboardPaste::None), 3)?;
         assert_eq!(cut.clipboard.as_deref(), Some("🙂"));
         assert!(cut.refresh);
         let doc = state.session.document().ok_or("missing doc")?;
@@ -1125,11 +1608,19 @@ mod tests {
                 Ok(())
             });
         assert_eq!(applied, None);
-        assert!(state.edit(EditAction::Undo, |_| Ok(None), 4)?.refresh);
+        assert!(
+            state
+                .edit(EditAction::Undo, |_| Ok(ClipboardPaste::None), 4)?
+                .refresh
+        );
         let doc = state.session.document().ok_or("missing doc")?;
         assert_eq!(doc.core().buffer_text()?, "甲🙂乙");
         assert_eq!(doc.core().current_selection(), SelectionSpec::new(7, 3));
-        assert!(state.edit(EditAction::Redo, |_| Ok(None), 5)?.refresh);
+        assert!(
+            state
+                .edit(EditAction::Redo, |_| Ok(ClipboardPaste::None), 5)?
+                .refresh
+        );
         let doc = state.session.document().ok_or("missing doc")?;
         assert_eq!(doc.core().buffer_text()?, "甲乙");
         assert_eq!(doc.core().current_selection(), SelectionSpec::new(3, 3));
@@ -1146,20 +1637,20 @@ mod tests {
             .edit_core()?;
         let identity = core.current_input_identity()?;
         core.type_selection(&identity, "甲", 1)?;
-        let selected = state.edit(EditAction::SelectAll, |_| Ok(None), 2)?;
+        let selected = state.edit(EditAction::SelectAll, |_| Ok(ClipboardPaste::None), 2)?;
         assert!(selected.clipboard.is_none());
         assert!(!selected.refresh);
-        let cut = state.edit(EditAction::Cut, |_| Ok(None), 3)?;
+        let cut = state.edit(EditAction::Cut, |_| Ok(ClipboardPaste::None), 3)?;
         assert_eq!(cut.clipboard.as_deref(), Some("甲base"));
         assert!(cut.refresh);
         let core = state.session.document().ok_or("missing doc")?.core();
         assert_eq!(core.buffer_text()?, "");
         assert_eq!(core.undo_depth(), 2);
-        state.edit(EditAction::Undo, |_| Ok(None), 4)?;
+        state.edit(EditAction::Undo, |_| Ok(ClipboardPaste::None), 4)?;
         let core = state.session.document().ok_or("missing doc")?.core();
         assert_eq!(core.buffer_text()?, "甲base");
         assert_eq!(core.current_selection(), SelectionSpec::new(0, 7));
-        state.edit(EditAction::Undo, |_| Ok(None), 5)?;
+        state.edit(EditAction::Undo, |_| Ok(ClipboardPaste::None), 5)?;
         let core = state.session.document().ok_or("missing doc")?.core();
         assert_eq!(core.buffer_text()?, "base");
         assert_eq!(core.current_selection(), SelectionSpec::new(0, 0));
@@ -1184,6 +1675,7 @@ mod tests {
             EditAction::Cut,
             EditAction::Copy,
             EditAction::Paste,
+            EditAction::PastePlain,
             EditAction::SelectAll,
             EditAction::Undo,
             EditAction::Redo,
@@ -1193,7 +1685,7 @@ mod tests {
                     action,
                     |_| {
                         reads += 1;
-                        Ok(Some(String::from("clipboard")))
+                        Ok(ClipboardPaste::Text(String::from("clipboard")))
                     },
                     3
                 ),
@@ -1222,9 +1714,17 @@ mod tests {
             .id()
             .clone();
         let loading = state.queue_refresh()?.ok_or("missing first refresh")?;
-        state.edit(EditAction::Paste, |_| Ok(Some(String::from("甲"))), 1)?;
+        state.edit(
+            EditAction::Paste,
+            |_| Ok(ClipboardPaste::Text(String::from("甲"))),
+            1,
+        )?;
         assert!(state.queue_refresh()?.is_none());
-        state.edit(EditAction::Paste, |_| Ok(Some(String::from("🙂"))), 2)?;
+        state.edit(
+            EditAction::Paste,
+            |_| Ok(ClipboardPaste::Text(String::from("🙂"))),
+            2,
+        )?;
         assert!(state.queue_refresh()?.is_none());
         let (next, applied) = state.refresh_finished(loading.run(), |_, _| Ok(()));
         assert_eq!(applied, None);

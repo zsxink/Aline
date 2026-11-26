@@ -51,9 +51,9 @@ use aline_buffer::{HistoryBudget, LineIndexBudget, TextBudget};
 use aline_markdown::{DiagnosticKind, ParseBudget, ParseConfig, Parsed};
 use aline_source::StorageBudget;
 use gpui::{
-    App, Bounds, Context, Entity, FocusHandle, Image, KeyBinding, Menu, MenuItem, MouseButton,
-    PathPromptOptions, Role, SharedString, Subscription, Task, Window, WindowBounds, WindowOptions,
-    div, prelude::*, px, rgb, rgba, size,
+    App, Bounds, Context, Entity, ExternalPaths, FocusHandle, Image, KeyBinding, Menu, MenuItem,
+    MouseButton, PathPromptOptions, Role, SharedString, Subscription, Task, Window, WindowBounds,
+    WindowOptions, div, prelude::*, px, rgb, rgba, size,
 };
 
 use crate::document::{
@@ -1545,6 +1545,9 @@ impl NativeWindowCopy {
             "document.save_migration_retry",
             "document.save_target_failed",
             "document.resource_insert_failed",
+            "document.image_unsupported",
+            "document.image_too_large",
+            "document.image_insert_failed",
             "document.recovery_disabled",
             "document.recovery_restore_failed",
             "document.recovery_discard_failed",
@@ -4052,7 +4055,7 @@ impl Render for NativeDocumentWindow {
                 this.dispatch_edit(EditAction::Paste, window, cx)
             }))
             .on_action(cx.listener(|this, _: &PastePlain, window, cx| {
-                this.dispatch_edit(EditAction::Paste, window, cx)
+                this.dispatch_edit(EditAction::PastePlain, window, cx)
             }))
             .on_action(cx.listener(|this, _: &SelectAll, window, cx| {
                 this.dispatch_edit(EditAction::SelectAll, window, cx)
@@ -4062,6 +4065,9 @@ impl Render for NativeDocumentWindow {
             }))
             .on_action(cx.listener(|this, _: &Redo, window, cx| {
                 this.dispatch_edit(EditAction::Redo, window, cx)
+            }))
+            .on_drop::<ExternalPaths>(cx.listener(|this, paths: &ExternalPaths, window, cx| {
+                this.drop_images(paths.paths(), window, cx)
             }))
             .on_action(cx.listener(|this, _: &CancelNavigation, window, cx| {
                 if this.dismiss_table_menu(window, cx) {

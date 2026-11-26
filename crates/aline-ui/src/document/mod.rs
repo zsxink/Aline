@@ -43,12 +43,12 @@ pub(crate) use readonly_session::{AutosaveAction, OpenTimings, StageTimer, Stage
 pub(crate) use statistics::DocumentStatistics;
 
 pub(crate) use recovery::{
-    PreparedRecovery, RecoveryAction, RecoveryCloseJob, RecoveryConfig, RecoveryConfigError,
-    RecoveryDiscardCompletion, RecoveryDiscardJob, RecoveryDocumentId, RecoveryGenerationStatus,
-    RecoveryLineageDisposition, RecoveryPrepareJob, RecoveryPublishJob, RecoveryResourceSource,
-    RecoveryRestoreCompletion, RecoveryRestoreJob, RecoveryScan, RecoverySettlement, RecoveryStart,
-    RecoveryStore, RecoveryStoreError, RestoredRecovery, RetireOutcome, UnavailableResources,
-    create_default_root,
+    MAX_RESOURCE_BYTES, PreparedRecovery, RecoveryAction, RecoveryCloseJob, RecoveryConfig,
+    RecoveryConfigError, RecoveryDiscardCompletion, RecoveryDiscardJob, RecoveryDocumentId,
+    RecoveryGenerationStatus, RecoveryLineageDisposition, RecoveryPrepareJob, RecoveryPublishJob,
+    RecoveryResourceSource, RecoveryRestoreCompletion, RecoveryRestoreJob, RecoveryScan,
+    RecoverySettlement, RecoveryStart, RecoveryStore, RecoveryStoreError, RestoredRecovery,
+    RetireOutcome, UnavailableResources, create_default_root,
 };
 /// 恢复根仅由 crate 内测试直接构造；生产根接线归 4.2。
 #[cfg(test)]
@@ -64,6 +64,8 @@ pub(crate) use persistence::{
     SaveJob, SaveRejection, SaveResult, WriteCompletion, WriteKind,
 };
 
+/// 生产图片插入的失败分类；窗口层据此选择本地化反馈。
+pub(crate) use readonly_session::ImageInsertError;
 /// 4.2b 首次保存/另存为动作消费的关联命令；窗口接线前只由 crate 内测试驱动。
 #[allow(unused_imports)]
 pub(crate) use readonly_session::{

@@ -199,6 +199,82 @@ impl ResourceMigration {
     }
 }
 
+/// 命名文档正文插入已写入的资产；失败时按身份撤回本次新建的文件。
+pub(crate) struct PlacedAsset {
+    reference: String,
+    created: Vec<(PathBuf, FileIdentity)>,
+    directory: PathBuf,
+    created_directory: bool,
+}
+
+impl PlacedAsset {
+    /// 返回可直接写入 Markdown 的目标文本。
+    pub(crate) fn reference(&self) -> &str {
+        &self.reference
+    }
+
+    /// 只在引用提交失败时调用；只删除本次新建且身份未变的文件与空目录。
+    pub(crate) fn rollback(self) {
+        rollback_assets(&self.directory, &self.created, self.created_directory);
+    }
+}
+
+/// 为命名文档写一张正文图片并返回待提交引用；不修改文本。
+///
+/// 与首次保存/另存为迁移共用目录规则、去重命名与引用格式；任何失败都不留下
+/// 非本次创建的副作用，调用方可以放弃插入。
+pub(crate) fn place_body_image(
+    settings: &ImageSettings,
+    document_dir: &Path,
+    display_name: &str,
+    extension: &str,
+    bytes: &[u8],
+    max_bytes: u64,
+) -> Result<PlacedAsset, MigrationError> {
+    // 与迁移一致：非 macOS 在任何文件系统副作用之前失败关闭。
+    if !cfg!(target_os = "macos") {
+        return Err(MigrationError::UnsupportedPlatform);
+    }
+    settings.validate()?;
+    if bytes.len() > MAX_RESOURCE_BYTES
+        || u64::try_from(bytes.len()).unwrap_or(u64::MAX) > max_bytes
+    {
+        return Err(MigrationError::BudgetExceeded);
+    }
+    if !document_dir.is_absolute() {
+        return Err(MigrationError::InvalidTarget);
+    }
+    let directory = match &settings.directory {
+        ImageDirectory::Relative(dir) => document_dir.join(dir),
+        ImageDirectory::Absolute(dir) => dir.clone(),
+    };
+    let created_directory = ensure_asset_directory(&directory)?;
+    let mut created = Vec::new();
+    let (file_name, _) = match place_asset(
+        &directory,
+        &asset_stem(display_name, 0),
+        extension,
+        bytes,
+        &mut created,
+    ) {
+        Ok(placed) => placed,
+        Err(error) => {
+            rollback_assets(&directory, &created, created_directory);
+            return Err(error);
+        }
+    };
+    if platform_fs::sync_directory(&directory).is_err() {
+        rollback_assets(&directory, &created, created_directory);
+        return Err(MigrationError::Io);
+    }
+    Ok(PlacedAsset {
+        reference: reference_text(settings, &directory, &file_name),
+        created,
+        directory,
+        created_directory,
+    })
+}
+
 /// 迁移失败分类；任何失败都不报告成功，已发布资产按身份撤回。
 #[derive(Debug, Eq, PartialEq)]
 #[cfg_attr(not(test), allow(dead_code))]

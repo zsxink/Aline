@@ -9,7 +9,8 @@ use aline_source::DiskVersion;
 // 出现未使用导入并在 `-D warnings` 下失败。
 #[cfg(target_os = "macos")]
 use crate::document::readonly_session::{
-    AssociationCommand, AssociationOutcome, AssociationStep, ReadonlyFileAccess, ReadonlyFileInput,
+    AssociationCommand, AssociationOutcome, AssociationStep, ImageInsertError, ReadonlyFileAccess,
+    ReadonlyFileInput,
 };
 #[cfg(target_os = "macos")]
 use crate::document::resources::{ImageDirectory, ImageSettings, MigrationCompletion, TempRoot};
@@ -2615,6 +2616,547 @@ fn resource_file_count(root: &Path) -> Result<usize, Box<dyn std::error::Error>>
         Ok(count)
     }
     walk(root)
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn named_insert_writes_asset_and_commits_relative_reference() -> TestResult {
+    let directory = TempSaveDir::create("aline-insert-named")?;
+    let original = directory.0.join("doc/notes.md");
+    std::fs::create_dir_all(original.parent().ok_or("target parent")?)?;
+    std::fs::write(&original, b"\n")?;
+    let mut session = editable_absolute_session(&original)?;
+    let png = media_sample("plain.png")?;
+
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .insert_image("pasted.png", &png, 64 * 1024, 1)
+        .map_err(|error| format!("{error:?}"))?;
+
+    assert_eq!(
+        current_text(&mut session)?,
+        "![pasted](./assets/pasted.png)\n",
+        "命名文档应提交相对资产目录引用"
+    );
+    assert_eq!(
+        std::fs::read(directory.0.join("doc/assets/pasted.png"))?,
+        png,
+        "资产必须与插入字节逐字节一致"
+    );
+    // IMAGE-08：撤销插入只撤销引用，已发布资产保留。
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .checked_undo()?;
+    assert_eq!(current_text(&mut session)?, "\n");
+    assert!(
+        directory.0.join("doc/assets/pasted.png").exists(),
+        "撤销引用不得删除已发布资产"
+    );
+    Ok(())
+}
+
+/// 读取 V-03 冻结的图片样本。
+#[cfg(target_os = "macos")]
+fn media_sample(name: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    Ok(std::fs::read(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../scripts/fixtures/m4-v03/samples")
+            .join(name),
+    )?)
+}
+
+/// 未命名文档插入图片：引用使用受检临时定位值，首次保存后迁移为相对资产引用。
+#[cfg(target_os = "macos")]
+#[test]
+fn untitled_insert_uses_temp_locator_and_first_save_migrates() -> TestResult {
+    let directory = TempSaveDir::create("aline-insert-untitled")?;
+    let home = directory.0.join("home");
+    let root = temp_resource_root(&home)?;
+    let mut session = untitled_editable_session(Some(root.clone()))?;
+    let png = media_sample("plain.png")?;
+
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .insert_image("pasted.png", &png, 64 * 1024, 1)
+        .map_err(|error| format!("{error:?}"))?;
+
+    let text = current_text(&mut session)?;
+    let locator = text
+        .strip_prefix("![pasted](")
+        .and_then(|rest| rest.strip_suffix(")x\n"))
+        .ok_or_else(|| format!("未命名文档应提交临时引用，实际: {text:?}"))?
+        .to_owned();
+    assert!(
+        locator.starts_with("aline-temp:") && locator.ends_with(".png"),
+        "临时引用必须是受检定位值，实际: {locator}"
+    );
+    assert_eq!(
+        resource_file_count(root.path())?,
+        1,
+        "未命名文档的图片必须落在受检临时根"
+    );
+    let temp_file = single_resource_file(root.path())?;
+    assert_eq!(std::fs::read(&temp_file)?, png, "临时图片必须逐字节一致");
+    let registered = session
+        .document()
+        .ok_or("应存在可编辑文档")?
+        .core()
+        .resources()
+        .iter()
+        .any(|reference| reference.locator() == locator);
+    assert!(registered, "插入后必须按文档级身份登记临时资源");
+
+    let target = directory.0.join("out/notes.md");
+    std::fs::create_dir_all(target.parent().ok_or("target parent")?)?;
+    let completion = association_copy(&mut session, WriteKind::Create, &target)?;
+    let job = association_write_job(&mut session, completion)?;
+    let settlement = run_association_write(&mut session, job)?;
+    assert!(settlement.adopted, "首次保存应采纳写盘结果");
+    assert_eq!(
+        current_text(&mut session)?,
+        "![pasted](./assets/pasted.png)x\n",
+        "首次保存应把临时引用改写为相对资产引用"
+    );
+    assert_eq!(
+        std::fs::read(&target)?,
+        b"![pasted](./assets/pasted.png)x\n",
+        "落盘源文件必须与引用一致"
+    );
+    assert_eq!(
+        std::fs::read(directory.0.join("out/assets/pasted.png"))?,
+        png,
+        "迁移后的资产必须与插入字节逐字节一致"
+    );
+    assert!(temp_file.exists(), "文档释放前不得删除仍被登记的临时资源");
+    Ok(())
+}
+
+/// 返回受检临时根下唯一的普通文件。
+#[cfg(target_os = "macos")]
+fn single_resource_file(root: &Path) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    fn walk(path: &Path, found: &mut Vec<PathBuf>) -> std::io::Result<()> {
+        for entry in std::fs::read_dir(path)? {
+            let entry = entry?;
+            if entry.metadata()?.is_dir() {
+                walk(&entry.path(), found)?;
+            } else {
+                found.push(entry.path());
+            }
+        }
+        Ok(())
+    }
+    let mut found = Vec::new();
+    walk(root, &mut found)?;
+    match found.as_slice() {
+        [only] => Ok(only.clone()),
+        _ => Err(format!("预期一个临时资源文件，实际 {}", found.len()).into()),
+    }
+}
+
+/// 绝对图片目录设置：引用写成尖括号绝对路径，资产落到该目录。
+#[cfg(target_os = "macos")]
+#[test]
+fn named_insert_honours_absolute_image_directory() -> TestResult {
+    let directory = TempSaveDir::create("aline-insert-absolute")?;
+    let original = directory.0.join("doc/notes.md");
+    std::fs::create_dir_all(original.parent().ok_or("target parent")?)?;
+    std::fs::write(&original, b"\n")?;
+    let assets = directory.0.join("media");
+    let mut session = editable_absolute_session_with(
+        &original,
+        ImageSettings {
+            directory: ImageDirectory::Absolute(assets.clone()),
+        },
+    )?;
+    let png = media_sample("plain.png")?;
+
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .insert_image("pasted.png", &png, 64 * 1024, 1)
+        .map_err(|error| format!("{error:?}"))?;
+
+    let reference = format!("<{}>", assets.join("pasted.png").display());
+    assert_eq!(
+        current_text(&mut session)?,
+        format!("![pasted]({reference})\n"),
+        "绝对目录设置应提交尖括号绝对引用"
+    );
+    assert_eq!(
+        std::fs::read(assets.join("pasted.png"))?,
+        png,
+        "绝对目录资产必须与插入字节一致"
+    );
+    assert!(
+        !directory.0.join("doc/assets").exists(),
+        "绝对设置不得再在文档目录建相对资产目录"
+    );
+    Ok(())
+}
+
+/// 打开块中已有未提交草稿时插入图片：草稿与引用一起提交，不丢输入。
+#[cfg(target_os = "macos")]
+#[test]
+fn named_insert_commits_with_open_block_draft() -> TestResult {
+    let directory = TempSaveDir::create("aline-insert-draft")?;
+    let original = directory.0.join("doc/notes.md");
+    std::fs::create_dir_all(original.parent().ok_or("target parent")?)?;
+    std::fs::write(&original, b"\n")?;
+    let mut session = editable_absolute_session(&original)?;
+    open_editing_block(&mut session)?;
+    {
+        let document = session.document_mut().ok_or("应存在可编辑文档")?;
+        document.edit_core()?.type_text(0, "草稿", 0)?;
+    }
+    let png = media_sample("plain.png")?;
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .insert_image("pasted.png", &png, 64 * 1024, 1)
+        .map_err(|error| format!("{error:?}"))?;
+
+    assert_eq!(
+        current_text(&mut session)?,
+        "草稿![pasted](./assets/pasted.png)\n",
+        "未提交草稿与图片引用必须一起提交"
+    );
+    assert_eq!(
+        std::fs::read(directory.0.join("doc/assets/pasted.png"))?,
+        png
+    );
+    // 撤销引用后草稿文本仍在（草稿已在同一步提交），资产保留。
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .checked_undo()?;
+    assert_eq!(current_text(&mut session)?, "草稿\n");
+    assert!(directory.0.join("doc/assets/pasted.png").exists());
+    Ok(())
+}
+
+/// 资产目录被同名普通文件占据：插入失败且不提交引用、不留下资产。
+#[cfg(target_os = "macos")]
+#[test]
+fn named_insert_directory_conflict_leaves_no_reference() -> TestResult {
+    let directory = TempSaveDir::create("aline-insert-dir-conflict")?;
+    let original = directory.0.join("doc/notes.md");
+    std::fs::create_dir_all(original.parent().ok_or("target parent")?)?;
+    std::fs::write(&original, b"x\n")?;
+    std::fs::write(directory.0.join("doc/assets"), b"blocked")?;
+    let mut session = editable_absolute_session(&original)?;
+    let png = media_sample("plain.png")?;
+
+    let error = session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .insert_image("pasted.png", &png, 64 * 1024, 1)
+        .err()
+        .ok_or("资产目录冲突必须失败")?;
+    assert_eq!(error, ImageInsertError::Write);
+    assert_eq!(current_text(&mut session)?, "x\n", "失败不得提交引用");
+    assert_eq!(
+        std::fs::read(directory.0.join("doc/assets"))?,
+        b"blocked",
+        "既有同名文件不得被改写"
+    );
+    Ok(())
+}
+
+/// 写入中途失败（资产目录不可写）：不提交引用、不留下部分资产或空目录。
+#[cfg(target_os = "macos")]
+#[test]
+fn named_insert_mid_write_failure_rolls_back() -> TestResult {
+    use std::os::unix::fs::PermissionsExt;
+
+    let directory = TempSaveDir::create("aline-insert-mid-write")?;
+    let original = directory.0.join("doc/notes.md");
+    std::fs::create_dir_all(original.parent().ok_or("target parent")?)?;
+    std::fs::write(&original, b"x\n")?;
+    let assets = directory.0.join("doc/assets");
+    std::fs::create_dir(&assets)?;
+    std::fs::set_permissions(&assets, std::fs::Permissions::from_mode(0o500))?;
+    let mut session = editable_absolute_session(&original)?;
+    let png = media_sample("plain.png")?;
+
+    let result = session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .insert_image("pasted.png", &png, 64 * 1024, 1);
+    std::fs::set_permissions(&assets, std::fs::Permissions::from_mode(0o700))?;
+
+    assert_eq!(result.err(), Some(ImageInsertError::Write));
+    assert_eq!(current_text(&mut session)?, "x\n", "失败不得提交引用");
+    assert_eq!(
+        std::fs::read_dir(&assets)?.count(),
+        0,
+        "失败后不得留下部分资产"
+    );
+    Ok(())
+}
+
+/// 同名同内容复用同一资产；同名不同内容改用 `-1` 后缀，引用与文件一一对应。
+#[cfg(target_os = "macos")]
+#[test]
+fn named_insert_dedupes_and_suffixes_same_name() -> TestResult {
+    let directory = TempSaveDir::create("aline-insert-dedupe")?;
+    let original = directory.0.join("doc/notes.md");
+    std::fs::create_dir_all(original.parent().ok_or("target parent")?)?;
+    std::fs::write(&original, b"\n")?;
+    let mut session = editable_absolute_session(&original)?;
+    let png = media_sample("plain.png")?;
+    let other_png = media_sample("anim.png")?;
+
+    for _ in 0..2 {
+        session
+            .document_mut()
+            .ok_or("应存在可编辑文档")?
+            .insert_image("pasted.png", &png, 64 * 1024, 1)
+            .map_err(|error| format!("{error:?}"))?;
+    }
+    let text = current_text(&mut session)?;
+    assert_eq!(
+        text.matches("](./assets/pasted.png)").count(),
+        2,
+        "同内容同名必须复用同一资产引用，实际: {text:?}"
+    );
+    assert_eq!(
+        std::fs::read(directory.0.join("doc/assets/pasted.png"))?,
+        png
+    );
+
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .insert_image("pasted.png", &other_png, 64 * 1024, 1)
+        .map_err(|error| format!("{error:?}"))?;
+    let text = current_text(&mut session)?;
+    assert!(
+        text.contains("](./assets/pasted-1.png)"),
+        "同名不同内容必须改用可用后缀，实际: {text:?}"
+    );
+    assert_eq!(
+        std::fs::read(directory.0.join("doc/assets/pasted-1.png"))?,
+        other_png
+    );
+    assert_eq!(
+        resource_file_count(&directory.0.join("doc/assets"))?,
+        2,
+        "去重后只应有两条资产"
+    );
+    Ok(())
+}
+
+/// 未命名文档插入被拒（格式不支持/超预算/只读）时无文本、无临时文件副作用。
+#[cfg(target_os = "macos")]
+#[test]
+fn untitled_insert_rejections_have_no_side_effects() -> TestResult {
+    let directory = TempSaveDir::create("aline-insert-reject")?;
+    let home = directory.0.join("home");
+    let root = temp_resource_root(&home)?;
+    let mut session = untitled_editable_session(Some(root.clone()))?;
+    let png = media_sample("plain.png")?;
+
+    let unsupported = session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .insert_image("bad.png", b"not an image", 64 * 1024, 1)
+        .err()
+        .ok_or("未知格式必须被拒绝")?;
+    assert_eq!(unsupported, ImageInsertError::UnsupportedFormat);
+    let oversized = session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .insert_image("big.png", &png, 1, 1)
+        .err()
+        .ok_or("超预算图片必须被拒绝")?;
+    assert_eq!(oversized, ImageInsertError::TooLarge);
+    assert_eq!(current_text(&mut session)?, "x\n");
+    assert_eq!(resource_file_count(root.path())?, 0, "拒绝时不得写临时文件");
+
+    // 只读打开同一份内容：插入必须先拒绝，且不产生资源。
+    let limits = ReadonlyOpenLimits::new(
+        StorageBudget::new(4096),
+        DocLimits::new(
+            TextBudget::new(4096),
+            LineIndexBudget::new(128),
+            HistoryBudget::new(16, 4096),
+        ),
+        ParseConfig::m0(),
+        ParseBudget::m0(),
+    );
+    let mut readonly = ReadonlySession::new(limits);
+    readonly.configure_temp_root(Some(root.clone()));
+    let request = readonly.request_open()?;
+    let job = readonly
+        .accept_selection(&request, Some(vec![PathBuf::from("untitled.md")]))?
+        .ok_or("应生成打开工作")?;
+    assert!(matches!(
+        readonly.accept_open(job.read_with(&BytesFiles(b"x\n".to_vec()))),
+        OpenDisposition::Applied
+    ));
+    let error = readonly
+        .document_mut()
+        .ok_or("应存在只读文档")?
+        .insert_image("pasted.png", &png, 64 * 1024, 1)
+        .err()
+        .ok_or("只读文档必须拒绝插入")?;
+    assert_eq!(error, ImageInsertError::NotEditable);
+    assert_eq!(resource_file_count(root.path())?, 0);
+    Ok(())
+}
+
+/// 首次保存复制完成后、复核前插入图片：新增引用必须要求重试且不写盘。
+#[cfg(target_os = "macos")]
+#[test]
+fn first_save_insert_during_preparation_requests_retry() -> TestResult {
+    let directory = TempSaveDir::create("aline-insert-in-flight")?;
+    let home = directory.0.join("home");
+    let root = temp_resource_root(&home)?;
+    let target = directory.0.join("out/notes.md");
+    std::fs::create_dir_all(target.parent().ok_or("target parent")?)?;
+    let mut session = untitled_editable_session(Some(root.clone()))?;
+    let png = media_sample("plain.png")?;
+
+    let completion = association_copy(&mut session, WriteKind::Create, &target)?;
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .insert_image("pasted.png", &png, 64 * 1024, 1)
+        .map_err(|error| format!("{error:?}"))?;
+    match session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .association_prepared(completion, 1)
+    {
+        AssociationStep::Settled(AssociationOutcome::NeedsRetry) => {}
+        _ => return Err("在途插入应要求重试".into()),
+    }
+    assert!(!target.exists(), "要求重试时不得写盘");
+    assert_eq!(
+        resource_file_count(root.path())?,
+        1,
+        "在途引用的临时资源必须保留"
+    );
+    Ok(())
+}
+
+/// 首次保存成功后释放文档：临时文件被清理，迁移后的资产与引用保留。
+#[cfg(target_os = "macos")]
+#[test]
+fn untitled_insert_temp_files_are_cleaned_after_release() -> TestResult {
+    use crate::document::resources::CleanupOutcome;
+
+    let directory = TempSaveDir::create("aline-insert-cleanup")?;
+    let home = directory.0.join("home");
+    let root = temp_resource_root(&home)?;
+    let target = directory.0.join("out/notes.md");
+    std::fs::create_dir_all(target.parent().ok_or("target parent")?)?;
+    let mut session = untitled_editable_session(Some(root.clone()))?;
+    let png = media_sample("plain.png")?;
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .insert_image("pasted.png", &png, 64 * 1024, 1)
+        .map_err(|error| format!("{error:?}"))?;
+    let completion = association_copy(&mut session, WriteKind::Create, &target)?;
+    let job = association_write_job(&mut session, completion)?;
+    let settlement = run_association_write(&mut session, job)?;
+    assert!(settlement.adopted);
+    assert_eq!(
+        std::fs::read(directory.0.join("out/assets/pasted.png"))?,
+        png
+    );
+
+    let job = session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .retire_resources(None)
+        .ok_or("插入后应存在临时资源目录")?;
+    assert_eq!(job.run(), CleanupOutcome::Cleaned, "无引用时临时文件应清理");
+    assert_eq!(
+        resource_file_count(root.path())?,
+        0,
+        "文档释放后不得保留临时图片"
+    );
+    assert_eq!(
+        std::fs::read(directory.0.join("out/assets/pasted.png"))?,
+        png,
+        "清理不得触碰已迁移的资产"
+    );
+    assert_eq!(
+        std::fs::read(&target)?,
+        b"![pasted](./assets/pasted.png)x\n",
+        "清理不得改写源文件引用"
+    );
+    Ok(())
+}
+
+/// 未命名插入后的恢复记录：源文本含临时引用，资源字节可读且与插入一致。
+#[cfg(target_os = "macos")]
+#[test]
+fn untitled_insert_is_captured_by_recovery_with_resource_bytes() -> TestResult {
+    use crate::document::recovery::{RecoveryConfig, RecoveryRoot, RecoveryStart, RecoveryStore};
+    use crate::document::resources::TempResourceSource;
+    use std::os::unix::fs::PermissionsExt;
+    use std::sync::Arc;
+
+    let directory = TempSaveDir::create("aline-insert-recovery")?;
+    let home = directory.0.join("home");
+    let root = temp_resource_root(&home)?;
+    let mut session = untitled_editable_session(Some(root.clone()))?;
+    let png = media_sample("plain.png")?;
+    session
+        .document_mut()
+        .ok_or("应存在可编辑文档")?
+        .insert_image("pasted.png", &png, 64 * 1024, 1)
+        .map_err(|error| format!("{error:?}"))?;
+    let text = current_text(&mut session)?;
+
+    let recovery_dir = directory.0.join("recovery");
+    std::fs::create_dir(&recovery_dir)?;
+    std::fs::set_permissions(&recovery_dir, std::fs::Permissions::from_mode(0o700))?;
+    let store = RecoveryStore::open(
+        RecoveryRoot::open(&recovery_dir).map_err(|error| format!("{error:?}"))?,
+    )
+    .map_err(|error| format!("{error:?}"))?;
+    let document = session.document_mut().ok_or("应存在可编辑文档")?;
+    document.attach_recovery(RecoveryConfig {
+        store: store.clone(),
+        resources: Arc::new(TempResourceSource::new(root.clone())),
+    });
+    document.recovery_arm(0);
+    let Some(RecoveryStart::Prepare(job)) = document.recovery_start(10_000) else {
+        return Err("插入后恢复应可准备".into());
+    };
+    let prepared = job.run();
+    let Some(RecoveryStart::Publish(job)) = document.recovery_prepared(prepared, 10_000) else {
+        return Err("临时资源可读时恢复应完整发布".into());
+    };
+    let settlement = job.run();
+    assert!(settlement.published.is_some(), "恢复代必须发布");
+    document.recovery_settled(settlement, 10_000);
+
+    let scan = store.scan().map_err(|error| format!("{error:?}"))?;
+    let lineage = scan
+        .recoverable_lineages()
+        .first()
+        .copied()
+        .ok_or("恢复谱系")?;
+    let generation = lineage.latest_complete().ok_or("完整恢复代")?.generation;
+    let restored = store
+        .recover(lineage.document, generation)
+        .map_err(|error| format!("{error:?}"))?;
+    assert_eq!(restored.source, text, "恢复源必须与当前文本一致");
+    assert_eq!(restored.resources.len(), 1, "恢复记录必须携带插入资源");
+    assert!(
+        text.contains(restored.resources[0].reference.as_str()),
+        "恢复资源引用必须仍被文本引用"
+    );
+    assert_eq!(restored.resources[0].bytes, png, "恢复资源字节必须一致");
+    Ok(())
 }
 
 #[cfg(target_os = "macos")]

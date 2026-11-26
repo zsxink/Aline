@@ -24,7 +24,7 @@ use migration::ResourceMapping;
 pub(crate) use migration::{
     DiscoveredAsset, ImageDirectory, ImageSettings, MigrationCompletion, MigrationError,
     ResourceHistory, ResourceMigration, ResourceMigrationJob, discover_relative_assets,
-    locator_spans, rewrite_locators,
+    locator_spans, place_body_image, rewrite_locators,
 };
 pub(crate) use source::TempResourceSource;
 pub(crate) use temp_root::{
