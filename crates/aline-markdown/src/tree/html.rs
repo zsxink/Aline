@@ -12,6 +12,7 @@ use std::fmt;
 use std::ops::Range;
 
 use crate::budget::ParseBudget;
+use crate::link::is_allowed_link;
 use crate::mapping::MappingPrecision;
 
 /// 有限 HTML 的可见样式集合；只影响展示，不改变源码范围。
@@ -779,18 +780,6 @@ fn style_for_tag(name: &str, inner: &str) -> HtmlStyle {
         _ => {}
     }
     style
-}
-
-fn is_allowed_link(href: &str) -> bool {
-    let trimmed = href.trim();
-    if trimmed.is_empty() {
-        return false;
-    }
-    if trimmed.starts_with('#') || trimmed.starts_with('/') {
-        return true;
-    }
-    let lower = trimmed.to_ascii_lowercase();
-    lower.starts_with("http://") || lower.starts_with("https://") || lower.starts_with("mailto:")
 }
 
 /// 有限 HTML 子集之外的 void 标签按字面显示；`br` 在专用分支输出合成换行。

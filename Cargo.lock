@@ -139,6 +139,7 @@ dependencies = [
  "aline-source",
  "gpui-pre",
  "gpui-pre-macos",
+ "usvg",
 ]
 
 [[package]]

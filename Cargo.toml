@@ -31,6 +31,7 @@ pulldown-cmark = { version = "=0.13.6", default-features = false }
 unicode-segmentation = "=1.13.3"
 toml = { version = "=1.1.8", default-features = false, features = ["std", "parse", "serde"] }
 rust-embed = { version = "=8.13.0", default-features = false, features = ["debug-embed"] }
+usvg = { version = "=0.46.0", default-features = false }
 
 # 已准入的本地来源：crates.io 发布包 + 已审查的中文避头尾补丁。
 # 字节身份由 scripts/engineering_policy.json 的 native_backend.core（tree_sha256 +

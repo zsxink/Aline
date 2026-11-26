@@ -1,6 +1,7 @@
 //! 文档状态、只读生命周期与原生单窗口装配边界。
 
 mod document;
+pub mod media;
 mod plugins;
 
 pub use plugins::{
