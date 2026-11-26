@@ -119,79 +119,172 @@ def raise_panel(driver):
     time.sleep(0.3)
 
 
+def close_residual_panel(driver):
+    """关闭上一轮残留的文件面板：优先点面板自身的 Cancel，ESC 兜底。"""
+    snapshot = driver.snapshot()
+    index = driver.find_button(snapshot, "Cancel")
+    if index is not None:
+        driver.call(["click", "--element-index", str(index)], "关闭残留文件面板（Cancel）")
+        time.sleep(1.0)
+        return
+    system_events(driver, "key code 53", "关闭残留文件面板（ESC）")
+    time.sleep(1.0)
+
+
+def wait_runtime_recovered(driver, attempts=4, pause=3.0):
+    """Orca 运行时无响应时有限次等待其恢复，避免每轮再触发长超时。"""
+    for _ in range(attempts):
+        if driver.probe():
+            return True
+        time.sleep(pause)
+    return False
+
+
+def find_panel_path_field(driver, timeout=8.0):
+    """轮询「前往文件夹」弹层的路径字段；返回 (索引或 None, 最后一次快照是否截断)。
+
+    面板列视图会从根列开始列出整条祖先链；路径较深时列视图本身接近
+    1200 节点快照上限，弹层整体被截掉（run-preview-5 复用轮：截图里弹层
+    已打开且值正确，树里却只剩列视图）。快照的 truncation 元数据随调用
+    返回，调用方据此区分「弹层没开」与「弹层被截掉」。
+    """
+    deadline = time.monotonic() + timeout
+    truncated = False
+    while time.monotonic() < deadline:
+        snapshot = driver.snapshot()
+        truncated = bool((snapshot.get("truncation") or {}).get("truncated"))
+        match = re.search(r'^\s*(\d+) text field \(settable\), Value: /',
+                          driver.tree_text(snapshot), re.M)
+        if match:
+            return int(match.group(1)), truncated
+        time.sleep(0.2)
+    return None, truncated
+
+
+def shrink_panel_listing(driver):
+    """快照被截断时把面板导航到浅目录，让弹层重新落进快照上限。
+
+    先 ESC 关闭弹层（弹层有焦点时只关弹层），再点边栏「文稿」；返回面板
+    是否仍然打开（ESC 若把面板也关了则返回 False，交由外层重试）。
+    """
+    system_events(driver, "key code 53", "关闭前往文件夹弹层（快照截断）")
+    time.sleep(1.0)
+    if driver.title() != "Open":
+        return False
+    snapshot = driver.snapshot()
+    match = re.search(r'^\s*(\d+) cell (?:Documents|文稿)(?:,|$)',
+                      driver.tree_text(snapshot), re.M)
+    if match is None:
+        return False
+    driver.call(["click", "--element-index", match.group(1)],
+                "点击边栏「文稿」缩小面板列视图")
+    time.sleep(1.5)
+    return driver.title() == "Open"
+
+
 def open_document_robust(driver, document, rounds=3):
     """经文件面板打开夹具；面板偶发不响应「前往文件夹」或不上报选中时重试。
 
     打开机制本身不是被测行为，但每一轮的观测都写入证据目录；面板行容器
-    辅助动作与点击是共享驱动里已有的回退手段。
+    辅助动作与点击是共享驱动里已有的回退手段。面板是系统面板服务的远程
+    视图，无障碍快照可能截断行容器，此时退回「点选同名文本域 + 回车」；
+    单轮自动化异常记为 round_error，关闭残留面板后进入下一轮。
     """
     target = str(document.resolve())
     attempts = []
     for round_index in range(1, rounds + 1):
         record = {"round": round_index}
         attempts.append(record)
-        if driver.title() == "Open":
-            system_events(driver, "key code 53", "关闭残留文件面板")
-            time.sleep(1.0)
-        activate(driver)
-        driver.call(["hotkey", "--key", native.OPEN_PANEL_KEY], "打开文件面板")
-        deadline = time.monotonic() + 6.0
-        while time.monotonic() < deadline and driver.title() != "Open":
-            time.sleep(0.2)
-        record["panel_opened"] = driver.title() == "Open"
-        if not record["panel_opened"]:
-            continue
-        time.sleep(0.4)
-        raise_panel(driver)
-        system_events(driver, 'keystroke "g" using {command down, shift down}',
-                      "打开前往文件夹")
-        field = None
-        deadline = time.monotonic() + 5.0
-        while time.monotonic() < deadline:
-            snapshot = driver.snapshot()
-            match = re.search(r'^\s*(\d+) text field \(settable\), Value: /',
-                              driver.tree_text(snapshot), re.M)
-            if match:
-                field = int(match.group(1))
-                break
-            time.sleep(0.2)
-        record["path_field"] = field is not None
-        if field is None:
-            continue
-        driver.call(["set-value", "--element-index", str(field), "--value", target],
-                    "写入夹具绝对路径")
-        time.sleep(0.4)
-        system_events(driver, "key code 36", "回车确认路径")
-        container = None
-        deadline = time.monotonic() + 6.0
-        while time.monotonic() < deadline:
-            snapshot = driver.snapshot()
-            container = driver.find_row_container(snapshot, document.name)
-            if container is not None:
-                break
-            time.sleep(0.2)
-        record["row_container"] = container
-        if container is None:
-            continue
-        record["opened_by"] = "secondary-action"
         try:
-            driver.call(["perform-secondary-action", "--element-index", str(container),
-                         "--action", "open"], "行容器 open 辅助动作")
+            if driver.title() == "Open":
+                close_residual_panel(driver)
+                if driver.title() == "Open":
+                    record["panel_still_open"] = True
+                    continue
+            activate(driver)
+            driver.call(["hotkey", "--key", native.OPEN_PANEL_KEY], "打开文件面板")
+            deadline = time.monotonic() + 6.0
+            while time.monotonic() < deadline and driver.title() != "Open":
+                time.sleep(0.2)
+            record["panel_opened"] = driver.title() == "Open"
+            if not record["panel_opened"]:
+                continue
+            time.sleep(0.4)
+            raise_panel(driver)
+            system_events(driver, 'keystroke "g" using {command down, shift down}',
+                          "打开前往文件夹")
+            field, truncated = find_panel_path_field(driver)
+            if field is None and truncated:
+                record["panel_shrunk"] = shrink_panel_listing(driver)
+                if record["panel_shrunk"]:
+                    raise_panel(driver)
+                    system_events(driver, 'keystroke "g" using {command down, shift down}',
+                                  "重新打开前往文件夹")
+                    field, truncated = find_panel_path_field(driver)
+            record["path_field"] = field is not None
+            if field is None:
+                continue
+            driver.call(["set-value", "--element-index", str(field), "--value", target],
+                        "写入夹具绝对路径")
+            time.sleep(0.4)
+            system_events(driver, "key code 36", "回车确认路径")
+            container = None
+            snapshot = None
+            deadline = time.monotonic() + 6.0
+            while time.monotonic() < deadline:
+                snapshot = driver.snapshot()
+                container = driver.find_row_container(snapshot, document.name)
+                if container is not None:
+                    break
+                time.sleep(0.2)
+            record["row_container"] = container
+            if container is None:
+                named = (driver.find_named_field(snapshot, document.name)
+                         if snapshot is not None else None)
+                record["named_field"] = named
+                if named is not None:
+                    record["opened_by"] = "field-click"
+                    driver.call(["click", "--element-index", str(named)],
+                                "点选目标文件行")
+                    time.sleep(0.8)
+                else:
+                    record["opened_by"] = "enter-after-path"
+                system_events(driver, "key code 36", "回车打开目标文件")
+                time.sleep(1.5)
+                if driver.title() == document.name:
+                    break
+                continue
+            record["opened_by"] = "secondary-action"
+            try:
+                driver.call(["perform-secondary-action", "--element-index", str(container),
+                             "--action", "open"], "行容器 open 辅助动作")
+            except native.DriverError as error:
+                record["secondary_action_error"] = str(error)[:300]
+            time.sleep(1.5)
+            if driver.title() == document.name:
+                break
+            record["opened_by"] = "row-click"
+            driver.call(["click", "--element-index", str(container)], "点击行容器打开")
+            time.sleep(1.5)
+            if driver.title() == document.name:
+                break
+            record["opened_by"] = "enter"
+            system_events(driver, "key code 36", "回车打开所选夹具")
+            time.sleep(1.5)
+            if driver.title() == document.name:
+                break
         except native.DriverError as error:
-            record["secondary_action_error"] = str(error)[:300]
-        time.sleep(1.5)
-        if driver.title() == document.name:
-            break
-        record["opened_by"] = "row-click"
-        driver.call(["click", "--element-index", str(container)], "点击行容器打开")
-        time.sleep(1.5)
-        if driver.title() == document.name:
-            break
-        record["opened_by"] = "enter"
-        system_events(driver, "key code 36", "回车打开所选夹具")
-        time.sleep(1.5)
-        if driver.title() == document.name:
-            break
+            record["round_error"] = str(error)[:500]
+            if "runtime_timeout" in record["round_error"]:
+                record["runtime_recovered"] = wait_runtime_recovered(driver)
+                if not record["runtime_recovered"]:
+                    raise
+            else:
+                try:
+                    close_residual_panel(driver)
+                except native.DriverError:
+                    pass
+            time.sleep(1.0)
     else:
         write_json(driver.evidence / "open-panel.json", {
             "attempts": attempts,

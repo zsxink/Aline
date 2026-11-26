@@ -3484,3 +3484,110 @@ fn media_budget_env_parsing_is_explicit_and_fail_closed() -> Result<(), Box<dyn 
     }
     Ok(())
 }
+
+#[test]
+fn chooser_routes_supported_image_extensions_to_preview_without_opening_a_document()
+-> Result<(), Box<dyn Error>> {
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    let request = state.request_open()?;
+    let outcome =
+        state.accept_dialog_routed(&request, Ok(Some(vec![PathBuf::from("photo.PNG")])), true);
+    match outcome {
+        super::DialogOutcome::Preview(path) => {
+            assert_eq!(path, PathBuf::from("photo.PNG"));
+        }
+        _ => return Err("图片选择应进入预览".into()),
+    }
+    assert!(state.take_focus_return());
+    assert!(state.feedback_key().is_none());
+    assert!(!state.session().is_loading());
+    assert!(state.session().pending_phase().is_none());
+    assert!(state.session().document().is_none());
+    Ok(())
+}
+
+#[test]
+fn chooser_keeps_markdown_on_the_readonly_document_path() -> Result<(), Box<dyn Error>> {
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    let request = state.request_open()?;
+    let job =
+        match state.accept_dialog_routed(&request, Ok(Some(vec![PathBuf::from("notes.md")])), true)
+        {
+            super::DialogOutcome::Read(job) => job,
+            _ => return Err("Markdown 应进入只读读取".into()),
+        };
+    let (next, prepared) =
+        state.read_finished(job.read_with(&Files("# 标题".as_bytes())), false, |_| {
+            Ok(())
+        });
+    assert!(next.is_none());
+    assert!(prepared.is_some());
+    assert_eq!(
+        state.session().document().ok_or("missing doc")?.path(),
+        Path::new("notes.md")
+    );
+    Ok(())
+}
+
+#[test]
+fn chooser_reports_disabled_preview_and_cancels_the_pending_open() -> Result<(), Box<dyn Error>> {
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    let request = state.request_open()?;
+    let outcome =
+        state.accept_dialog_routed(&request, Ok(Some(vec![PathBuf::from("photo.png")])), false);
+    assert!(matches!(outcome, super::DialogOutcome::Rejected));
+    assert_eq!(state.feedback_key(), Some("open_error.preview_blocked"));
+    assert!(state.take_focus_return());
+    assert!(!state.session().is_loading());
+    assert!(state.session().pending_phase().is_none());
+    Ok(())
+}
+
+#[test]
+fn chooser_stale_image_selection_does_not_start_a_preview() -> Result<(), Box<dyn Error>> {
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    let old = state.request_open()?;
+    let latest = state.request_open()?;
+    let outcome =
+        state.accept_dialog_routed(&old, Ok(Some(vec![PathBuf::from("photo.png")])), true);
+    assert!(matches!(outcome, super::DialogOutcome::Rejected));
+    assert!(!state.take_focus_return());
+    assert_eq!(state.feedback_key(), None);
+    let job = match state.accept_dialog_routed(&latest, Ok(Some(vec![PathBuf::from("a.md")])), true)
+    {
+        super::DialogOutcome::Read(job) => job,
+        _ => return Err("最新请求仍应可打开 Markdown".into()),
+    };
+    let (next, prepared) = state.read_finished(job.read_with(&Files(b"A")), false, |_| Ok(()));
+    assert!(next.is_none());
+    assert!(prepared.is_some());
+    Ok(())
+}
+
+#[test]
+fn chooser_multiple_image_selection_keeps_the_selection_count_error() -> Result<(), Box<dyn Error>>
+{
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    let request = state.request_open()?;
+    let outcome = state.accept_dialog_routed(
+        &request,
+        Ok(Some(vec![PathBuf::from("a.png"), PathBuf::from("b.png")])),
+        true,
+    );
+    assert!(matches!(outcome, super::DialogOutcome::Rejected));
+    assert_eq!(state.feedback_key(), Some("open_error.selection"));
+    assert!(state.take_focus_return());
+    assert!(!state.session().is_loading());
+    Ok(())
+}
+
+#[test]
+fn preview_scroll_maps_pixels_and_lines_to_pan_delta() -> Result<(), Box<dyn Error>> {
+    use gpui::{ScrollDelta, point, px};
+
+    let (x, y) = super::preview_scroll_delta(ScrollDelta::Pixels(point(px(12.0), px(-34.0))));
+    assert_eq!((x, y), (12.0, -34.0));
+    let (x, y) = super::preview_scroll_delta(ScrollDelta::Lines(point(1.0, -2.0)));
+    assert_eq!((x, y), (20.0, -40.0));
+    Ok(())
+}

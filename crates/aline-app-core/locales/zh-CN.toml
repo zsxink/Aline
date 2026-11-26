@@ -71,6 +71,14 @@ undo = "撤销"
 redo = "重做"
 find = "查找…"
 
+preview_fit = "适应窗口"
+preview_actual_size = "原始尺寸"
+preview_zoom_in = "放大"
+preview_zoom_out = "缩小"
+preview_close = "关闭预览"
+preview_retry = "重试"
+preview_label = "图片预览"
+
 [find]
 query = "查找"
 replacement = "替换为"
@@ -194,6 +202,20 @@ io = "无法读取文档。"
 decode = "文档不是有效的 UTF-8 文本。"
 internal = "无法准备该文档进行阅读。"
 dialog = "无法打开文件选择器。"
+preview_blocked = "图片预览插件已关闭，无法打开新的预览。"
+
+[preview]
+loading = "正在加载图片…"
+disabled = "图片预览插件已关闭；预览已暂停，图片路径仍保留。"
+percent = "{percent}%"
+zoom_limit = "已达到缩放边界，无法继续。"
+
+[preview.error]
+no_budget = "当前构建未启用图片解码预算，无法显示预览。"
+unsupported = "该文件不是受支持的图片格式。"
+too_large = "图片超出当前资源上限。"
+io = "无法读取图片文件。"
+changed = "图片文件已变化，请重试。"
 
 [startup]
 window_failed = "无法打开应用窗口。"

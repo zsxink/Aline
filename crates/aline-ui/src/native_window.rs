@@ -28,9 +28,10 @@ mod tokens;
 #[cfg(test)]
 mod tests;
 
+use body_image_cache::{RenderableImage, RenderableSource};
 use edit_actions::{EditAction, edit_error_key};
 use find_panel::FindPanel;
-use geometry::content_metrics;
+use geometry::{content_metrics, preview_viewport};
 use readonly_content::{NavigationIntent, navigation_intent};
 use readonly_hit::{HitError, HitTarget, PreparedLayout};
 use readonly_layout::LayoutError;
@@ -46,14 +47,15 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Instant;
 
-use aline_app_core::{LARGE_SOURCE_REASON_KEY, Translator};
+use aline_app_core::{EffectiveSettings, LARGE_SOURCE_REASON_KEY, Translator};
 use aline_buffer::{HistoryBudget, LineIndexBudget, TextBudget};
 use aline_markdown::{DiagnosticKind, ParseBudget, ParseConfig, Parsed};
+use aline_plugin::CapabilityId;
 use aline_source::StorageBudget;
 use gpui::{
-    App, Bounds, Context, Entity, ExternalPaths, FocusHandle, Image, KeyBinding, Menu, MenuItem,
-    MouseButton, PathPromptOptions, Role, SharedString, Subscription, Task, Window, WindowBounds,
-    WindowOptions, div, prelude::*, px, rgb, rgba, size,
+    App, Bounds, Context, Entity, ExternalPaths, FocusHandle, Image, ImageSource, KeyBinding, Menu,
+    MenuItem, MouseButton, ObjectFit, PathPromptOptions, Role, SharedString, Subscription, Task,
+    Window, WindowBounds, WindowOptions, div, img, prelude::*, px, rgb, rgba, size,
 };
 
 use crate::document::{
@@ -68,10 +70,15 @@ use crate::document::{
     WriteCompletion, WriteKind,
 };
 use crate::fonts::{FontEnvironment, FontStatus};
+use crate::image_preview::{
+    FileVersion, ImageSize, PreviewEnable, PreviewFailure, PreviewPhase, PreviewSlot, PreviewView,
+    PreviewViewport, failure_from_body_image, file_version,
+};
 use crate::{
     DocLimits, DocumentId, EditorMode, ModeSwitchOutcome, OpenDisposition, OpenError,
-    OpenRequestId, ParseRefreshJob, PublicationKind, PublicationOutcome, ReadonlyDocument,
-    ReadonlyOpenCompletion, ReadonlyOpenJob, ReadonlyOpenLimits, ReadonlySession, WaitHandle,
+    OpenRequestId, ParseRefreshJob, PluginGate, PublicationKind, PublicationOutcome,
+    ReadonlyDocument, ReadonlyOpenCompletion, ReadonlyOpenJob, ReadonlyOpenLimits, ReadonlySession,
+    WaitHandle,
 };
 
 gpui::actions!(
@@ -95,7 +102,8 @@ gpui::actions!(
         ReadStart,
         ReadEnd,
         CancelNavigation,
-        InvalidateFont
+        InvalidateFont,
+        ToggleImagePreview
     ]
 );
 
@@ -165,6 +173,25 @@ fn parse_media_budget(raw: &str) -> Option<crate::media::MediaBudget> {
     Some(crate::media::MediaBudget::new(
         source, pixels, decoded, frames,
     ))
+}
+
+/// 验证用预览加载延迟：只有 debug 构建且显式设置
+/// `ALINE_M4_PREVIEW_DELAY_MS` 时才放慢后台读取，用于旧结果拒绝取证；
+/// 生产构建恒为 `None`（fail-closed）。
+#[cfg(debug_assertions)]
+fn preview_load_delay_from_env() -> Option<std::time::Duration> {
+    let millis = std::env::var("ALINE_M4_PREVIEW_DELAY_MS")
+        .ok()?
+        .trim()
+        .parse::<u64>()
+        .ok()?;
+    (millis > 0).then(|| std::time::Duration::from_millis(millis.min(60_000)))
+}
+
+/// 发布构建永不延迟预览加载。
+#[cfg(not(debug_assertions))]
+fn preview_load_delay_from_env() -> Option<std::time::Duration> {
+    None
 }
 
 /// 窗口层保存宿主状态；只记录阶段与等待句柄，不复制文档队列。
@@ -253,6 +280,44 @@ pub(super) enum SaveIntent {
 
 /// 冲突面板展示数据：状态、保存基线、当前编辑、磁盘文本（不可读时为 None）。
 type ConflictPanelData = (ExternalDiskState, Arc<str>, Arc<str>, Option<Arc<str>>);
+
+/// 滚轮增量换算为预览平移；行增量按固定行高折算为逻辑像素。
+///
+/// 预览不把滚轮当缩放手势（UI §9）：只平移，方向与系统滚动一致。
+fn preview_scroll_delta(delta: gpui::ScrollDelta) -> (f32, f32) {
+    const LINE_HEIGHT: f32 = 20.0;
+    match delta {
+        gpui::ScrollDelta::Pixels(point) => (f32::from(point.x), f32::from(point.y)),
+        gpui::ScrollDelta::Lines(point) => (point.x * LINE_HEIGHT, point.y * LINE_HEIGHT),
+    }
+}
+
+/// 预览工具条上的可执行控件。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PreviewControl {
+    /// 适应窗口。
+    Fit,
+    /// 1:1 实际尺寸。
+    ActualSize,
+    /// 放大一档。
+    ZoomIn,
+    /// 缩小一档。
+    ZoomOut,
+    /// 失败后重试。
+    Retry,
+    /// 关闭预览。
+    Close,
+}
+
+/// 打开选择结果的去向。
+pub(super) enum DialogOutcome {
+    /// 只读 Markdown 读取任务。
+    Read(ReadonlyOpenJob),
+    /// 图片预览请求；打开意图已取消，文档会话保持原状。
+    Preview(PathBuf),
+    /// 取消、拒绝或旧请求；无任务。
+    Rejected,
+}
 
 impl NativeOpenCoordinator {
     pub(super) fn new(limits: ReadonlyOpenLimits) -> Self {
@@ -1273,6 +1338,40 @@ impl NativeOpenCoordinator {
         self.close_document_with(false, |_| ()).is_ok()
     }
 
+    /// 按扩展名分流选择结果：支持的图片扩展名取消打开意图并交给预览，
+    /// Markdown 与其它扩展名沿用只读打开校验；插件关闭时拦截并说明。
+    ///
+    /// 图片分流只看扩展名，签名与预算由预览加载在后台校验；`.md` 永不走预览。
+    pub(super) fn accept_dialog_routed(
+        &mut self,
+        request: &OpenRequestId,
+        selection: Result<Option<Vec<PathBuf>>, ()>,
+        preview_allowed: bool,
+    ) -> DialogOutcome {
+        if let Ok(Some(paths)) = &selection
+            && paths.len() == 1
+            && crate::image_preview::has_preview_extension(&paths[0])
+        {
+            if !preview_allowed {
+                if self.session.cancel_open(request) {
+                    self.feedback = Some("open_error.preview_blocked");
+                    self.return_focus = !self.closed;
+                }
+                return DialogOutcome::Rejected;
+            }
+            if self.session.cancel_open(request) {
+                self.feedback = None;
+                self.return_focus = !self.closed;
+                return DialogOutcome::Preview(paths[0].clone());
+            }
+            return DialogOutcome::Rejected;
+        }
+        match self.accept_dialog(request, selection) {
+            Some(job) => DialogOutcome::Read(job),
+            None => DialogOutcome::Rejected,
+        }
+    }
+
     #[cfg(test)]
     pub(super) fn close_window(&mut self, unsettled_input: bool) -> bool {
         if self.close_document_with(unsettled_input, |_| ()).is_err() {
@@ -1482,6 +1581,15 @@ pub(super) struct NativeWindowCopy {
     selecting: SharedString,
     loading: SharedString,
     readonly: SharedString,
+    preview_label: SharedString,
+    preview_fit: SharedString,
+    preview_actual_size: SharedString,
+    preview_zoom_in: SharedString,
+    preview_zoom_out: SharedString,
+    preview_close: SharedString,
+    preview_retry: SharedString,
+    preview_loading: SharedString,
+    preview_disabled: SharedString,
     visual_view: SharedString,
     source_view: SharedString,
     cancel_navigation: SharedString,
@@ -1573,6 +1681,14 @@ impl NativeWindowCopy {
             "link.rejected.empty",
             "link.rejected.scheme",
             "link.rejected.unsupported",
+            "open_error.preview_blocked",
+            "preview.disabled",
+            "preview.zoom_limit",
+            "preview.error.no_budget",
+            "preview.error.unsupported",
+            "preview.error.too_large",
+            "preview.error.io",
+            "preview.error.changed",
         ] {
             errors.insert(key, text(key)?);
         }
@@ -1604,6 +1720,15 @@ impl NativeWindowCopy {
             selecting: text("window.selecting")?,
             loading: text("window.loading")?,
             readonly: text("window.readonly")?,
+            preview_label: text("action.preview_label")?,
+            preview_fit: text("action.preview_fit")?,
+            preview_actual_size: text("action.preview_actual_size")?,
+            preview_zoom_in: text("action.preview_zoom_in")?,
+            preview_zoom_out: text("action.preview_zoom_out")?,
+            preview_close: text("action.preview_close")?,
+            preview_retry: text("action.preview_retry")?,
+            preview_loading: text("preview.loading")?,
+            preview_disabled: text("preview.disabled")?,
             visual_view: text("action.visual_view")?,
             source_view: text("action.source_view")?,
             cancel_navigation: text("action.cancel_navigation")?,
@@ -1650,6 +1775,15 @@ impl NativeWindowCopy {
             text("status.characters", &characters)?,
             text("status.lines", &lines)?,
         ))
+    }
+
+    /// 预览百分比文案；插值失败时退回裸百分比，不丢当前缩放信息。
+    fn preview_percent(&self, percent: u32) -> SharedString {
+        let percent = percent.to_string();
+        self.translator
+            .t_with("preview.percent", &[("percent", &percent)])
+            .map(SharedString::from)
+            .unwrap_or_else(|_| SharedString::from(format!("{percent}%")))
     }
 
     /// 恢复记录标题按 `{id}` 现取；缺键或占位符错误时返回 Err。
@@ -1780,7 +1914,10 @@ pub(crate) fn open_initial_window(
         ),
     ]);
     #[cfg(debug_assertions)]
-    cx.bind_keys([KeyBinding::new("cmd-alt-l", ReportLayout, Some("M1Window"))]);
+    cx.bind_keys([
+        KeyBinding::new("cmd-alt-l", ReportLayout, Some("M1Window")),
+        KeyBinding::new("cmd-alt-p", ToggleImagePreview, Some("M1Window")),
+    ]);
     // 字体失效触发只在两个验证环境变量齐全时绑定；生产没有任何快捷键。
     if font_invalidate::FontInvalidation::from_env().is_some() {
         cx.bind_keys([KeyBinding::new(
@@ -1873,6 +2010,16 @@ struct NativeDocumentWindow {
     font_invalidation: Option<font_invalidate::FontInvalidation>,
     /// 正文图片预算；生产默认不注入，只有显式设置后才解码图片。
     media_budget: Option<crate::media::MediaBudget>,
+    /// 内置插件门控；设置服务接入前按 PRD 默认值发布一次启用集合。
+    plugins: PluginGate,
+    /// 只读图片预览单槽；与文档会话互不替换。
+    preview: PreviewSlot,
+    /// 已通过入口校验的预览图片；加载中被清空。
+    preview_image: Option<Rc<RenderableImage>>,
+    /// 预览加载任务；新请求替换旧任务，迟到结果由槽按请求与代次拒绝。
+    preview_task: Option<(u64, Task<()>)>,
+    /// 左键拖拽平移的上一个位置。
+    preview_drag: Option<(f32, f32)>,
 }
 
 impl NativeDocumentWindow {
@@ -1940,6 +2087,19 @@ impl NativeDocumentWindow {
             m2_evidence: m2_evidence::M2Evidence::from_env(),
             font_invalidation: font_invalidate::FontInvalidation::from_env(),
             media_budget: media_budget_from_env(),
+            plugins: {
+                // 设置服务（5.4）接入前按 PRD 默认值发布启用集合；注册失败只让
+                // 对应能力留在 UnknownCapability，不影响文档与会话。
+                let mut gate = PluginGate::with_builtin_providers().unwrap_or_default();
+                gate.publish_enabled(crate::enabled_capabilities(
+                    EffectiveSettings::default().plugins,
+                ));
+                gate
+            },
+            preview: PreviewSlot::new(),
+            preview_image: None,
+            preview_task: None,
+            preview_drag: None,
         };
         if state.probe.is_some() {
             cx.spawn_in(window, async move |weak, cx| {
@@ -2047,15 +2207,20 @@ impl NativeDocumentWindow {
             };
             let _ = weak.update_in(cx, |this, window, cx| {
                 this.dialog_task = None;
-                let job = this.state.accept_dialog(&request, selection);
+                let preview_allowed = this.preview_enabled();
+                let outcome = this
+                    .state
+                    .accept_dialog_routed(&request, selection, preview_allowed);
                 if this.state.take_focus_return() {
                     this.dialog_return_focus
                         .take()
                         .unwrap_or_else(|| this.focus.clone())
                         .focus(window, cx);
                 }
-                if let Some(job) = job {
-                    this.start_read(job, window, cx);
+                match outcome {
+                    DialogOutcome::Read(job) => this.start_read(job, window, cx),
+                    DialogOutcome::Preview(path) => this.open_preview(path, window, cx),
+                    DialogOutcome::Rejected => {}
                 }
                 this.update_menu(cx);
                 cx.notify();
@@ -2152,6 +2317,11 @@ impl NativeDocumentWindow {
     }
 
     fn close_document(&mut self, _: &CloseDocument, window: &mut Window, cx: &mut Context<Self>) {
+        // Cmd+W 先关预览视口；没有预览时才关闭文档，避免一次按键同时丢两种上下文。
+        if self.preview.phase() != PreviewPhase::Closed {
+            self.close_preview(window, cx);
+            return;
+        }
         if !self.close_with_evidence(cx) {
             cx.notify();
             return;
@@ -2162,6 +2332,479 @@ impl NativeDocumentWindow {
         self.refresh_find(cx);
         window.set_window_title(self.copy.title.as_ref());
         self.focus.focus(window, cx);
+        self.update_menu(cx);
+        cx.notify();
+    }
+
+    /// 预览视口：窗口逻辑尺寸减去工具栏与状态栏。
+    fn current_preview_viewport(&self, window: &Window) -> PreviewViewport {
+        let size = window.viewport_size();
+        let (width, height) = preview_viewport(f32::from(size.width), f32::from(size.height));
+        PreviewViewport::new(width, height)
+    }
+
+    /// 图片预览能力当前是否可用（已注册且已启用）。
+    fn preview_enabled(&self) -> bool {
+        self.plugins
+            .check_capability(CapabilityId::IMAGE_PREVIEW)
+            .is_ok()
+    }
+
+    /// 打开预览：同路径复用现有视口，不同路径开始新加载。
+    fn open_preview(&mut self, path: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.preview_enabled() {
+            self.state.feedback = Some("open_error.preview_blocked");
+            cx.notify();
+            return;
+        }
+        let viewport = self.current_preview_viewport(window);
+        let generation = self.plugins.plugin_generation();
+        let version = file_version(&path);
+        if let Some(name) = path.file_name() {
+            window.set_window_title(name.to_string_lossy().as_ref());
+        }
+        let Some(request) = self.preview.open(
+            path.clone(),
+            version.unwrap_or(FileVersion::new(0, None)),
+            generation,
+            viewport,
+        ) else {
+            // 同一路径：保留当前模式、缩放与平移，只按新视口重算。
+            self.preview.set_viewport(viewport);
+            self.state.feedback = None;
+            self.update_menu(cx);
+            cx.notify();
+            return;
+        };
+        self.state.feedback = None;
+        match version {
+            Some(version) => self.spawn_preview_load(request, path, version, window, cx),
+            None => {
+                // 元数据都读不到时不必进入后台：直接给可重试的读取失败。
+                self.preview.accept_failed(request, PreviewFailure::Io);
+                self.preview_image = None;
+                self.update_menu(cx);
+                cx.notify();
+            }
+        }
+    }
+
+    /// 后台读取并校验图片；结果连同完成时的文件版本交回槽复验。
+    fn spawn_preview_load(
+        &mut self,
+        request: u64,
+        path: PathBuf,
+        version: FileVersion,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) {
+        let budget = self.media_budget;
+        let delay = preview_load_delay_from_env();
+        let load_path = path.clone();
+        let timer = delay.map(|delay| cx.background_executor().timer(delay));
+        let work = cx.background_executor().spawn(async move {
+            if let Some(timer) = timer {
+                timer.await;
+            }
+            let result = crate::body_image::resolve_local_image(&load_path, budget);
+            let after = file_version(&load_path);
+            (result, after)
+        });
+        self.preview_image = None;
+        self.preview_task = Some((
+            request,
+            cx.spawn_in(window, async move |weak, cx| {
+                let (result, after) = work.await;
+                let _ = weak.update_in(cx, |this, _window, cx| {
+                    if this
+                        .preview_task
+                        .as_ref()
+                        .is_some_and(|(pending, _)| *pending == request)
+                    {
+                        this.preview_task = None;
+                    }
+                    let current = this.plugins.plugin_generation();
+                    match result {
+                        Ok(image) => {
+                            let size = ImageSize::new(
+                                image.dimensions().width(),
+                                image.dimensions().height(),
+                            );
+                            let Some(size) = size else {
+                                this.preview
+                                    .accept_failed(request, PreviewFailure::Unsupported);
+                                cx.notify();
+                                return;
+                            };
+                            if this.preview.accept_loaded(
+                                request,
+                                current,
+                                size,
+                                after.unwrap_or(version),
+                            ) {
+                                this.preview_image = Some(Rc::new(RenderableImage::new(image)));
+                            }
+                        }
+                        Err(error) => {
+                            this.preview
+                                .accept_failed(request, failure_from_body_image(error));
+                            this.preview_image = None;
+                        }
+                    }
+                    cx.notify();
+                });
+            }),
+        ));
+        self.update_menu(cx);
+        cx.notify();
+    }
+
+    /// 关闭预览视口；文档会话与阅读位置保持不变。
+    fn close_preview(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.preview.close();
+        self.preview_image = None;
+        self.preview_task = None;
+        self.preview_drag = None;
+        self.state.feedback = None;
+        match &self.loaded_name {
+            Some(name) => window.set_window_title(name.as_ref()),
+            None => window.set_window_title(self.copy.title.as_ref()),
+        }
+        self.focus.focus(window, cx);
+        self.update_menu(cx);
+        cx.notify();
+    }
+
+    /// 失败后按当前文件版本重试。
+    fn retry_preview(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.preview_enabled() {
+            self.state.feedback = Some("open_error.preview_blocked");
+            cx.notify();
+            return;
+        }
+        let Some(path) = self.preview.path().map(Path::to_path_buf) else {
+            return;
+        };
+        let Some(version) = file_version(&path) else {
+            self.state.feedback = Some(PreviewFailure::Io.key());
+            cx.notify();
+            return;
+        };
+        let viewport = self.current_preview_viewport(window);
+        let generation = self.plugins.plugin_generation();
+        if let Some(request) = self.preview.retry(version, generation, viewport) {
+            self.spawn_preview_load(request, path, version, window, cx);
+        }
+    }
+
+    /// 预览工具按钮动作；缩放边界与关闭都经过同一入口。
+    fn preview_control(
+        &mut self,
+        control: PreviewControl,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        match control {
+            PreviewControl::Fit => self.preview.fit(),
+            PreviewControl::ActualSize => self.preview.actual_size(),
+            PreviewControl::ZoomIn => {
+                if self
+                    .preview
+                    .zoom_in()
+                    .is_some_and(|outcome| outcome.at_limit)
+                {
+                    self.state.feedback = Some("preview.zoom_limit");
+                }
+            }
+            PreviewControl::ZoomOut => {
+                if self
+                    .preview
+                    .zoom_out()
+                    .is_some_and(|outcome| outcome.at_limit)
+                {
+                    self.state.feedback = Some("preview.zoom_limit");
+                }
+            }
+            PreviewControl::Retry => self.retry_preview(window, cx),
+            PreviewControl::Close => {
+                self.close_preview(window, cx);
+                return;
+            }
+        }
+        cx.notify();
+    }
+
+    /// 预览状态文案：就绪显示百分比，其余显示对应说明。
+    fn preview_state_label(&self, phase: PreviewPhase, view: Option<&PreviewView>) -> SharedString {
+        match phase {
+            PreviewPhase::Closed => SharedString::from(""),
+            PreviewPhase::Loading => self.copy.preview_loading.clone(),
+            PreviewPhase::Disabled => self.copy.preview_disabled.clone(),
+            PreviewPhase::Failed => self
+                .preview
+                .failure()
+                .and_then(|failure| self.copy.errors.get(failure.key()).cloned())
+                .unwrap_or_else(|| self.copy.preview_label.clone()),
+            PreviewPhase::Ready => view.map_or_else(
+                || self.copy.preview_loading.clone(),
+                |view| self.copy.preview_percent(view.percent()),
+            ),
+        }
+    }
+
+    /// 预览工具按钮：可聚焦、Tab 可达，Enter/Space 与点击等价。
+    fn preview_button(
+        &self,
+        id: &'static str,
+        label: SharedString,
+        enabled: bool,
+        control: PreviewControl,
+        cx: &mut Context<Self>,
+    ) -> gpui::AnyElement {
+        div()
+            .id(id)
+            .aria_label(label.clone())
+            .px_2()
+            .py_1()
+            .rounded_md()
+            .border_1()
+            .border_color(rgb(tokens::BORDER))
+            .text_xs()
+            .text_color(rgb(if enabled {
+                tokens::TEXT
+            } else {
+                tokens::SECONDARY
+            }))
+            .when(enabled, |button| {
+                button
+                    .focusable()
+                    .tab_stop(true)
+                    .role(Role::Button)
+                    .focus(|style| style.border_color(rgb(tokens::ACCENT)))
+                    .cursor_pointer()
+                    .hover(|style| style.bg(rgba(tokens::HOVER)))
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.preview_control(control, window, cx);
+                    }))
+                    .on_key_down(cx.listener(
+                        move |this, event: &gpui::KeyDownEvent, window, cx| {
+                            if event.keystroke.key == "enter" || event.keystroke.key == "space" {
+                                this.preview_control(control, window, cx);
+                                cx.stop_propagation();
+                            }
+                        },
+                    ))
+            })
+            .child(label)
+            .into_any_element()
+    }
+
+    /// 工具栏内的预览控件：适应、1:1、缩放、百分比、重试与关闭。
+    fn render_preview_controls(&self, cx: &mut Context<Self>) -> gpui::AnyElement {
+        let phase = self.preview.phase();
+        let view = self.preview.view().copied();
+        let ready = phase == PreviewPhase::Ready;
+        div()
+            .flex()
+            .items_center()
+            .gap_1()
+            .pl_2()
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(rgb(tokens::SECONDARY))
+                    .child(self.copy.preview_label.clone()),
+            )
+            .child(self.preview_button(
+                "preview-fit",
+                self.copy.preview_fit.clone(),
+                ready,
+                PreviewControl::Fit,
+                cx,
+            ))
+            .child(self.preview_button(
+                "preview-actual",
+                self.copy.preview_actual_size.clone(),
+                ready,
+                PreviewControl::ActualSize,
+                cx,
+            ))
+            .child(self.preview_button(
+                "preview-zoom-out",
+                self.copy.preview_zoom_out.clone(),
+                ready,
+                PreviewControl::ZoomOut,
+                cx,
+            ))
+            .child(
+                div()
+                    .min_w(px(44.0))
+                    .text_center()
+                    .text_xs()
+                    .text_color(rgb(tokens::SECONDARY))
+                    .child(self.preview_state_label(phase, view.as_ref())),
+            )
+            .child(self.preview_button(
+                "preview-zoom-in",
+                self.copy.preview_zoom_in.clone(),
+                ready,
+                PreviewControl::ZoomIn,
+                cx,
+            ))
+            .when(phase == PreviewPhase::Failed, |row| {
+                row.child(self.preview_button(
+                    "preview-retry",
+                    self.copy.preview_retry.clone(),
+                    true,
+                    PreviewControl::Retry,
+                    cx,
+                ))
+            })
+            .child(self.preview_button(
+                "preview-close",
+                self.copy.preview_close.clone(),
+                true,
+                PreviewControl::Close,
+                cx,
+            ))
+            .into_any_element()
+    }
+
+    /// 预览视口：整块内容区，图片按缩放尺寸居中并按平移偏移绘制。
+    fn render_preview(&self, cx: &mut Context<Self>) -> gpui::AnyElement {
+        let phase = self.preview.phase();
+        let view = self.preview.view().copied();
+        let mut area = div()
+            .id("image-preview")
+            .flex_1()
+            .min_h_0()
+            .w_full()
+            .relative()
+            .overflow_hidden()
+            .bg(rgb(tokens::NOTICE_SURFACE))
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, event: &gpui::MouseDownEvent, _, cx| {
+                    this.preview_drag =
+                        Some((f32::from(event.position.x), f32::from(event.position.y)));
+                    cx.stop_propagation();
+                }),
+            )
+            .on_mouse_move(cx.listener(|this, event: &gpui::MouseMoveEvent, _, cx| {
+                let Some((last_x, last_y)) = this.preview_drag else {
+                    return;
+                };
+                if event.pressed_button != Some(MouseButton::Left) {
+                    this.preview_drag = None;
+                    return;
+                }
+                let x = f32::from(event.position.x);
+                let y = f32::from(event.position.y);
+                this.preview_drag = Some((x, y));
+                if this.preview.pan_by(x - last_x, y - last_y) {
+                    cx.notify();
+                }
+            }))
+            .on_mouse_up(
+                MouseButton::Left,
+                cx.listener(|this, _, _, _| {
+                    this.preview_drag = None;
+                }),
+            )
+            .on_scroll_wheel(cx.listener(|this, event: &gpui::ScrollWheelEvent, _, cx| {
+                let (dx, dy) = preview_scroll_delta(event.delta);
+                if this.preview.pan_by(dx, dy) {
+                    cx.notify();
+                }
+                cx.stop_propagation();
+            }));
+        if let (Some(image), Some(view)) = (&self.preview_image, view) {
+            let source: ImageSource = match image.source() {
+                RenderableSource::Local(path) => path.clone().into(),
+                RenderableSource::Data(data) => data.clone().into(),
+            };
+            let scale = view.scale();
+            let width = view.image().width() as f32 * scale;
+            let height = view.image().height() as f32 * scale;
+            let pan = view.pan();
+            let viewport = view.viewport();
+            area = area.child(
+                img(source)
+                    .id("preview-image")
+                    .absolute()
+                    .left(px((viewport.width() - width) / 2.0 + pan.x()))
+                    .top(px((viewport.height() - height) / 2.0 + pan.y()))
+                    .w(px(width))
+                    .h(px(height))
+                    .object_fit(ObjectFit::Fill),
+            );
+        } else {
+            let mut message = div()
+                .absolute()
+                .left(px(0.0))
+                .top(px(0.0))
+                .w_full()
+                .h_full()
+                .flex()
+                .flex_col()
+                .justify_center()
+                .items_center()
+                .gap_2()
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(rgb(tokens::TEXT))
+                        .child(self.preview_state_label(phase, view.as_ref())),
+                );
+            if let Some(path) = self.preview.path() {
+                message = message.child(
+                    div()
+                        .text_xs()
+                        .text_color(rgb(tokens::SECONDARY))
+                        .child(SharedString::from(path.display().to_string())),
+                );
+            }
+            area = area.child(message);
+        }
+        area.into_any_element()
+    }
+
+    /// 插件开关（debug 取证入口）：关闭转说明状态，重新启用按 PL-03 恢复。
+    #[cfg(debug_assertions)]
+    fn toggle_image_preview(
+        &mut self,
+        _: &ToggleImagePreview,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let enabled = !self.preview_enabled();
+        let mut plugins = EffectiveSettings::default().plugins;
+        plugins.image_preview = enabled;
+        let generation = self
+            .plugins
+            .publish_enabled(crate::enabled_capabilities(plugins));
+        if !enabled {
+            self.preview.disable();
+            self.preview_task = None;
+            self.preview_image = None;
+            self.preview_drag = None;
+        } else {
+            let viewport = self.current_preview_viewport(window);
+            let path = self.preview.path().map(Path::to_path_buf);
+            let version = path.as_deref().and_then(file_version);
+            match self.preview.enable(version, generation, viewport) {
+                PreviewEnable::Idle => {}
+                PreviewEnable::Failed(failure) => {
+                    self.preview_image = None;
+                    self.state.feedback = Some(failure.key());
+                }
+                PreviewEnable::Loading(request) => {
+                    if let (Some(path), Some(version)) = (path, version) {
+                        self.spawn_preview_load(request, path, version, window, cx);
+                    }
+                }
+            }
+        }
         self.update_menu(cx);
         cx.notify();
     }
@@ -2769,6 +3412,11 @@ impl NativeDocumentWindow {
                 // 新文档接管窗口：旧状态与在途输入全部作废；恢复/自动保存等待首次关联。
                 self.clear_input_state();
                 self.reset_recovery_tasks();
+                // 文档接管内容区：预览视口让位，迟到的图片结果不再可达。
+                self.preview.close();
+                self.preview_image = None;
+                self.preview_task = None;
+                self.preview_drag = None;
                 self.state.panel.mark_restored(document);
                 reader.schedule_height_hint(window, cx);
                 self.reader = Some(reader);
@@ -3413,7 +4061,9 @@ impl NativeDocumentWindow {
         let table = editable && self.has_table_menu_target();
         self.copy.install_menu(
             cx,
-            self.state.session().document().is_some() || self.state.session().is_loading(),
+            self.state.session().document().is_some()
+                || self.state.session().is_loading()
+                || self.preview.phase() != PreviewPhase::Closed,
             (editable, table),
             self.state.save_as_enabled(),
             self.state.save_cancel_enabled(),
@@ -3726,6 +4376,12 @@ impl Render for NativeDocumentWindow {
             });
         let viewport_width = f32::from(window.viewport_size().width);
         let metrics = content_metrics(viewport_width, viewport_width);
+        // 预览占据整块内容区：每帧按当前窗口重算视口，适应模式随之收敛。
+        let preview_active = self.preview.phase() != PreviewPhase::Closed;
+        if preview_active {
+            self.preview
+                .set_viewport(self.current_preview_viewport(window));
+        }
         let mut reader_reset = false;
         if let (Some(reader), Some(document)) = (&mut self.reader, self.state.session().document())
         {
@@ -3909,64 +4565,80 @@ impl Render for NativeDocumentWindow {
                 cx.listener(|this, _, window, cx| this.open_document(&OpenDocument, window, cx)),
             )
             .child(self.copy.open.clone());
-        let content_body = match reader_element {
-            Some(reader) => div().flex_1().min_h_0().w_full().child(reader),
-            None => {
-                let mut body = div().flex_1().min_h_0().w_full().flex().flex_col();
-                if let Some(panel) = recovery_panel {
-                    body = body.child(panel);
+        let content_body = if preview_active {
+            self.render_preview(cx)
+        } else {
+            match reader_element {
+                Some(reader) => div()
+                    .flex_1()
+                    .min_h_0()
+                    .w_full()
+                    .child(reader)
+                    .into_any_element(),
+                None => {
+                    let mut body = div().flex_1().min_h_0().w_full().flex().flex_col();
+                    if let Some(panel) = recovery_panel {
+                        body = body.child(panel);
+                    }
+                    body.when(!document_open, |body| {
+                        body.child(
+                            div()
+                                .flex_1()
+                                .flex()
+                                .flex_col()
+                                .justify_center()
+                                .items_center()
+                                .gap_3()
+                                .child(
+                                    div()
+                                        .text_xl()
+                                        .text_color(rgb(tokens::TEXT))
+                                        .child(self.copy.empty.clone()),
+                                )
+                                .child(open_button),
+                        )
+                    })
+                    .into_any_element()
                 }
-                body.when(!document_open, |body| {
-                    body.child(
-                        div()
-                            .flex_1()
-                            .flex()
-                            .flex_col()
-                            .justify_center()
-                            .items_center()
-                            .gap_3()
-                            .child(
-                                div()
-                                    .text_xl()
-                                    .text_color(rgb(tokens::TEXT))
-                                    .child(self.copy.empty.clone()),
-                            )
-                            .child(open_button),
-                    )
-                })
             }
         };
-        let toolbar = shell::toolbar_row()
-            .child(shell::brand(self.brand.clone(), self.copy.title.clone()))
-            .children(mode.map(|mode| {
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_1()
-                    .child(self.mode_button(
-                        "mode-visual",
-                        self.copy.visual_view.clone(),
-                        mode == EditorMode::Visual,
-                        EditorMode::Visual,
-                        cx,
-                    ))
-                    .child(self.mode_button(
-                        "mode-source",
-                        self.copy.source_view.clone(),
-                        mode == EditorMode::Source,
-                        EditorMode::Source,
-                        cx,
-                    ))
-            }))
-            .when(document_open && !editable, |row| {
-                row.child(
+        let toolbar = if preview_active {
+            shell::toolbar_row()
+                .child(shell::brand(self.brand.clone(), self.copy.title.clone()))
+                .child(self.render_preview_controls(cx))
+        } else {
+            shell::toolbar_row()
+                .child(shell::brand(self.brand.clone(), self.copy.title.clone()))
+                .children(mode.map(|mode| {
                     div()
-                        .pl_2()
-                        .text_size(px(12.0))
-                        .text_color(rgb(tokens::SECONDARY))
-                        .child(self.copy.readonly.clone()),
-                )
-            });
+                        .flex()
+                        .items_center()
+                        .gap_1()
+                        .child(self.mode_button(
+                            "mode-visual",
+                            self.copy.visual_view.clone(),
+                            mode == EditorMode::Visual,
+                            EditorMode::Visual,
+                            cx,
+                        ))
+                        .child(self.mode_button(
+                            "mode-source",
+                            self.copy.source_view.clone(),
+                            mode == EditorMode::Source,
+                            EditorMode::Source,
+                            cx,
+                        ))
+                }))
+                .when(document_open && !editable, |row| {
+                    row.child(
+                        div()
+                            .pl_2()
+                            .text_size(px(12.0))
+                            .text_color(rgb(tokens::SECONDARY))
+                            .child(self.copy.readonly.clone()),
+                    )
+                })
+        };
         let current_id = self
             .state
             .session()
@@ -3976,20 +4648,35 @@ impl Render for NativeDocumentWindow {
             .statistics
             .as_ref()
             .filter(|(id, _, _)| current_id.is_some_and(|current| current == id));
-        let status = shell::status_row()
-            .when(document_open, |row| match adopted {
-                Some((_, characters, lines)) => row
-                    .child(div().child(characters.clone()))
-                    .child(div().child(lines.clone())),
-                None => row.child(div().child(self.copy.statistics_pending.clone())),
-            })
-            .child(div().flex_1())
-            .children(mode.map(|mode| {
-                div().child(match mode {
-                    EditorMode::Visual => self.copy.visual_view.clone(),
-                    EditorMode::Source => self.copy.source_view.clone(),
+        let status = if preview_active {
+            let preview_phase = self.preview.phase();
+            let preview_view = self.preview.view().copied();
+            shell::status_row()
+                .child(div().child(self.copy.preview_label.clone()))
+                .when_some(
+                    self.state
+                        .feedback_key()
+                        .and_then(|key| self.copy.errors.get(key).cloned()),
+                    |row, message| row.child(div().child(message)),
+                )
+                .child(div().flex_1())
+                .child(div().child(self.preview_state_label(preview_phase, preview_view.as_ref())))
+        } else {
+            shell::status_row()
+                .when(document_open, |row| match adopted {
+                    Some((_, characters, lines)) => row
+                        .child(div().child(characters.clone()))
+                        .child(div().child(lines.clone())),
+                    None => row.child(div().child(self.copy.statistics_pending.clone())),
                 })
-            }));
+                .child(div().flex_1())
+                .children(mode.map(|mode| {
+                    div().child(match mode {
+                        EditorMode::Visual => self.copy.visual_view.clone(),
+                        EditorMode::Source => self.copy.source_view.clone(),
+                    })
+                }))
+        };
         let content = shell::content_row().child(
             div()
                 .flex_1()
@@ -3997,10 +4684,12 @@ impl Render for NativeDocumentWindow {
                 .min_h_0()
                 .flex()
                 .flex_col()
-                .children(notice)
-                .children(conflict_panel)
-                .children(format_preview)
-                .children(self.find_panel.as_ref().map(|(panel, _)| panel.clone()))
+                .when(!preview_active, |body| {
+                    body.children(notice)
+                        .children(conflict_panel)
+                        .children(format_preview)
+                        .children(self.find_panel.as_ref().map(|(panel, _)| panel.clone()))
+                })
                 .child(content_body),
         );
         let root = div()
@@ -4151,6 +4840,8 @@ impl Render for NativeDocumentWindow {
                 reader.report();
             }
         }));
+        #[cfg(debug_assertions)]
+        let root = root.on_action(cx.listener(Self::toggle_image_preview));
         if let Some(serial) = probe_ticket {
             let submitted = cx.entity().downgrade();
             // 锁定 GPUI 在同一 window update 中 draw 后调用 present；effect 回调

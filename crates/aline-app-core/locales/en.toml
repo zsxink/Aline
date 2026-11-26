@@ -71,6 +71,14 @@ undo = "Undo"
 redo = "Redo"
 find = "Find…"
 
+preview_fit = "Fit Window"
+preview_actual_size = "Actual Size"
+preview_zoom_in = "Zoom In"
+preview_zoom_out = "Zoom Out"
+preview_close = "Close Preview"
+preview_retry = "Retry"
+preview_label = "Image Preview"
+
 [find]
 query = "Find"
 replacement = "Replace with"
@@ -194,6 +202,20 @@ io = "The document could not be read."
 decode = "The document is not valid UTF-8."
 internal = "The document could not be prepared for reading."
 dialog = "The file chooser could not be opened."
+preview_blocked = "The image preview plugin is off; a new preview cannot be opened."
+
+[preview]
+loading = "Loading image…"
+disabled = "The image preview plugin is off; the preview is paused and its path is kept."
+percent = "{percent}%"
+zoom_limit = "Zoom limit reached."
+
+[preview.error]
+no_budget = "Image decoding budget is not enabled in this build, so the preview cannot be shown."
+unsupported = "This file is not a supported image format."
+too_large = "The image exceeds the current resource limit."
+io = "The image file could not be read."
+changed = "The image file changed. Try again."
 
 [startup]
 window_failed = "The application window could not be opened."

@@ -31,7 +31,7 @@ pub(super) struct RenderableImage {
 }
 
 impl RenderableImage {
-    fn new(image: BodyImage) -> Self {
+    pub(super) fn new(image: BodyImage) -> Self {
         let dimensions = image.dimensions();
         let source = match image.source() {
             BodyImageSource::Local(path) => RenderableSource::Local(path.clone()),

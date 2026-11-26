@@ -95,6 +95,17 @@ pub(super) fn content_metrics(window_width: f32, area_width: f32) -> ContentMetr
     }
 }
 
+/// 图片预览视口：窗口逻辑尺寸减去工具栏与状态栏行高，下限 1。
+///
+/// 预览视口只按窗口与固定行高计算，不含标签栏（M4 无标签栏）与通知条；
+/// 通知条出现时实际可见区域更小，适应重算在下一帧按此值收敛。
+pub(super) fn preview_viewport(width: f32, height: f32) -> (f32, f32) {
+    (
+        width.max(1.0),
+        (height - TOOLBAR_HEIGHT - STATUSBAR_HEIGHT).max(1.0),
+    )
+}
+
 /// 模块内无头测试：单元测试与生产代码同源编译，无需 `#[path]` 引入。
 #[cfg(test)]
 mod tests {
@@ -170,5 +181,15 @@ mod tests {
         assert_eq!(metrics.column_width, 28.0);
         assert_eq!(metrics.padding_x, 0.0);
         assert_eq!(metrics.text_width, 28.0);
+    }
+
+    #[test]
+    fn preview_viewport_is_the_content_area_between_toolbar_and_status() {
+        let (width, height) = preview_viewport(1200.0, 800.0);
+        assert_eq!(width, 1200.0);
+        assert_eq!(height, 800.0 - TOOLBAR_HEIGHT - STATUSBAR_HEIGHT);
+
+        let (_, tiny) = preview_viewport(100.0, 10.0);
+        assert_eq!(tiny, 1.0);
     }
 }

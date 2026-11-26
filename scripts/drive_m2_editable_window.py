@@ -74,7 +74,14 @@ class WindowDriver:
         self.serial += 1
         argv = [ORCA, "computer"] + args + ["--app", "pid:" + str(self.pid), "--json"]
         started = time.time_ns()
-        result = subprocess.run(argv, text=True, capture_output=True)
+        try:
+            result = subprocess.run(argv, text=True, capture_output=True, timeout=120.0)
+        except subprocess.TimeoutExpired:
+            write_json(self.evidence / f"step-{self.serial:03d}.command.json",
+                       {"argv": argv, "note": note, "exit_code": -1,
+                        "timeout_seconds": 120.0,
+                        "started_epoch_ns": started, "finished_epoch_ns": time.time_ns()})
+            raise DriverError("Orca 调用超时（120 秒）：" + note)
         write_json(self.evidence / f"step-{self.serial:03d}.command.json",
                    {"argv": argv, "note": note, "exit_code": result.returncode,
                     "started_epoch_ns": started, "finished_epoch_ns": time.time_ns()})
@@ -103,7 +110,10 @@ class WindowDriver:
 
     def probe(self):
         argv = [ORCA, "computer", "get-app-state", "--app", "pid:" + str(self.pid), "--json"]
-        result = subprocess.run(argv, text=True, capture_output=True)
+        try:
+            result = subprocess.run(argv, text=True, capture_output=True, timeout=30.0)
+        except subprocess.TimeoutExpired:
+            return False
         try:
             value = json.loads(result.stdout)
         except json.JSONDecodeError:
@@ -337,13 +347,27 @@ class WindowDriver:
                         return int(match.group(2))
         return None
 
+    def find_named_field(self, snapshot, name):
+        """按文件名定位面板列视图里的文本域（快照截断时容器行可能缺失）。"""
+        match = re.search(r'^\s*(\d+) text field \((?:selected, )?settable\), Value: '
+                          + re.escape(name) + r'(?:, Secondary Actions: .*)?\s*$',
+                          self.tree_text(snapshot), re.M)
+        return int(match.group(1)) if match else None
+
     def osascript(self, script, note):
         """文件面板属于系统面板服务窗口：面板内按键经 System Events 投递。"""
         self.serial += 1
         started = time.time_ns()
-        result = subprocess.run(
-            ["osascript", "-e", 'tell application "System Events" to ' + script],
-            text=True, capture_output=True)
+        try:
+            result = subprocess.run(
+                ["osascript", "-e", 'tell application "System Events" to ' + script],
+                text=True, capture_output=True, timeout=60.0)
+        except subprocess.TimeoutExpired:
+            write_json(self.evidence / f"step-{self.serial:03d}.command.json",
+                       {"argv": ["osascript", "-e", "<System Events: " + note + ">"],
+                        "note": note, "exit_code": -1, "timeout_seconds": 60.0,
+                        "started_epoch_ns": started, "finished_epoch_ns": time.time_ns()})
+            raise DriverError("文件面板按键超时（60 秒）：" + note)
         write_json(self.evidence / f"step-{self.serial:03d}.command.json",
                    {"argv": ["osascript", "-e", "<System Events: " + note + ">"],
                     "note": note, "exit_code": result.returncode,

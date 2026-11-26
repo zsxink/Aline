@@ -337,6 +337,44 @@ pub enum PreviewFailure {
     Changed,
 }
 
+impl PreviewFailure {
+    /// 用户可见说明的 catalog 键。
+    pub const fn key(self) -> &'static str {
+        match self {
+            Self::NoBudget => "preview.error.no_budget",
+            Self::Unsupported => "preview.error.unsupported",
+            Self::TooLarge => "preview.error.too_large",
+            Self::Io => "preview.error.io",
+            Self::Changed => "preview.error.changed",
+        }
+    }
+}
+
+/// 把图片入口错误归类为预览失败；预算与解码细节不进入视口状态。
+pub fn failure_from_body_image(error: crate::body_image::BodyImageError) -> PreviewFailure {
+    use crate::body_image::BodyImageError;
+    use crate::media::MediaError;
+
+    match error {
+        BodyImageError::NoBudget => PreviewFailure::NoBudget,
+        BodyImageError::Io => PreviewFailure::Io,
+        BodyImageError::Remote | BodyImageError::UnsupportedScheme => PreviewFailure::Unsupported,
+        BodyImageError::Media(
+            MediaError::SourceTooLarge { .. }
+            | MediaError::PixelLimit { .. }
+            | MediaError::FrameLimit { .. }
+            | MediaError::DecodedLimit { .. },
+        ) => PreviewFailure::TooLarge,
+        BodyImageError::Media(
+            MediaError::EmptySource
+            | MediaError::UnsupportedFormat
+            | MediaError::InvalidHeader
+            | MediaError::InvalidDataUrl
+            | MediaError::InvalidSvg,
+        ) => PreviewFailure::Unsupported,
+    }
+}
+
 /// 预览槽的当前阶段。
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PreviewPhase {
@@ -1230,5 +1268,73 @@ mod tests {
         for name in ["a.md", "b.png.txt", "c", "d.tiff", "e.avif"] {
             assert!(!has_preview_extension(Path::new(name)), "{name}");
         }
+    }
+
+    #[test]
+    fn body_image_errors_map_to_preview_failures() {
+        use crate::body_image::BodyImageError;
+        use crate::media::MediaError;
+
+        assert_eq!(
+            failure_from_body_image(BodyImageError::NoBudget),
+            PreviewFailure::NoBudget
+        );
+        assert_eq!(
+            failure_from_body_image(BodyImageError::Io),
+            PreviewFailure::Io
+        );
+        for error in [
+            MediaError::EmptySource,
+            MediaError::UnsupportedFormat,
+            MediaError::InvalidHeader,
+            MediaError::InvalidDataUrl,
+            MediaError::InvalidSvg,
+        ] {
+            assert_eq!(
+                failure_from_body_image(BodyImageError::Media(error)),
+                PreviewFailure::Unsupported
+            );
+        }
+        for error in [
+            MediaError::SourceTooLarge {
+                limit: 1,
+                actual: 2,
+            },
+            MediaError::PixelLimit {
+                width: 1,
+                height: 1,
+                limit: 1,
+            },
+            MediaError::FrameLimit {
+                frames: 2,
+                limit: 1,
+            },
+            MediaError::DecodedLimit { bytes: 2, limit: 1 },
+        ] {
+            assert_eq!(
+                failure_from_body_image(BodyImageError::Media(error)),
+                PreviewFailure::TooLarge
+            );
+        }
+        assert_eq!(
+            failure_from_body_image(BodyImageError::Remote),
+            PreviewFailure::Unsupported
+        );
+        assert_eq!(
+            failure_from_body_image(BodyImageError::UnsupportedScheme),
+            PreviewFailure::Unsupported
+        );
+    }
+
+    #[test]
+    fn preview_failure_keys_are_stable() {
+        assert_eq!(PreviewFailure::NoBudget.key(), "preview.error.no_budget");
+        assert_eq!(
+            PreviewFailure::Unsupported.key(),
+            "preview.error.unsupported"
+        );
+        assert_eq!(PreviewFailure::TooLarge.key(), "preview.error.too_large");
+        assert_eq!(PreviewFailure::Io.key(), "preview.error.io");
+        assert_eq!(PreviewFailure::Changed.key(), "preview.error.changed");
     }
 }
