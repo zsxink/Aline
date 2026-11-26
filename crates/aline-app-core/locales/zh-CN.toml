@@ -90,7 +90,7 @@ refused = "当前查找或替换操作无法完成。"
 count = "第 {current} 项，共 {total} 项"
 
 [reading]
-large_source = "文档超过 4 MiB，已默认以源码视图打开；你仍可切换到可视化视图。"
+large_source = "文档超过设定的大小阈值，已默认以源码视图打开；你仍可切换到可视化视图。"
 parse_budget_fallback = "文档超过当前 Markdown 解析上限。可在源码视图中阅读原文。"
 parse_raw_fallback = "无法解析此文档。可在源码视图中阅读原文。"
 layout_budget = "此区域超过当前布局预算。源码已保留；切换到源码视图可继续阅读。"
@@ -188,3 +188,7 @@ dialog = "无法打开文件选择器。"
 window_failed = "无法打开应用窗口。"
 no_display = "未检测到可用显示器，未显示窗口。"
 language_fallback = "无法检测系统语言，当前使用英语。"
+
+[settings.issue]
+unreadable = "设置文件无法解析，已使用默认值。"
+invalid_value = "“{field}”的设置值无效，已使用默认值。"

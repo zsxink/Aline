@@ -7,6 +7,7 @@ use std::rc::Rc;
 
 use super::readonly_content::{Block, ContentError, ContentIndex, ContentRow};
 use crate::{DocumentId, EditorMode, ReadonlyDocument, WorkingVersion};
+use aline_app_core::{DEFAULT_LARGE_DOCUMENT_SOURCE_THRESHOLD_BYTES, LARGE_SOURCE_REASON_KEY};
 use aline_buffer::{
     Affinity, LineIndex, LineIndexBudget, SnapshotId, SrcOffset, SrcRange, TextBudget,
 };
@@ -15,11 +16,19 @@ use aline_markdown::{MappingBudget, Parsed, Projection, ProjectionId};
 const SOURCE_FRAGMENT_BYTES: usize = 4096;
 // 在 UTF-8 字符内部截断时，非末片最多回退三个字节。
 const MIN_FULL_SOURCE_FRAGMENT_BYTES: usize = SOURCE_FRAGMENT_BYTES - 3;
-const DEFAULT_SOURCE_THRESHOLD: usize = 4 * 1024 * 1024;
 
-pub(super) fn initial_view(source_bytes: usize) -> (EditorMode, Option<&'static str>) {
-    if source_bytes > DEFAULT_SOURCE_THRESHOLD {
-        (EditorMode::Source, Some("reading.large_source"))
+/// 默认阈值来自 app-core 的全局设置模型，避免两处常量各自漂移。
+pub(super) fn default_source_threshold() -> usize {
+    usize::try_from(DEFAULT_LARGE_DOCUMENT_SOURCE_THRESHOLD_BYTES).unwrap_or(usize::MAX)
+}
+
+/// 超过生效阈值时默认进入源码视图；原因键与阈值解耦，改配置不换提示。
+pub(super) fn initial_view(
+    source_bytes: usize,
+    threshold_bytes: usize,
+) -> (EditorMode, Option<&'static str>) {
+    if source_bytes > threshold_bytes {
+        (EditorMode::Source, Some(LARGE_SOURCE_REASON_KEY))
     } else {
         (EditorMode::Visual, None)
     }
@@ -1034,15 +1043,25 @@ mod tests {
     }
 
     #[test]
-    fn initial_source_policy_uses_strict_four_mib_source_byte_threshold() {
-        let threshold = 4 * 1024 * 1024;
+    fn initial_source_policy_uses_strict_threshold_and_four_mib_default() {
+        assert_eq!(
+            DEFAULT_LARGE_DOCUMENT_SOURCE_THRESHOLD_BYTES,
+            4 * 1024 * 1024
+        );
+        let threshold = default_source_threshold();
+        assert_eq!(threshold, 4 * 1024 * 1024);
         for bytes in [0, threshold - 1, threshold] {
-            assert_eq!(initial_view(bytes), (EditorMode::Visual, None));
+            assert_eq!(initial_view(bytes, threshold), (EditorMode::Visual, None));
         }
         assert_eq!(
-            initial_view(threshold + 1),
-            (EditorMode::Source, Some("reading.large_source"))
+            initial_view(threshold + 1, threshold),
+            (EditorMode::Source, Some(LARGE_SOURCE_REASON_KEY))
         );
+        assert_eq!(
+            initial_view(11, 10),
+            (EditorMode::Source, Some(LARGE_SOURCE_REASON_KEY))
+        );
+        assert_eq!(initial_view(10, 10), (EditorMode::Visual, None));
     }
 
     #[test]

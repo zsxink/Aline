@@ -160,6 +160,36 @@ fn newly_opened_large_document_defaults_source_with_specific_reason() -> Result<
 }
 
 #[test]
+fn configured_large_document_threshold_changes_initial_view_with_same_reason()
+-> Result<(), Box<dyn Error>> {
+    let bytes = "中".repeat(1024).into_bytes();
+    assert!(bytes.len() > 1024);
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    state.set_large_document_source_threshold(1024);
+    let request = state.request_open()?;
+    let job = state
+        .accept_dialog(&request, Ok(Some(vec![PathBuf::from("threshold.md")])))
+        .ok_or("job")?;
+    state.read_finished(job.read_with(&Files(&bytes)), false, |_| Ok(()));
+    let document = state.session().document().ok_or("document")?;
+    assert_eq!(document.core().mode(), EditorMode::Source);
+    assert_eq!(state.feedback_key(), Some("reading.large_source"));
+    drop(state);
+
+    let mut state = super::NativeOpenCoordinator::new(super::open_limits());
+    state.set_large_document_source_threshold(1024 * 1024);
+    let request = state.request_open()?;
+    let job = state
+        .accept_dialog(&request, Ok(Some(vec![PathBuf::from("threshold.md")])))
+        .ok_or("job")?;
+    state.read_finished(job.read_with(&Files(&bytes)), false, |_| Ok(()));
+    let document = state.session().document().ok_or("document")?;
+    assert_eq!(document.core().mode(), EditorMode::Visual);
+    assert_eq!(state.feedback_key(), None);
+    Ok(())
+}
+
+#[test]
 fn layout_failures_distinguish_budget_from_internal_errors() {
     use super::layout_error_key;
     use super::readonly_layout::LayoutError;

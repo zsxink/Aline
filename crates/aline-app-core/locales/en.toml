@@ -90,7 +90,7 @@ refused = "Could not complete the find or replace operation."
 count = "Match {current} of {total}"
 
 [reading]
-large_source = "This document exceeds 4 MiB. It opened in Source View by default; you can switch to Rendered View."
+large_source = "This document exceeds the configured size threshold. It opened in Source View by default; you can switch to Rendered View."
 parse_budget_fallback = "This document exceeds the Markdown parsing limit. You can read the original text in Source View."
 parse_raw_fallback = "This document could not be parsed. You can read the original text in Source View."
 layout_budget = "This region exceeds the current layout budget. The source is preserved; switch to Source View to continue reading."
@@ -188,3 +188,7 @@ dialog = "The file chooser could not be opened."
 window_failed = "The application window could not be opened."
 no_display = "No display was available; no window was shown."
 language_fallback = "System language detection failed; using English."
+
+[settings.issue]
+unreadable = "The settings file could not be parsed; defaults are in use."
+invalid_value = "The value for “{field}” is invalid; the default is in use."

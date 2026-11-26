@@ -45,7 +45,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Instant;
 
-use aline_app_core::Translator;
+use aline_app_core::{LARGE_SOURCE_REASON_KEY, Translator};
 use aline_buffer::{HistoryBudget, LineIndexBudget, TextBudget};
 use aline_markdown::{DiagnosticKind, ParseBudget, ParseConfig, Parsed};
 use aline_source::StorageBudget;
@@ -189,6 +189,8 @@ pub(super) struct NativeOpenCoordinator {
     recovery_temp_root: Option<TempRoot>,
     /// 启动扫描代次；0 表示尚未开始，保证每窗口只扫描一次。
     startup_scan_generation: u64,
+    /// 生效的大文档阈值（字节）；由设置发布方写入，影响后续打开的初始视图。
+    large_document_source_threshold: usize,
 }
 
 /// 外改检查结算后窗口应执行的副作用；反馈键已选定。
@@ -238,7 +240,15 @@ impl NativeOpenCoordinator {
             recovery_store: None,
             recovery_temp_root: None,
             startup_scan_generation: 0,
+            large_document_source_threshold: readonly_layout::default_source_threshold(),
         }
+    }
+
+    /// 设置发布方在有效配置变化时写入阈值；不改变已打开文档的当前视图。
+    /// 设置服务在 5.4 装配前，本入口仅由 crate 内测试驱动。
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(super) fn set_large_document_source_threshold(&mut self, bytes: u64) {
+        self.large_document_source_threshold = usize::try_from(bytes).unwrap_or(usize::MAX);
     }
 
     pub(super) fn session(&self) -> &ReadonlySession {
@@ -1142,13 +1152,15 @@ impl NativeOpenCoordinator {
         prepare: impl FnOnce(&ReadonlyDocument) -> Result<T, LayoutError>,
     ) -> (Option<ReadonlyOpenJob>, Option<T>) {
         self.reading = false;
+        let threshold = self.large_document_source_threshold;
         let result = self.session.accept_open_with(completion, |document| {
             // 输入 job 尚未发布时核心仍可能干净，替换资格须包含宿主已接收的输入。
             if unsettled_input {
                 return Err("document.close_pending_changes");
             }
             let parsed = document.parsed();
-            let (mut mode, reason) = readonly_layout::initial_view(parsed.snapshot().len_bytes());
+            let (mut mode, reason) =
+                readonly_layout::initial_view(parsed.snapshot().len_bytes(), threshold);
             if parse_fallback_key(parsed).is_some() {
                 mode = EditorMode::Source;
             }
@@ -1516,7 +1528,7 @@ impl NativeWindowCopy {
             "open_error.decode",
             "open_error.internal",
             "open_error.dialog",
-            "reading.large_source",
+            LARGE_SOURCE_REASON_KEY,
             "reading.parse_budget_fallback",
             "reading.parse_raw_fallback",
             "reading.layout_budget",
@@ -2902,7 +2914,7 @@ impl NativeDocumentWindow {
                     if let Some(evidence) = &self.evidence {
                         evidence.borrow_mut().switching(before, mode);
                     }
-                    if self.state.feedback == Some("reading.large_source") {
+                    if self.state.feedback == Some(LARGE_SOURCE_REASON_KEY) {
                         self.state.feedback = None;
                     }
                 }
