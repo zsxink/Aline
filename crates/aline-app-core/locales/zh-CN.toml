@@ -111,6 +111,14 @@ caution = "注意"
 register_failed = "字体数据无法注册；继续使用当前字体，文档与位置未改变。"
 family_missing = "字体已安装但所选字族不可用；继续使用当前字体，未激活新字体。"
 
+[link]
+allowed = "链接协议已通过检查。"
+
+[link.rejected]
+empty = "链接目标为空，未打开。"
+scheme = "不支持的链接协议，未打开。"
+unsupported = "不支持的链接目标，未打开。"
+
 [menu]
 format = "格式"
 file = "文件"

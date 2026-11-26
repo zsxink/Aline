@@ -8,6 +8,7 @@
 use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
 use std::ops::Range;
+use std::path::Path;
 use std::rc::Rc;
 
 use aline_buffer::{Affinity, SrcOffset, SrcRange};
@@ -15,10 +16,10 @@ use aline_markdown::{
     AlertKind, CodeLine, MappingBudget, Parsed, Projection, ProjectionId, TableAlignment,
 };
 use gpui::{
-    AnyElement, App, Bounds, Div, Font, FontFallbacks, FontStyle, FontWeight, ListAlignment,
-    ListOffset, ListSizingBehavior, ListState, MouseButton, Pixels, Point, Role, SharedString,
-    StrikethroughStyle, StyledText, TextAlign, TextRun, UnderlineStyle, Window, canvas, div, fill,
-    list, point, prelude::*, px, rgb, rgba, size,
+    AnyElement, App, Bounds, Div, Font, FontFallbacks, FontStyle, FontWeight, ImageSource,
+    ListAlignment, ListOffset, ListSizingBehavior, ListState, MouseButton, ObjectFit, Pixels,
+    Point, Role, SharedString, StrikethroughStyle, StyledText, TextAlign, TextRun, UnderlineStyle,
+    Window, canvas, div, fill, img, list, point, prelude::*, px, rgb, rgba, size,
 };
 
 use super::editable_input::InputRowLayout;
@@ -430,10 +431,12 @@ pub(super) struct TableCellInput {
 }
 
 /// 行级命中回调；参数与 `ReaderSurface::render_row` 的调用方约定一致。
+/// 第四个参数是平台修饰键（Cmd/Ctrl）是否按下，只有链接打开使用它。
 type HitCallback = dyn Fn(
     &HitTarget,
     Result<Result<usize, usize>, HitError>,
     &PreparedLayout,
+    bool,
     &mut Window,
     &mut App,
 );
@@ -462,6 +465,8 @@ pub(super) struct ReaderSurface {
     restores: Rc<RefCell<RestoreState>>,
     metrics: Cell<ContentMetrics>,
     font: Font,
+    /// 正文图片入口缓存；未注入预算时恒为空，只显示替代文字。
+    images: RefCell<super::body_image_cache::BodyImageCache>,
     alive: Rc<Cell<bool>>,
     /// 上次补高度提示时的视口宽度；列表宽度变化时 GPUI 会清空高度提示。
     hint_width: Rc<Cell<Option<f32>>>,
@@ -471,6 +476,7 @@ impl ReaderSurface {
         document: &ReadonlyDocument,
         generation: u64,
         evidence: Option<super::readonly_evidence::SharedEvidence>,
+        media_budget: Option<crate::media::MediaBudget>,
     ) -> Result<Self, LayoutError> {
         let index = ReaderIndex::new(document, MAX_ROWS)?;
         Ok(Self::from_index(
@@ -479,6 +485,7 @@ impl ReaderSurface {
             document.core().mode(),
             generation,
             evidence,
+            media_budget,
         ))
     }
 
@@ -489,6 +496,7 @@ impl ReaderSurface {
         mode: EditorMode,
         generation: u64,
         evidence: Option<super::readonly_evidence::SharedEvidence>,
+        media_budget: Option<crate::media::MediaBudget>,
     ) -> Self {
         let list = ListState::new(index.row_count(mode), ListAlignment::Top, px(120.0));
         let restores = Rc::new(RefCell::new(RestoreState::new(
@@ -514,6 +522,7 @@ impl ReaderSurface {
             restores,
             metrics: Cell::new(default_metrics()),
             font: Font::default(),
+            images: RefCell::new(super::body_image_cache::BodyImageCache::new(media_budget)),
             alive: Rc::new(Cell::new(true)),
             hint_width: Rc::new(Cell::new(None)),
         }
@@ -782,6 +791,7 @@ impl ReaderSurface {
             &HitTarget,
             Result<Result<usize, usize>, HitError>,
             &PreparedLayout,
+            bool,
             &mut Window,
             &mut App,
         ) + 'static,
@@ -811,6 +821,7 @@ impl ReaderSurface {
             &HitTarget,
             Result<Result<usize, usize>, HitError>,
             &PreparedLayout,
+            bool,
             &mut Window,
             &mut App,
         ) + 'static,
@@ -923,10 +934,40 @@ impl ReaderSurface {
                     let candidate = target
                         .ensure_layout(click_cache.borrow().token())
                         .and_then(|()| click_prepared.index_for_position(event.position));
-                    on_hit(&target, candidate, &click_prepared, window, cx);
+                    on_hit(
+                        &target,
+                        candidate,
+                        &click_prepared,
+                        event.modifiers.platform,
+                        window,
+                        cx,
+                    );
                 })
             })
             .into_any_element()
+    }
+
+    /// 解析本行图片叶子；未注入预算时返回空，行内只保留替代文字。
+    fn row_images(
+        &self,
+        document: &ReadonlyDocument,
+        leaves: &[Leaf],
+    ) -> Vec<Rc<super::body_image_cache::RenderableImage>> {
+        let directory = document.path().parent().unwrap_or(Path::new(""));
+        let mut cache = self.images.borrow_mut();
+        let mut images = Vec::new();
+        for leaf in leaves {
+            if leaf.kind != LeafKind::Image {
+                continue;
+            }
+            let Some(destination) = leaf.destination.as_deref() else {
+                continue;
+            };
+            if let Some(image) = cache.resolve(destination, directory) {
+                images.push(image);
+            }
+        }
+        images
     }
 
     #[expect(clippy::too_many_arguments, reason = "表格输入和命中由窗口持有")]
@@ -1034,13 +1075,32 @@ impl ReaderSurface {
                     .and_then(|(token, projection)| {
                         HitTarget::new(document, token, projection).ok()
                     });
-                div()
+                let line = div()
                     .flex()
                     .items_start()
                     .when_some(label, |line, label| line.child(footnote_label(label, copy)))
                     .when_some(marker, |line, marker| line.child(marker_chip(marker)))
-                    .child(text_wrap)
-                    .into_any_element()
+                    .child(text_wrap);
+                let images = self.row_images(document, leaves);
+                if images.is_empty() {
+                    line.into_any_element()
+                } else {
+                    // 行内混排图片无法嵌进单一 `StyledText`：图片显示在文字上方，
+                    // 替代文字仍在同一行保留，命中与锚点映射不受影响。
+                    div()
+                        .w_full()
+                        .flex()
+                        .flex_col()
+                        .children(images.iter().enumerate().map(|(index, image)| {
+                            body_image_element(
+                                image,
+                                metrics.text_width,
+                                body_image_element_id(source_start, index),
+                            )
+                        }))
+                        .child(line)
+                        .into_any_element()
+                }
             }
             Block::Code {
                 info,
@@ -1364,7 +1424,14 @@ impl ReaderSurface {
                 let candidate = target
                     .ensure_layout(cache.borrow().token())
                     .and_then(|()| prepared.index_for_position(event.position));
-                callback(&target, candidate, &prepared, window, cx);
+                callback(
+                    &target,
+                    candidate,
+                    &prepared,
+                    event.modifiers.platform,
+                    window,
+                    cx,
+                );
             })
         } else {
             outer
@@ -1459,7 +1526,7 @@ impl ReaderSurface {
                 let prepared = click_prepared.clone();
                 element = element.on_mouse_down(MouseButton::Right, move |event, window, cx| {
                     let target = target.clone().for_table_menu(cell.clone(), event.position);
-                    menu_callback(&target, Ok(Ok(0)), &prepared, window, cx);
+                    menu_callback(&target, Ok(Ok(0)), &prepared, false, window, cx);
                     cx.stop_propagation();
                 });
             }
@@ -1472,7 +1539,14 @@ impl ReaderSurface {
                         click_prepared.index_for_position(event.position)
                     }
                 });
-                on_hit(&target, candidate, &click_prepared, window, cx);
+                on_hit(
+                    &target,
+                    candidate,
+                    &click_prepared,
+                    event.modifiers.platform,
+                    window,
+                    cx,
+                );
             });
         }
         element.into_any_element()
@@ -1762,6 +1836,44 @@ fn footnote_label(label: ContentLabel, copy: &ContentCopy) -> AnyElement {
         .into_any_element()
 }
 
+/// 正文图片元素；按列宽等比缩放，替代文字仍由同一行文本绘制。
+/// 正文图片的元素 id：按行首源偏移与行内序号稳定生成。
+///
+/// GPUI 只对带元素 id 的多帧图片调用 `request_animation_frame`；id 跨帧
+/// 不变才能保留帧序号，行内多张图片之间不同才不会互相覆盖动画状态。
+fn body_image_element_id(source_start: usize, index: usize) -> gpui::ElementId {
+    gpui::ElementId::Name(SharedString::from(format!(
+        "body-image-{source_start}-{index}"
+    )))
+}
+
+fn body_image_element(
+    image: &super::body_image_cache::RenderableImage,
+    max_width: f32,
+    element_id: gpui::ElementId,
+) -> AnyElement {
+    use super::body_image_cache::{RenderableSource, fitted_size};
+
+    let (width, height) = fitted_size(image.dimensions(), max_width);
+    let source: ImageSource = match image.source() {
+        RenderableSource::Local(path) => path.clone().into(),
+        RenderableSource::Data(data) => data.clone().into(),
+    };
+    div()
+        .w_full()
+        .flex()
+        .justify_center()
+        .pb(px(8.0))
+        .child(
+            img(source)
+                .id(element_id)
+                .w(px(width))
+                .h(px(height))
+                .object_fit(ObjectFit::Contain),
+        )
+        .into_any_element()
+}
+
 fn marker_chip(marker: ListMarker) -> AnyElement {
     div()
         .flex_none()
@@ -1808,6 +1920,103 @@ mod tests {
 
     use super::super::readonly_content::InlineStyle;
     use super::*;
+
+    #[test]
+    fn body_image_element_ids_are_stable_and_unique_per_image() {
+        // GPUI 只给带元素 id 的多帧图片请求动画帧；id 每帧必须相同（否则
+        // 动画状态每帧重建、永远停在首帧），同一行多张图片之间必须不同。
+        let first = body_image_element_id(120, 0);
+        assert_eq!(
+            first,
+            body_image_element_id(120, 0),
+            "同一图片跨帧的 id 必须稳定"
+        );
+        assert_ne!(
+            first,
+            body_image_element_id(120, 1),
+            "同一行多张图片不得共用 id"
+        );
+        assert_ne!(
+            first,
+            body_image_element_id(240, 0),
+            "不同行的图片不得共用 id"
+        );
+    }
+
+    #[test]
+    fn body_images_resolve_only_when_a_budget_is_injected() -> Result<(), Box<dyn std::error::Error>>
+    {
+        use crate::{
+            DocLimits, ReadonlyFileAccess, ReadonlyFileInput, ReadonlyOpenLimits, ReadonlySession,
+        };
+        use aline_buffer::{HistoryBudget, LineIndexBudget, TextBudget};
+        use aline_markdown::{ParseBudget, ParseConfig};
+        use aline_source::StorageBudget;
+        use std::{io::Cursor, path::Path, path::PathBuf};
+
+        struct File(Vec<u8>);
+        impl ReadonlyFileAccess for File {
+            type Reader = Cursor<Vec<u8>>;
+            fn open(&self, _: &Path) -> std::io::Result<ReadonlyFileInput<Self::Reader>> {
+                Ok(ReadonlyFileInput::new(
+                    Cursor::new(self.0.clone()),
+                    self.0.len() as u64,
+                    true,
+                ))
+            }
+        }
+        let samples =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../scripts/fixtures/m4-v03/samples");
+        let mut session = ReadonlySession::new(
+            ReadonlyOpenLimits::new(
+                StorageBudget::new(4096),
+                DocLimits::new(
+                    TextBudget::new(4096),
+                    LineIndexBudget::new(128),
+                    HistoryBudget::new(8, 4096),
+                ),
+                ParseConfig::m0(),
+                ParseBudget::m0(),
+            )
+            .with_editing(),
+        );
+        let request = session.request_open()?;
+        let job = session
+            .accept_selection(&request, Some(vec![samples.join("fixture.md")]))?
+            .ok_or("没有打开任务")?;
+        session.accept_open(job.read_with(&File(b"![alt](plain.png)\n".to_vec())));
+        let document = session.document_mut().ok_or("没有文档")?;
+        let leaves = [
+            Leaf {
+                drawn: 1..4,
+                style: InlineStyle::default(),
+                kind: LeafKind::Image,
+                destination: Some(Rc::from("plain.png")),
+            },
+            Leaf {
+                drawn: 5..6,
+                style: InlineStyle::default(),
+                kind: LeafKind::Image,
+                destination: Some(Rc::from("https://example.test/a.png")),
+            },
+        ];
+
+        let unbudgeted = ReaderSurface::new(document, 1, None, None)?;
+        assert!(
+            unbudgeted.row_images(document, &leaves).is_empty(),
+            "未注入预算时不得解码或读取任何图片"
+        );
+
+        let budget = crate::media::MediaBudget::new(1 << 20, 1 << 24, 1 << 28, 8);
+        let budgeted = ReaderSurface::new(document, 1, None, Some(budget))?;
+        let images = budgeted.row_images(document, &leaves);
+        assert_eq!(images.len(), 1, "远程图片不得进入渲染列表");
+        assert_eq!(
+            images[0].dimensions(),
+            crate::media::ImageDimensions::new(2, 2)
+        );
+        Ok(())
+    }
 
     #[test]
     fn mode_roundtrip_anchor_keeps_the_nonfirst_source_line()
@@ -1862,7 +2071,7 @@ mod tests {
             current.text().src_offset(206)?,
         )?;
         document.edit_core()?.select(&identity, &selection)?;
-        let mut reader = ReaderSurface::new(document, 1, None)?;
+        let mut reader = ReaderSurface::new(document, 1, None, None)?;
         let environment = LayoutEnvironment::new(600.0, 2.0, 0, true, 16.0, 25.0)?;
         reader.heights.borrow_mut().prepare(LayoutKey::new(
             document,
@@ -1908,7 +2117,12 @@ mod tests {
     }
 
     fn leaf(drawn: Range<usize>, style: InlineStyle, kind: LeafKind) -> Leaf {
-        Leaf { drawn, style, kind }
+        Leaf {
+            drawn,
+            style,
+            kind,
+            destination: None,
+        }
     }
 
     fn base() -> RunBase {

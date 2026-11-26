@@ -3470,3 +3470,17 @@ fn recovery_panel_marks_restored_record_for_later_discard() -> Result<(), Box<dy
     assert_eq!(panel.confirming(), Some(document), "已恢复条目只允许丢弃");
     Ok(())
 }
+
+#[test]
+fn media_budget_env_parsing_is_explicit_and_fail_closed() -> Result<(), Box<dyn Error>> {
+    let budget = super::parse_media_budget("1048576,16777216,268435456,8").ok_or("合法预算")?;
+    assert_eq!(budget.max_source_bytes(), 1_048_576);
+    assert_eq!(budget.max_pixels(), 16_777_216);
+    assert_eq!(budget.max_decoded_bytes(), 268_435_456);
+    assert_eq!(budget.max_frames(), 8);
+
+    for raw in ["", "1,2,3", "1,2,3,4,5", "a,b,c,d", "1,2,3,-1"] {
+        assert!(super::parse_media_budget(raw).is_none(), "{raw}");
+    }
+    Ok(())
+}

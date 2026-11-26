@@ -3,6 +3,7 @@
 //! 窗口持有一个文档会话。读取和解析刷新各保留一个在途任务及至多一个最新候选；
 //! 文件选择、任务与焦点在本层装配，render 只读已采用的解析。
 
+mod body_image_cache;
 mod edit_actions;
 mod editable_input;
 mod find_panel;
@@ -133,6 +134,37 @@ pub(super) fn open_limits() -> ReadonlyOpenLimits {
         ParseBudget::m0(),
     )
     .with_editing()
+}
+
+/// 验证用正文图片预算入口：只有 debug 构建且显式设置
+/// `ALINE_M4_MEDIA_BUDGET` 时才启用解码。V-06 尚未冻结正文图片预算，
+/// 生产默认不注入任何数值；未设置或解析失败时保持不注入（fail-closed）。
+#[cfg(debug_assertions)]
+fn media_budget_from_env() -> Option<crate::media::MediaBudget> {
+    parse_media_budget(&std::env::var("ALINE_M4_MEDIA_BUDGET").ok()?)
+}
+
+/// 发布构建永不注入正文图片预算。
+#[cfg(not(debug_assertions))]
+fn media_budget_from_env() -> Option<crate::media::MediaBudget> {
+    None
+}
+
+/// 解析 `源字节,像素,解码字节,帧`；缺项、多项或坏值都返回 `None`。
+#[cfg_attr(not(debug_assertions), allow(dead_code))]
+fn parse_media_budget(raw: &str) -> Option<crate::media::MediaBudget> {
+    let mut parts = raw.split(',');
+    let mut field = || parts.next()?.trim().parse::<u64>().ok();
+    let source = field()?;
+    let pixels = field()?;
+    let decoded = field()?;
+    let frames = u32::try_from(field()?).ok()?;
+    if parts.next().is_some() {
+        return None;
+    }
+    Some(crate::media::MediaBudget::new(
+        source, pixels, decoded, frames,
+    ))
 }
 
 /// 窗口层保存宿主状态；只记录阶段与等待句柄，不复制文档队列。
@@ -1534,6 +1566,10 @@ impl NativeWindowCopy {
             "reading.layout_budget",
             "font.register_failed",
             "font.family_missing",
+            "link.allowed",
+            "link.rejected.empty",
+            "link.rejected.scheme",
+            "link.rejected.unsupported",
         ] {
             errors.insert(key, text(key)?);
         }
@@ -1832,6 +1868,8 @@ struct NativeDocumentWindow {
     /// 显式启用的 M2 状态采样；只在 `ALINE_M2_EVIDENCE_DIR` 存在时创建。
     m2_evidence: Option<m2_evidence::M2Evidence>,
     font_invalidation: Option<font_invalidate::FontInvalidation>,
+    /// 正文图片预算；生产默认不注入，只有显式设置后才解码图片。
+    media_budget: Option<crate::media::MediaBudget>,
 }
 
 impl NativeDocumentWindow {
@@ -1898,6 +1936,7 @@ impl NativeDocumentWindow {
             evidence: readonly_evidence::ReadonlyEvidence::from_env(),
             m2_evidence: m2_evidence::M2Evidence::from_env(),
             font_invalidation: font_invalidate::FontInvalidation::from_env(),
+            media_budget: media_budget_from_env(),
         };
         if state.probe.is_some() {
             cx.spawn_in(window, async move |weak, cx| {
@@ -2049,12 +2088,16 @@ impl NativeDocumentWindow {
                             let viewport_width = f32::from(window.viewport_size().width);
                             let metrics = content_metrics(viewport_width, viewport_width);
                             let layout_started = StageTimer::start();
-                            let result =
-                                ReaderSurface::new(document, generation, this.evidence.clone())
-                                    .and_then(|mut reader| {
-                                        reader.prepare(document, window, metrics, &this.fonts)?;
-                                        Ok((reader, generation))
-                                    });
+                            let result = ReaderSurface::new(
+                                document,
+                                generation,
+                                this.evidence.clone(),
+                                this.media_budget,
+                            )
+                            .and_then(|mut reader| {
+                                reader.prepare(document, window, metrics, &this.fonts)?;
+                                Ok((reader, generation))
+                            });
                             layout_timing = layout_started.finish();
                             adopt_started = Some(StageTimer::start());
                             result
@@ -2703,11 +2746,16 @@ impl NativeDocumentWindow {
                 let viewport_width = f32::from(window.viewport_size().width);
                 let metrics = content_metrics(viewport_width, viewport_width);
                 let layout_started = StageTimer::start();
-                let result = ReaderSurface::new(candidate, generation, self.evidence.clone())
-                    .and_then(|mut reader| {
-                        reader.prepare(candidate, window, metrics, &self.fonts)?;
-                        Ok((reader, generation))
-                    });
+                let result = ReaderSurface::new(
+                    candidate,
+                    generation,
+                    self.evidence.clone(),
+                    self.media_budget,
+                )
+                .and_then(|mut reader| {
+                    reader.prepare(candidate, window, metrics, &self.fonts)?;
+                    Ok((reader, generation))
+                });
                 layout_timing = layout_started.finish();
                 adopt_started = Some(StageTimer::start());
                 result
@@ -3025,9 +3073,16 @@ impl NativeDocumentWindow {
                 failure,
                 &self.copy.content,
                 table_input,
-                move |target, candidate, prepared, window, cx| {
+                move |target, candidate, prepared, platform_modifier, window, cx| {
                     let _ = weak.update(cx, |this, cx| {
-                        this.accept_reading_hit(target, candidate, prepared, window, cx)
+                        this.accept_reading_hit(
+                            target,
+                            candidate,
+                            prepared,
+                            platform_modifier,
+                            window,
+                            cx,
+                        )
                     });
                 },
                 move |target, _, cx| {
@@ -3102,6 +3157,7 @@ impl NativeDocumentWindow {
         target: &HitTarget,
         candidate: Result<Result<usize, usize>, HitError>,
         prepared: &PreparedLayout,
+        platform_modifier: bool,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -3126,6 +3182,39 @@ impl NativeDocumentWindow {
             return;
         }
         self.table_menu = None;
+        // IMAGE-03/06：平台修饰键（Cmd/Ctrl）+ 点击才处理链接；普通点击仍按
+        // 原路径进入块编辑或只读定位，不因为落在链接文字上而改行为。
+        if platform_modifier {
+            let index = match &candidate {
+                Ok(Ok(index) | Err(index)) => Some(*index),
+                Err(_) => None,
+            };
+            let destination = index
+                .filter(|_| target.validate(document, reader.layout_token()).is_ok())
+                .and_then(|index| {
+                    target
+                        .resolve(Ok(index), aline_buffer::Affinity::Before)
+                        .ok()
+                })
+                .and_then(|(_, hit)| {
+                    let start = hit.source_range().byte_range().start;
+                    aline_markdown::link_destination_at(document.parsed(), start).map(str::to_owned)
+                });
+            if let Some(destination) = destination {
+                match aline_markdown::link_verdict(&destination) {
+                    aline_markdown::LinkVerdict::Allowed => {
+                        // 只有 http/https/mailto 能交给系统打开；`#` 锚点、
+                        // `/` 绝对路径与 `//host` 尚无站内/本地打开动作。
+                        if let Some(url) = aline_markdown::external_link_url(&destination) {
+                            cx.open_url(url);
+                        }
+                    }
+                    verdict => self.state.feedback = Some(verdict.message_key()),
+                }
+                cx.notify();
+                return;
+            }
+        }
         if document.is_editable()
             && document.core().mode() == EditorMode::Visual
             && let Ok(Ok(index)) = candidate
@@ -3659,7 +3748,7 @@ impl Render for NativeDocumentWindow {
         let entity = cx.entity().downgrade();
         self.input_frame = None;
         let reader_element = self.reader.as_ref().map(|reader| {
-            reader.render(move |row, _, cx| {
+            reader.render(move |row, _window, cx| {
                 entity
                     .update(cx, |this, cx| this.render_reading_row(row, cx))
                     .unwrap_or_else(|_| div().into_any_element())

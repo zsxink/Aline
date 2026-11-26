@@ -20,7 +20,9 @@ mod tree;
 pub use budget::{CancelCheck, CancelToken, ParseBudget, ParseStats};
 pub use config::{ParseConfig, ParseFeatures};
 pub use diagnostic::{Diagnostic, DiagnosticKind};
-pub use link::{LinkVerdict, is_allowed_link, link_verdict};
+pub use link::{
+    LinkVerdict, external_link_url, is_allowed_link, link_destination_at, link_verdict,
+};
 pub use mapping::{
     DrawnOffset, DrawnRange, GraphemeError, Mapped, MappingBudget, MappingError, MappingPrecision,
     MappingSegment, Projection, ProjectionId, Utf16Offset, Utf16Range,

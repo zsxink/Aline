@@ -2,7 +2,18 @@
 //!
 //! 判定只回答“能否交给宿主打开”；真正的打开动作在原生窗口层。
 
-use aline_markdown::{LinkVerdict, is_allowed_link, link_verdict};
+use std::error::Error;
+
+use aline_buffer::{TextBudget, TextSnapshot};
+use aline_markdown::{
+    LinkVerdict, ParseBudget, ParseConfig, Parsed, external_link_url, is_allowed_link,
+    link_destination_at, link_verdict, parse,
+};
+
+fn parse_text(source: &str) -> Result<Parsed, Box<dyn Error>> {
+    let snapshot = TextSnapshot::new(source.to_owned(), TextBudget::new(1 << 20))?;
+    Ok(parse(&snapshot, ParseConfig::m0(), ParseBudget::m0())?)
+}
 
 #[test]
 fn frozen_allowlist_accepts_only_http_https_mailto_and_local_prefixes() {
@@ -95,4 +106,69 @@ fn verdicts_expose_the_frozen_feedback_keys() {
         LinkVerdict::UnsupportedTarget.message_key(),
         "link.rejected.unsupported"
     );
+}
+
+#[test]
+fn link_destination_is_returned_only_for_offsets_inside_the_link_text() -> Result<(), Box<dyn Error>>
+{
+    let source = "before [docs](https://example.test/a) after ![alt](pic.png)\n";
+    let parsed = parse_text(source)?;
+    let link_start = source.find("docs").ok_or("link 文字")?;
+    assert_eq!(
+        link_destination_at(&parsed, link_start),
+        Some("https://example.test/a")
+    );
+    assert_eq!(
+        link_destination_at(&parsed, link_start + 3),
+        Some("https://example.test/a")
+    );
+    assert_eq!(link_destination_at(&parsed, 0), None);
+    assert_eq!(
+        link_destination_at(&parsed, source.find("after").ok_or("after")?),
+        None
+    );
+    assert_eq!(
+        link_destination_at(&parsed, source.find("alt").ok_or("alt")?),
+        None,
+        "图片目标不得按链接打开"
+    );
+    Ok(())
+}
+
+#[test]
+fn only_external_schemes_are_handed_to_the_host() {
+    for (destination, expected) in [
+        (
+            "https://example.test/a?b=1",
+            Some("https://example.test/a?b=1"),
+        ),
+        ("HTTP://EXAMPLE.TEST", Some("HTTP://EXAMPLE.TEST")),
+        (
+            "mailto:someone@example.test",
+            Some("mailto:someone@example.test"),
+        ),
+        ("  https://example.test  ", Some("https://example.test")),
+        ("#section", None),
+        ("/docs/a.md", None),
+        ("//example.test/a", None),
+        ("javascript:alert(1)", None),
+        ("file:///tmp/a.md", None),
+        ("docs/a.md", None),
+        ("", None),
+    ] {
+        assert_eq!(external_link_url(destination), expected, "{destination}");
+    }
+}
+
+#[test]
+fn nested_emphasis_inside_a_link_keeps_the_outer_destination() -> Result<(), Box<dyn Error>> {
+    let source = "[**bold** text](#anchor)\n";
+    let parsed = parse_text(source)?;
+    let bold = source.find("bold").ok_or("bold")?;
+    assert_eq!(link_destination_at(&parsed, bold), Some("#anchor"));
+    assert_eq!(
+        link_destination_at(&parsed, source.find("text").ok_or("text")?),
+        Some("#anchor")
+    );
+    Ok(())
 }

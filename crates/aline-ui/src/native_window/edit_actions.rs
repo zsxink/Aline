@@ -2,11 +2,15 @@
 
 use aline_buffer::{BufferError, SelectionSpec, SrcOffset, SrcRange, SrcSelection, TextBudget};
 use aline_markdown::Parsed;
-use gpui::{App, ClipboardEntry, ClipboardItem, Context, Window};
+use gpui::{App, ClipboardEntry, ClipboardItem, Context, ImageFormat, Window};
 
 use super::readonly_layout::{LayoutError, ReaderIndex};
 use super::{
     NativeDocumentWindow, NativeOpenCoordinator, ReaderSurface, content_metrics, layout_error_key,
+};
+use crate::media::{
+    ClipboardImageFormat, ClipboardRoute, ClipboardWriteItem, ClipboardWritePlan,
+    plan_clipboard_write,
 };
 use crate::{
     DocError, DocumentId, EditorMode, InputIdentity, ModeSwitchOutcome, ParseConfigGeneration,
@@ -270,8 +274,11 @@ impl NativeDocumentWindow {
                 if let Some(key) = effect.notice {
                     self.state.feedback = Some(key);
                 }
-                if let Some(text) = effect.clipboard {
-                    cx.write_to_clipboard(ClipboardItem::new_string(text));
+                if let Some(text) = effect.clipboard
+                    && let Some(item) =
+                        clipboard_item(plan_clipboard_write(&[ClipboardWriteItem::Text(&text)]))
+                {
+                    cx.write_to_clipboard(item);
                 }
                 if effect.refresh {
                     self.refresh_after_edit(window, cx);
@@ -317,6 +324,7 @@ impl NativeDocumentWindow {
                                 document.core().mode(),
                                 generation,
                                 this.evidence.clone(),
+                                this.media_budget,
                             ),
                             generation,
                         ))
@@ -467,6 +475,64 @@ fn clipboard_text(cx: &App, budget: TextBudget) -> Result<Option<String>, DocErr
     let Some(item) = cx.read_from_clipboard() else {
         return Ok(None);
     };
+    clipboard_text_from_item(&item, budget)
+}
+
+/// 按 V-03 冻结路由从剪贴板条目提取可粘贴文本。
+///
+/// 文件与文本路由都取字符串项：macOS 文件分支会附带纯文本路径，宿主因此
+/// 可以把路径当文本粘贴。图片与无路由不进入文本粘贴，图片粘贴归 IMAGE-02。
+fn clipboard_text_from_item(
+    item: &ClipboardItem,
+    budget: TextBudget,
+) -> Result<Option<String>, DocError> {
+    match clipboard_route(item) {
+        ClipboardRoute::Files | ClipboardRoute::Text => collect_clipboard_text(item, budget),
+        ClipboardRoute::Image(_) | ClipboardRoute::None => Ok(None),
+    }
+}
+
+/// 由读回的条目推导冻结路由；不做实际读取或解码。
+fn clipboard_route(item: &ClipboardItem) -> ClipboardRoute {
+    let mut has_files = false;
+    let mut has_text = false;
+    let mut images = Vec::new();
+    for entry in item.entries() {
+        match entry {
+            ClipboardEntry::String(_) => has_text = true,
+            ClipboardEntry::Image(image) => images.push(clipboard_image_format(image.format)),
+            ClipboardEntry::ExternalPaths(_) => has_files = true,
+        }
+    }
+    ClipboardRoute::from_entries(has_files, has_text, &images)
+}
+
+fn clipboard_image_format(format: ImageFormat) -> ClipboardImageFormat {
+    match format {
+        ImageFormat::Png => ClipboardImageFormat::Png,
+        ImageFormat::Jpeg => ClipboardImageFormat::Jpeg,
+        ImageFormat::Webp => ClipboardImageFormat::Webp,
+        ImageFormat::Gif => ClipboardImageFormat::Gif,
+        ImageFormat::Svg => ClipboardImageFormat::Svg,
+        ImageFormat::Bmp => ClipboardImageFormat::Bmp,
+        ImageFormat::Tiff => ClipboardImageFormat::Tiff,
+        ImageFormat::Ico => ClipboardImageFormat::Ico,
+        ImageFormat::Pnm => ClipboardImageFormat::Pnm,
+    }
+}
+
+/// 按写入计划构造剪贴板条目；只有纯文本能由本路径写出。
+fn clipboard_item(plan: ClipboardWritePlan) -> Option<ClipboardItem> {
+    match plan {
+        ClipboardWritePlan::Text(text) => Some(ClipboardItem::new_string(text)),
+        ClipboardWritePlan::Image(_) | ClipboardWritePlan::None => None,
+    }
+}
+
+fn collect_clipboard_text(
+    item: &ClipboardItem,
+    budget: TextBudget,
+) -> Result<Option<String>, DocError> {
     let mut text = String::new();
     for entry in item.entries() {
         let ClipboardEntry::String(entry) = entry else {
@@ -944,6 +1010,51 @@ mod tests {
                 "{scenario}"
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn clipboard_text_uses_the_frozen_route_and_stays_bounded() -> Result<(), Box<dyn Error>> {
+        use gpui::{Image, ImageFormat};
+
+        use crate::media::{ClipboardImageFormat, ClipboardWritePlan};
+
+        let text = ClipboardItem::new_string("甲".to_owned());
+        assert_eq!(
+            clipboard_text_from_item(&text, TextBudget::new(64))?,
+            Some("甲".to_owned())
+        );
+
+        let image = ClipboardItem {
+            entries: vec![ClipboardEntry::Image(Image::from_bytes(
+                ImageFormat::Png,
+                vec![1, 2, 3],
+            ))],
+        };
+        assert_eq!(clipboard_text_from_item(&image, TextBudget::new(64))?, None);
+        assert_eq!(
+            clipboard_text_from_item(
+                &ClipboardItem {
+                    entries: Vec::new()
+                },
+                TextBudget::new(64)
+            )?,
+            None
+        );
+
+        let oversized = ClipboardItem::new_string("abcdef".to_owned());
+        assert!(matches!(
+            clipboard_text_from_item(&oversized, TextBudget::new(3)),
+            Err(DocError::Buffer(BufferError::BudgetExceeded { .. }))
+        ));
+
+        let item = clipboard_item(ClipboardWritePlan::Text("甲".to_owned())).ok_or("缺少文本项")?;
+        assert_eq!(item.text().as_deref(), Some("甲"));
+        assert!(
+            clipboard_item(ClipboardWritePlan::Image(ClipboardImageFormat::Png)).is_none(),
+            "图片写入不属于文本复制路径"
+        );
+        assert!(clipboard_item(ClipboardWritePlan::None).is_none());
         Ok(())
     }
 

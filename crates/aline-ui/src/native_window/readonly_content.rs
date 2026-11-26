@@ -119,6 +119,8 @@ pub(super) struct Leaf {
     pub(super) drawn: Range<usize>,
     pub(super) style: InlineStyle,
     pub(super) kind: LeafKind,
+    /// 图片叶子的解析器原始目标；其他叶子为 `None`。目标不进入绘制文字。
+    pub(super) destination: Option<Rc<str>>,
 }
 
 /// 表格单元格计划；`drawn` 是单元格可见文字的全文绘制范围。
@@ -599,6 +601,7 @@ impl Builder {
                         drawn: drawn.clone(),
                         style,
                         kind: LeafKind::Code,
+                        destination: None,
                     }]
                 };
                 let row = self.row(
@@ -757,6 +760,7 @@ impl Builder {
                 drawn: drawn.clone(),
                 style: InlineStyle::default(),
                 kind: LeafKind::Text,
+                destination: None,
             });
         }
         let row = self.row(
@@ -809,7 +813,7 @@ impl Builder {
             }
             _ => style,
         };
-        if matches!(node.kind(), PresentationKind::Image { .. }) {
+        if let PresentationKind::Image { destination } = node.kind() {
             let drawn = node.drawn_range().byte_range();
             if !drawn.is_empty() {
                 let style = merged.merged(self.html_style(&drawn));
@@ -817,6 +821,7 @@ impl Builder {
                     drawn,
                     style,
                     kind: LeafKind::Image,
+                    destination: Some(Rc::from(destination.as_str())),
                 });
             }
             return;
@@ -839,7 +844,12 @@ impl Builder {
             let drawn = node.drawn_range().byte_range();
             if !drawn.is_empty() {
                 let style = merged.merged(self.html_style(&drawn));
-                leaves.push(Leaf { drawn, style, kind });
+                leaves.push(Leaf {
+                    drawn,
+                    style,
+                    kind,
+                    destination: None,
+                });
             }
         }
         if node.children().is_empty() {
@@ -903,6 +913,7 @@ impl Builder {
                         drawn: drawn.clone(),
                         style: InlineStyle::default(),
                         kind: LeafKind::Text,
+                        destination: None,
                     });
                 }
                 cells.push(TableCell {
@@ -1542,6 +1553,7 @@ mod tests {
             &_parsed.projection().drawn_text()[image.drawn.clone()],
             "diagram"
         );
+        assert_eq!(image.destination.as_deref(), Some("./missing.svg"));
         assert!(
             rows.iter()
                 .flat_map(leaves)

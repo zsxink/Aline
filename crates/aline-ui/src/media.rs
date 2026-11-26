@@ -153,30 +153,35 @@ pub enum ClipboardRoute {
 impl ClipboardRoute {
     /// 按冻结优先级从 flavor 集合推导路由；不做实际读取。
     pub fn from_flavors(flavors: &[&str]) -> Self {
-        if flavors
+        let has_files = flavors
             .iter()
-            .any(|flavor| flavor.eq_ignore_ascii_case("files"))
-        {
+            .any(|flavor| flavor.eq_ignore_ascii_case("files"));
+        let has_text = flavors
+            .iter()
+            .any(|flavor| flavor.eq_ignore_ascii_case("text"));
+        let images = flavors
+            .iter()
+            .filter_map(|flavor| ClipboardImageFormat::from_flavor(flavor))
+            .collect::<Vec<_>>();
+        Self::from_entries(has_files, has_text, &images)
+    }
+
+    /// 按冻结优先级从已分类的条目推导路由。
+    ///
+    /// 文件优先于文本，文本优先于图片；多张图片按
+    /// [`ClipboardImageFormat::priority`] 取最靠前者。
+    pub fn from_entries(has_files: bool, has_text: bool, images: &[ClipboardImageFormat]) -> Self {
+        if has_files {
             return Self::Files;
         }
-        if flavors
-            .iter()
-            .any(|flavor| flavor.eq_ignore_ascii_case("text"))
-        {
+        if has_text {
             return Self::Text;
         }
-        let mut best = None;
-        for flavor in flavors {
-            let Some(format) = ClipboardImageFormat::from_flavor(flavor) else {
-                continue;
-            };
-            if best
-                .is_none_or(|current: ClipboardImageFormat| format.priority() < current.priority())
-            {
-                best = Some(format);
-            }
-        }
-        best.map_or(Self::None, Self::Image)
+        images
+            .iter()
+            .copied()
+            .min_by_key(|format| format.priority())
+            .map_or(Self::None, Self::Image)
     }
 }
 

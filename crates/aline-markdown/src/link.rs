@@ -91,6 +91,42 @@ pub fn is_allowed_link(destination: &str) -> bool {
     link_verdict(destination).is_allowed()
 }
 
+/// 平台修饰键点击时可交给宿主打开的 URL。
+///
+/// 只有 `http`/`https`/`mailto` 会返回目标；`#` 锚点、`/` 绝对路径与协议
+/// 相对 `//host` 虽在 allowlist 内，但不是可交给系统打开的完整 URL，返回
+/// `None`，由调用方决定站内导航或保持不动。
+pub fn external_link_url(destination: &str) -> Option<&str> {
+    let trimmed = destination.trim();
+    if !is_allowed_link(trimmed) || trimmed.starts_with(['#', '/']) {
+        return None;
+    }
+    Some(trimmed)
+}
+
+/// 返回包含给定源码偏移的最内层链接目标。
+///
+/// 只沿展示树查找链接节点；图片、普通文字或落在链接范围之外的偏移返回
+/// `None`。偏移来自绘制文字命中，不用于重新解析 Markdown。
+pub fn link_destination_at(parsed: &crate::Parsed, source_offset: usize) -> Option<&str> {
+    fn find(nodes: &[crate::PresentationNode], offset: usize) -> Option<&str> {
+        for node in nodes {
+            let range = node.source_range().byte_range();
+            if offset < range.start || offset >= range.end {
+                continue;
+            }
+            if let crate::PresentationKind::Link { destination } = node.kind() {
+                return Some(destination);
+            }
+            if let Some(found) = find(node.children(), offset) {
+                return Some(found);
+            }
+        }
+        None
+    }
+    find(parsed.presentation(), source_offset)
+}
+
 fn has_scheme(lower: &str, scheme: &str) -> bool {
     lower
         .strip_prefix(scheme)

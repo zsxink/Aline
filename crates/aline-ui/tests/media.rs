@@ -390,3 +390,28 @@ fn clipboard_read_order_and_image_priority_are_frozen() {
     );
     assert_eq!(ClipboardRoute::from_flavors(&[]), ClipboardRoute::None);
 }
+
+#[test]
+fn clipboard_route_from_entries_keeps_the_frozen_priority() {
+    use ClipboardImageFormat::{Gif, Png, Tiff, Webp};
+    assert_eq!(
+        ClipboardRoute::from_entries(true, true, &[Png]),
+        ClipboardRoute::Files
+    );
+    assert_eq!(
+        ClipboardRoute::from_entries(false, true, &[Png]),
+        ClipboardRoute::Text
+    );
+    assert_eq!(
+        ClipboardRoute::from_entries(false, false, &[Gif, Webp]),
+        ClipboardRoute::Image(Webp)
+    );
+    assert_eq!(
+        ClipboardRoute::from_entries(false, false, &[Tiff, Png]),
+        ClipboardRoute::Image(Png)
+    );
+    assert_eq!(
+        ClipboardRoute::from_entries(false, false, &[]),
+        ClipboardRoute::None
+    );
+}
