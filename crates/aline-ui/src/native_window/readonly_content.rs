@@ -668,8 +668,8 @@ impl Builder {
             PresentationKind::Emphasis
             | PresentationKind::Strong
             | PresentationKind::Strikethrough
-            | PresentationKind::Link
-            | PresentationKind::Image
+            | PresentationKind::Link { .. }
+            | PresentationKind::Image { .. }
             | PresentationKind::Text
             | PresentationKind::Code
             | PresentationKind::InlineMath
@@ -789,11 +789,11 @@ impl Builder {
                 strike: true,
                 ..InlineStyle::default()
             }),
-            PresentationKind::Link => style.merged(InlineStyle {
+            PresentationKind::Link { .. } => style.merged(InlineStyle {
                 link: true,
                 ..InlineStyle::default()
             }),
-            PresentationKind::Image => style.merged(InlineStyle {
+            PresentationKind::Image { .. } => style.merged(InlineStyle {
                 image: true,
                 ..InlineStyle::default()
             }),
@@ -809,7 +809,7 @@ impl Builder {
             }
             _ => style,
         };
-        if matches!(node.kind(), PresentationKind::Image) {
+        if matches!(node.kind(), PresentationKind::Image { .. }) {
             let drawn = node.drawn_range().byte_range();
             if !drawn.is_empty() {
                 let style = merged.merged(self.html_style(&drawn));

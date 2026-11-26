@@ -175,7 +175,7 @@ fn matches_kind(kind: &PresentationKind, format: InlineFormat) -> bool {
             | (PresentationKind::Emphasis, InlineFormat::Emphasis)
             | (PresentationKind::Strikethrough, InlineFormat::Strike)
             | (PresentationKind::Code, InlineFormat::Code)
-            | (PresentationKind::Link, InlineFormat::Link)
+            | (PresentationKind::Link { .. }, InlineFormat::Link)
     )
 }
 

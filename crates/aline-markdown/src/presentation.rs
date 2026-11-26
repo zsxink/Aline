@@ -90,10 +90,16 @@ pub enum PresentationKind {
     Strong,
     /// 删除线。
     Strikethrough,
-    /// 链接文字；不暴露或执行目标协议。
-    Link,
-    /// 图片引用，来源范围可供原文回退。
-    Image,
+    /// 链接文字；目标协议只供宿主路由，不进入绘制文字。
+    Link {
+        /// 解析器给出的原始目标；宿主必须按协议 allowlist 判定后才可执行。
+        destination: String,
+    },
+    /// 图片引用；目标供宿主解析资源，绘制文字仍只含替代文字。
+    Image {
+        /// 解析器给出的原始目标；宿主必须按来源与格式策略处理。
+        destination: String,
+    },
     /// 普通文本。
     Text,
     /// 行内代码。
@@ -394,8 +400,12 @@ fn tag_kind(
         Tag::Emphasis => PresentationKind::Emphasis,
         Tag::Strong => PresentationKind::Strong,
         Tag::Strikethrough => PresentationKind::Strikethrough,
-        Tag::Link { .. } => PresentationKind::Link,
-        Tag::Image { .. } => PresentationKind::Image,
+        Tag::Link { dest_url, .. } => PresentationKind::Link {
+            destination: owned(dest_url)?,
+        },
+        Tag::Image { dest_url, .. } => PresentationKind::Image {
+            destination: owned(dest_url)?,
+        },
         _ => PresentationKind::Unsupported,
     })
 }

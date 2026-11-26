@@ -62,17 +62,39 @@ fn nested_semantics_keep_alert_list_order_and_inline_styles() -> Result<(), Box<
             .count(),
         3
     );
-    for kind in [
-        PresentationKind::Strong,
-        PresentationKind::Emphasis,
-        PresentationKind::Strikethrough,
-        PresentationKind::Code,
-        PresentationKind::Link,
+    for (name, present) in [
+        (
+            "Strong",
+            nodes
+                .iter()
+                .any(|node| matches!(node.kind(), PresentationKind::Strong)),
+        ),
+        (
+            "Emphasis",
+            nodes
+                .iter()
+                .any(|node| matches!(node.kind(), PresentationKind::Emphasis)),
+        ),
+        (
+            "Strikethrough",
+            nodes
+                .iter()
+                .any(|node| matches!(node.kind(), PresentationKind::Strikethrough)),
+        ),
+        (
+            "Code",
+            nodes
+                .iter()
+                .any(|node| matches!(node.kind(), PresentationKind::Code)),
+        ),
+        (
+            "Link",
+            nodes
+                .iter()
+                .any(|node| matches!(node.kind(), PresentationKind::Link { .. })),
+        ),
     ] {
-        assert!(
-            nodes.iter().any(|node| node.kind() == &kind),
-            "missing {kind:?}"
-        );
+        assert!(present, "missing {name}");
     }
     for node in nodes {
         assert_eq!(node.source_range().snapshot_id(), parsed.snapshot().id());
@@ -393,6 +415,43 @@ fn m1_fixture_groups_match_independent_drawn_and_source_expectations() -> Result
         let expected = std::fs::read_to_string(fixture(&format!("expected/{name}.drawn")))?;
         assert_eq!(parsed.projection().drawn_text(), expected, "fixture {name}");
     }
+    Ok(())
+}
+
+#[test]
+fn link_and_image_nodes_expose_destinations_but_never_draw_them() -> Result<(), Box<dyn Error>> {
+    let parsed = parse_text("[官网](https://example.test/a?b=1) and ![替代](assets/pic.png)\n")?;
+    let nodes = descendants(parsed.presentation());
+
+    let link = nodes
+        .iter()
+        .find_map(|node| match node.kind() {
+            PresentationKind::Link { destination } => Some(destination.as_str()),
+            _ => None,
+        })
+        .ok_or("missing link node")?;
+    assert_eq!(link, "https://example.test/a?b=1");
+
+    let image = nodes
+        .iter()
+        .find_map(|node| match node.kind() {
+            PresentationKind::Image { destination } => Some(destination.as_str()),
+            _ => None,
+        })
+        .ok_or("missing image node")?;
+    assert_eq!(image, "assets/pic.png");
+
+    let drawn = parsed.projection().drawn_text();
+    assert!(drawn.contains("官网"), "链接文字必须保留");
+    assert!(drawn.contains("替代"), "图片替代文字必须保留");
+    assert!(
+        !drawn.contains("https://example.test"),
+        "链接目标不得进入绘制文字"
+    );
+    assert!(
+        !drawn.contains("assets/pic.png"),
+        "图片目标不得进入绘制文字"
+    );
     Ok(())
 }
 

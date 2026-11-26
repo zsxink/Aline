@@ -107,7 +107,7 @@ fn runs(
             PresentationKind::Emphasis => 2,
             PresentationKind::Strikethrough => 4,
             PresentationKind::Code => 8,
-            PresentationKind::Link => 16,
+            PresentationKind::Link { .. } => 16,
             _ => 0,
         };
         let style = inherited | own;

@@ -530,8 +530,8 @@ fn continues_item_tail(
                     | PresentationKind::Emphasis
                     | PresentationKind::Strong
                     | PresentationKind::Strikethrough
-                    | PresentationKind::Link
-                    | PresentationKind::Image
+                    | PresentationKind::Link { .. }
+                    | PresentationKind::Image { .. }
                     | PresentationKind::Code
                     | PresentationKind::InlineMath
                     | PresentationKind::SoftBreak
