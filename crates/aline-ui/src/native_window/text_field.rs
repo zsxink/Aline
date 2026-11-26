@@ -1,4 +1,7 @@
-//! 面板的短文本控件拥有各自的输入和焦点。只向面板发送字段变化及按键意图。
+//! 短文本控件：拥有输入法组合、选区和焦点，只向宿主发送字段变化及按键意图。
+//!
+//! 查找面板与链接/图片弹窗共用同一实现；宽度由调用方给定，Enter/Shift+Enter
+//! 只表达提交意图，具体语义（查找导航或弹窗确认）由宿主决定。
 
 use std::ops::Range;
 
@@ -9,17 +12,25 @@ use gpui::{
     size,
 };
 
-use super::super::{Copy, Cut, Paste, PastePlain, Redo, SelectAll, Undo};
-use super::{FindDirection, FindEvent, tokens};
+use super::{Copy, Cut, Paste, PastePlain, Redo, SelectAll, Undo, tokens};
 
 const MAX_FIELD_BYTES: usize = 4096;
 const FIELD_HEIGHT: Pixels = px(23.0);
 
+/// 字段向宿主发送的事件。
 #[derive(Clone, Copy)]
-pub(super) enum FieldEvent {
+pub(crate) enum TextFieldEvent {
+    /// 已提交文字发生变化（组合中文字不计）。
     Changed,
+    /// 输入法组合开始或结束。
     Composition,
-    Forward(FindEvent),
+    /// Enter/Shift+Enter。
+    Submit {
+        /// Enter 时是否按住 Shift。
+        shift: bool,
+    },
+    /// Escape。
+    Cancel,
 }
 
 struct FieldComposition {
@@ -34,38 +45,48 @@ struct FieldGeometry {
     origin: Point<Pixels>,
 }
 
-pub(super) struct FindField {
+pub(crate) struct TextField {
     id: &'static str,
     placeholder: SharedString,
-    pub(super) focus: FocusHandle,
-    pub(super) text: SharedString,
+    width: Pixels,
+    pub(crate) focus: FocusHandle,
+    pub(crate) text: SharedString,
     selection: Range<usize>,
     composition: Option<FieldComposition>,
     geometry: Option<FieldGeometry>,
 }
 
-impl EventEmitter<FieldEvent> for FindField {}
+impl EventEmitter<TextFieldEvent> for TextField {}
 
-impl FindField {
-    pub(super) fn new(id: &'static str, placeholder: SharedString, cx: &mut Context<Self>) -> Self {
+impl TextField {
+    pub(crate) fn new(
+        id: &'static str,
+        placeholder: SharedString,
+        width: Pixels,
+        initial: SharedString,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        let selection = 0..initial.len();
         Self {
             id,
             placeholder,
+            width,
             focus: cx.focus_handle(),
-            text: SharedString::default(),
-            selection: 0..0,
+            text: initial,
+            selection,
             composition: None,
             geometry: None,
         }
     }
 
-    pub(super) fn committed(&self) -> SharedString {
+    /// 已提交文字；输入法组合中返回组合前文字。
+    pub(crate) fn committed(&self) -> SharedString {
         self.composition
             .as_ref()
             .map_or_else(|| self.text.clone(), |mark| mark.before.clone())
     }
 
-    pub(super) fn is_composing(&self) -> bool {
+    pub(crate) fn is_composing(&self) -> bool {
         self.composition.is_some()
     }
 
@@ -100,7 +121,7 @@ impl FindField {
 
     fn publish(&mut self, before: &SharedString, cx: &mut Context<Self>) {
         if before != &self.text {
-            cx.emit(FieldEvent::Changed);
+            cx.emit(TextFieldEvent::Changed);
         }
         cx.notify();
     }
@@ -152,15 +173,10 @@ impl FindField {
             return;
         } else {
             match key.key.as_str() {
-                "enter" => {
-                    let direction = if key.modifiers.shift {
-                        FindDirection::Previous
-                    } else {
-                        FindDirection::Next
-                    };
-                    cx.emit(FieldEvent::Forward(FindEvent::Navigate(direction)));
-                }
-                "escape" => cx.emit(FieldEvent::Forward(FindEvent::Close)),
+                "enter" => cx.emit(TextFieldEvent::Submit {
+                    shift: key.modifiers.shift,
+                }),
+                "escape" => cx.emit(TextFieldEvent::Cancel),
                 "left" | "right" => self.move_caret(key.key == "left"),
                 "backspace" | "delete" => {
                     if self.selection.is_empty() {
@@ -220,7 +236,7 @@ impl FindField {
     }
 }
 
-impl Render for FindField {
+impl Render for TextField {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let entity = cx.entity();
         let focused = self.focus.is_focused(window);
@@ -232,7 +248,7 @@ impl Render for FindField {
             .aria_value(self.text.clone())
             .track_focus(&self.focus)
             .tab_stop(true)
-            .w(px(228.0))
+            .w(self.width)
             .max_w_full()
             .px_2()
             .border_1()
@@ -352,7 +368,7 @@ impl Render for FindField {
     }
 }
 
-impl EntityInputHandler for FindField {
+impl EntityInputHandler for TextField {
     fn text_for_range(
         &mut self,
         range: Range<usize>,
@@ -384,7 +400,7 @@ impl EntityInputHandler for FindField {
 
     fn unmark_text(&mut self, _: &mut Window, cx: &mut Context<Self>) {
         if let Some(mark) = self.composition.take() {
-            cx.emit(FieldEvent::Composition);
+            cx.emit(TextFieldEvent::Composition);
             self.publish(&mark.before, cx);
         }
     }
@@ -409,7 +425,7 @@ impl EntityInputHandler for FindField {
         {
             self.selection = inserted.end..inserted.end;
             if self.composition.take().is_some() {
-                cx.emit(FieldEvent::Composition);
+                cx.emit(TextFieldEvent::Composition);
             }
             self.publish(&before, cx);
         }
@@ -451,7 +467,7 @@ impl EntityInputHandler for FindField {
                 self.selection = mark.before_selection.clone();
                 self.composition = None;
                 self.geometry = None;
-                cx.emit(FieldEvent::Composition);
+                cx.emit(TextFieldEvent::Composition);
                 cx.notify();
             }
             return;
@@ -470,7 +486,7 @@ impl EntityInputHandler for FindField {
                 marked,
             });
             if starting {
-                cx.emit(FieldEvent::Composition);
+                cx.emit(TextFieldEvent::Composition);
             }
             cx.notify();
         }
@@ -515,7 +531,7 @@ fn field_bounds(origin: Point<Pixels>, line: &ShapedLine, bytes: &Range<usize>) 
     )
 }
 
-// 偏移只属于面板私有字段。GPUI 传入的半个代理对不能用于字符串切片。
+// 偏移只属于字段私有文本。GPUI 传入的半个代理对不能用于字符串切片。
 fn bytes_for_utf16(text: &str, range: Range<usize>) -> Option<Range<usize>> {
     if range.start > range.end {
         return None;

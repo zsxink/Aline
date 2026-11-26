@@ -10,9 +10,8 @@ use gpui::{
 };
 use std::{rc::Rc, sync::Arc};
 
-mod field;
 mod host;
-use field::{FieldEvent, FindField};
+use super::text_field::{TextField, TextFieldEvent};
 #[cfg(test)]
 pub(super) use host::{replace_all_for_test, reveal_in_source};
 
@@ -299,8 +298,8 @@ impl FindCopy {
 pub(super) struct FindPanel {
     translator: Rc<Translator>,
     copy: FindCopy,
-    query: Entity<FindField>,
-    replacement: Entity<FindField>,
+    query: Entity<TextField>,
+    replacement: Entity<TextField>,
     focus: FocusHandle,
     case: FindCase,
     search: SearchState,
@@ -315,18 +314,43 @@ impl EventEmitter<FindEvent> for FindPanel {}
 
 impl FindPanel {
     fn new(translator: Rc<Translator>, copy: FindCopy, cx: &mut Context<Self>) -> Self {
-        let query = cx.new(|cx| FindField::new("find-query", copy.query.clone(), cx));
-        let replacement =
-            cx.new(|cx| FindField::new("find-replacement", copy.replacement.clone(), cx));
+        let query = cx.new(|cx| {
+            TextField::new(
+                "find-query",
+                copy.query.clone(),
+                gpui::px(228.0),
+                SharedString::default(),
+                cx,
+            )
+        });
+        let replacement = cx.new(|cx| {
+            TextField::new(
+                "find-replacement",
+                copy.replacement.clone(),
+                gpui::px(228.0),
+                SharedString::default(),
+                cx,
+            )
+        });
         let query_events = cx.subscribe(&query, |panel, _, &event, cx| match event {
-            FieldEvent::Changed => panel.query_changed(false, cx),
-            FieldEvent::Composition => cx.notify(),
-            FieldEvent::Forward(event) => cx.emit(event),
+            TextFieldEvent::Changed => panel.query_changed(false, cx),
+            TextFieldEvent::Composition => cx.notify(),
+            TextFieldEvent::Submit { shift } => cx.emit(FindEvent::Navigate(if shift {
+                FindDirection::Previous
+            } else {
+                FindDirection::Next
+            })),
+            TextFieldEvent::Cancel => cx.emit(FindEvent::Close),
         });
         let replacement_events = cx.subscribe(&replacement, |panel, _, &event, cx| match event {
-            FieldEvent::Changed => panel.query_changed(true, cx),
-            FieldEvent::Composition => cx.notify(),
-            FieldEvent::Forward(event) => cx.emit(event),
+            TextFieldEvent::Changed => panel.query_changed(true, cx),
+            TextFieldEvent::Composition => cx.notify(),
+            TextFieldEvent::Submit { shift } => cx.emit(FindEvent::Navigate(if shift {
+                FindDirection::Previous
+            } else {
+                FindDirection::Next
+            })),
+            TextFieldEvent::Cancel => cx.emit(FindEvent::Close),
         });
         Self {
             translator,

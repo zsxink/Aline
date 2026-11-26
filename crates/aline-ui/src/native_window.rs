@@ -22,6 +22,7 @@ mod recovery_runtime;
 mod recovery_slot;
 mod shell;
 mod table_commands;
+mod text_field;
 mod tokens;
 
 /// 原生窗口同源协调器的无窗口回归；真实 chooser/菜单/焦点另作 macOS 实验。
