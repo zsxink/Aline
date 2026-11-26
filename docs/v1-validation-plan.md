@@ -170,6 +170,8 @@ Mermaid 护眼模式使用亮色映射；固定主题不跟随应用，主题是
 
 *状态：* **V-03 仍未整项通过。** 解码/协议/复制/语法/图类型矩阵已取证，但链接打开与拒绝提示的生产路径、图片预览交互、插件门控下的图像复制/导出、主题安装事务与真实视觉外观仍未取证，跨平台差异未覆盖。证据 `logs/validation/m4-plugins-and-themes/2026-11-26-v03/`（`summary.json`、`matrix.md`、`dependencies.json`、各 `*.log`、`artifacts/`）。
 
+***2026-11-26 任务 1.5 复核更正（只追加，不改上文）：*** 上文“依赖事实”与“本轮未测”中的两处候选后端陈述按**生产 features** 更正。(1) `mermaid-rs-renderer@0.3.1` 在 `default-features=false` 下只新增 `json5@1.3.8`、`ucd-trie@0.1.8` 与自身，**不**带入 resvg/usvg 0.47；0.47 是 V-03 探针默认 features 组合的结果，不是生产选择。(2) `ttf-parser@0.25.1` 已在锁定 GPUI 的 usvg/fontdb 闭包内，`latex-rust@2.1.1` 关闭默认 features 后只新增自身一个包，RUSTSEC-2026-0192 属既有依赖而非本次引入。三项候选的准入已由用户 2026-11-26 裁决，支持契约、精确身份、边与剩余缺口见 `openspec/changes/m4-plugins-and-themes/admission-review.md`。
+
 ## V-04 · 主题包与原生字体能力
 
 先验证锁定环境的动态静态字体加载、中文回退、主题切换后缓存/布局刷新，以及三平台背景透明度。透明背景不支持可回退到同色不透明；字体无法激活不能静默忽略，须解决能力阻塞或记录新的产品决定。

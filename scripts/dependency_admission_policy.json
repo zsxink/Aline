@@ -1,8 +1,8 @@
 {
   "format": 1,
   "reviewed": true,
-  "reviewed_on": "2026-11-02",
-  "review_evidence": "docs/v1-architecture.md#32-栈与依赖的状态; docs/engine-design.md#182-依赖准入与未解决实现风险; docs/decisions.md §36（2026-11-12 生产来源准入）",
+  "reviewed_on": "2026-11-26",
+  "review_evidence": "docs/v1-architecture.md#32-栈与依赖的状态; docs/engine-design.md#182-依赖准入与未解决实现风险; docs/decisions.md §36（2026-11-12 生产来源准入）; openspec/changes/m4-plugins-and-themes/admission-review.md（2026-11-26 用户裁决：export-pdf/export-docx/math-latex/diagram-mermaid/highlight-syntect）",
   "purpose": "八成员 workspace 的逐依赖准入分组与许可证策略；分组说明是人工审查结论，包身份、选包、边、features 与校验和由账本自动核对",
   "license": {
     "allowed": [
@@ -352,6 +352,181 @@
       "consumer": "app（aline），启动时映射到 app-core Locale",
       "alternatives": "GPUI 核心没有系统首选语言 API；显式测试语言和 LANG 不能替代 macOS GUI 系统偏好",
       "necessity": "M1 默认随系统语言；许可证按全局允许集合校验，不适用 MPL 例外"
+    },
+    {
+      "id": "export-pdf",
+      "rule": {
+        "kind": "closure",
+        "roots": [
+          "krilla"
+        ],
+        "optional": true,
+        "root_identities": [
+          {
+            "package": "krilla@0.8.2",
+            "source": "registry+https://github.com/rust-lang/crates.io-index",
+            "checksum": "27da593198b20eeba65caeb73c2bbeec3e53ab08fa549898312ce81c4fce5e33"
+          }
+        ],
+        "root_incoming": [
+          {
+            "from": "aline-plugin@0.1.0",
+            "to": "krilla@0.8.2",
+            "alias": "krilla",
+            "kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ]
+      },
+      "selected_allowed": true,
+      "purpose": "krilla =0.8.2 PDF 闭包（raster-images + simple-text）；V-02 实测纸型/方向/四边页边距与 CJK 字体子集",
+      "consumer": "aline-plugin，EXPORT-02～04 PDF 后端",
+      "alternatives": "printpdf 因 MPL/tokio 被排除；无第二个 PDF 候选进入实测",
+      "necessity": "V-02 实测产物与预算达标；版本、来源、checksum、入边与 features 精确核对；2026-11-26 用户裁决准入"
+    },
+    {
+      "id": "export-docx",
+      "rule": {
+        "kind": "closure",
+        "roots": [
+          "docx-rs"
+        ],
+        "optional": true,
+        "root_identities": [
+          {
+            "package": "docx-rs@0.4.22",
+            "source": "registry+https://github.com/rust-lang/crates.io-index",
+            "checksum": "7fdf00e8af6d0b3e92d4bbf9b76f773d8b84ea80f310324ad16cbdc2e653e02c"
+          }
+        ],
+        "root_incoming": [
+          {
+            "from": "aline-plugin@0.1.0",
+            "to": "docx-rs@0.4.22",
+            "alias": "docx_rs",
+            "kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ]
+      },
+      "selected_allowed": true,
+      "purpose": "docx-rs =0.4.22 闭包（default-features=false，不含 image）；Word 标题/正文/代码样式与可编辑边界",
+      "consumer": "aline-plugin，EXPORT-02～04 Word 后端；zip/typed-path 由主题 ZIP 导入共享",
+      "alternatives": "无第二个 DOCX 候选进入实测；image feature 会引入获批根以外的 wasip2 路径，明确不启用",
+      "necessity": "V-02 实测 Word 样式/编号/表格/脚注可用；2026-11-26 用户裁决准入，生产清单必须 default-features=false"
+    },
+    {
+      "id": "math-latex",
+      "rule": {
+        "kind": "closure",
+        "roots": [
+          "latex-rust"
+        ],
+        "optional": true,
+        "root_identities": [
+          {
+            "package": "latex-rust@2.1.1",
+            "source": "registry+https://github.com/rust-lang/crates.io-index",
+            "checksum": "f8094b939c8af51f9c7d08256ffa607b743e24d466d9a0ccc602dc748c911e54"
+          }
+        ],
+        "root_incoming": [
+          {
+            "from": "aline-plugin@0.1.0",
+            "to": "latex-rust@2.1.1",
+            "alias": "latex_rust",
+            "kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ]
+      },
+      "selected_allowed": true,
+      "purpose": "latex-rust =2.1.1 公式闭包（std，无默认 features）；V-03 七类公式在同一后端实测通过",
+      "consumer": "aline-plugin，公式渲染",
+      "alternatives": "无第二个公式候选进入实测；ratex 需浏览器/WebView，§3.2 禁止",
+      "necessity": "V-03 七类公式通过；内嵌 STIX 字体（OFL-1.1）与 dvipsnames（LPPL-1.3c）已由用户 2026-11-26 裁决随附许可证文本分发"
+    },
+    {
+      "id": "diagram-mermaid",
+      "rule": {
+        "kind": "closure",
+        "roots": [
+          "mermaid-rs-renderer"
+        ],
+        "optional": true,
+        "root_identities": [
+          {
+            "package": "mermaid-rs-renderer@0.3.1",
+            "source": "registry+https://github.com/rust-lang/crates.io-index",
+            "checksum": "6cb5b469222ce6b9896edf0a969cf68464f5a028ef394fd6643f00bd943df117"
+          }
+        ],
+        "root_incoming": [
+          {
+            "from": "aline-plugin@0.1.0",
+            "to": "mermaid-rs-renderer@0.3.1",
+            "alias": "mermaid_rs_renderer",
+            "kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ]
+      },
+      "selected_allowed": true,
+      "purpose": "mermaid-rs-renderer =0.3.1 闭包（无默认 features，不启用 png/cli）；输出 SVG，由计划中的 resvg 0.46 栅格化",
+      "consumer": "aline-plugin，23 类 Mermaid 图",
+      "alternatives": "§3.2 禁止借浏览器/WebView 补图表；无第二个图表候选进入实测",
+      "necessity": "V-03 23 类图类型实测通过；regex 入边已由用户 2026-11-26 精确裁决并登记"
+    },
+    {
+      "id": "highlight-syntect",
+      "rule": {
+        "kind": "closure",
+        "roots": [
+          "syntect"
+        ],
+        "optional": true,
+        "root_identities": [
+          {
+            "package": "syntect@5.3.0",
+            "source": "registry+https://github.com/rust-lang/crates.io-index",
+            "checksum": "656b45c05d95a5704399aeef6bd0ddec7b2b3531b7c9e900abbf7c4d2190c925"
+          }
+        ],
+        "root_incoming": [
+          {
+            "from": "aline-plugin@0.1.0",
+            "to": "syntect@5.3.0",
+            "alias": "syntect",
+            "kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ]
+      },
+      "selected_allowed": true,
+      "purpose": "syntect =5.3.0 闭包（parsing/default-syntaxes/default-themes/dump-load/regex-fancy）；语言识别与 scope 着色",
+      "consumer": "aline-plugin，PLUGIN-05 / PL-02 代码高亮",
+      "alternatives": "无第二个高亮候选进入实测；two-face 为历史可选语法集，未引入",
+      "necessity": "PLUGIN-05 需要语言识别与独立配色；regex-automata/regex-syntax 入边已由用户 2026-11-26 精确裁决并登记"
     },
     {
       "id": "unassigned",

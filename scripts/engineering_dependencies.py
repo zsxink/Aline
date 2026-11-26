@@ -102,6 +102,33 @@ def normalized_edge(packages, parent, edge):
             "kinds": sorted(edge["dep_kinds"], key=lambda kind: (kind.get("kind") or "", kind.get("target") or ""))}
 
 
+def registered_outside_exception(packages, nodes, lock, policy, identity, scenario):
+    """禁库包在 GPUI 之外可达时，只有完整登记才放行。
+
+    2026-11-26 用户裁决把 regex 族精确例外扩展到 `mermaid-rs-renderer` 与
+    `syntect`——这两个根**不经过** GPUI，所以旧的“只在 GPUI 子图内可达”前提
+    不再成立。放行条件不是“存在例外记录”，而是全图**每一条入边**都在登记表
+    内，且来源、校验和、目标组合一致；任何未登记父包（含 metadata-only 边）
+    都会失败关闭。
+    """
+    key = package_key(packages[identity])
+    exception = policy.get("exceptions", {}).get(key)
+    if exception is None:
+        return False
+    if packages[identity].get("source") != exception["source"]:
+        return False
+    if lock.get(key, {}).get("checksum") != exception["checksum"]:
+        return False
+    if scenario not in exception["scenarios"]:
+        return False
+    allowed = exception["incoming"]
+    for parent in nodes:
+        for edge in nodes[parent]["deps"]:
+            if edge["pkg"] == identity and normalized_edge(packages, parent, edge) not in allowed:
+                return False
+    return True
+
+
 def model(data, lock):
     try:
         packages = {p["id"]: p for p in data["packages"]}
@@ -238,7 +265,11 @@ def validate(data, tree, lock_path, policy, scenario, admission=None, ledger=Fal
         if identity in native_approved:
             continue
         name = packages[identity]["name"]
-        if forbidden_name(name) or gpui_name(name) or name in PARSERS:
+        if forbidden_name(name):
+            if registered_outside_exception(packages, nodes, lock, policy, identity, scenario):
+                continue
+            raise Violation("metadata-only 自有禁库旁路: " + route(packages, nodes, roots, identity))
+        if gpui_name(name) or name in PARSERS:
             raise Violation("metadata-only 自有禁库旁路: " + route(packages, nodes, roots, identity))
     incoming = collections.defaultdict(list)
     for parent in selected:
@@ -255,7 +286,10 @@ def validate(data, tree, lock_path, policy, scenario, admission=None, ledger=Fal
             continue
         key = package_key(packages[identity])
         if not gpui or identity in outside:
-            raise Violation("禁库或 GPUI 例外旁路: " + route(packages, nodes, roots, identity))
+            # 例外只在 GPUI 子图外仍然成立时才放行：完整登记且全图入边都受审。
+            if not (gpui is not None and identity in outside
+                    and registered_outside_exception(packages, nodes, lock, policy, identity, scenario)):
+                raise Violation("禁库或 GPUI 例外旁路: " + route(packages, nodes, roots, identity))
         exception = policy["exceptions"].get(key)
         if exception is None:
             raise Violation("无精确依赖例外: " + key)

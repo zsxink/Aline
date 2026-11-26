@@ -1,14 +1,14 @@
 # M4 后端与平台适配准入审查
 
-状态：**任务 1.5 未完成——三项准入决定待用户裁决。** 本记录冻结了 1.2～1.4 支持契约对应的候选后端、版本、校验和、许可证、依赖边、目标/features 与逐场景门禁裁决，并把它们做成可复跑探针（自测与十组实测均通过）。但下列三项必须由用户裁决后，相应生产接线才可开始：导出闭包（krilla/docx-rs/zip）与新 GPUI 指纹、`latex-rust` 内嵌素材许可证、`mermaid`/`syntect` 的禁库守卫扩展。在此之前不得把本记录读成“已准入”，也不得写 `engineering_policy.json`/`dependency_admission_policy.json` 或改生产 manifest。
+状态：**任务 1.5 完成（2026-11-26 用户裁决）。** 本记录冻结了 1.2～1.4 支持契约对应的候选后端、版本、校验和、许可证、依赖边、目标/features 与逐场景门禁裁决；三项待裁决已全部批准（见“裁决结果”），禁库守卫与五个运行时准入分组已按裁决登记并入正式策略，`theme-zip` 分组与七场景 GPUI 指纹按接线顺序在对应任务登记。探针在正式策略上复跑 `PROBE_OK groups=11 failed=0`。
 
-已可准入（零新增包、零漂移）：`usvg@0.46.0`、`resvg@0.46.0`、`tiny-skia@0.11.4` 三个直依赖，以及 M4 全部 8 项平台适配（锁定 GPUI 既有 API，零新增依赖）。“依赖已明确”不等于对应任务已完成。
+已可准入（零新增包、零漂移）：`usvg@0.46.0`、`resvg@0.46.0`、`tiny-skia@0.11.4` 三个直依赖，以及 M4 全部 8 项平台适配（锁定 GPUI 既有 API，零新增依赖）。“依赖已明确”不等于对应任务已完成；生产接线仍按任务顺序在 3.x/4.x/5.x 进行。
 
 ## 方法与可重复性
 
 - 规则层 `scripts/m4_admission_rules.py`：纯常量与纯函数，冻结候选身份、直接依赖行、分组期望、内嵌素材、平台适配与策略快照 SHA-256；不读磁盘、不起进程。
 - 探针 `scripts/probe_m4_admission.py`：把八个 workspace 成员、`vendor/` 与四份根清单复制到 `<tmp>` 工作区副本，按分组注入候选直接依赖，逐场景执行 `cargo metadata`/`cargo tree`，再用**门禁自己的** `engineering_dependencies.validate()` 裁决；同时用门禁自己的 `gpui_snapshot()`/`fingerprint()` 重算 GPUI 受审子图指纹，使被指纹检查拒绝的组也能给出拟批准值。
-- 复跑命令：`python3 -I scripts/probe_m4_admission.py --self-test` 与 `python3 -I scripts/probe_m4_admission.py --offline`。本轮结果：`SELFTEST_OK groups=10 packages=29 scenarios=7`、`PROBE_OK groups=10 failed=0`。
+- 复跑命令：`python3 -I scripts/probe_m4_admission.py --self-test` 与 `python3 -I scripts/probe_m4_admission.py --offline`。裁决前测量：`SELFTEST_OK groups=10 packages=29 scenarios=7`、`PROBE_OK groups=10 failed=0`；裁决并登记策略后：`SELFTEST_OK groups=11 packages=29 scenarios=7`、`PROBE_OK groups=11 failed=0`。新增的第 11 组 `production` 是 M4 终态组合（全部已批准后端 + SVG 直依赖）。
 - 环境：macOS 27.2.1 arm64、cargo/rustc 1.98.1、Python 3.9.6，cargo 强制离线并使用本机 registry 缓存。原始 metadata/tree/lock 与 `summary.json`/`report.md` 位于 `<repo>/logs/validation/m4-plugins-and-themes/2026-11-26-admission/review-probe/`（ignored），不是仓库公共报告。
 - **口径声明**：`m4_admission_rules.py` 的期望值来自本轮同一次测量的冻结，探针再跑一遍只证明**可复现性与门禁当前行为**，不构成对候选的独立批准；独立批准只能来自用户裁决。
 - 策略快照：`scripts/engineering_policy.json` 与 `scripts/dependency_admission_policy.json` 的 SHA-256 冻结在规则层；策略一旦变化，探针先失败而不是静默沿用旧期望。
@@ -46,12 +46,12 @@
 
 | 身份 | 校验和 | 许可证 | rust-version | features | 消费方 | 状态 |
 |---|---|---|---|---|---|---|
-| `zip@8.6.0` | `2d04a6b5381502aa6087c94c669499eb1602eb9c5e8198e534de571f7154809b` | MIT | 1.88 | `deflate-flate2-zlib-rs` | aline-plugin | 待裁决 |
-| `krilla@0.8.2` | `27da593198b20eeba65caeb73c2bbeec3e53ab08fa549898312ce81c4fce5e33` | MIT OR Apache-2.0 | 1.92 | `raster-images, simple-text` | aline-plugin | 待裁决 |
-| `docx-rs@0.4.22` | `7fdf00e8af6d0b3e92d4bbf9b76f773d8b84ea80f310324ad16cbdc2e653e02c` | MIT | — | 无 | aline-plugin | 待裁决 |
-| `latex-rust@2.1.1` | `f8094b939c8af51f9c7d08256ffa607b743e24d466d9a0ccc602dc748c911e54` | MIT OR Apache-2.0 | 1.76 | `std` | aline-plugin | 待许可证裁决 |
-| `mermaid-rs-renderer@0.3.1` | `6cb5b469222ce6b9896edf0a969cf68464f5a028ef394fd6643f00bd943df117` | MIT | — | 无 | aline-plugin | 待守卫裁决 |
-| `syntect@5.3.0` | `656b45c05d95a5704399aeef6bd0ddec7b2b3531b7c9e900abbf7c4d2190c925` | MIT | — | `parsing, default-syntaxes, default-themes, dump-load, regex-fancy` | aline-plugin | 待守卫裁决 |
+| `zip@8.6.0` | `2d04a6b5381502aa6087c94c669499eb1602eb9c5e8198e534de571f7154809b` | MIT | 1.88 | `deflate-flate2-zlib-rs` | aline-plugin | 已批准（2026-11-26） |
+| `krilla@0.8.2` | `27da593198b20eeba65caeb73c2bbeec3e53ab08fa549898312ce81c4fce5e33` | MIT OR Apache-2.0 | 1.92 | `raster-images, simple-text` | aline-plugin | 已批准（2026-11-26） |
+| `docx-rs@0.4.22` | `7fdf00e8af6d0b3e92d4bbf9b76f773d8b84ea80f310324ad16cbdc2e653e02c` | MIT | — | 无 | aline-plugin | 已批准（2026-11-26） |
+| `latex-rust@2.1.1` | `f8094b939c8af51f9c7d08256ffa607b743e24d466d9a0ccc602dc748c911e54` | MIT OR Apache-2.0 | 1.76 | `std` | aline-plugin | 已批准，随附许可证（2026-11-26） |
+| `mermaid-rs-renderer@0.3.1` | `6cb5b469222ce6b9896edf0a969cf68464f5a028ef394fd6643f00bd943df117` | MIT | — | 无 | aline-plugin | 已批准并登记入边（2026-11-26） |
+| `syntect@5.3.0` | `656b45c05d95a5704399aeef6bd0ddec7b2b3531b7c9e900abbf7c4d2190c925` | MIT | — | `parsing, default-syntaxes, default-themes, dump-load, regex-fancy` | aline-plugin | 已批准并登记入边（2026-11-26） |
 | `usvg@0.46.0` | 基线已有 | Apache-2.0 OR MIT | — | 无 | aline-ui | 可准入 |
 | `resvg@0.46.0` | 基线已有 | Apache-2.0 OR MIT | — | 无 | aline-ui | 可准入 |
 | `tiny-skia@0.11.4` | 基线已有 | BSD-3-Clause | — | `std, simd` | aline-ui | 可准入 |
@@ -72,10 +72,12 @@
 | mermaid | 438 | 3 | guard-bypass | 是 |
 | latex | 436 | 1 | admission-group | 是 |
 | full-plain | 455 | 20 | gpui-drift | 是 |
+| production（终态组合） | 464 | 29 | gpui-drift | 是 |
 
 - 基线在七个场景全部通过，指纹与当前已批准的七场景值逐一相同；选包数为 all/all-features 394、macos-arm 332、macos-intel 333、windows-x64 286、linux-x64 278、linux-arm 277。
 - `svg-direct` 在七个场景全部通过且指纹不变：三个直依赖已在锁定 GPUI 闭包内，仅增加调用点。
-- 各组拒绝消息分类稳定，未出现“期望类别不符”或无法归类的消息。
+- 裁决并登记后的第二次实测：`baseline`、`svg-direct`、`latex` 七场景 `pass`；其余组因 GPUI 指纹仍是 M1 值而报 `gpui-drift`；`docx-image` 仍在原生路径层被拒。所有组的期望与实际一致。
+- 除 `latex` 外，各组拒绝消息分类稳定，未出现“期望类别不符”或无法归类的消息。
 
 ## 新增包身份（29 个）
 
@@ -115,7 +117,7 @@
 | mermaid | `ucd-trie@0.1.8` | `8f20bdbfc9915686faa18fb5bbe8b4552778505defbf9f12289beefbc44092a6` | MIT OR Apache-2.0 | — |
 | latex | `latex-rust@2.1.1` | `f8094b939c8af51f9c7d08256ffa607b743e24d466d9a0ccc602dc748c911e54` | MIT OR Apache-2.0 | 1.76 |
 
-`full-plain` 的新增包是 krilla、docx-plain、latex 三组的并集（20 个），未出现并集外身份。
+`full-plain` 的新增包是 krilla、docx-plain、latex 三组的并集（20 个）；`production` 的新增包是 krilla、docx-plain、latex、syntect、mermaid 五组的并集（29 个），两者都未出现并集外身份。
 
 ## 禁库入边与原生目标路径
 
@@ -142,6 +144,14 @@ aline-plugin@0.1.0 --docx_rs[normal]--> docx-rs@0.4.22 --image[normal]--> image@
 
 `cfg(fuzzing)` 与 wasm32/wasi 条件使该路径在任何桌面 target tree 中都不被选中（五个桌面场景 `selected = false`；`all`/`all-features` 为 `true`，因为 `--target all` 会把目标分支一起选上）。门禁仍在原生路径层拒绝，因为原生路径检查先于 metadata-only 旁路。结论：**`docx-rs` 生产接线必须 `default-features = false`**；Word 图片改用 `Pic::new_with_dimensions` + `tiny-skia` 预编码 PNG。
 
+### 守卫扩展的实现（2026-11-26）
+
+只把四条入边写进策略数据不够：旧守卫先判断“禁库是否可在 GPUI 之外到达”，`syntect`/`mermaid` 不经过 GPUI，因此在读例外表之前就被拒绝（实测仍报 `guard-bypass`）。按裁决对 `scripts/engineering_dependencies.py` 做了最小改动：
+
+- 新增 `registered_outside_exception()`：禁库包在 GPUI 之外可达时，放行条件是**全图每一条入边**都在该身份的 `exceptions.incoming` 中，且来源、校验和、目标组合一致。
+- 两处调用：metadata-only 禁库旁路检查与已选禁库旁路检查。`gpui`/解析器/无 GPUI 的图保持原有严格拒绝；任何未登记父包（包括 metadata-only 边）仍然失败关闭。
+- 策略登记：`regex@1.13.1` 增加 `mermaid-rs-renderer@0.3.1` 入边；`regex-automata@0.4.18` 增加 `fancy-regex@0.16.2`；`regex-syntax@0.8.11` 增加 `fancy-regex@0.16.2` 与 `syntect@5.3.0`。七场景全部允许。
+
 ## GPUI 受审子图漂移
 
 - `zip` 与 `docx-plain`：`flate2@1.1.10` 的 features 增加 `any_zlib`、`zlib-rs`，并**把基线已有但未被选中的 `zlib-rs@0.6.8` 变为选中**。`zlib-rs` 不是新增包，但 `selected` 翻转同样改变指纹，不能读成“只多了两个包”。
@@ -161,23 +171,27 @@ aline-plugin@0.1.0 --docx_rs[normal]--> docx-rs@0.4.22 --image[normal]--> image@
 | syntect | `23e7b11d7151592f9d31b4173f6b7b0af8dd63567159f7dbdbedb2a30d7e6a3f` | `eb0d0bf65836d021a93d7858708b74376f4e70007d2e76bdb921347ba914c261` | `4b872bb269c4ae224c96a262880534647d45028c9f88e5f9fc7d7493e24921fe` | `05c299a99da4ff647491c0497083d74b6e712f81f49626cdc4cb17df61d4f975` | `dd00f463ac0a13677be944e92d6ae2732e49ea48ea6422db2797a4142975497a` | `96078cbb38ce64f09989c99f876c88531017ed451302146eaf84464f88bc33ed` | `23e7b11d7151592f9d31b4173f6b7b0af8dd63567159f7dbdbedb2a30d7e6a3f` |
 | mermaid | `f6e77bbc287eaecd30441709fa9a9e8be86fd3c2bbac286aa4f4c9d85fb2cdfb` | `378aaf32fa7a7c4a848491cb431d9ceb87cfd610185550b7d818984e760c548e` | `dae86251b92709597dc4c3d01fb3e77954cfa10bce3212aa0742d79aca96142a` | `f344f962ecf8e379b874db691bda2ecebdab0672bf3c5f9d39eebc53145906d1` | `4a24ad5bbba060b68d9ea9b4f1ef3f3a47a5898beb2adfdd58a36929bbf78a63` | `44bc8198d5a2019a1ae16d0f9557d8a4e7c7e6ff85d03821f83e0bbc952c0a2e` | `f6e77bbc287eaecd30441709fa9a9e8be86fd3c2bbac286aa4f4c9d85fb2cdfb` |
 | full-plain | `3297801c0315f2044bb62033fc07bf40b1dac612e4152bcec3ef6957402b0063` | `cbe723635342060091b959428e2388df5e87b0d8ba5291335fe5c9c88dacec1c` | `1715ddf8910eb9d6e5cf814a932347b7c8991b1b297d7e99b288575bbf52c2a1` | `d10ed843dcd512e7e89f0f647aef266e1059916cbac1f80fe4733fff722b8ae7` | `ecbd460920890d44c3916ab9763cdb07e59067922a1eaf75f89ac3bf2910da39` | `15f1e83afe8179b645a0fdaaf0d20c3a0f05766ebf80ed67745eefde7d3a54da` | `3297801c0315f2044bb62033fc07bf40b1dac612e4152bcec3ef6957402b0063` |
+| production（终态） | `115f4b5f2c010a12267fe458659bbd117e81c60add5d620ace8559b35b362605` | `ee8fe5d8469b4e1a00643fb3885f885813d4c6e9d79c2aedba113cbac47b6551` | `edb4cd7ba1a790417e7c449f10b6fa134a8d2695175f64e3e310dc719e29108b` | `f05dac7bdcabb31c14339289907632e2b895aab015de2a613feb55ab4bece390` | `256e1366c6a60d4cd06d7350b3ec9cec7bd5d80715abba3ad62c1a88935c53f5` | `34a2bb67b27a8a5b752b2362eafee9f983e7ec70315a7cce5d83b695b8c7a821` | `115f4b5f2c010a12267fe458659bbd117e81c60add5d620ace8559b35b362605` |
 
-`docx-image` 因用户未裁决不列入拟批准；其指纹与 `docx-plain` 相同，但依赖路径含上节原生分支，不应作为生产组合。
+`production` 的选包数为 all/all-features 424、macos-arm 363、macos-intel 365、windows-x64 318、linux-x64 310、linux-arm 308；metadata 464 包、新增 29 包，全部校验和/许可证/来源/rust-version 与冻结表一致。
 
-## 运行时准入分组缺口
+**指纹登记时机：** 策略每场景只保存一个指纹，而指纹随清单实际组合变化，因此上表是“接线到该精确组合时应当登记的值”，不是现在就替换。本轮不修改 `engineering_policy.json` 的 `scenarios`；每个接线提交以其实际清单复跑探针，若与表中组合不一致，必须在复测后追加并经用户确认才能替换。
 
-`latex` 组的唯一拒绝是 `已选包未进入运行时准入分组: latex-rust@2.1.1`，说明现有 8 个分组未覆盖新闭包。若用户批准，需要为每个新闭包登记分组（root 身份、checksum、root 入边、允许场景），建议划分：
+`docx-image` 不列入拟批准：`image` feature 会引入获批根以外的路径（见上节），生产组合固定为 `docx-plain`。
 
-| 建议分组 | 根身份 | 覆盖包 |
+## 运行时准入分组登记
+
+裁决前 `latex` 组的唯一拒绝是 `已选包未进入运行时准入分组: latex-rust@2.1.1`。现已按裁决在 `scripts/dependency_admission_policy.json` 登记五个 `optional` 闭包分组（根身份、checksum、根入边、场景全部精确）；根不存在时自动跳过，出现即做精确核对：
+
+| 已登记分组 | 根身份 | 覆盖包 |
 |---|---|---|
 | `export-pdf` | `krilla@0.8.2` | krilla 闭包 10 包 |
-| `export-docx` | `docx-rs@0.4.22` | docx-rs 闭包 9 包 |
-| `theme-zip` | `zip@8.6.0` | zip、typed-path |
+| `export-docx` | `docx-rs@0.4.22` | docx-rs 闭包 9 包，含 `zip`/`typed-path` |
 | `math-latex` | `latex-rust@2.1.1` | latex-rust |
 | `diagram-mermaid` | `mermaid-rs-renderer@0.3.1` | mermaid、json5、ucd-trie |
-| `highlight-syntect` | `syntect@5.3.0` | syntect 闭包 6 包 |
+| `highlight-syntect` | `syntect@5.3.0` | syntect 闭包 6 包（regex 族仍归 gpui 组） |
 
-同一包可能被多个根共享（`zip`/`typed-path` 同时属于 docx-rs 与 zip 闭包），分组规则必须按闭包并集处理，不能按“首次归属”独占。
+`theme-zip` **本轮不登记**，原因不是裁决未通过，而是机制冲突：`zip` 会随 `docx-rs`（4.4）先出现，而闭包分组的 `root_incoming` 是精确集合——先只登记 `aline-plugin → zip` 会在 4.4 的中间状态失配，登记两条又会在只有一条时失配。因此 `zip`/`typed-path` 在 4.4 起由 `export-docx` 闭包准入；5.2 加入 `aline-plugin → zip` 直依赖时再登记 `theme-zip`，`root_incoming` 同时包含两条边，并用探针复测。分组归属是“先登记先得”，与 `gpui`/`gpui-macos-backend` 的共享包处理一致。
 
 ## 平台适配（零新增依赖）
 
@@ -194,14 +208,18 @@ aline-plugin@0.1.0 --docx_rs[normal]--> docx-rs@0.4.22 --image[normal]--> image@
 | 设置/跟随系统外观 | 5.4 | `App::set_window_appearance` | `app.rs:1712` | `platform.rs:808` | 无 |
 | 观察外观变化 | 5.4 | `Window::observe_window_appearance` | `src/window.rs:2314` | `platform.rs:800` | 无 |
 
-## 待用户裁决
+## 裁决结果（2026-11-26）
 
-1. **导出闭包（`export-closure`）**：是否按上表精确身份、校验和、边与 features 登记 krilla/docx-rs/zip 闭包，新增 `export-pdf`/`export-docx`/`theme-zip` 分组，并采用探针重算的七场景 GPUI 指纹？不批准则 4.4 导出、5.2 主题包安装与主题 ZIP 导入无后端可用。
-2. **`latex-rust` 内嵌素材（`latex-rust-assets`）**：是否准入内嵌 `fonts/stix-two-math/STIXTwoMath-Regular.otf`（838652 字节，OFL-1.1）与 `data/dvipsnames.tsv`（3212 字节，LPPL-1.3c，`NOTICE` 的版权人行是未替换的模板占位符）的 `latex-rust@2.1.1`？两者许可证都不在现行白名单内；批准须同时接受分发时随附 OFL 文本、保留 `NOTICE` 修改声明与原始 graphics bundle 获取指引。不批准则 4.2 公式无可锁定后端，须缩减 PRD 范围或另找候选。
-3. **禁库守卫扩展（`regex-guard`）**：是否为 `mermaid-rs-renderer`/`syntect` 扩展禁库守卫、登记上表四条精确入边并重定 GPUI 基线？这需要改 `engineering_dependencies` 的守卫代码（把精确例外覆盖到这两个根），不是只加策略数据。不批准则 4.1/4.3/4.5 的图表与代码高亮无后端，须缩减 PRD 范围。
+| 事项 | 裁决 | 执行状态 |
+|---|---|---|
+| 导出闭包（krilla/docx-rs/zip） | 全部批准 | `export-pdf`/`export-docx` 已登记；`theme-zip` 按上节推迟到 5.2；GPUI 指纹待接线提交登记 |
+| `latex-rust` 内嵌素材 | 批准并随附许可证 | `math-latex` 已登记；分发义务见下 |
+| 禁库守卫扩展（mermaid/syntect） | 两者都批准 | 守卫代码与四条入边已落地，七场景通过 |
 
-另有一项独立于上述三者的待确认：**4.1 的高亮语言集尚未在任何工件中冻结**（见“契约缺口与更正”第 1 条）。它决定 `syntect` 是发布全量 `default-syntaxes` 还是受控子集，应在 4.1 开工前补齐冻结清单。
+**`latex-rust` 分发义务（必须随产品分发执行）：** 内嵌 `fonts/stix-two-math/STIXTwoMath-Regular.otf`（OFL-1.1）须随附 OFL 文本，不得单独售卖字体，不得用保留字体名发布修改版；`data/dvipsnames.tsv`（LPPL-1.3c）须保留文件头与 `NOTICE` 的修改声明，并保留获取原始 graphics bundle 的指引（`NOTICE` 的版权人行是未替换的模板占位符，不转录其内容）。这两项不在 SPDX 白名单内，是用户裁决的精确例外，不扩展全局许可证集合。
+
+**仍未闭合的一项：** 4.1 的高亮语言集尚未在任何工件中冻结（见“契约缺口与更正”第 1 条）。它不改变已测量的依赖身份，但决定 `syntect` 发布全量 `default-syntaxes` 还是受控子集，必须在 4.1 开工前补齐冻结清单；若届时需要 `default-syntaxes` 之外的语法集（如 `two-face`），属于新增依赖，须重新准入。
 
 ## 当前门禁状态说明
 
-本轮未改任何 Cargo 清单或策略文件。因此 `python3 scripts/check_engineering.py` 若通过，只证明**现有清单没有变化**，不构成本记录任何候选的准入证据；真正的准入要在用户裁决并完成策略登记后，用同一探针与正式入口复跑。
+本轮改了 `scripts/engineering_dependencies.py`（守卫放行条件）与两份策略文件，未改任何 Cargo 清单。`python3 scripts/check_engineering.py` 通过，证明现有八成员图仍满足全部规则；探针在工作区副本上的十一个注入组合也全部符合期望。两者都不等于生产组合已接入：GPUI 指纹仍是 M1 值，生产清单一旦变化就会失败关闭，必须按接线提交重新登记。

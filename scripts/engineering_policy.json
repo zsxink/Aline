@@ -1,7 +1,7 @@
 {
   "format": 1,
   "reviewed": true,
-  "review_evidence": "docs/decisions.md#21-2026-11-02-m1-原生后端候选与准入暂停; docs/decisions.md §36（2026-11-12 生产来源准入）",
+  "review_evidence": "docs/decisions.md#21-2026-11-02-m1-原生后端候选与准入暂停; docs/decisions.md §36（2026-11-12 生产来源准入）; openspec/changes/m4-plugins-and-themes/admission-review.md（2026-11-26 用户裁决：mermaid-rs-renderer/syntect 的 regex 精确入边）",
   "purpose": "正式八成员 workspace 的 GPUI 精确子图；不准许自动更新指纹",
   "workspace_features": {
     "aline": {},
@@ -43,6 +43,17 @@
       "incoming": [
         {
           "from": "regex@1.13.1",
+          "to": "regex-automata@0.4.18",
+          "alias": "regex_automata",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ]
+        },
+        {
+          "from": "fancy-regex@0.16.2",
           "to": "regex-automata@0.4.18",
           "alias": "regex_automata",
           "kinds": [
@@ -99,6 +110,28 @@
               "target": null
             }
           ]
+        },
+        {
+          "from": "fancy-regex@0.16.2",
+          "to": "regex-syntax@0.8.11",
+          "alias": "regex_syntax",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ]
+        },
+        {
+          "from": "syntect@5.3.0",
+          "to": "regex-syntax@0.8.11",
+          "alias": "regex_syntax",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ]
         }
       ],
       "scenarios": [
@@ -117,6 +150,17 @@
       "incoming": [
         {
           "from": "gpui-pre@0.3.9",
+          "to": "regex@1.13.1",
+          "alias": "regex",
+          "kinds": [
+            {
+              "kind": null,
+              "target": null
+            }
+          ]
+        },
+        {
+          "from": "mermaid-rs-renderer@0.3.1",
           "to": "regex@1.13.1",
           "alias": "regex",
           "kinds": [

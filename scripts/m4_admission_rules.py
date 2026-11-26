@@ -42,11 +42,13 @@ SCENARIOS = (
 )
 
 # 2026-11-26 策略快照；探针据此判断本表的期望是否仍然同源。
+# 本轮快照随用户裁决更新：engineering_policy 增加 mermaid/syntect 的 regex 精确
+# 入边，dependency_admission_policy 增加五个 optional 闭包分组；指纹未变。
 POLICY_SHA256 = {
     "scripts/engineering_policy.json":
-        "4555fa107824479777fb3aed905012add29f3ec37fadb145e80902201b1af75a",
+        "98956005709f9e804a4b8788a9e8e0147fe83e676ea40e6b6dd37f380751ee2b",
     "scripts/dependency_admission_policy.json":
-        "9a80938c1c69991add885b61962f25413e96b94f327cfe61cd7b1f3c0279246c",
+        "c2951b3809847732ae9817acb37edaeb5d5e5cce671c010f1a9b232525f6f4b3",
 }
 
 # 当前已批准的七场景 GPUI 受审子图指纹；新增依赖获批后由接线任务替换。
@@ -622,7 +624,7 @@ GROUPS = {
         "workspace_deps": ("syntect@5.3.0",),
         "plugin_deps": ("syntect",),
         "ui_deps": (),
-        "expected_verdicts": _same(GUARD_BYPASS),
+        "expected_verdicts": _same(GPUI_DRIFT),
         "new_packages": (
             "bincode@1.3.3",
             "bit-set@0.8.0",
@@ -643,7 +645,7 @@ GROUPS = {
         "workspace_deps": ("mermaid-rs-renderer@0.3.1",),
         "plugin_deps": ("mermaid-rs-renderer",),
         "ui_deps": (),
-        "expected_verdicts": _same(GUARD_BYPASS),
+        "expected_verdicts": _same(GPUI_DRIFT),
         "new_packages": (
             "json5@1.3.8",
             "mermaid-rs-renderer@0.3.1",
@@ -659,7 +661,7 @@ GROUPS = {
         "workspace_deps": ("latex-rust@2.1.1",),
         "plugin_deps": ("latex-rust",),
         "ui_deps": (),
-        "expected_verdicts": _same(ADMISSION_GROUP),
+        "expected_verdicts": _PASS,
         "new_packages": ("latex-rust@2.1.1",),
         "gpui_drift": _drift(()),
         "forbidden_edges": (),
@@ -710,6 +712,73 @@ GROUPS = {
             new=("bytemuck_derive@1.12.1",),
         ),
         "forbidden_edges": (),
+        "outside_paths": (),
+    },
+    # M4 终态组合：用户 2026-11-26 批准的全部后端（docx 走 plain、不含 image），
+    # 加上 SVG 直依赖。指纹只对应这一组精确 features；清单变化必须重跑。
+    "production": {
+        "workspace_deps": (
+            "krilla@0.8.2", "docx-rs@0.4.22", "zip@8.6.0", "latex-rust@2.1.1",
+            "mermaid-rs-renderer@0.3.1", "syntect@5.3.0",
+            "usvg@0.46.0", "resvg@0.46.0", "tiny-skia@0.11.4",
+        ),
+        "plugin_deps": ("krilla", "docx-rs", "zip", "latex-rust",
+                        "mermaid-rs-renderer", "syntect"),
+        "ui_deps": ("usvg", "resvg", "tiny-skia"),
+        "expected_verdicts": _same(GPUI_DRIFT),
+        "new_packages": (
+            "bincode@1.3.3",
+            "bit-set@0.8.0",
+            "bit-vec@0.8.0",
+            "bytemuck_derive@1.12.1",
+            "core_detect@1.0.0",
+            "docx-rs@0.4.22",
+            "encoding_rs@0.8.44",
+            "fancy-regex@0.16.2",
+            "fnv@1.0.7",
+            "font-types@0.11.3",
+            "json5@1.3.8",
+            "krilla@0.8.2",
+            "latex-rust@2.1.1",
+            "mermaid-rs-renderer@0.3.1",
+            "multiversion_no_op@1.0.0",
+            "pdf-writer@0.15.0",
+            "quick-xml@0.41.0",
+            "read-fonts@0.39.2",
+            "simdutf8@0.1.5",
+            "skrifa@0.42.1",
+            "subsetter@0.2.6",
+            "syntect@5.3.0",
+            "tiny-skia-path@0.12.0",
+            "typed-path@0.12.4",
+            "ucd-trie@0.1.8",
+            "write-fonts@0.48.1",
+            "xmp-writer@0.3.3",
+            "zip@8.6.0",
+            "zopfli@0.8.4",
+        ),
+        "gpui_drift": _drift(
+            (
+                "bytemuck@1.25.2",
+                "flate2@1.1.10",
+                "float-cmp@0.9.0",
+                "fontdb@0.23.0",
+                "regex-automata@0.4.18",
+                "smallvec@1.16.4",
+                "stable_deref_trait@1.2.1",
+                "yoke@0.8.4",
+                "zerofrom@0.1.8",
+                "zlib-rs@0.6.8",
+            ),
+            desktop_extra=("bumpalo@3.20.3", "rustversion@1.0.23"),
+            new=("bytemuck_derive@1.12.1",),
+        ),
+        "forbidden_edges": (
+            ("fancy-regex@0.16.2", "regex-automata@0.4.18"),
+            ("fancy-regex@0.16.2", "regex-syntax@0.8.11"),
+            ("syntect@5.3.0", "regex-syntax@0.8.11"),
+            ("mermaid-rs-renderer@0.3.1", "regex@1.13.1"),
+        ),
         "outside_paths": (),
     },
 }
