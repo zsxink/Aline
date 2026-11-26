@@ -1,6 +1,12 @@
 //! 文档状态、只读生命周期与原生单窗口装配边界。
 
 mod document;
+mod plugins;
+
+pub use plugins::{
+    BUILT_IN_CAPABILITIES, BUILT_IN_SETTINGS, PluginGate, PluginGateError, PluginTaskKey,
+    capability_for_setting, enabled_capabilities, setting_for_capability,
+};
 
 pub use document::{
     CloseDisposition, CommitOutcome, CompositionView, CurrentSnapshot, DerivedRequestId, DocCore,

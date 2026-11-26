@@ -135,6 +135,7 @@ dependencies = [
  "aline-buffer",
  "aline-edit",
  "aline-markdown",
+ "aline-plugin",
  "aline-source",
  "gpui-pre",
  "gpui-pre-macos",
