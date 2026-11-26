@@ -4,6 +4,8 @@ mod budget;
 mod build;
 mod config;
 mod diagnostic;
+mod image;
+mod insert;
 mod link;
 mod mapping;
 mod mdast;
@@ -20,6 +22,8 @@ mod tree;
 pub use budget::{CancelCheck, CancelToken, ParseBudget, ParseStats};
 pub use config::{ParseConfig, ParseFeatures};
 pub use diagnostic::{Diagnostic, DiagnosticKind};
+pub use image::image_destination_at;
+pub use insert::{InlineMarkupKind, InsertRejection, inline_markup};
 pub use link::{
     LinkVerdict, external_link_url, is_allowed_link, link_destination_at, link_verdict,
 };
