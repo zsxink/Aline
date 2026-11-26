@@ -2,6 +2,7 @@
 
 pub mod body_image;
 mod document;
+pub mod image_preview;
 pub mod media;
 mod plugins;
 
