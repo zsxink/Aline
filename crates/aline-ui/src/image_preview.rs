@@ -4,7 +4,8 @@
 //! 尺寸并把结果映射为布局。缩放按整数百分比显示，步进 1.25 倍，范围
 //! 10%–800%（UI §9、PREVIEW-02）。
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 /// 缩放百分比下限（PREVIEW-02）。
 pub const MIN_PERCENT: u32 = 10;
@@ -299,6 +300,426 @@ pub fn has_preview_extension(path: &Path) -> bool {
         })
 }
 
+/// 预览资源的文件版本：长度与修改时间。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FileVersion {
+    /// 文件长度（字节）。
+    pub length: u64,
+    /// 修改时间；平台不提供时为 `None`。
+    pub modified: Option<SystemTime>,
+}
+
+impl FileVersion {
+    /// 构造文件版本快照。
+    pub const fn new(length: u64, modified: Option<SystemTime>) -> Self {
+        Self { length, modified }
+    }
+}
+
+/// 读取文件版本；文件不可读时返回 `None`。
+pub fn file_version(path: &Path) -> Option<FileVersion> {
+    let metadata = std::fs::metadata(path).ok()?;
+    Some(FileVersion::new(metadata.len(), metadata.modified().ok()))
+}
+
+/// 预览失败类别；窗口层负责映射为用户可见说明。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PreviewFailure {
+    /// 未注入图片预算。
+    NoBudget,
+    /// 签名、头或载荷不是受支持图片。
+    Unsupported,
+    /// 超出已配置预算。
+    TooLarge,
+    /// 文件读取失败。
+    Io,
+    /// 再启用时资源已变化。
+    Changed,
+}
+
+/// 预览槽的当前阶段。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PreviewPhase {
+    /// 没有预览。
+    Closed,
+    /// 正在读取/校验图片。
+    Loading,
+    /// 图片可显示。
+    Ready,
+    /// 加载失败；保留路径。
+    Failed,
+    /// 插件关闭；保留路径与视口。
+    Disabled,
+}
+
+/// 插件重新启用后的结果。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PreviewEnable {
+    /// 没有可恢复的预览。
+    Idle,
+    /// 已开始重新加载；携带请求编号。
+    Loading(u64),
+    /// 恢复为失败/资源变化状态；保留路径，等待重试。
+    Failed(PreviewFailure),
+}
+
+struct PreviewLoad {
+    request: u64,
+    path: PathBuf,
+    version: FileVersion,
+    generation: u64,
+    viewport: PreviewViewport,
+    restore: Option<PreviewView>,
+}
+
+struct PreviewReady {
+    path: PathBuf,
+    version: FileVersion,
+    view: PreviewView,
+}
+
+struct PreviewFailed {
+    path: PathBuf,
+    failure: PreviewFailure,
+    version: Option<FileVersion>,
+}
+
+struct PreviewDisabled {
+    path: PathBuf,
+    version: Option<FileVersion>,
+    view: Option<PreviewView>,
+    failure: Option<PreviewFailure>,
+}
+
+enum PreviewState {
+    Closed,
+    Loading(PreviewLoad),
+    Ready(PreviewReady),
+    Failed(PreviewFailed),
+    Disabled(PreviewDisabled),
+}
+
+/// 单槽图片预览：路径复用、加载结果校验、插件开关与再启用恢复。
+///
+/// 槽只保存状态与视图，不读文件也不解码；窗口层在后台完成读取后把
+/// 结果连同当前插件代次交回，由槽拒绝旧请求与已变化的资源。
+pub struct PreviewSlot {
+    state: PreviewState,
+    next_request: u64,
+}
+
+impl PreviewSlot {
+    /// 空槽。
+    pub fn new() -> Self {
+        Self {
+            state: PreviewState::Closed,
+            next_request: 1,
+        }
+    }
+
+    /// 当前阶段。
+    pub fn phase(&self) -> PreviewPhase {
+        match &self.state {
+            PreviewState::Closed => PreviewPhase::Closed,
+            PreviewState::Loading(_) => PreviewPhase::Loading,
+            PreviewState::Ready(_) => PreviewPhase::Ready,
+            PreviewState::Failed(_) => PreviewPhase::Failed,
+            PreviewState::Disabled(_) => PreviewPhase::Disabled,
+        }
+    }
+
+    /// 当前图片路径；关闭后为 `None`。
+    pub fn path(&self) -> Option<&Path> {
+        match &self.state {
+            PreviewState::Closed => None,
+            PreviewState::Loading(load) => Some(load.path.as_path()),
+            PreviewState::Ready(ready) => Some(ready.path.as_path()),
+            PreviewState::Failed(failed) => Some(failed.path.as_path()),
+            PreviewState::Disabled(disabled) => Some(disabled.path.as_path()),
+        }
+    }
+
+    /// 当前视图；失败后为 `None`，关闭期间保留原视图。
+    pub fn view(&self) -> Option<&PreviewView> {
+        match &self.state {
+            PreviewState::Ready(ready) => Some(&ready.view),
+            PreviewState::Disabled(disabled) => disabled.view.as_ref(),
+            _ => None,
+        }
+    }
+
+    /// 当前失败类别；非失败状态为 `None`。
+    pub fn failure(&self) -> Option<PreviewFailure> {
+        match &self.state {
+            PreviewState::Failed(failed) => Some(failed.failure),
+            PreviewState::Disabled(disabled) => disabled.failure,
+            _ => None,
+        }
+    }
+
+    /// 打开图片：同路径复用现有状态；不同路径开始新加载并返回请求编号。
+    pub fn open(
+        &mut self,
+        path: PathBuf,
+        version: FileVersion,
+        generation: u64,
+        viewport: PreviewViewport,
+    ) -> Option<u64> {
+        if self.path().is_some_and(|current| current == path) {
+            return None;
+        }
+        let request = self.take_request();
+        self.state = PreviewState::Loading(PreviewLoad {
+            request,
+            path,
+            version,
+            generation,
+            viewport,
+            restore: None,
+        });
+        Some(request)
+    }
+
+    /// 采纳加载结果；旧请求、旧插件代次或资源变化都返回 `false`。
+    pub fn accept_loaded(
+        &mut self,
+        request: u64,
+        generation: u64,
+        image: ImageSize,
+        version: FileVersion,
+    ) -> bool {
+        let state = std::mem::replace(&mut self.state, PreviewState::Closed);
+        match state {
+            PreviewState::Loading(load) => {
+                if load.request != request || load.generation != generation {
+                    self.state = PreviewState::Loading(load);
+                    return false;
+                }
+                if load.version != version {
+                    self.state = PreviewState::Failed(PreviewFailed {
+                        path: load.path,
+                        failure: PreviewFailure::Changed,
+                        version: Some(version),
+                    });
+                    return false;
+                }
+                let view = match load.restore {
+                    Some(mut saved) if saved.image() == image => {
+                        saved.set_viewport(load.viewport);
+                        saved
+                    }
+                    _ => PreviewView::new(image, load.viewport),
+                };
+                self.state = PreviewState::Ready(PreviewReady {
+                    path: load.path,
+                    version,
+                    view,
+                });
+                true
+            }
+            other => {
+                self.state = other;
+                false
+            }
+        }
+    }
+
+    /// 采纳失败结果；只有当前请求生效。
+    pub fn accept_failed(&mut self, request: u64, failure: PreviewFailure) -> bool {
+        let state = std::mem::replace(&mut self.state, PreviewState::Closed);
+        match state {
+            PreviewState::Loading(load) if load.request == request => {
+                self.state = PreviewState::Failed(PreviewFailed {
+                    path: load.path,
+                    failure,
+                    version: Some(load.version),
+                });
+                true
+            }
+            other => {
+                self.state = other;
+                false
+            }
+        }
+    }
+
+    /// 插件关闭：保留路径与视图（含失败类别），丢弃加载中的请求。
+    pub fn disable(&mut self) {
+        let state = std::mem::replace(&mut self.state, PreviewState::Closed);
+        self.state = match state {
+            PreviewState::Closed => PreviewState::Closed,
+            PreviewState::Loading(load) => PreviewState::Disabled(PreviewDisabled {
+                path: load.path,
+                version: Some(load.version),
+                view: load.restore,
+                failure: None,
+            }),
+            PreviewState::Ready(ready) => PreviewState::Disabled(PreviewDisabled {
+                path: ready.path,
+                version: Some(ready.version),
+                view: Some(ready.view),
+                failure: None,
+            }),
+            PreviewState::Failed(failed) => PreviewState::Disabled(PreviewDisabled {
+                path: failed.path,
+                version: failed.version,
+                view: None,
+                failure: Some(failed.failure),
+            }),
+            PreviewState::Disabled(disabled) => PreviewState::Disabled(disabled),
+        };
+    }
+
+    /// 插件重新启用：按当前文件版本决定重新加载或报告资源变化。
+    pub fn enable(
+        &mut self,
+        version: Option<FileVersion>,
+        generation: u64,
+        viewport: PreviewViewport,
+    ) -> PreviewEnable {
+        let state = std::mem::replace(&mut self.state, PreviewState::Closed);
+        let PreviewState::Disabled(disabled) = state else {
+            self.state = state;
+            return PreviewEnable::Idle;
+        };
+        let unchanged = match (disabled.version, version) {
+            (Some(expected), Some(current)) => expected == current,
+            (None, None) => true,
+            _ => false,
+        };
+        if !unchanged {
+            self.state = PreviewState::Failed(PreviewFailed {
+                path: disabled.path,
+                failure: PreviewFailure::Changed,
+                version,
+            });
+            return PreviewEnable::Failed(PreviewFailure::Changed);
+        }
+        if let Some(failure) = disabled.failure {
+            self.state = PreviewState::Failed(PreviewFailed {
+                path: disabled.path,
+                failure,
+                version,
+            });
+            return PreviewEnable::Failed(failure);
+        }
+        let Some(version) = version else {
+            self.state = PreviewState::Failed(PreviewFailed {
+                path: disabled.path,
+                failure: PreviewFailure::Io,
+                version: None,
+            });
+            return PreviewEnable::Failed(PreviewFailure::Io);
+        };
+        let request = self.take_request();
+        let restore = disabled.view.map(|mut view| {
+            view.set_viewport(viewport);
+            view
+        });
+        self.state = PreviewState::Loading(PreviewLoad {
+            request,
+            path: disabled.path,
+            version,
+            generation,
+            viewport,
+            restore,
+        });
+        PreviewEnable::Loading(request)
+    }
+
+    /// 失败后重试：按当前版本重新加载。
+    pub fn retry(
+        &mut self,
+        version: FileVersion,
+        generation: u64,
+        viewport: PreviewViewport,
+    ) -> Option<u64> {
+        let state = std::mem::replace(&mut self.state, PreviewState::Closed);
+        match state {
+            PreviewState::Failed(failed) => {
+                let request = self.take_request();
+                self.state = PreviewState::Loading(PreviewLoad {
+                    request,
+                    path: failed.path,
+                    version,
+                    generation,
+                    viewport,
+                    restore: None,
+                });
+                Some(request)
+            }
+            other => {
+                self.state = other;
+                None
+            }
+        }
+    }
+
+    /// 关闭预览；迟到的加载结果随之作废。
+    pub fn close(&mut self) {
+        self.state = PreviewState::Closed;
+    }
+
+    /// 视口变化：就绪时重算适应/夹取平移，加载中记录最新视口。
+    pub fn set_viewport(&mut self, viewport: PreviewViewport) {
+        match &mut self.state {
+            PreviewState::Ready(ready) => ready.view.set_viewport(viewport),
+            PreviewState::Loading(load) => load.viewport = viewport,
+            _ => {}
+        }
+    }
+
+    /// 放大一步；非就绪状态返回 `None`。
+    pub fn zoom_in(&mut self) -> Option<ZoomOutcome> {
+        match &mut self.state {
+            PreviewState::Ready(ready) => Some(ready.view.zoom_in()),
+            _ => None,
+        }
+    }
+
+    /// 缩小一步；非就绪状态返回 `None`。
+    pub fn zoom_out(&mut self) -> Option<ZoomOutcome> {
+        match &mut self.state {
+            PreviewState::Ready(ready) => Some(ready.view.zoom_out()),
+            _ => None,
+        }
+    }
+
+    /// 回到适应模式。
+    pub fn fit(&mut self) {
+        if let PreviewState::Ready(ready) = &mut self.state {
+            ready.view.fit();
+        }
+    }
+
+    /// 切到 1:1。
+    pub fn actual_size(&mut self) {
+        if let PreviewState::Ready(ready) = &mut self.state {
+            ready.view.actual_size();
+        }
+    }
+
+    /// 平移给定偏移；返回是否实际变化。
+    pub fn pan_by(&mut self, dx: f32, dy: f32) -> bool {
+        match &mut self.state {
+            PreviewState::Ready(ready) => ready.view.pan_by(dx, dy),
+            _ => false,
+        }
+    }
+
+    fn take_request(&mut self) -> u64 {
+        let request = self.next_request;
+        self.next_request = self.next_request.saturating_add(1);
+        request
+    }
+}
+
+impl Default for PreviewSlot {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -526,6 +947,277 @@ mod tests {
         assert!(ImageSize::new(0, 10).is_none());
         assert!(ImageSize::new(10, 0).is_none());
         assert!(ImageSize::new(10, 10).is_some());
+    }
+
+    // ---- 预览槽：加载/复用/关闭/插件开关/资源变化/旧结果 ----
+
+    fn version(length: u64) -> FileVersion {
+        FileVersion::new(length, None)
+    }
+
+    fn viewport() -> PreviewViewport {
+        PreviewViewport::new(800.0, 600.0)
+    }
+
+    fn size(width: u32, height: u32) -> Result<ImageSize, Box<dyn Error>> {
+        Ok(ImageSize::new(width, height).ok_or("测试图片尺寸必须非零")?)
+    }
+
+    fn loaded_slot(width: u32, height: u32) -> Result<PreviewSlot, Box<dyn Error>> {
+        let mut slot = PreviewSlot::new();
+        let request = slot
+            .open(PathBuf::from("/tmp/a.png"), version(1), 7, viewport())
+            .ok_or("首次打开应开始加载")?;
+        assert!(slot.accept_loaded(request, 7, size(width, height)?, version(1)));
+        Ok(slot)
+    }
+
+    #[test]
+    fn open_starts_loading_and_completion_makes_it_ready() -> TestResult {
+        let mut slot = PreviewSlot::new();
+        assert_eq!(slot.phase(), PreviewPhase::Closed);
+        let request = slot
+            .open(PathBuf::from("/tmp/a.png"), version(1), 7, viewport())
+            .ok_or("首次打开应开始加载")?;
+        assert_eq!(slot.phase(), PreviewPhase::Loading);
+        assert_eq!(slot.path(), Some(Path::new("/tmp/a.png")));
+
+        assert!(slot.accept_loaded(request, 7, size(100, 50)?, version(1)));
+        assert_eq!(slot.phase(), PreviewPhase::Ready);
+        assert_eq!(slot.view().ok_or("缺少视图")?.percent(), 100);
+        Ok(())
+    }
+
+    #[test]
+    fn same_path_reuses_the_ready_preview_and_keeps_the_view() -> TestResult {
+        let mut slot = loaded_slot(1600, 1200)?;
+        slot.actual_size();
+        assert!(slot.zoom_in().ok_or("缩放")?.changed);
+        assert_eq!(slot.view().ok_or("视图")?.percent(), 125);
+
+        assert!(
+            slot.open(PathBuf::from("/tmp/a.png"), version(9), 8, viewport())
+                .is_none(),
+            "同路径必须复用，不重新加载"
+        );
+        assert_eq!(slot.phase(), PreviewPhase::Ready);
+        assert_eq!(slot.view().ok_or("视图")?.percent(), 125);
+        assert_eq!(slot.path(), Some(Path::new("/tmp/a.png")));
+        Ok(())
+    }
+
+    #[test]
+    fn different_path_replaces_the_slot_and_rejects_the_old_result() -> TestResult {
+        let mut slot = PreviewSlot::new();
+        let first = slot
+            .open(PathBuf::from("/tmp/a.png"), version(1), 7, viewport())
+            .ok_or("首次加载")?;
+        let second = slot
+            .open(PathBuf::from("/tmp/b.png"), version(1), 7, viewport())
+            .ok_or("第二次加载")?;
+        assert_ne!(first, second);
+
+        assert!(!slot.accept_loaded(first, 7, size(10, 10)?, version(1)));
+        assert_eq!(slot.phase(), PreviewPhase::Loading);
+        assert_eq!(slot.path(), Some(Path::new("/tmp/b.png")));
+
+        assert!(slot.accept_loaded(second, 7, size(10, 10)?, version(1)));
+        assert_eq!(slot.phase(), PreviewPhase::Ready);
+        Ok(())
+    }
+
+    #[test]
+    fn close_forgets_the_path_and_rejects_in_flight_results() -> TestResult {
+        let mut slot = PreviewSlot::new();
+        let request = slot
+            .open(PathBuf::from("/tmp/a.png"), version(1), 7, viewport())
+            .ok_or("加载")?;
+        slot.close();
+        assert_eq!(slot.phase(), PreviewPhase::Closed);
+        assert_eq!(slot.path(), None);
+        assert!(!slot.accept_loaded(request, 7, size(10, 10)?, version(1)));
+        assert!(!slot.accept_failed(request, PreviewFailure::Io));
+        Ok(())
+    }
+
+    #[test]
+    fn stale_plugin_generation_is_rejected() -> TestResult {
+        let mut slot = PreviewSlot::new();
+        let request = slot
+            .open(PathBuf::from("/tmp/a.png"), version(1), 7, viewport())
+            .ok_or("加载")?;
+        assert!(!slot.accept_loaded(request, 8, size(10, 10)?, version(1)));
+        assert_eq!(slot.phase(), PreviewPhase::Loading);
+        Ok(())
+    }
+
+    #[test]
+    fn resource_change_at_completion_fails_and_keeps_the_path() -> TestResult {
+        let mut slot = PreviewSlot::new();
+        let request = slot
+            .open(PathBuf::from("/tmp/a.png"), version(1), 7, viewport())
+            .ok_or("加载")?;
+        assert!(!slot.accept_loaded(request, 7, size(10, 10)?, version(2)));
+        assert_eq!(slot.phase(), PreviewPhase::Failed);
+        assert_eq!(slot.failure(), Some(PreviewFailure::Changed));
+        assert_eq!(slot.path(), Some(Path::new("/tmp/a.png")));
+        Ok(())
+    }
+
+    #[test]
+    fn disable_keeps_path_and_manual_view_and_enable_restores_it() -> TestResult {
+        let mut slot = loaded_slot(1600, 1200)?;
+        slot.actual_size();
+        assert!(slot.zoom_in().ok_or("缩放")?.changed);
+        assert!(slot.pan_by(100.0, 100.0));
+
+        slot.disable();
+        assert_eq!(slot.phase(), PreviewPhase::Disabled);
+        assert_eq!(slot.path(), Some(Path::new("/tmp/a.png")));
+        let saved = slot.view().ok_or("关闭期间应保留视图")?;
+        assert_eq!(saved.mode(), PreviewMode::Manual);
+        assert_eq!(saved.percent(), 125);
+
+        let request = match slot.enable(Some(version(1)), 9, PreviewViewport::new(400.0, 300.0)) {
+            PreviewEnable::Loading(request) => request,
+            other => return Err(format!("期望重新加载，实际 {other:?}").into()),
+        };
+        assert!(slot.accept_loaded(request, 9, size(1600, 1200)?, version(1)));
+        let view = slot.view().ok_or("视图")?;
+        assert_eq!(view.mode(), PreviewMode::Manual);
+        assert_eq!(view.percent(), 125);
+        assert_close(view.pan().x(), 100.0);
+        assert_close(view.pan().y(), 100.0);
+        Ok(())
+    }
+
+    #[test]
+    fn enable_recomputes_fit_for_the_current_viewport() -> TestResult {
+        let mut slot = loaded_slot(1600, 1200)?;
+        assert_eq!(slot.view().ok_or("视图")?.percent(), 50);
+        slot.disable();
+
+        let request = match slot.enable(Some(version(1)), 9, PreviewViewport::new(400.0, 300.0)) {
+            PreviewEnable::Loading(request) => request,
+            other => return Err(format!("期望重新加载，实际 {other:?}").into()),
+        };
+        assert!(slot.accept_loaded(request, 9, size(1600, 1200)?, version(1)));
+        assert_eq!(slot.view().ok_or("视图")?.mode(), PreviewMode::Fit);
+        assert_eq!(slot.view().ok_or("视图")?.percent(), 25);
+        Ok(())
+    }
+
+    #[test]
+    fn enable_after_resource_change_reports_changed_and_keeps_the_path() -> TestResult {
+        let mut slot = loaded_slot(1600, 1200)?;
+        slot.disable();
+        assert_eq!(
+            slot.enable(Some(version(2)), 9, viewport()),
+            PreviewEnable::Failed(PreviewFailure::Changed)
+        );
+        assert_eq!(slot.phase(), PreviewPhase::Failed);
+        assert_eq!(slot.failure(), Some(PreviewFailure::Changed));
+        assert_eq!(slot.path(), Some(Path::new("/tmp/a.png")));
+        Ok(())
+    }
+
+    #[test]
+    fn failure_keeps_the_path_and_retry_loads_again() -> TestResult {
+        let mut slot = PreviewSlot::new();
+        let request = slot
+            .open(PathBuf::from("/tmp/a.png"), version(1), 7, viewport())
+            .ok_or("加载")?;
+        assert!(slot.accept_failed(request, PreviewFailure::Unsupported));
+        assert_eq!(slot.phase(), PreviewPhase::Failed);
+        assert_eq!(slot.failure(), Some(PreviewFailure::Unsupported));
+        assert_eq!(slot.path(), Some(Path::new("/tmp/a.png")));
+
+        let retry = slot
+            .retry(version(3), 7, viewport())
+            .ok_or("失败后应可重试")?;
+        assert_eq!(slot.phase(), PreviewPhase::Loading);
+        assert!(slot.accept_loaded(retry, 7, size(10, 10)?, version(3)));
+        assert_eq!(slot.phase(), PreviewPhase::Ready);
+        Ok(())
+    }
+
+    #[test]
+    fn disable_while_loading_cancels_and_enable_starts_a_fresh_load() -> TestResult {
+        let mut slot = PreviewSlot::new();
+        let request = slot
+            .open(PathBuf::from("/tmp/a.png"), version(1), 7, viewport())
+            .ok_or("加载")?;
+        slot.disable();
+        assert_eq!(slot.phase(), PreviewPhase::Disabled);
+        assert_eq!(slot.path(), Some(Path::new("/tmp/a.png")));
+        assert!(slot.view().is_none());
+
+        let fresh = match slot.enable(Some(version(1)), 9, viewport()) {
+            PreviewEnable::Loading(request) => request,
+            other => return Err(format!("期望重新加载，实际 {other:?}").into()),
+        };
+        assert_ne!(request, fresh);
+        assert!(!slot.accept_loaded(request, 7, size(10, 10)?, version(1)));
+        assert!(slot.accept_loaded(fresh, 9, size(10, 10)?, version(1)));
+        Ok(())
+    }
+
+    #[test]
+    fn failed_state_survives_re_enable_with_an_unchanged_version() -> TestResult {
+        let mut slot = PreviewSlot::new();
+        let request = slot
+            .open(PathBuf::from("/tmp/a.png"), version(1), 7, viewport())
+            .ok_or("加载")?;
+        assert!(slot.accept_failed(request, PreviewFailure::Io));
+        slot.disable();
+        assert_eq!(
+            slot.enable(Some(version(1)), 9, viewport()),
+            PreviewEnable::Failed(PreviewFailure::Io)
+        );
+        assert_eq!(slot.phase(), PreviewPhase::Failed);
+        assert_eq!(slot.path(), Some(Path::new("/tmp/a.png")));
+        Ok(())
+    }
+
+    #[test]
+    fn viewport_changes_apply_while_ready() -> TestResult {
+        let mut slot = loaded_slot(1600, 1200)?;
+        assert_eq!(slot.view().ok_or("视图")?.percent(), 50);
+        slot.set_viewport(PreviewViewport::new(400.0, 300.0));
+        assert_eq!(slot.view().ok_or("视图")?.percent(), 25);
+        Ok(())
+    }
+
+    #[test]
+    fn zoom_and_pan_require_a_ready_preview() -> TestResult {
+        let mut slot = PreviewSlot::new();
+        let _ = slot
+            .open(PathBuf::from("/tmp/a.png"), version(1), 7, viewport())
+            .ok_or("加载")?;
+        assert!(slot.zoom_in().is_none());
+        assert!(slot.zoom_out().is_none());
+        assert!(!slot.pan_by(10.0, 10.0));
+        Ok(())
+    }
+
+    #[test]
+    fn file_version_tracks_length_changes() -> TestResult {
+        let directory = std::env::temp_dir().join(format!(
+            "aline-preview-version-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)?
+                .as_nanos()
+        ));
+        std::fs::create_dir(&directory)?;
+        let path = directory.join("a.png");
+        std::fs::write(&path, b"a")?;
+        let first = file_version(&path).ok_or("应有文件版本")?;
+        std::fs::write(&path, b"ab")?;
+        let second = file_version(&path).ok_or("应有文件版本")?;
+        assert_ne!(first, second);
+        std::fs::remove_dir_all(&directory)?;
+        Ok(())
     }
 
     #[test]
