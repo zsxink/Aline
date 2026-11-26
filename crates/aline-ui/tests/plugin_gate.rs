@@ -317,3 +317,39 @@ fn unrelated_capability_change_invalidates_in_flight_task() -> Result<(), Box<dy
     assert_eq!(calls.get(), 1, "失效任务不得再次调用提供者");
     Ok(())
 }
+
+#[test]
+fn built_in_gate_registers_image_preview_and_follows_the_default_switch()
+-> Result<(), Box<dyn Error>> {
+    let mut gate = PluginGate::with_builtin_providers()?;
+    assert_eq!(
+        gate.check_capability(CapabilityId::IMAGE_PREVIEW),
+        Err(PluginGateError::Disabled {
+            capability: CapabilityId::IMAGE_PREVIEW,
+        }),
+        "内置提供者必须已注册；未发布启用集合时是 Disabled 而不是 UnknownCapability"
+    );
+
+    let defaults = aline_app_core::EffectiveSettings::default();
+    gate.publish_enabled(enabled_capabilities(defaults.plugins));
+    assert_eq!(gate.check_capability(CapabilityId::IMAGE_PREVIEW), Ok(()));
+    Ok(())
+}
+
+#[test]
+fn built_in_image_preview_dispatch_returns_no_intents() -> Result<(), Box<dyn Error>> {
+    let mut gate = PluginGate::with_builtin_providers()?;
+    let defaults = aline_app_core::EffectiveSettings::default();
+    gate.publish_enabled(enabled_capabilities(defaults.plugins));
+    let doc = new_doc("x\n", 1)?;
+    let task = gate.begin_task(CapabilityId::IMAGE_PREVIEW, &doc)?;
+
+    let outcome = gate.adopt(&task, &doc, RequestInput::None)?;
+    assert_eq!(outcome.request_id, task.request_id());
+    assert_eq!(outcome.generation, gate.plugin_generation());
+    assert!(
+        outcome.intents.is_empty(),
+        "预览像素处理归 UI，提供者不返回意图"
+    );
+    Ok(())
+}

@@ -8,9 +8,11 @@
 use std::fmt;
 
 use aline_app_core::{EffectivePlugins, SettingsField};
+use aline_markdown::ParseFeatures;
 use aline_plugin::{
-    CapabilityId, DispatchError, DispatchOutcome, EnabledCapabilities, HostRequest, Lifecycle,
-    Provider, RegistrationError, Registry, RequestId, RequestInput, dispatch,
+    CapabilityDeclaration, CapabilityId, DispatchError, DispatchOutcome, EnabledCapabilities,
+    HostRequest, Lifecycle, OutputIntent, Provider, ProviderDescriptor, ProviderDiagnostic,
+    ProviderId, ProviderSource, RegistrationError, Registry, RequestId, RequestInput, dispatch,
 };
 
 use crate::document::{DocCore, DocumentId, WorkingVersion};
@@ -176,6 +178,39 @@ impl fmt::Display for PluginGateError {
 
 impl std::error::Error for PluginGateError {}
 
+/// 内置图片预览提供者。
+///
+/// 预览的解码、缩放与平移全部归 UI 视口（plugin-system §6.6），提供者只
+/// 声明能力并确认派发；因此 `dispatch` 不返回任何意图。
+struct ImagePreviewProvider {
+    descriptor: ProviderDescriptor,
+}
+
+impl ImagePreviewProvider {
+    fn new() -> Self {
+        Self {
+            descriptor: ProviderDescriptor::new(
+                ProviderId::from_static("builtin.image-preview"),
+                ProviderSource::BuiltIn,
+                vec![CapabilityDeclaration::new(
+                    CapabilityId::IMAGE_PREVIEW,
+                    ParseFeatures::EMPTY,
+                )],
+            ),
+        }
+    }
+}
+
+impl Provider for ImagePreviewProvider {
+    fn descriptor(&self) -> &ProviderDescriptor {
+        &self.descriptor
+    }
+
+    fn dispatch(&self, _request: &HostRequest) -> Result<Vec<OutputIntent>, ProviderDiagnostic> {
+        Ok(Vec::new())
+    }
+}
+
 /// UI 侧插件门控：持有注册表、启用代次与主题/资源来源代次。
 ///
 /// 提供者计算仍由 `aline-plugin` 的注册/派发契约承担；本类型只决定任务
@@ -203,6 +238,17 @@ impl PluginGate {
     /// 登记提供者；校验与拒绝语义由 [`Registry::register`] 决定。
     pub fn register(&mut self, provider: Box<dyn Provider>) -> Result<(), RegistrationError> {
         self.registry.register(provider)
+    }
+
+    /// 空注册表并登记 V1 内置提供者；能力仍全关，须再发布启用集合。
+    ///
+    /// 内置提供者目前只有图片预览：其像素处理归 UI 视口，提供者不产生
+    /// 意图。其余五个能力在各自任务接线时补登记，未登记前调用
+    /// [`check_capability`](Self::check_capability) 返回 `UnknownCapability`。
+    pub fn with_builtin_providers() -> Result<Self, RegistrationError> {
+        let mut gate = Self::new();
+        gate.register(Box::new(ImagePreviewProvider::new()))?;
+        Ok(gate)
     }
 
     /// 发布有效启用集合；集合变化才推进插件代次。
