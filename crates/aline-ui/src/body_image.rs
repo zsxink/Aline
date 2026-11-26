@@ -107,6 +107,21 @@ pub fn resolve_body_image(
     }
 }
 
+/// 解析图片预览入口的本地路径。
+///
+/// 与 [`resolve_body_image`] 不同，这里的路径来自文件选择而不是 Markdown
+/// 目标：不做百分号解码、不拼接文档目录，避免把文件名里的 `%` 当成转义。
+/// 仍然先判预算，再读头判型；SVG 读完整字节并净化。
+pub fn resolve_local_image(
+    path: &Path,
+    budget: Option<MediaBudget>,
+) -> Result<BodyImage, BodyImageError> {
+    let Some(budget) = budget else {
+        return Err(BodyImageError::NoBudget);
+    };
+    from_local(path.to_path_buf(), budget)
+}
+
 fn from_bytes(bytes: Vec<u8>, budget: MediaBudget) -> Result<BodyImage, BodyImageError> {
     let Some(format) = sniff_format(&bytes) else {
         return Err(BodyImageError::Media(MediaError::UnsupportedFormat));

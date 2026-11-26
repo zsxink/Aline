@@ -5,7 +5,9 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
-use aline_ui::body_image::{BodyImage, BodyImageError, BodyImageSource, resolve_body_image};
+use aline_ui::body_image::{
+    BodyImage, BodyImageError, BodyImageSource, resolve_body_image, resolve_local_image,
+};
 use aline_ui::media::{ImageDimensions, MediaBudget, MediaError, MediaFormat};
 
 fn samples() -> PathBuf {
@@ -211,5 +213,87 @@ fn relative_file_urls_and_percent_escapes_resolve_against_the_document_directory
         return Err("file: URL 应解析为本地路径".into());
     };
     assert_eq!(url_path, direct_path);
+    Ok(())
+}
+
+// ---- 图片预览入口：直接给本地路径，不经 Markdown 目标解析 ----
+
+fn preview_dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/fixtures/m4-v03/samples")
+}
+
+#[test]
+fn local_preview_path_is_used_verbatim_without_percent_decoding() -> Result<(), Box<dyn Error>> {
+    // 绝对路径里出现 `%` 是合法文件名，不能按 Markdown 目标解码。
+    let directory = std::env::temp_dir().join(format!(
+        "aline-image-preview-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_nanos()
+    ));
+    std::fs::create_dir(&directory)?;
+    let path = directory.join("100%25 chart.png");
+    std::fs::copy(preview_dir().join("plain.png"), &path)?;
+
+    let image = resolve_local_image(&path, Some(budget()))?;
+    assert_eq!(image.format(), MediaFormat::Png);
+    assert_eq!(image.dimensions(), ImageDimensions::new(2, 2));
+    match image.source() {
+        BodyImageSource::Local(resolved) => assert_eq!(resolved.as_path(), path.as_path()),
+        other => return Err(format!("本地栅格图应保留原路径，实际 {other:?}").into()),
+    }
+    std::fs::remove_dir_all(&directory)?;
+    Ok(())
+}
+
+#[test]
+fn local_preview_requires_a_budget_before_reading() {
+    assert_eq!(
+        resolve_local_image(&preview_dir().join("plain.png"), None),
+        Err(BodyImageError::NoBudget)
+    );
+}
+
+#[test]
+fn local_preview_rejects_missing_files_and_foreign_signatures() -> Result<(), Box<dyn Error>> {
+    assert_eq!(
+        resolve_local_image(&preview_dir().join("missing.png"), Some(budget())),
+        Err(BodyImageError::Io)
+    );
+
+    let directory = std::env::temp_dir().join(format!(
+        "aline-image-preview-bad-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_nanos()
+    ));
+    std::fs::create_dir(&directory)?;
+    let fake = directory.join("fake.png");
+    std::fs::write(&fake, b"not an image at all")?;
+    assert_eq!(
+        resolve_local_image(&fake, Some(budget())),
+        Err(BodyImageError::Media(MediaError::UnsupportedFormat)),
+        "扩展名像图片但签名不符必须按格式拒绝"
+    );
+    std::fs::remove_dir_all(&directory)?;
+    Ok(())
+}
+
+#[test]
+fn local_preview_sanitizes_svg_and_keeps_animation_frames() -> Result<(), Box<dyn Error>> {
+    let svg = resolve_local_image(&preview_dir().join("plain.svg"), Some(budget()))?;
+    assert_eq!(svg.format(), MediaFormat::Svg);
+    match svg.source() {
+        BodyImageSource::Bytes(bytes) => {
+            let text = std::str::from_utf8(bytes.as_slice())?;
+            assert!(text.contains("<svg"), "{text}");
+        }
+        other => return Err(format!("SVG 应走净化字节，实际 {other:?}").into()),
+    }
+
+    let animated = resolve_local_image(&preview_dir().join("anim.gif"), Some(budget()))?;
+    assert_eq!(animated.frames(), 3);
     Ok(())
 }
