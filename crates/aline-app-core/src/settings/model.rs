@@ -113,6 +113,93 @@ impl AppearanceMode {
     }
 }
 
+/// 代码主题维度：随应用主题家族，或固定某一内置家族。
+///
+/// 固定维度不被之后的应用主题变化覆盖；只有 `FollowApp` 才读取应用当前
+/// 家族。主题包身份与用户导入主题归 5.1，这里只覆盖四个内置家族。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum HighlightThemeChoice {
+    /// 随应用主题家族。
+    FollowApp,
+    /// 固定主题家族。
+    Fixed(ThemeFamily),
+}
+
+impl HighlightThemeChoice {
+    /// 内部持久化标识。
+    pub const fn token(self) -> &'static str {
+        match self {
+            Self::FollowApp => "follow-app",
+            Self::Fixed(family) => family.token(),
+        }
+    }
+
+    /// 从持久化标识解析；未知标识返回 `None`。
+    pub fn parse(token: &str) -> Option<Self> {
+        if token == "follow-app" {
+            return Some(Self::FollowApp);
+        }
+        ThemeFamily::parse(token).map(Self::Fixed)
+    }
+
+    /// 解析为实际主题家族；`FollowApp` 取应用当前家族。
+    pub const fn resolve(self, app: ThemeFamily) -> ThemeFamily {
+        match self {
+            Self::FollowApp => app,
+            Self::Fixed(family) => family,
+        }
+    }
+}
+
+/// 代码高亮模式维度：随应用外观模式，或固定亮、暗、护眼。
+///
+/// 与 `AppearanceMode` 分开，是因为“随应用”与应用自身的“随系统”不是同一
+/// 记号：代码维度跟随的是应用外观**已解析**的具体模式。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum HighlightModeChoice {
+    /// 随应用外观模式。
+    FollowApp,
+    /// 固定亮色。
+    Light,
+    /// 固定暗色。
+    Dark,
+    /// 固定护眼。
+    Sepia,
+}
+
+impl HighlightModeChoice {
+    /// 内部持久化标识。
+    pub const fn token(self) -> &'static str {
+        match self {
+            Self::FollowApp => "follow-app",
+            Self::Light => "light",
+            Self::Dark => "dark",
+            Self::Sepia => "sepia",
+        }
+    }
+
+    /// 从持久化标识解析；未知标识返回 `None`。
+    pub fn parse(token: &str) -> Option<Self> {
+        match token {
+            "follow-app" => Some(Self::FollowApp),
+            "light" => Some(Self::Light),
+            "dark" => Some(Self::Dark),
+            "sepia" => Some(Self::Sepia),
+            _ => None,
+        }
+    }
+
+    /// 解析为实际外观模式；`FollowApp` 取应用已解析的具体模式。
+    pub const fn resolve(self, app: AppearanceMode) -> AppearanceMode {
+        match self {
+            Self::FollowApp => app,
+            Self::Light => AppearanceMode::Light,
+            Self::Dark => AppearanceMode::Dark,
+            Self::Sepia => AppearanceMode::Sepia,
+        }
+    }
+}
+
 /// 可独立重置的全局设置分区。
 ///
 /// UI 的“高级”分区在 V1 没有设置项，因此没有对应变体；不能为了分区存在
@@ -127,18 +214,21 @@ pub enum Section {
     Editor,
     /// 图片。
     Images,
-    /// 插件开关（插件专属选项按插件另立分区，见后续任务）。
+    /// 插件开关（插件专属设置另立分区，见 `Highlight`）。
     Plugins,
+    /// 代码语言高亮（插件专属分区，位于设置页底部）。
+    Highlight,
 }
 
 impl Section {
     /// 全部分区，按设置页顺序。
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::General,
         Self::Appearance,
         Self::Editor,
         Self::Images,
         Self::Plugins,
+        Self::Highlight,
     ];
 
     /// 内部持久化表名。
@@ -149,6 +239,7 @@ impl Section {
             Self::Editor => "editor",
             Self::Images => "images",
             Self::Plugins => "plugins",
+            Self::Highlight => "highlight",
         }
     }
 
@@ -171,6 +262,10 @@ impl Section {
                 SettingsField::MathEnabled,
                 SettingsField::HighlightEnabled,
                 SettingsField::ImagePreviewEnabled,
+            ],
+            Self::Highlight => &[
+                SettingsField::HighlightCodeTheme,
+                SettingsField::HighlightCodeMode,
             ],
         }
     }
@@ -209,6 +304,10 @@ pub enum SettingsField {
     HighlightEnabled,
     /// 图片预览开关。
     ImagePreviewEnabled,
+    /// 代码高亮的代码主题维度。
+    HighlightCodeTheme,
+    /// 代码高亮的高亮模式维度。
+    HighlightCodeMode,
 }
 
 impl SettingsField {
@@ -230,6 +329,8 @@ impl SettingsField {
             Self::MathEnabled => "math",
             Self::HighlightEnabled => "highlight",
             Self::ImagePreviewEnabled => "image_preview",
+            Self::HighlightCodeTheme => "code_theme",
+            Self::HighlightCodeMode => "code_mode",
         }
     }
 
@@ -249,6 +350,7 @@ impl SettingsField {
             | Self::MathEnabled
             | Self::HighlightEnabled
             | Self::ImagePreviewEnabled => Section::Plugins,
+            Self::HighlightCodeTheme | Self::HighlightCodeMode => Section::Highlight,
         }
     }
 }
@@ -308,6 +410,15 @@ pub struct PluginOverrides {
     pub image_preview: Option<bool>,
 }
 
+/// 代码语言高亮分区的显式覆盖；两维分别独立解析。
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct HighlightOverrides {
+    /// 代码主题维度覆盖。
+    pub code_theme: Option<HighlightThemeChoice>,
+    /// 高亮模式维度覆盖。
+    pub code_mode: Option<HighlightModeChoice>,
+}
+
 /// 全局设置的显式覆盖集合；默认实例表示全部沿用默认值。
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Settings {
@@ -321,6 +432,8 @@ pub struct Settings {
     pub images: ImageOverrides,
     /// 插件开关覆盖。
     pub plugins: PluginOverrides,
+    /// 代码语言高亮覆盖。
+    pub highlight: HighlightOverrides,
 }
 
 impl Settings {
@@ -344,6 +457,8 @@ impl Settings {
             SettingsField::MathEnabled => self.plugins.math.is_some(),
             SettingsField::HighlightEnabled => self.plugins.highlight.is_some(),
             SettingsField::ImagePreviewEnabled => self.plugins.image_preview.is_some(),
+            SettingsField::HighlightCodeTheme => self.highlight.code_theme.is_some(),
+            SettingsField::HighlightCodeMode => self.highlight.code_mode.is_some(),
         }
     }
 
@@ -355,6 +470,7 @@ impl Settings {
             Section::Editor => self.editor = EditorOverrides::default(),
             Section::Images => self.images = ImageOverrides::default(),
             Section::Plugins => self.plugins = PluginOverrides::default(),
+            Section::Highlight => self.highlight = HighlightOverrides::default(),
         }
     }
 
@@ -399,6 +515,16 @@ impl Settings {
                     .plugins
                     .image_preview
                     .unwrap_or(defaults.plugins.image_preview),
+            },
+            highlight: EffectiveHighlight {
+                code_theme: self
+                    .highlight
+                    .code_theme
+                    .unwrap_or(defaults.highlight.code_theme),
+                code_mode: self
+                    .highlight
+                    .code_mode
+                    .unwrap_or(defaults.highlight.code_mode),
             },
         }
     }
@@ -459,6 +585,40 @@ pub struct EffectivePlugins {
     pub image_preview: bool,
 }
 
+/// 解析后的代码语言高亮配置；两维分别独立解析。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct EffectiveHighlight {
+    /// 有效代码主题维度。
+    pub code_theme: HighlightThemeChoice,
+    /// 有效高亮模式维度。
+    pub code_mode: HighlightModeChoice,
+}
+
+impl EffectiveHighlight {
+    /// 解析代码主题家族；`FollowApp` 取应用当前家族。
+    pub const fn resolve_theme(self, app: ThemeFamily) -> ThemeFamily {
+        self.code_theme.resolve(app)
+    }
+
+    /// 解析代码高亮模式；`FollowApp` 取应用已解析的具体模式。
+    ///
+    /// `app` 必须是具体模式（亮/暗/护眼）；应用自身“随系统”的解析由外观
+    /// 层完成，本方法不重复推断。
+    pub const fn resolve_mode(self, app: AppearanceMode) -> AppearanceMode {
+        self.code_mode.resolve(app)
+    }
+}
+
+impl Default for EffectiveHighlight {
+    /// PRD §5.13：代码主题与高亮模式初始都随应用。
+    fn default() -> Self {
+        Self {
+            code_theme: HighlightThemeChoice::FollowApp,
+            code_mode: HighlightModeChoice::FollowApp,
+        }
+    }
+}
+
 /// 解析后的有效设置；UI 与插件只消费这一层，不自行合并覆盖。
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EffectiveSettings {
@@ -472,6 +632,8 @@ pub struct EffectiveSettings {
     pub images: EffectiveImages,
     /// 插件开关。
     pub plugins: EffectivePlugins,
+    /// 代码语言高亮配置。
+    pub highlight: EffectiveHighlight,
 }
 
 impl Default for EffectiveSettings {
@@ -504,6 +666,7 @@ impl Default for EffectiveSettings {
                 highlight: true,
                 image_preview: true,
             },
+            highlight: EffectiveHighlight::default(),
         }
     }
 }

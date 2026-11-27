@@ -9,8 +9,9 @@ use std::fmt::Write as _;
 use toml::{Table, Value};
 
 use super::model::{
-    AppearanceMode, AppearanceOverrides, EditorOverrides, GeneralOverrides, ImageOverrides,
-    LanguagePreference, PluginOverrides, Section, Settings, SettingsField, ThemeFamily,
+    AppearanceMode, AppearanceOverrides, EditorOverrides, GeneralOverrides, HighlightModeChoice,
+    HighlightOverrides, HighlightThemeChoice, ImageOverrides, LanguagePreference, PluginOverrides,
+    Section, Settings, SettingsField, ThemeFamily,
 };
 
 /// 设置读取诊断原因。
@@ -112,6 +113,22 @@ impl Settings {
                 image_preview: read_bool(table, SettingsField::ImagePreviewEnabled, &mut issues),
             };
         }
+        if let Some(table) = section(&root, Section::Highlight, &mut issues) {
+            settings.highlight = HighlightOverrides {
+                code_theme: read_enum(
+                    table,
+                    SettingsField::HighlightCodeTheme,
+                    HighlightThemeChoice::parse,
+                    &mut issues,
+                ),
+                code_mode: read_enum(
+                    table,
+                    SettingsField::HighlightCodeMode,
+                    HighlightModeChoice::parse,
+                    &mut issues,
+                ),
+            };
+        }
         SettingsLoad { settings, issues }
     }
 
@@ -178,6 +195,22 @@ impl Settings {
             }
         }
         push_block(&mut blocks, Section::Plugins, plugins);
+        let mut highlight = String::new();
+        if let Some(theme) = self.highlight.code_theme {
+            write_string(
+                &mut highlight,
+                SettingsField::HighlightCodeTheme.key(),
+                theme.token(),
+            );
+        }
+        if let Some(mode) = self.highlight.code_mode {
+            write_string(
+                &mut highlight,
+                SettingsField::HighlightCodeMode.key(),
+                mode.token(),
+            );
+        }
+        push_block(&mut blocks, Section::Highlight, highlight);
         blocks.join("\n")
     }
 }

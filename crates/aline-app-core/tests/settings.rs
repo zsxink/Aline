@@ -2,7 +2,8 @@
 
 use aline_app_core::{
     AppearanceMode, CatalogError, DEFAULT_LARGE_DOCUMENT_SOURCE_THRESHOLD_BYTES, EditorOverrides,
-    EffectiveSettings, LARGE_SOURCE_REASON_KEY, LanguagePreference, Locale, PluginOverrides,
+    EffectiveHighlight, EffectiveSettings, HighlightModeChoice, HighlightOverrides,
+    HighlightThemeChoice, LARGE_SOURCE_REASON_KEY, LanguagePreference, Locale, PluginOverrides,
     Section, Settings, SettingsField, SettingsIssue, SettingsIssueReason, ThemeFamily, Translator,
 };
 
@@ -27,6 +28,10 @@ directory = "../assets images"
 [plugins]
 mermaid = false
 export = false
+
+[highlight]
+code_theme = "feishu"
+code_mode = "dark"
 "#;
 
 #[test]
@@ -67,6 +72,169 @@ fn defaults_follow_frozen_product_values() {
 }
 
 #[test]
+fn highlight_section_is_the_last_plugin_specific_section() {
+    assert_eq!(
+        Section::ALL,
+        [
+            Section::General,
+            Section::Appearance,
+            Section::Editor,
+            Section::Images,
+            Section::Plugins,
+            Section::Highlight,
+        ]
+    );
+    assert_eq!(Section::Highlight.name(), "highlight");
+    assert_eq!(
+        Section::Highlight.fields(),
+        [
+            SettingsField::HighlightCodeTheme,
+            SettingsField::HighlightCodeMode
+        ]
+    );
+    assert_eq!(SettingsField::HighlightCodeTheme.key(), "code_theme");
+    assert_eq!(SettingsField::HighlightCodeMode.key(), "code_mode");
+    assert_eq!(
+        SettingsField::HighlightCodeTheme.section(),
+        Section::Highlight
+    );
+    assert_eq!(
+        SettingsField::HighlightCodeMode.section(),
+        Section::Highlight
+    );
+}
+
+#[test]
+fn highlight_choices_default_to_follow_app_and_resolve_against_current_appearance() {
+    let effective = Settings::default().effective();
+    assert_eq!(effective.highlight, EffectiveHighlight::default());
+    assert_eq!(
+        effective.highlight.code_theme,
+        HighlightThemeChoice::FollowApp
+    );
+    assert_eq!(
+        effective.highlight.code_mode,
+        HighlightModeChoice::FollowApp
+    );
+    assert_eq!(
+        effective.highlight.resolve_theme(ThemeFamily::Vue),
+        ThemeFamily::Vue
+    );
+    assert_eq!(
+        effective.highlight.resolve_mode(AppearanceMode::Dark),
+        AppearanceMode::Dark
+    );
+}
+
+#[test]
+fn fixed_highlight_dimensions_ignore_later_app_appearance_changes()
+-> Result<(), Box<dyn std::error::Error>> {
+    let load = Settings::load("[highlight]\ncode_theme = \"notion\"\ncode_mode = \"sepia\"\n");
+    assert!(load.issues.is_empty(), "{:?}", load.issues);
+    assert!(
+        load.settings
+            .is_overridden(SettingsField::HighlightCodeTheme)
+    );
+    assert!(
+        load.settings
+            .is_overridden(SettingsField::HighlightCodeMode)
+    );
+    assert_eq!(
+        load.settings.highlight.code_theme,
+        Some(HighlightThemeChoice::Fixed(ThemeFamily::Notion))
+    );
+    assert_eq!(
+        load.settings.highlight.code_mode,
+        Some(HighlightModeChoice::Sepia)
+    );
+    let effective = load.settings.effective();
+    assert_eq!(
+        effective.highlight.resolve_theme(ThemeFamily::Vue),
+        ThemeFamily::Notion
+    );
+    assert_eq!(
+        effective.highlight.resolve_mode(AppearanceMode::Light),
+        AppearanceMode::Sepia
+    );
+    Ok(())
+}
+
+#[test]
+fn explicit_follow_app_tokens_are_recorded_as_overrides() -> Result<(), Box<dyn std::error::Error>>
+{
+    let load =
+        Settings::load("[highlight]\ncode_theme = \"follow-app\"\ncode_mode = \"follow-app\"\n");
+    assert!(load.issues.is_empty(), "{:?}", load.issues);
+    assert!(
+        load.settings
+            .is_overridden(SettingsField::HighlightCodeTheme)
+    );
+    assert!(
+        load.settings
+            .is_overridden(SettingsField::HighlightCodeMode)
+    );
+    assert_eq!(
+        load.settings.highlight.code_theme,
+        Some(HighlightThemeChoice::FollowApp)
+    );
+    assert_eq!(
+        load.settings.highlight.code_mode,
+        Some(HighlightModeChoice::FollowApp)
+    );
+    assert_eq!(
+        load.settings.to_toml_string(),
+        "[highlight]\ncode_theme = \"follow-app\"\ncode_mode = \"follow-app\"\n"
+    );
+    Ok(())
+}
+
+#[test]
+fn invalid_highlight_values_fall_back_per_field() {
+    let load = Settings::load("[highlight]\ncode_theme = \"system\"\ncode_mode = \"auto\"\n");
+    assert_eq!(load.settings, Settings::default());
+    assert_eq!(
+        load.issues,
+        vec![
+            SettingsIssue {
+                field: Some(SettingsField::HighlightCodeTheme),
+                reason: SettingsIssueReason::InvalidValue,
+            },
+            SettingsIssue {
+                field: Some(SettingsField::HighlightCodeMode),
+                reason: SettingsIssueReason::InvalidValue,
+            },
+        ]
+    );
+    let typed = Settings::load("[highlight]\ncode_theme = 1\n");
+    assert_eq!(
+        typed.issues,
+        vec![SettingsIssue {
+            field: Some(SettingsField::HighlightCodeTheme),
+            reason: SettingsIssueReason::InvalidValue,
+        }]
+    );
+}
+
+#[test]
+fn wrong_highlight_section_shape_reports_each_field() {
+    let load = Settings::load("highlight = 1\n");
+    assert_eq!(load.settings, Settings::default());
+    assert_eq!(
+        load.issues,
+        vec![
+            SettingsIssue {
+                field: Some(SettingsField::HighlightCodeTheme),
+                reason: SettingsIssueReason::InvalidValue,
+            },
+            SettingsIssue {
+                field: Some(SettingsField::HighlightCodeMode),
+                reason: SettingsIssueReason::InvalidValue,
+            },
+        ]
+    );
+}
+
+#[test]
 fn explicit_overrides_resolve_and_round_trip() -> Result<(), Box<dyn std::error::Error>> {
     let load = Settings::load(FULL_OVERRIDES);
     assert!(load.issues.is_empty(), "{:?}", load.issues);
@@ -86,6 +254,21 @@ fn explicit_overrides_resolve_and_round_trip() -> Result<(), Box<dyn std::error:
     assert!(!effective.plugins.mermaid);
     assert!(!effective.plugins.export);
     assert!(effective.plugins.table);
+    assert_eq!(
+        effective.highlight.code_theme,
+        HighlightThemeChoice::Fixed(ThemeFamily::Feishu)
+    );
+    assert_eq!(effective.highlight.code_mode, HighlightModeChoice::Dark);
+    assert_eq!(
+        effective
+            .highlight
+            .resolve_theme(effective.appearance.theme),
+        ThemeFamily::Feishu
+    );
+    assert_eq!(
+        effective.highlight.resolve_mode(effective.appearance.mode),
+        AppearanceMode::Dark
+    );
     let written = load.settings.to_toml_string();
     let reloaded = Settings::load(&written);
     assert!(reloaded.issues.is_empty(), "{:?}", reloaded.issues);
@@ -199,6 +382,13 @@ fn section_reset_clears_only_that_section() {
     settings.reset_section(Section::Plugins);
     assert_eq!(settings.plugins, PluginOverrides::default());
     assert_eq!(settings.general.language, Some(LanguagePreference::ZhCn));
+    assert_eq!(
+        settings.highlight.code_theme,
+        Some(HighlightThemeChoice::Fixed(ThemeFamily::Feishu))
+    );
+    settings.reset_section(Section::Highlight);
+    assert_eq!(settings.highlight, HighlightOverrides::default());
+    assert_eq!(settings.general.language, Some(LanguagePreference::ZhCn));
     settings.reset_section(Section::General);
     settings.reset_section(Section::Appearance);
     settings.reset_section(Section::Images);
@@ -234,7 +424,13 @@ fn serialization_writes_only_explicit_overrides() {
     settings.plugins.export = Some(false);
     assert_eq!(settings.to_toml_string(), "[plugins]\nexport = false\n");
     settings.images.directory = Some(String::from("C:\\图 片\\\"assets\""));
+    settings.highlight.code_theme = Some(HighlightThemeChoice::Fixed(ThemeFamily::Feishu));
+    settings.highlight.code_mode = Some(HighlightModeChoice::Dark);
     let text = settings.to_toml_string();
+    assert!(
+        text.ends_with("[highlight]\ncode_theme = \"feishu\"\ncode_mode = \"dark\"\n"),
+        "{text}"
+    );
     let reloaded = Settings::load(&text);
     assert!(reloaded.issues.is_empty(), "{:?}", reloaded.issues);
     assert_eq!(reloaded.settings, settings);

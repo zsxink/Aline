@@ -8,8 +8,9 @@ mod validate;
 
 pub use model::{
     AppearanceMode, AppearanceOverrides, DEFAULT_LARGE_DOCUMENT_SOURCE_THRESHOLD_BYTES,
-    EditorOverrides, EffectiveAppearance, EffectiveEditor, EffectiveGeneral, EffectiveImages,
-    EffectivePlugins, EffectiveSettings, GeneralOverrides, ImageOverrides, LARGE_SOURCE_REASON_KEY,
+    EditorOverrides, EffectiveAppearance, EffectiveEditor, EffectiveGeneral, EffectiveHighlight,
+    EffectiveImages, EffectivePlugins, EffectiveSettings, GeneralOverrides, HighlightModeChoice,
+    HighlightOverrides, HighlightThemeChoice, ImageOverrides, LARGE_SOURCE_REASON_KEY,
     LanguagePreference, PluginOverrides, Section, Settings, SettingsField, ThemeFamily,
 };
 pub use validate::{SettingsIssue, SettingsIssueReason, SettingsLoad};

@@ -6,8 +6,9 @@ mod settings;
 pub use i18n::{CatalogError, Locale, Translator};
 pub use settings::{
     AppearanceMode, AppearanceOverrides, DEFAULT_LARGE_DOCUMENT_SOURCE_THRESHOLD_BYTES,
-    EditorOverrides, EffectiveAppearance, EffectiveEditor, EffectiveGeneral, EffectiveImages,
-    EffectivePlugins, EffectiveSettings, GeneralOverrides, ImageOverrides, LARGE_SOURCE_REASON_KEY,
+    EditorOverrides, EffectiveAppearance, EffectiveEditor, EffectiveGeneral, EffectiveHighlight,
+    EffectiveImages, EffectivePlugins, EffectiveSettings, GeneralOverrides, HighlightModeChoice,
+    HighlightOverrides, HighlightThemeChoice, ImageOverrides, LARGE_SOURCE_REASON_KEY,
     LanguagePreference, PluginOverrides, Section, Settings, SettingsField, SettingsIssue,
     SettingsIssueReason, SettingsLoad, ThemeFamily,
 };
