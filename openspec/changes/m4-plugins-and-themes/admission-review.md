@@ -177,6 +177,8 @@ aline-plugin@0.1.0 --docx_rs[normal]--> docx-rs@0.4.22 --image[normal]--> image@
 
 **指纹登记时机：** 策略每场景只保存一个指纹，而指纹随清单实际组合变化，因此上表是“接线到该精确组合时应当登记的值”，不是现在就替换。本轮不修改 `engineering_policy.json` 的 `scenarios`；每个接线提交以其实际清单复跑探针，若与表中组合不一致，必须在复测后追加并经用户确认才能替换。
 
+**已登记（2026-11-27，任务 4.1 接线）：** 生产清单仅新增 `aline-plugin → syntect@5.3.0`（冻结 features），与本表 `syntect` 组合一致；七个指纹已按上表登记进 `engineering_policy.json`，并以实际清单运行 `python3 scripts/check_engineering.py` 七场景全部通过。实图漂移仅为 `regex-automata@0.4.18` 的 features 增加 `dfa/dfa-build/dfa-search/nfa/perf`（`fancy-regex` 入边），无新增/移除包、无来源/校验和/边/选包变化。
+
 `docx-image` 不列入拟批准：`image` feature 会引入获批根以外的路径（见上节），生产组合固定为 `docx-plain`。
 
 ## 运行时准入分组登记
@@ -223,3 +225,13 @@ aline-plugin@0.1.0 --docx_rs[normal]--> docx-rs@0.4.22 --image[normal]--> image@
 ## 当前门禁状态说明
 
 本轮改了 `scripts/engineering_dependencies.py`（守卫放行条件）与两份策略文件，未改任何 Cargo 清单。`python3 scripts/check_engineering.py` 通过，证明现有八成员图仍满足全部规则；探针在工作区副本上的十一个注入组合也全部符合期望。两者都不等于生产组合已接入：GPUI 指纹仍是 M1 值，生产清单一旦变化就会失败关闭，必须按接线提交重新登记。
+
+## 裁决结果（2026-11-27）：4.1 高亮语言集冻结
+
+用户裁决：采用 `syntect@5.3.0` `default-syntaxes` 随 crate 内嵌的全量默认集作为 V-03 的高亮支持集；不引入 `two-face`，不在构建期生成受控子集 dump。本裁决闭合上文“仍未闭合的一项”。
+
+- **身份**：`syntect@5.3.0`（校验和见上表）；内嵌 `assets/default_newlines.packdump` 368,467 字节、SHA-256 `d740b20c12e40b678b9f1012401e1969aaa5cd55f1ab329ffeb94d746b06a5c0`；共 **74** 个语法定义。
+- **支持清单**（`包/名称`，按字母序，逐项来自该 dump）：ASP/ASP；ASP/HTML-ASP；ActionScript/ActionScript；AppleScript/AppleScript；Batch File/Batch File；C#/Build；C#/C#；C++/C；C++/C++；CSS/CSS；Clojure/Clojure；D/D；Diff/Diff；Erlang/Erlang；Erlang/HTML (Erlang)；Go/Go；Graphviz/DOT；Groovy/Groovy；HTML/HTML；Haskell/Haskell；Haskell/Literate Haskell；Java/Java；Java/Java Server Pages (JSP)；Java/JavaDoc；Java/JavaProperties；JavaScript/JSON；JavaScript/JavaScript；JavaScript/Regular Expressions (JavaScript)；LaTeX/Bibtex；LaTeX/LaTeX；LaTeX/LaTeX Log；LaTeX/TeX；Lisp/Lisp；Lua/Lua；Makefile/Make Output；Makefile/Makefile；Markdown/Markdown；Markdown/MultiMarkdown；Matlab/Matlab；OCaml/OCaml；OCaml/OCamllex；OCaml/OCamlyacc；OCaml/camlp4；Objective-C/Objective-C；Objective-C/Objective-C++；PHP/PHP；PHP/PHP Source；Pascal/Pascal；Perl/Perl；Python/Python；Python/Regular Expressions (Python)；R/R；R/R Console；R/Rd (R Documentation)；Rails/HTML (Rails)；Rails/JavaScript (Rails)；Rails/Ruby Haml；Rails/Ruby on Rails；Rails/SQL (Rails)；Regular Expressions/RegExp；RestructuredText/reStructuredText；Ruby/Ruby；Rust/Cargo；Rust/Rust；SQL/SQL；Scala/Scala；ShellScript/Bash；ShellScript/Shell-Unix-Generic；ShellScript/commands-builtin-shell-bash；TCL/HTML (Tcl)；TCL/Tcl；Textile/Textile；XML/XML；YAML/YAML。
+- **拒绝清单**：不在上述定义中的语言标识（含空标识）与识别失败一律按 PLUGIN-05 回退普通代码——不显示拒绝提示、不阻止打开、不改变围栏 info。
+- **识别口径**：围栏 info 与 syntect 语法定义内的名称/别名匹配；4.1 以探针枚举实际可识别的名称与别名并留证，不以文件扩展名猜测代替。
+- **未纳入**：TypeScript/TSX、Kotlin、Swift、TOML、SCSS/Sass/Less、Dockerfile 等默认集不含的语言；若后续产品需要，须新增 `two-face` 依赖并重新准入。

@@ -9,3 +9,4 @@ workspace = true
 
 [dependencies]
 aline-markdown.workspace = true
+syntect.workspace = true

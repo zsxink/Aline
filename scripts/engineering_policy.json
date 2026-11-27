@@ -1,7 +1,7 @@
 {
   "format": 1,
   "reviewed": true,
-  "review_evidence": "docs/decisions.md#21-2026-11-02-m1-原生后端候选与准入暂停; docs/decisions.md §36（2026-11-12 生产来源准入）; openspec/changes/m4-plugins-and-themes/admission-review.md（2026-11-26 用户裁决：mermaid-rs-renderer/syntect 的 regex 精确入边）",
+  "review_evidence": "docs/decisions.md#21-2026-11-02-m1-原生后端候选与准入暂停; docs/decisions.md §36（2026-11-12 生产来源准入）; openspec/changes/m4-plugins-and-themes/admission-review.md（2026-11-26 用户裁决：mermaid-rs-renderer/syntect 的 regex 精确入边）；openspec/changes/m4-plugins-and-themes/admission-review.md「GPUI 受审子图漂移」syntect 组合七场景拟批准指纹（2026-11-27 任务 4.1 接线复测登记）",
   "purpose": "正式八成员 workspace 的 GPUI 精确子图；不准许自动更新指纹",
   "workspace_features": {
     "aline": {},
@@ -15,25 +15,25 @@
   },
   "scenarios": {
     "all": {
-      "gpui_subtree_sha256": "3a57cfcb0907ceec19418888259685bec9021706510b8f4acdb2c294559cf69d"
+      "gpui_subtree_sha256": "23e7b11d7151592f9d31b4173f6b7b0af8dd63567159f7dbdbedb2a30d7e6a3f"
     },
     "all-features": {
-      "gpui_subtree_sha256": "3a57cfcb0907ceec19418888259685bec9021706510b8f4acdb2c294559cf69d"
+      "gpui_subtree_sha256": "23e7b11d7151592f9d31b4173f6b7b0af8dd63567159f7dbdbedb2a30d7e6a3f"
     },
     "macos-arm": {
-      "gpui_subtree_sha256": "0fd9fbdc366bfc2e37b96f3c895e7f3bc7278c4284ea29269cc2f6773ada4815"
+      "gpui_subtree_sha256": "eb0d0bf65836d021a93d7858708b74376f4e70007d2e76bdb921347ba914c261"
     },
     "macos-intel": {
-      "gpui_subtree_sha256": "a7cf9d9e5abfa209a8c54961daa64a4c426a6c4a1c16d122967083c839c20819"
+      "gpui_subtree_sha256": "4b872bb269c4ae224c96a262880534647d45028c9f88e5f9fc7d7493e24921fe"
     },
     "windows-x64": {
-      "gpui_subtree_sha256": "d417bf93757eb0bb96dbe012e5c2861a5deeb6e22a2b94d695d8d179bbbf2159"
+      "gpui_subtree_sha256": "05c299a99da4ff647491c0497083d74b6e712f81f49626cdc4cb17df61d4f975"
     },
     "linux-x64": {
-      "gpui_subtree_sha256": "80bca853c98ef36a2f12a008c0baf1f6115442a3324d2b5a1ea266a6b6064c5b"
+      "gpui_subtree_sha256": "dd00f463ac0a13677be944e92d6ae2732e49ea48ea6422db2797a4142975497a"
     },
     "linux-arm": {
-      "gpui_subtree_sha256": "639218209d396e02c15885620d2dd10630148ee435f1d76a42199412788dccb4"
+      "gpui_subtree_sha256": "96078cbb38ce64f09989c99f876c88531017ed451302146eaf84464f88bc33ed"
     }
   },
   "exceptions": {

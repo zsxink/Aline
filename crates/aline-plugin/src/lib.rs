@@ -10,6 +10,7 @@
 
 mod contracts;
 mod dispatch;
+mod highlight;
 mod lifecycle;
 mod registry;
 mod traits;
@@ -20,6 +21,10 @@ pub use contracts::{
     RequestInput,
 };
 pub use dispatch::{DispatchError, dispatch};
+pub use highlight::{
+    CodeSpan, HighlightOutcome, HighlightedCode, SyntaxCategory, highlight_code, preload_languages,
+    resolve_language, supported_languages,
+};
 pub use lifecycle::{EnabledCapabilities, Lifecycle};
 pub use registry::{CapabilityQuery, RegistrationError, RegistrationErrorKind, Registry};
 pub use traits::Provider;
