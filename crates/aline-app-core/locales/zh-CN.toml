@@ -127,6 +127,50 @@ empty = "链接目标为空，未打开。"
 scheme = "不支持的链接协议，未打开。"
 unsupported = "不支持的链接目标，未打开。"
 
+[insert]
+link_title = "新增链接"
+image_title = "插入图片"
+text_label = "文字"
+alt_label = "替代文字"
+target_label = "目标"
+link_text_placeholder = "显示文字"
+image_text_placeholder = "替代文字（留空时使用目标）"
+link_target_placeholder = "网址或路径"
+image_target_placeholder = "图片路径或网址"
+confirm = "确认"
+cancel = "取消"
+
+[insert.rejected]
+empty = "目标不能为空，未插入。"
+scheme = "不支持的链接协议，未插入。"
+line_break = "目标不能包含换行或空字符。"
+
+[context]
+add_link = "新增链接…"
+insert_image = "插入图片…"
+
+[image]
+copy_done = "已复制图片。"
+copy_failed = "复制图片失败。"
+save_done = "图片已另存为。"
+save_failed = "图片另存为失败。"
+copy_path_done = "已复制图片路径。"
+reveal_failed = "无法打开图片所在位置。"
+
+[image.action]
+copy = "复制图片"
+save_as = "另存为…"
+copy_path = "复制路径"
+reveal = "打开所在位置"
+
+[image.unavailable]
+remote = "远程图片不会自动下载。"
+missing = "找不到图片文件。"
+inline = "内嵌图片没有文件路径。"
+unsupported = "不支持该图片引用。"
+too_large = "图片超过读取上限。"
+platform = "当前平台不支持该操作。"
+
 [menu]
 format = "格式"
 file = "文件"

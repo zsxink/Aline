@@ -26,12 +26,13 @@ use super::recovery::{
     RecoverySession, RecoverySettlement, RecoveryStart, RecoveryStore,
 };
 use super::{
-    DocCore, DocError, DocLimits, EditorMode, InputIdentity, ModeSwitchOutcome, PublicationKind,
-    PublicationOutcome, WaitHandle, WaitStatus,
+    CommitOutcome, DocCore, DocError, DocLimits, EditorMode, InputIdentity, ModeSwitchOutcome,
+    PublicationKind, PublicationOutcome, WaitHandle, WaitStatus,
 };
 use aline_buffer::{PatchBudget, ReloadOutcome, SrcSelection, TextSnapshot};
 use aline_edit::{
-    EditBudget, EditCommand, EditContext, EditMode, PlanOutcome, SourceEdit, plan_change,
+    EditBudget, EditCommand, EditContext, EditMode, EditRefusal, PlanOutcome, RereadFailure,
+    SourceEdit, plan_change,
 };
 use aline_markdown::parse_with_cancel;
 use aline_source::Cancellation;
@@ -556,9 +557,29 @@ impl ReadonlyDocument {
             .text()
             .slice(&range, self.limits.text())
             .map_err(|_| ImageInsertError::Reference)?;
-        let source = snapshot
-            .full_text(self.limits.text())
-            .map_err(|_| ImageInsertError::Reference)?;
+        let edit = SourceEdit::new(
+            range.byte_range(),
+            expected.into_owned(),
+            replacement.to_owned(),
+        );
+        self.commit_source_edit(identity, edit, now_millis)
+            .map(|_| ())
+            .map_err(|_| ImageInsertError::Reference)
+    }
+
+    /// 以 Source 权限把给定源码替换立即发布为一次可撤销的命令步。
+    ///
+    /// 契约与 [`Self::commit_source_replacement`] 相同：不改变用户视图模式，
+    /// `edit.expected` 为调用方快照中的原文，计划阶段重读不一致即拒绝。
+    pub(crate) fn commit_source_edit(
+        &mut self,
+        identity: &InputIdentity,
+        edit: SourceEdit,
+        now_millis: u64,
+    ) -> Result<CommitOutcome, DocError> {
+        let snapshot = self.current_snapshot()?;
+        let selection = snapshot.selection().clone();
+        let source = snapshot.full_text(self.limits.text())?;
         let parsed_local;
         let parsed =
             if self.is_parse_current() && self.parsed.snapshot().id() == snapshot.text().id() {
@@ -575,24 +596,25 @@ impl ReadonlyDocument {
                         parsed_local = parsed;
                         &parsed_local
                     }
-                    Err(_) => return Err(ImageInsertError::Reference),
+                    Err(_) => {
+                        return Err(DocError::Edit(EditRefusal::RereadFailed {
+                            reason: RereadFailure::Parse,
+                            cause: None,
+                        }));
+                    }
                 }
             };
-        // 结果长度按替换后的实际字节估算：先减被替换的选区，再加引用文本。
+        // 结果长度按替换后的实际字节估算：先减被替换范围，再加替换文本。
         let output = source
             .len()
-            .saturating_sub(expected.len())
-            .saturating_add(replacement.len());
+            .saturating_sub(edit.range().len())
+            .saturating_add(edit.replacement().len());
         let budget = EditBudget::new(
-            PatchBudget::new(1, replacement.len(), output),
+            PatchBudget::new(1, edit.replacement().len(), output),
             self.limits.text(),
             self.parse_budget,
         );
-        let command = EditCommand::replace(vec![SourceEdit::new(
-            range.byte_range(),
-            expected.into_owned(),
-            replacement.to_owned(),
-        )]);
+        let command = EditCommand::replace(vec![edit]);
         // 与首次保存/另存为的引用重写一致：Source 上下文、不改变用户视图。
         let context = EditContext::new(EditMode::Source);
         match plan_change(
@@ -606,14 +628,11 @@ impl ReadonlyDocument {
             Ok(PlanOutcome::Changed(plan)) => {
                 let prepared = self
                     .core
-                    .prepare_migration_change(identity, parsed, &plan, now_millis)
-                    .map_err(|_| ImageInsertError::Reference)?;
-                self.core
-                    .publish_migration_change(prepared)
-                    .map_err(|_| ImageInsertError::Reference)
+                    .prepare_migration_change(identity, parsed, &plan, now_millis)?;
+                self.core.publish_migration_change_outcome(prepared)
             }
-            Ok(PlanOutcome::Unchanged(_)) => Ok(()),
-            Err(_) => Err(ImageInsertError::Reference),
+            Ok(PlanOutcome::Unchanged(_)) => Ok(CommitOutcome::Unchanged),
+            Err(error) => Err(DocError::Edit(error)),
         }
     }
 

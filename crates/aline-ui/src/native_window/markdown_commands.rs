@@ -140,10 +140,15 @@ impl NativeDocumentWindow {
     pub(super) fn run_markdown_command(
         &mut self,
         command: MarkdownCommand,
-        window: &Window,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.find_contains_focus(window, cx) {
+        if self.find_contains_focus(window, cx) || self.insert_dialog.is_some() {
+            return;
+        }
+        // 链接命令统一进入编辑弹窗；取消、拒绝与确认都不经过命令规划。
+        if matches!(command, MarkdownCommand::Inline(InlineFormat::Link)) {
+            self.open_insert_dialog(super::insert_dialog::InsertKind::Link, window, cx);
             return;
         }
         self.execute_markdown_command(command, window, cx);
@@ -230,7 +235,10 @@ impl NativeDocumentWindow {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.has_unsettled_input() || self.find_contains_focus(window, cx) {
+        if self.has_unsettled_input()
+            || self.find_contains_focus(window, cx)
+            || self.insert_dialog.is_some()
+        {
             return;
         }
         let prepared = (|| {

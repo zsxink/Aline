@@ -186,6 +186,23 @@ fn read_head(path: &Path, length: u64) -> Result<Vec<u8>, BodyImageError> {
     Ok(head)
 }
 
+/// 解析本地图片目标的绝对路径，不读磁盘。
+///
+/// 右键菜单需要在不解码、不发起请求的前提下确定文件位置；远程目标返回
+/// [`BodyImageError::Remote`]，`data:` 与非本地协议返回
+/// [`BodyImageError::UnsupportedScheme`]。路径规则与 [`resolve_body_image`]
+/// 共用同一实现。
+pub fn local_destination_path(
+    destination: &str,
+    document_dir: &Path,
+) -> Result<PathBuf, BodyImageError> {
+    match classify_source(destination) {
+        SourceKind::Local => local_path(destination, document_dir),
+        SourceKind::Remote => Err(BodyImageError::Remote),
+        SourceKind::DataUrl | SourceKind::Unsupported => Err(BodyImageError::UnsupportedScheme),
+    }
+}
+
 fn local_path(destination: &str, document_dir: &Path) -> Result<PathBuf, BodyImageError> {
     let trimmed = destination.trim();
     let lower = trimmed.to_ascii_lowercase();
@@ -246,5 +263,52 @@ fn hex(byte: u8) -> Option<u8> {
         b'a'..=b'f' => Some(byte - b'a' + 10),
         b'A'..=b'F' => Some(byte - b'A' + 10),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn relative_destination_resolves_against_the_document_directory()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let path = local_destination_path("images/a.png", Path::new("/docs"))?;
+        assert_eq!(path, PathBuf::from("/docs/images/a.png"));
+        Ok(())
+    }
+
+    #[test]
+    fn absolute_and_file_url_destinations_resolve_to_the_same_style_of_path()
+    -> Result<(), Box<dyn std::error::Error>> {
+        assert_eq!(
+            local_destination_path("/pictures/a.png", Path::new("/docs"))?,
+            PathBuf::from("/pictures/a.png")
+        );
+        assert_eq!(
+            local_destination_path("file://localhost/pictures/a%20b.png", Path::new("/docs"))?,
+            PathBuf::from("/pictures/a b.png")
+        );
+        assert_eq!(
+            local_destination_path("file:/pictures/a.png", Path::new("/docs"))?,
+            PathBuf::from("/pictures/a.png")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn non_local_destinations_are_rejected() {
+        assert_eq!(
+            local_destination_path("https://example.test/a.png", Path::new("/docs")),
+            Err(BodyImageError::Remote)
+        );
+        assert_eq!(
+            local_destination_path("file://other.test/a.png", Path::new("/docs")),
+            Err(BodyImageError::UnsupportedScheme)
+        );
+        assert_eq!(
+            local_destination_path("data:image/png;base64,AAAA", Path::new("/docs")),
+            Err(BodyImageError::UnsupportedScheme)
+        );
     }
 }

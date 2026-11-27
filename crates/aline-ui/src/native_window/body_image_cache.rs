@@ -107,7 +107,7 @@ pub(super) fn fitted_size(dimensions: ImageDimensions, max_width: f32) -> (f32, 
     (max_width, height * (max_width / width))
 }
 
-fn image_format(format: MediaFormat) -> ImageFormat {
+pub(super) fn image_format(format: MediaFormat) -> ImageFormat {
     match format {
         MediaFormat::Png => ImageFormat::Png,
         MediaFormat::Jpeg => ImageFormat::Jpeg,

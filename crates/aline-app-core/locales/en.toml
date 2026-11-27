@@ -127,6 +127,50 @@ empty = "The link target is empty; nothing was opened."
 scheme = "The link uses an unsupported protocol; nothing was opened."
 unsupported = "The link target is unsupported; nothing was opened."
 
+[insert]
+link_title = "Add Link"
+image_title = "Insert Image"
+text_label = "Text"
+alt_label = "Alt Text"
+target_label = "Destination"
+link_text_placeholder = "Display text"
+image_text_placeholder = "Alt text (destination is used when empty)"
+link_target_placeholder = "URL or path"
+image_target_placeholder = "Image path or URL"
+confirm = "Confirm"
+cancel = "Cancel"
+
+[insert.rejected]
+empty = "The destination is empty; nothing was inserted."
+scheme = "The link uses an unsupported protocol; nothing was inserted."
+line_break = "The destination cannot contain line breaks or null characters."
+
+[context]
+add_link = "Add Link…"
+insert_image = "Insert Image…"
+
+[image]
+copy_done = "Image copied."
+copy_failed = "Copying the image failed."
+save_done = "Image saved as a new file."
+save_failed = "Saving the image failed."
+copy_path_done = "Image path copied."
+reveal_failed = "Could not reveal the image location."
+
+[image.action]
+copy = "Copy Image"
+save_as = "Save As…"
+copy_path = "Copy Path"
+reveal = "Reveal in Finder"
+
+[image.unavailable]
+remote = "Remote images are not downloaded automatically."
+missing = "The image file was not found."
+inline = "Inline images have no file path."
+unsupported = "This image reference is not supported."
+too_large = "The image exceeds the read limit."
+platform = "This action is not supported on this platform."
+
 [menu]
 format = "Format"
 file = "File"

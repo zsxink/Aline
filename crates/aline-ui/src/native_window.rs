@@ -4,11 +4,13 @@
 //! 文件选择、任务与焦点在本层装配，render 只读已采用的解析。
 
 mod body_image_cache;
+mod context_menu;
 mod edit_actions;
 mod editable_input;
 mod find_panel;
 mod font_invalidate;
 mod geometry;
+mod insert_dialog;
 mod m2_evidence;
 mod markdown_commands;
 mod probe;
@@ -1604,6 +1606,7 @@ pub(super) struct NativeWindowCopy {
     recovery_discard_cancel: SharedString,
     recovery_unnamed: SharedString,
     content: ContentCopy,
+    insert: insert_dialog::InsertCopy,
     errors: BTreeMap<&'static str, SharedString>,
 }
 
@@ -1690,6 +1693,20 @@ impl NativeWindowCopy {
             "preview.error.too_large",
             "preview.error.io",
             "preview.error.changed",
+            "insert.rejected.empty",
+            "insert.rejected.scheme",
+            "insert.rejected.line_break",
+            "image.copy_done",
+            "image.copy_failed",
+            "image.save_done",
+            "image.save_failed",
+            "image.copy_path_done",
+            "image.unavailable.remote",
+            "image.unavailable.missing",
+            "image.unavailable.inline",
+            "image.unavailable.unsupported",
+            "image.unavailable.too_large",
+            "image.unavailable.platform",
         ] {
             errors.insert(key, text(key)?);
         }
@@ -1754,6 +1771,7 @@ impl NativeWindowCopy {
                     text("content.alert.caution")?,
                 ],
             ),
+            insert: insert_dialog::InsertCopy::new(&translator)?,
             errors,
             translator: Rc::new(translator),
         })
@@ -1996,6 +2014,14 @@ struct NativeDocumentWindow {
     protected_source_location: Option<edit_actions::ProtectedSourceLocation>,
     format_preview: Option<markdown_commands::FormatPreview>,
     table_menu: Option<table_commands::TableMenu>,
+    /// 链接/图片编辑弹窗；确认前不改文档。
+    insert_dialog: Option<insert_dialog::InsertDialog>,
+    /// 正文右键菜单；绑定打开时的文档工作版本。
+    context_menu: Option<context_menu::ContextMenu>,
+    /// 图片复制任务；同时只允许一个在途读取。
+    image_task: Option<Task<()>>,
+    /// 图片另存为任务；与复制分开，避免互相清除。
+    image_save_task: Option<Task<()>>,
     input_frame: Option<editable_input::InputFrame>,
     composing_input_frame: Option<editable_input::InputFrame>,
     input_task: Option<Task<()>>,
@@ -2075,6 +2101,10 @@ impl NativeDocumentWindow {
             protected_source_location: None,
             format_preview: None,
             table_menu: None,
+            insert_dialog: None,
+            context_menu: None,
+            image_task: None,
+            image_save_task: None,
             input_frame: None,
             composing_input_frame: None,
             input_task: None,
@@ -3688,6 +3718,14 @@ impl NativeDocumentWindow {
         // 组合活动时解析身份必然失效，行级 `HitTarget` 创建失败，reader 不会挂
         // 命中回调；因此反馈必须在本层行容器上给出。
         let composing = document.core().composition().is_some();
+        let context: Rc<readonly_reader::ContextCallback> = {
+            let entity = cx.entity().downgrade();
+            Rc::new(move |target, position, window, cx| {
+                let _ = entity.update(cx, |this, cx| {
+                    this.open_context_menu(target, position, window, cx);
+                });
+            })
+        };
         let mut table_input = None;
         if document.is_editable()
             && let Some(range) = reader.input_row(document, row)
@@ -3705,7 +3743,7 @@ impl NativeDocumentWindow {
                     element: input,
                 });
             } else {
-                return reader.wrap_input_row(document, row, input, geometry);
+                return reader.wrap_input_row(document, row, input, geometry, context);
             }
         }
         let failure = self
@@ -3740,6 +3778,7 @@ impl NativeDocumentWindow {
                 move |target, _, cx| {
                     let _ = navigate.update(cx, |this, cx| this.navigate_to_source(target, cx));
                 },
+                context,
             )
         };
         if composing {
@@ -3975,7 +4014,9 @@ impl NativeDocumentWindow {
     }
 
     fn route_tab(&mut self, backward: bool, window: &mut Window, cx: &mut Context<Self>) {
-        if self.move_table_menu_focus(backward, window, cx)
+        if self.move_insert_dialog_focus(backward, window, cx)
+            || self.move_context_menu_focus(backward, window, cx)
+            || self.move_table_menu_focus(backward, window, cx)
             || (self.focus.is_focused(window) && self.markdown_key("tab", backward, window, cx))
         {
             return;
@@ -4363,6 +4404,8 @@ impl NativeDocumentWindow {
 
 impl Render for NativeDocumentWindow {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.prune_insert_dialog();
+        self.prune_context_menu();
         let probe_ticket = self
             .probe
             .as_mut()
@@ -4760,6 +4803,12 @@ impl Render for NativeDocumentWindow {
                 this.drop_images(paths.paths(), window, cx)
             }))
             .on_action(cx.listener(|this, _: &CancelNavigation, window, cx| {
+                if this.dismiss_insert_dialog(window, cx) {
+                    return;
+                }
+                if this.dismiss_context_menu(window, cx) {
+                    return;
+                }
                 if this.dismiss_table_menu(window, cx) {
                     return;
                 }
@@ -4834,7 +4883,9 @@ impl Render for NativeDocumentWindow {
             .children(self.offscreen_input(cx))
             .child(content)
             .child(status)
-            .children(self.render_table_menu(window, cx));
+            .children(self.render_table_menu(window, cx))
+            .children(self.render_context_menu(window, cx))
+            .children(self.render_insert_dialog(cx));
         #[cfg(debug_assertions)]
         let root = root.on_action(cx.listener(|this, _: &ReportLayout, _, _| {
             if let Some(reader) = &this.reader {

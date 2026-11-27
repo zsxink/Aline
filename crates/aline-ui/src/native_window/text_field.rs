@@ -14,7 +14,8 @@ use gpui::{
 
 use super::{Copy, Cut, Paste, PastePlain, Redo, SelectAll, Undo, tokens};
 
-const MAX_FIELD_BYTES: usize = 4096;
+/// 单个字段的字节上限；预填与输入共用，避免弹窗塞入超长选区。
+pub(super) const MAX_FIELD_BYTES: usize = 4096;
 const FIELD_HEIGHT: Pixels = px(23.0);
 
 /// 字段向宿主发送的事件。

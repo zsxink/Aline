@@ -444,6 +444,18 @@ type HitCallback = dyn Fn(
 /// 生成导航回调；参数是目标源码字节偏移。
 type NavigateCallback = dyn Fn(SourceNavigationTarget, &mut Window, &mut App);
 
+/// 右键命中的正文目标。
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) enum ContextTarget {
+    /// 正文文字；菜单提供新增链接与插入图片。
+    Text,
+    /// 正文图片；携带引用目标原文。
+    Image(SharedString),
+}
+
+/// 右键回调；参数是目标、按下位置与窗口上下文。
+pub(super) type ContextCallback = dyn Fn(ContextTarget, Point<Pixels>, &mut Window, &mut App);
+
 /// 绑定到创建导航控件时的文档、解析投影、布局和源码快照。
 #[derive(Clone)]
 pub(super) struct SourceNavigationTarget {
@@ -746,6 +758,7 @@ impl ReaderSurface {
         row: usize,
         input: AnyElement,
         geometry: InputRowLayout,
+        on_context: Rc<ContextCallback>,
     ) -> AnyElement {
         let metrics = self.metrics.get();
         let last_row = self.index.row_count(self.mode).saturating_sub(1);
@@ -776,6 +789,10 @@ impl ReaderSurface {
             text_bounds,
             document.core().document_id().clone(),
         )
+        .on_mouse_down(MouseButton::Right, move |event, window, cx| {
+            on_context(ContextTarget::Text, event.position, window, cx);
+            cx.stop_propagation();
+        })
         .into_any_element()
     }
 
@@ -796,10 +813,11 @@ impl ReaderSurface {
             &mut App,
         ) + 'static,
         on_navigate: impl Fn(SourceNavigationTarget, &mut Window, &mut App) + 'static,
+        on_context: Rc<ContextCallback>,
     ) -> AnyElement {
         self.rendered.set(self.rendered.get().saturating_add(1));
         if self.mode == EditorMode::Source {
-            return self.render_source_row(document, row, failure, on_hit);
+            return self.render_source_row(document, row, failure, on_hit, on_context);
         }
         self.render_visual_row(
             document,
@@ -809,6 +827,7 @@ impl ReaderSurface {
             table_input,
             Rc::new(on_hit),
             Rc::new(on_navigate),
+            on_context,
         )
     }
 
@@ -825,6 +844,7 @@ impl ReaderSurface {
             &mut Window,
             &mut App,
         ) + 'static,
+        on_context: Rc<ContextCallback>,
     ) -> AnyElement {
         let metrics = self.metrics.get();
         let projection = self
@@ -944,15 +964,21 @@ impl ReaderSurface {
                     );
                 })
             })
+            .on_mouse_down(MouseButton::Right, move |event, window, cx| {
+                on_context(ContextTarget::Text, event.position, window, cx);
+                cx.stop_propagation();
+            })
             .into_any_element()
     }
 
     /// 解析本行图片叶子；未注入预算时返回空，行内只保留替代文字。
+    ///
+    /// 返回引用目标原文与已通过入口校验的图片；右键菜单需要目标本身。
     fn row_images(
         &self,
         document: &ReadonlyDocument,
         leaves: &[Leaf],
-    ) -> Vec<Rc<super::body_image_cache::RenderableImage>> {
+    ) -> Vec<(SharedString, Rc<super::body_image_cache::RenderableImage>)> {
         let directory = document.path().parent().unwrap_or(Path::new(""));
         let mut cache = self.images.borrow_mut();
         let mut images = Vec::new();
@@ -964,7 +990,7 @@ impl ReaderSurface {
                 continue;
             };
             if let Some(image) = cache.resolve(destination, directory) {
-                images.push(image);
+                images.push((SharedString::from(destination), image));
             }
         }
         images
@@ -980,6 +1006,7 @@ impl ReaderSurface {
         mut table_input: Option<TableCellInput>,
         on_hit: Rc<HitCallback>,
         on_navigate: Rc<NavigateCallback>,
+        on_context: Rc<ContextCallback>,
     ) -> AnyElement {
         let metrics = self.metrics.get();
         let Some(content) = self.index.content_row(row) else {
@@ -1042,312 +1069,318 @@ impl ReaderSurface {
         let text_bounds = Rc::new(Cell::new(None::<Bounds<Pixels>>));
         let mut geometry: Option<(Projection, PreparedLayout)> = None;
         let mut hit: Option<HitTarget> = None;
-        let block: AnyElement = match &content.block {
-            Block::Text { leaves } => {
-                // 缺口行没有绘制范围，显示为空行；只有存在绘制范围却取窗口失败时才提示。
-                let text = match &projection {
-                    Some(projection) => SharedString::from(projection.drawn_text().to_owned()),
-                    None if content.drawn.is_none() => SharedString::from(""),
-                    None => failure.clone(),
-                };
-                let runs = if projection.is_some() {
-                    build_runs(&text, base_offset, leaves, &base)
-                } else {
-                    Vec::new()
-                };
-                let styled = styled_text(text, runs);
-                let prepared = PreparedLayout::new(styled.layout().clone());
-                let mark_prepared = prepared.clone();
-                let bounds_cell = text_bounds.clone();
-                let text_wrap = div()
-                    .flex_1()
-                    .min_w_0()
-                    .child(styled)
-                    .on_children_prepainted(move |bounds, _, _| {
-                        mark_prepared.mark_prepainted();
-                        bounds_cell.set(bounds.first().copied());
-                    });
-                if let Some(projection) = projection.clone() {
-                    geometry = Some((projection, prepared));
-                }
-                hit = token
-                    .zip(projection.clone())
-                    .and_then(|(token, projection)| {
-                        HitTarget::new(document, token, projection).ok()
-                    });
-                let line = div()
-                    .flex()
-                    .items_start()
-                    .when_some(label, |line, label| line.child(footnote_label(label, copy)))
-                    .when_some(marker, |line, marker| line.child(marker_chip(marker)))
-                    .child(text_wrap);
-                let images = self.row_images(document, leaves);
-                if images.is_empty() {
-                    line.into_any_element()
-                } else {
-                    // 行内混排图片无法嵌进单一 `StyledText`：图片显示在文字上方，
-                    // 替代文字仍在同一行保留，命中与锚点映射不受影响。
-                    div()
-                        .w_full()
+        let block: AnyElement =
+            match &content.block {
+                Block::Text { leaves } => {
+                    // 缺口行没有绘制范围，显示为空行；只有存在绘制范围却取窗口失败时才提示。
+                    let text = match &projection {
+                        Some(projection) => SharedString::from(projection.drawn_text().to_owned()),
+                        None if content.drawn.is_none() => SharedString::from(""),
+                        None => failure.clone(),
+                    };
+                    let runs = if projection.is_some() {
+                        build_runs(&text, base_offset, leaves, &base)
+                    } else {
+                        Vec::new()
+                    };
+                    let styled = styled_text(text, runs);
+                    let prepared = PreparedLayout::new(styled.layout().clone());
+                    let mark_prepared = prepared.clone();
+                    let bounds_cell = text_bounds.clone();
+                    let text_wrap = div()
+                        .flex_1()
+                        .min_w_0()
+                        .child(styled)
+                        .on_children_prepainted(move |bounds, _, _| {
+                            mark_prepared.mark_prepainted();
+                            bounds_cell.set(bounds.first().copied());
+                        });
+                    if let Some(projection) = projection.clone() {
+                        geometry = Some((projection, prepared));
+                    }
+                    hit = token
+                        .zip(projection.clone())
+                        .and_then(|(token, projection)| {
+                            HitTarget::new(document, token, projection).ok()
+                        });
+                    let line = div()
                         .flex()
-                        .flex_col()
-                        .children(images.iter().enumerate().map(|(index, image)| {
-                            body_image_element(
-                                image,
-                                metrics.text_width,
-                                body_image_element_id(source_start, index),
-                            )
-                        }))
-                        .child(line)
-                        .into_any_element()
-                }
-            }
-            Block::Code {
-                info,
-                lines,
-                leaves,
-            } => {
-                let text = projection
-                    .as_ref()
-                    .map(|projection| SharedString::from(projection.drawn_text().to_owned()))
-                    .unwrap_or_else(|| failure.clone());
-                let runs = if projection.is_some() {
-                    build_runs(&text, base_offset, leaves, &base)
-                } else {
-                    Vec::new()
-                };
-                let styled = styled_text(text, runs);
-                let prepared = PreparedLayout::new(styled.layout().clone());
-                let mark_prepared = prepared.clone();
-                let bounds_cell = text_bounds.clone();
-                let gutter = visible_gutter(projection.is_some(), lines).map(|numbers| {
-                    div()
-                        .flex_none()
-                        .w(px(gutter_width(&numbers)))
-                        .pr(px(12.0))
-                        .text_align(TextAlign::Right)
-                        .font_family(SharedString::from(CODE_FONT))
-                        .text_color(rgb(tokens::SECONDARY))
-                        .child(StyledText::new(SharedString::from(numbers)))
-                });
-                let scroller = div()
-                    .flex()
-                    .flex_1()
-                    .min_w_0()
-                    .whitespace_nowrap()
-                    // 块布局会把 nowrap 文本拉回容器宽，横向可滚动范围永远是零；
-                    // 行布局 + 不收缩的文本子项让滚动内容保持单行全宽的固有尺寸。
-                    .items_start()
-                    .child(div().flex_none().child(styled))
-                    .on_children_prepainted(move |bounds, _, _| {
-                        mark_prepared.mark_prepainted();
-                        bounds_cell.set(bounds.first().copied());
-                    })
-                    .id(SharedString::from(format!(
-                        "code-scroll-{}-{source_start}",
-                        self.generation
-                    )))
-                    .overflow_x_scroll()
-                    .restrict_scroll_to_axis();
-                if let Some(projection) = projection.clone() {
-                    geometry = Some((projection, prepared));
-                }
-                hit = token
-                    .zip(projection.clone())
-                    .and_then(|(token, projection)| {
-                        HitTarget::new(document, token, projection).ok()
-                    });
-                div()
-                    .w_full()
-                    .bg(rgb(tokens::CODE_SURFACE))
-                    .border_1()
-                    .border_color(rgb(tokens::BORDER))
-                    .rounded_md()
-                    .px(px(CODE_PADDING_X))
-                    .py(px(CODE_PADDING_Y))
-                    .font_family(SharedString::from(CODE_FONT))
-                    .text_size(px(CODE_FONT_SIZE))
-                    .line_height(px(CODE_LINE_HEIGHT))
-                    .when(!info.is_empty(), |code| {
-                        code.child(
-                            div()
-                                .mb(px(6.0))
-                                .text_size(px(12.0))
-                                .text_color(rgb(tokens::SECONDARY))
-                                .child(SharedString::from(info.clone())),
-                        )
-                    })
-                    .child(
+                        .items_start()
+                        .when_some(label, |line, label| line.child(footnote_label(label, copy)))
+                        .when_some(marker, |line, marker| line.child(marker_chip(marker)))
+                        .child(text_wrap);
+                    let images = self.row_images(document, leaves);
+                    if images.is_empty() {
+                        line.into_any_element()
+                    } else {
+                        // 行内混排图片无法嵌进单一 `StyledText`：图片显示在文字上方，
+                        // 替代文字仍在同一行保留，命中与锚点映射不受影响。
                         div()
-                            .flex()
-                            .items_start()
                             .w_full()
-                            .when_some(gutter, |row, gutter| row.child(gutter))
-                            .child(scroller),
-                    )
-                    .into_any_element()
-            }
-            Block::Table {
-                rows, truncated, ..
-            } => {
-                // 超过结构上限或投影失败的表格不逐行渲染：显示受限提示，
-                // 完整源码保留在源码视图中。
-                if *truncated || projection.is_none() {
-                    bounded_notice(failure.clone())
-                } else {
-                    let last_row = rows.len().saturating_sub(1);
-                    let source = document
-                        .parsed()
-                        .snapshot()
-                        .src_range(content.source.clone())
-                        .ok();
-                    let table_source = source.as_ref().and_then(|source| {
-                        if !document.is_editable() || !document.is_parse_current() {
-                            return None;
-                        }
-                        aline_markdown::table_source(
-                            document.parsed(),
-                            source,
-                            document.text_budget(),
-                        )
-                        .ok()
-                    });
-                    let mut table = div()
-                        .w_full()
-                        .flex()
-                        .flex_col()
-                        .rounded_md()
-                        .border_1()
-                        .border_color(rgb(tokens::BORDER))
-                        .overflow_hidden();
-                    for (index, table_row) in rows.iter().enumerate() {
-                        let last_cell = table_row.cells.len().saturating_sub(1);
-                        let mut line = div().flex().w_full();
-                        for (cell_index, cell) in table_row.cells.iter().enumerate() {
-                            if table_input.as_ref().is_some_and(|input| {
-                                input.row == index && input.column == cell_index
-                            }) && let Some(input) = table_input.take()
-                            {
-                                line = line.child(
-                                    div()
-                                        .flex_1()
-                                        .min_w_0()
-                                        .px(px(CELL_PADDING_X))
-                                        .py(px(CELL_PADDING_Y))
-                                        .bg(rgb(tokens::CODE_SURFACE))
-                                        .child(input.element),
-                                );
-                                continue;
-                            }
-                            line = line.child(self.table_cell(
-                                document,
-                                token,
-                                cell,
-                                table_row.head,
-                                index > 0 && index % 2 == 0,
-                                cell_index == last_cell,
-                                index == last_row,
-                                &failure,
-                                on_hit.clone(),
-                                table_source.as_ref().and_then(|table| {
-                                    let source_cell =
-                                        table.rows().get(index)?.cells().get(cell_index)?;
-                                    Some((
-                                        aline_edit::TableTarget::new(
-                                            table.source_range().clone(),
-                                            index,
-                                            cell_index,
-                                        ),
-                                        source_cell.source_range(),
-                                    ))
-                                }),
-                            ));
-                        }
-                        table = table.child(line);
+                            .flex()
+                            .flex_col()
+                            .children(images.iter().enumerate().map(
+                                |(index, (destination, image))| {
+                                    body_image_element(
+                                        image,
+                                        metrics.text_width,
+                                        body_image_element_id(source_start, index),
+                                        destination.clone(),
+                                        on_context.clone(),
+                                    )
+                                },
+                            ))
+                            .child(line)
+                            .into_any_element()
                     }
-                    table.into_any_element()
                 }
-            }
-            Block::Toc { entries, truncated } => {
-                if *truncated || projection.is_none() {
-                    bounded_notice(failure.clone())
-                } else {
-                    let mut list = div().w_full().flex().flex_col();
-                    if entries.is_empty() {
-                        list = list.child(
-                            div()
-                                .text_color(rgb(tokens::SECONDARY))
-                                .child(copy.toc_empty.clone()),
-                        );
+                Block::Code {
+                    info,
+                    lines,
+                    leaves,
+                } => {
+                    let text = projection
+                        .as_ref()
+                        .map(|projection| SharedString::from(projection.drawn_text().to_owned()))
+                        .unwrap_or_else(|| failure.clone());
+                    let runs = if projection.is_some() {
+                        build_runs(&text, base_offset, leaves, &base)
+                    } else {
+                        Vec::new()
+                    };
+                    let styled = styled_text(text, runs);
+                    let prepared = PreparedLayout::new(styled.layout().clone());
+                    let mark_prepared = prepared.clone();
+                    let bounds_cell = text_bounds.clone();
+                    let gutter = visible_gutter(projection.is_some(), lines).map(|numbers| {
+                        div()
+                            .flex_none()
+                            .w(px(gutter_width(&numbers)))
+                            .pr(px(12.0))
+                            .text_align(TextAlign::Right)
+                            .font_family(SharedString::from(CODE_FONT))
+                            .text_color(rgb(tokens::SECONDARY))
+                            .child(StyledText::new(SharedString::from(numbers)))
+                    });
+                    let scroller = div()
+                        .flex()
+                        .flex_1()
+                        .min_w_0()
+                        .whitespace_nowrap()
+                        // 块布局会把 nowrap 文本拉回容器宽，横向可滚动范围永远是零；
+                        // 行布局 + 不收缩的文本子项让滚动内容保持单行全宽的固有尺寸。
+                        .items_start()
+                        .child(div().flex_none().child(styled))
+                        .on_children_prepainted(move |bounds, _, _| {
+                            mark_prepared.mark_prepainted();
+                            bounds_cell.set(bounds.first().copied());
+                        })
+                        .id(SharedString::from(format!(
+                            "code-scroll-{}-{source_start}",
+                            self.generation
+                        )))
+                        .overflow_x_scroll()
+                        .restrict_scroll_to_axis();
+                    if let Some(projection) = projection.clone() {
+                        geometry = Some((projection, prepared));
                     }
-                    for entry in entries.iter() {
-                        let offset = entry.source.start;
-                        let target = self.navigation_target(document, offset);
-                        let target_click = target.clone();
-                        let target_key = target;
-                        let navigate_click = on_navigate.clone();
-                        let navigate_key = on_navigate.clone();
-                        let id = SharedString::from(format!("toc-{}-{offset}", self.generation));
-                        list = list.child(
-                            div()
-                                .id(id)
-                                .focusable()
-                                .tab_stop(true)
-                                .role(Role::Link)
-                                .cursor_pointer()
-                                .pl(px(TOC_INDENT * f32::from(entry.level.saturating_sub(1))))
-                                .py(px(2.0))
-                                .hover(|style| style.text_color(rgb(tokens::ACCENT)))
-                                .focus(|style| style.bg(rgba(tokens::ACCENT_SOFT)))
-                                .on_click(move |_, window, cx| {
-                                    if let Some(target) = target_click.clone() {
-                                        navigate_click(target, window, cx);
-                                    }
-                                })
-                                .on_key_down(move |event: &gpui::KeyDownEvent, window, cx| {
-                                    if event.keystroke.key == "enter"
-                                        || event.keystroke.key == "space"
-                                    {
-                                        if let Some(target) = target_key.clone() {
-                                            navigate_key(target, window, cx);
-                                        }
-                                        cx.stop_propagation();
-                                    }
-                                })
-                                .child(SharedString::from(entry.title.clone())),
-                        );
-                    }
+                    hit = token
+                        .zip(projection.clone())
+                        .and_then(|(token, projection)| {
+                            HitTarget::new(document, token, projection).ok()
+                        });
                     div()
                         .w_full()
                         .bg(rgb(tokens::CODE_SURFACE))
                         .border_1()
                         .border_color(rgb(tokens::BORDER))
                         .rounded_md()
-                        .px(px(20.0))
-                        .py(px(16.0))
-                        .text_size(px(TOC_FONT_SIZE))
-                        .line_height(px(TOC_LINE_HEIGHT))
-                        .child(list)
+                        .px(px(CODE_PADDING_X))
+                        .py(px(CODE_PADDING_Y))
+                        .font_family(SharedString::from(CODE_FONT))
+                        .text_size(px(CODE_FONT_SIZE))
+                        .line_height(px(CODE_LINE_HEIGHT))
+                        .when(!info.is_empty(), |code| {
+                            code.child(
+                                div()
+                                    .mb(px(6.0))
+                                    .text_size(px(12.0))
+                                    .text_color(rgb(tokens::SECONDARY))
+                                    .child(SharedString::from(info.clone())),
+                            )
+                        })
+                        .child(
+                            div()
+                                .flex()
+                                .items_start()
+                                .w_full()
+                                .when_some(gutter, |row, gutter| row.child(gutter))
+                                .child(scroller),
+                        )
                         .into_any_element()
                 }
-            }
-            Block::Rule => div()
-                .w_full()
-                .child(div().h(px(3.0)).w_full().bg(rgb(tokens::BORDER)))
-                .into_any_element(),
-            Block::FrontMatter => div()
-                .w_full()
-                .bg(rgb(tokens::CODE_SURFACE))
-                .border_1()
-                .border_color(rgb(tokens::BORDER))
-                .rounded_md()
-                .px(px(16.0))
-                .py(px(12.0))
-                .text_size(px(13.0))
-                .text_color(rgb(tokens::SECONDARY))
-                .child(copy.front_matter.clone())
-                .into_any_element(),
-        };
+                Block::Table {
+                    rows, truncated, ..
+                } => {
+                    // 超过结构上限或投影失败的表格不逐行渲染：显示受限提示，
+                    // 完整源码保留在源码视图中。
+                    if *truncated || projection.is_none() {
+                        bounded_notice(failure.clone())
+                    } else {
+                        let last_row = rows.len().saturating_sub(1);
+                        let source = document
+                            .parsed()
+                            .snapshot()
+                            .src_range(content.source.clone())
+                            .ok();
+                        let table_source = source.as_ref().and_then(|source| {
+                            if !document.is_editable() || !document.is_parse_current() {
+                                return None;
+                            }
+                            aline_markdown::table_source(
+                                document.parsed(),
+                                source,
+                                document.text_budget(),
+                            )
+                            .ok()
+                        });
+                        let mut table = div()
+                            .w_full()
+                            .flex()
+                            .flex_col()
+                            .rounded_md()
+                            .border_1()
+                            .border_color(rgb(tokens::BORDER))
+                            .overflow_hidden();
+                        for (index, table_row) in rows.iter().enumerate() {
+                            let last_cell = table_row.cells.len().saturating_sub(1);
+                            let mut line = div().flex().w_full();
+                            for (cell_index, cell) in table_row.cells.iter().enumerate() {
+                                if table_input.as_ref().is_some_and(|input| {
+                                    input.row == index && input.column == cell_index
+                                }) && let Some(input) = table_input.take()
+                                {
+                                    line = line.child(
+                                        div()
+                                            .flex_1()
+                                            .min_w_0()
+                                            .px(px(CELL_PADDING_X))
+                                            .py(px(CELL_PADDING_Y))
+                                            .bg(rgb(tokens::CODE_SURFACE))
+                                            .child(input.element),
+                                    );
+                                    continue;
+                                }
+                                line = line.child(self.table_cell(
+                                    document,
+                                    token,
+                                    cell,
+                                    table_row.head,
+                                    index > 0 && index % 2 == 0,
+                                    cell_index == last_cell,
+                                    index == last_row,
+                                    &failure,
+                                    on_hit.clone(),
+                                    table_source.as_ref().and_then(|table| {
+                                        let source_cell =
+                                            table.rows().get(index)?.cells().get(cell_index)?;
+                                        Some((
+                                            aline_edit::TableTarget::new(
+                                                table.source_range().clone(),
+                                                index,
+                                                cell_index,
+                                            ),
+                                            source_cell.source_range(),
+                                        ))
+                                    }),
+                                ));
+                            }
+                            table = table.child(line);
+                        }
+                        table.into_any_element()
+                    }
+                }
+                Block::Toc { entries, truncated } => {
+                    if *truncated || projection.is_none() {
+                        bounded_notice(failure.clone())
+                    } else {
+                        let mut list = div().w_full().flex().flex_col();
+                        if entries.is_empty() {
+                            list = list.child(
+                                div()
+                                    .text_color(rgb(tokens::SECONDARY))
+                                    .child(copy.toc_empty.clone()),
+                            );
+                        }
+                        for entry in entries.iter() {
+                            let offset = entry.source.start;
+                            let target = self.navigation_target(document, offset);
+                            let target_click = target.clone();
+                            let target_key = target;
+                            let navigate_click = on_navigate.clone();
+                            let navigate_key = on_navigate.clone();
+                            let id =
+                                SharedString::from(format!("toc-{}-{offset}", self.generation));
+                            list = list.child(
+                                div()
+                                    .id(id)
+                                    .focusable()
+                                    .tab_stop(true)
+                                    .role(Role::Link)
+                                    .cursor_pointer()
+                                    .pl(px(TOC_INDENT * f32::from(entry.level.saturating_sub(1))))
+                                    .py(px(2.0))
+                                    .hover(|style| style.text_color(rgb(tokens::ACCENT)))
+                                    .focus(|style| style.bg(rgba(tokens::ACCENT_SOFT)))
+                                    .on_click(move |_, window, cx| {
+                                        if let Some(target) = target_click.clone() {
+                                            navigate_click(target, window, cx);
+                                        }
+                                    })
+                                    .on_key_down(move |event: &gpui::KeyDownEvent, window, cx| {
+                                        if event.keystroke.key == "enter"
+                                            || event.keystroke.key == "space"
+                                        {
+                                            if let Some(target) = target_key.clone() {
+                                                navigate_key(target, window, cx);
+                                            }
+                                            cx.stop_propagation();
+                                        }
+                                    })
+                                    .child(SharedString::from(entry.title.clone())),
+                            );
+                        }
+                        div()
+                            .w_full()
+                            .bg(rgb(tokens::CODE_SURFACE))
+                            .border_1()
+                            .border_color(rgb(tokens::BORDER))
+                            .rounded_md()
+                            .px(px(20.0))
+                            .py(px(16.0))
+                            .text_size(px(TOC_FONT_SIZE))
+                            .line_height(px(TOC_LINE_HEIGHT))
+                            .child(list)
+                            .into_any_element()
+                    }
+                }
+                Block::Rule => div()
+                    .w_full()
+                    .child(div().h(px(3.0)).w_full().bg(rgb(tokens::BORDER)))
+                    .into_any_element(),
+                Block::FrontMatter => div()
+                    .w_full()
+                    .bg(rgb(tokens::CODE_SURFACE))
+                    .border_1()
+                    .border_color(rgb(tokens::BORDER))
+                    .rounded_md()
+                    .px(px(16.0))
+                    .py(px(12.0))
+                    .text_size(px(13.0))
+                    .text_color(rgb(tokens::SECONDARY))
+                    .child(copy.front_matter.clone())
+                    .into_any_element(),
+            };
         let last_row = row + 1 == self.index.row_count(EditorMode::Visual);
         let left_padding = metrics.padding_x
             + if quote { QUOTE_PADDING } else { 0.0 }
@@ -1394,6 +1427,12 @@ impl ReaderSurface {
             geometry.map(|(projection, prepared)| RowGeometry::Reading(projection, prepared));
         let outer = self.measured_row(outer, row, token, geometry, text_bounds, document_id);
         let outer = outer.id(element_id);
+        // 行级右键统一进入文字菜单；表格单元格与图片的右键处理器更靠内，
+        // 由它们停止冒泡后不会到达这里。
+        let outer = outer.on_mouse_down(MouseButton::Right, move |event, window, cx| {
+            on_context(ContextTarget::Text, event.position, window, cx);
+            cx.stop_propagation();
+        });
         let outer = if let Some(target) =
             footnote_target.and_then(|target| self.navigation_target(document, target))
         {
@@ -1851,6 +1890,8 @@ fn body_image_element(
     image: &super::body_image_cache::RenderableImage,
     max_width: f32,
     element_id: gpui::ElementId,
+    destination: SharedString,
+    on_context: Rc<ContextCallback>,
 ) -> AnyElement {
     use super::body_image_cache::{RenderableSource, fitted_size};
 
@@ -1869,7 +1910,16 @@ fn body_image_element(
                 .id(element_id)
                 .w(px(width))
                 .h(px(height))
-                .object_fit(ObjectFit::Contain),
+                .object_fit(ObjectFit::Contain)
+                .on_mouse_down(MouseButton::Right, move |event, window, cx| {
+                    on_context(
+                        ContextTarget::Image(destination.clone()),
+                        event.position,
+                        window,
+                        cx,
+                    );
+                    cx.stop_propagation();
+                }),
         )
         .into_any_element()
 }
@@ -2011,8 +2061,9 @@ mod tests {
         let budgeted = ReaderSurface::new(document, 1, None, Some(budget))?;
         let images = budgeted.row_images(document, &leaves);
         assert_eq!(images.len(), 1, "远程图片不得进入渲染列表");
+        assert_eq!(images[0].0.as_ref(), "plain.png");
         assert_eq!(
-            images[0].dimensions(),
+            images[0].1.dimensions(),
             crate::media::ImageDimensions::new(2, 2)
         );
         Ok(())

@@ -344,14 +344,21 @@ impl DocCore {
         &mut self,
         prepared: PreparedMigration,
     ) -> Result<(), DocError> {
+        self.publish_migration_change_outcome(prepared).map(|_| ())
+    }
+
+    /// 发布迁移计划并交还本次提交结果；身份与选区在发布前复验。
+    pub(crate) fn publish_migration_change_outcome(
+        &mut self,
+        prepared: PreparedMigration,
+    ) -> Result<CommitOutcome, DocError> {
         self.ensure_writable()?;
         self.accept_document_result(&prepared.identity)?;
         if self.current_selection() != prepared.selection || self.is_composition_active() {
             return Err(DocError::StaleResult);
         }
         let outcome = self.buffer.publish_prepared(prepared.buffer)?;
-        self.settle_command_outcome(outcome)?;
-        Ok(())
+        self.settle_command_outcome(outcome)
     }
 
     /// 冻结当前真实缓冲与全部历史步骤；迁移后台只读重放，不移动历史光标。
